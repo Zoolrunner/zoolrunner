@@ -8149,17 +8149,17 @@ typedef INT8_TYPE i8;              /* 1-byte signed integer */
 ** Macros to determine whether the machine is big or little endian,
 ** evaluated at runtime.
 */
-#ifdef SQLITE_AMALGAMATION
-SQLITE_PRIVATE const int sqlite3one = 1;
-#else
-SQLITE_PRIVATE const int sqlite3one;
-#endif
 #if defined(i386) || defined(__i386__) || defined(_M_IX86)\
                              || defined(__x86_64) || defined(__x86_64__)
 # define SQLITE_BIGENDIAN    0
 # define SQLITE_LITTLEENDIAN 1
 # define SQLITE_UTF16NATIVE  SQLITE_UTF16LE
 #else
+# ifdef SQLITE_AMALGAMATION
+SQLITE_PRIVATE const int sqlite3one = 1;
+# else
+SQLITE_PRIVATE const int sqlite3one;
+# endif
 # define SQLITE_BIGENDIAN    (*(char *)(&sqlite3one)==0)
 # define SQLITE_LITTLEENDIAN (*(char *)(&sqlite3one)==1)
 # define SQLITE_UTF16NATIVE (SQLITE_BIGENDIAN?SQLITE_UTF16BE:SQLITE_UTF16LE)
