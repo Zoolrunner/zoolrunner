@@ -18318,6 +18318,51 @@ static int winMutexNotheld(sqlite3_mutex *p){
 #endif
 
 
+typedef PVOID WINAPI interlocked_cmp_xchg_t(PVOID *dest, PVOID exc, PVOID comperand);
+
+/* Sorry mate, but we haven't got InterlockedCompareExchange in Win95! */
+static PVOID WINAPI
+interlocked_cmp_xchg(PVOID *dest, PVOID exc, PVOID comperand)
+{
+	static LONG spinlock = 0;
+	PVOID result;
+	DWORD dwSleep = 0;
+
+	/* Acqire spinlock (yielding control to other threads if cant aquire for the moment) */
+	while(InterlockedExchange(&spinlock, 1))
+	{
+		// Using Sleep(0) can cause a priority inversion.
+		// Sleep(0) only yields the processor if there's
+		// another thread of the same priority that's
+		// ready to run.  If a high-priority thread is
+		// trying to acquire the lock, which is held by
+		// a low-priority thread, then the low-priority
+		// thread may never get scheduled and hence never
+		// free the lock.  NT attempts to avoid priority
+		// inversions by temporarily boosting the priority
+		// of low-priority runnable threads, but the problem
+		// can still occur if there's a medium-priority
+		// thread that's always runnable.  If Sleep(1) is used,
+		// then the thread unconditionally yields the CPU.  We
+		// only do this for the second and subsequent even
+		// iterations, since a millisecond is a long time to wait
+		// if the thread can be scheduled in again sooner
+		// (~100,000 instructions).
+		// Avoid priority inversion: 0, 1, 0, 1,...
+		Sleep(dwSleep);
+		dwSleep = !dwSleep;
+	}
+	result = *dest;
+	if (result == comperand)
+		*dest = exc;
+	/* Release spinlock */
+	spinlock = 0;
+	return result;
+}
+
+static interlocked_cmp_xchg_t *ixchg;
+
+
 /*
 ** Initialize and deinitialize the mutex subsystem.
 */
@@ -18340,8 +18385,15 @@ static long winMutex_lock = 0;
 SQLITE_API void sqlite3_win32_sleep(DWORD milliseconds); /* os_win.c */
 
 static int winMutexInit(void){ 
+  if (!ixchg)
+  {
+    /* Sorely, Win95 has no InterlockedCompareExchange API (Win98 has), so we have to use emulation */
+    HANDLE kernel = GetModuleHandleA("kernel32.dll");
+    if (!kernel || (ixchg = (interlocked_cmp_xchg_t *)GetProcAddress(kernel, "InterlockedCompareExchange")) == NULL)
+      ixchg = interlocked_cmp_xchg;
+    }
   /* The first to increment to 1 does actual initialization */
-  if( InterlockedCompareExchange(&winMutex_lock, 1, 0)==0 ){
+  if( ixchg(&winMutex_lock, 1, 0)==0 ){
     int i;
     for(i=0; i<ArraySize(winMutex_staticMutexes); i++){
 #if SQLITE_OS_WINRT
@@ -18363,7 +18415,7 @@ static int winMutexInit(void){
 static int winMutexEnd(void){ 
   /* The first to decrement to 0 does actual shutdown 
   ** (which should be the last to shutdown.) */
-  if( InterlockedCompareExchange(&winMutex_lock, 0, 1)==1 ){
+  if( ixchg(&winMutex_lock, 0, 1)==1 ){
     if( winMutex_isInit==1 ){
       int i;
       for(i=0; i<ArraySize(winMutex_staticMutexes); i++){
@@ -30594,7 +30646,7 @@ static struct win_syscall {
 
 #define osGetFileAttributesW ((DWORD(WINAPI*)(LPCWSTR))aSyscall[21].pCurrent)
 
-#if defined(SQLITE_WIN32_HAS_WIDE)
+#if 0//defined(SQLITE_WIN32_HAS_WIDE)
   { "GetFileAttributesExW",    (SYSCALL)GetFileAttributesExW,    0 },
 #else
   { "GetFileAttributesExW",    (SYSCALL)0,                       0 },
@@ -33683,16 +33735,7 @@ static int winIsDir(const void *zConverted){
   DWORD lastErrno;
 
   if( isNT() ){
-    int cnt = 0;
-    WIN32_FILE_ATTRIBUTE_DATA sAttrData;
-    memset(&sAttrData, 0, sizeof(sAttrData));
-    while( !(rc = osGetFileAttributesExW((LPCWSTR)zConverted,
-                             GetFileExInfoStandard,
-                             &sAttrData)) && retryIoerr(&cnt, &lastErrno) ){}
-    if( !rc ){
-      return 0; /* Invalid name? */
-    }
-    attr = sAttrData.dwFileAttributes;
+    attr = osGetFileAttributesW((WCHAR*)zConverted);
 #if SQLITE_OS_WINCE==0
   }else{
     attr = osGetFileAttributesA((char*)zConverted);
@@ -34088,6 +34131,9 @@ static int winAccess(
   int rc = 0;
   DWORD lastErrno;
   void *zConverted;
+  HANDLE hFile;
+  DWORD lFilesize;
+  int cnt = 0;
   UNUSED_PARAMETER(pVfs);
 
   SimulateIOError( return SQLITE_IOERR_ACCESS; );
@@ -34096,26 +34142,22 @@ static int winAccess(
     return SQLITE_IOERR_NOMEM;
   }
   if( isNT() ){
-    int cnt = 0;
-    WIN32_FILE_ATTRIBUTE_DATA sAttrData;
-    memset(&sAttrData, 0, sizeof(sAttrData));
-    while( !(rc = osGetFileAttributesExW((LPCWSTR)zConverted,
-                             GetFileExInfoStandard, 
-                             &sAttrData)) && retryIoerr(&cnt, &lastErrno) ){}
-    if( rc ){
+    if( attr = GetFileAttributesW((WCHAR*)zConverted) ){
       /* For an SQLITE_ACCESS_EXISTS query, treat a zero-length file
       ** as if it does not exist.
       */
-      if(    flags==SQLITE_ACCESS_EXISTS
-          && sAttrData.nFileSizeHigh==0 
-          && sAttrData.nFileSizeLow==0 ){
-        attr = INVALID_FILE_ATTRIBUTES;
-      }else{
-        attr = sAttrData.dwFileAttributes;
+      if( flags==SQLITE_ACCESS_EXISTS && attr != INVALID_FILE_ATTRIBUTES ){
+        hFile = CreateFileW((WCHAR*)zConverted, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        lFilesize = GetFileSize(hFile,NULL);
+        if(!lFilesize)
+          attr = INVALID_FILE_ATTRIBUTES;
+        CloseHandle(hFile);
+      /*}else{
+        attr = sAttrData.dwFileAttributes;*/
       }
     }else{
       logIoerr(cnt);
-      if( lastErrno!=ERROR_FILE_NOT_FOUND && lastErrno!=ERROR_PATH_NOT_FOUND ){
+      if( lastErrno!=ERROR_FILE_NOT_FOUND ){
         winLogError(SQLITE_IOERR_ACCESS, lastErrno, "winAccess", zFilename);
         sqlite3_free(zConverted);
         return SQLITE_IOERR_ACCESS;
