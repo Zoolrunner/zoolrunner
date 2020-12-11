@@ -18318,6 +18318,51 @@ static int winMutexNotheld(sqlite3_mutex *p){
 #endif
 
 
+typedef PVOID WINAPI interlocked_cmp_xchg_t(PVOID *dest, PVOID exc, PVOID comperand);
+
+/* Sorry mate, but we haven't got InterlockedCompareExchange in Win95! */
+static PVOID WINAPI
+interlocked_cmp_xchg(PVOID *dest, PVOID exc, PVOID comperand)
+{
+	static LONG spinlock = 0;
+	PVOID result;
+	DWORD dwSleep = 0;
+
+	/* Acqire spinlock (yielding control to other threads if cant aquire for the moment) */
+	while(InterlockedExchange(&spinlock, 1))
+	{
+		// Using Sleep(0) can cause a priority inversion.
+		// Sleep(0) only yields the processor if there's
+		// another thread of the same priority that's
+		// ready to run.  If a high-priority thread is
+		// trying to acquire the lock, which is held by
+		// a low-priority thread, then the low-priority
+		// thread may never get scheduled and hence never
+		// free the lock.  NT attempts to avoid priority
+		// inversions by temporarily boosting the priority
+		// of low-priority runnable threads, but the problem
+		// can still occur if there's a medium-priority
+		// thread that's always runnable.  If Sleep(1) is used,
+		// then the thread unconditionally yields the CPU.  We
+		// only do this for the second and subsequent even
+		// iterations, since a millisecond is a long time to wait
+		// if the thread can be scheduled in again sooner
+		// (~100,000 instructions).
+		// Avoid priority inversion: 0, 1, 0, 1,...
+		Sleep(dwSleep);
+		dwSleep = !dwSleep;
+	}
+	result = *dest;
+	if (result == comperand)
+		*dest = exc;
+	/* Release spinlock */
+	spinlock = 0;
+	return result;
+}
+
+static interlocked_cmp_xchg_t *ixchg;
+
+
 /*
 ** Initialize and deinitialize the mutex subsystem.
 */
@@ -18340,8 +18385,15 @@ static long winMutex_lock = 0;
 SQLITE_API void sqlite3_win32_sleep(DWORD milliseconds); /* os_win.c */
 
 static int winMutexInit(void){ 
+  if (!ixchg)
+  {
+    /* Sorely, Win95 has no InterlockedCompareExchange API (Win98 has), so we have to use emulation */
+    HANDLE kernel = GetModuleHandleA("kernel32.dll");
+    if (!kernel || (ixchg = (interlocked_cmp_xchg_t *)GetProcAddress(kernel, "InterlockedCompareExchange")) == NULL)
+      ixchg = interlocked_cmp_xchg;
+    }
   /* The first to increment to 1 does actual initialization */
-  if( InterlockedCompareExchange(&winMutex_lock, 1, 0)==0 ){
+  if( ixchg(&winMutex_lock, 1, 0)==0 ){
     int i;
     for(i=0; i<ArraySize(winMutex_staticMutexes); i++){
 #if SQLITE_OS_WINRT
@@ -18363,7 +18415,7 @@ static int winMutexInit(void){
 static int winMutexEnd(void){ 
   /* The first to decrement to 0 does actual shutdown 
   ** (which should be the last to shutdown.) */
-  if( InterlockedCompareExchange(&winMutex_lock, 0, 1)==1 ){
+  if( ixchg(&winMutex_lock, 0, 1)==1 ){
     if( winMutex_isInit==1 ){
       int i;
       for(i=0; i<ArraySize(winMutex_staticMutexes); i++){
@@ -30594,7 +30646,7 @@ static struct win_syscall {
 
 #define osGetFileAttributesW ((DWORD(WINAPI*)(LPCWSTR))aSyscall[21].pCurrent)
 
-#if defined(SQLITE_WIN32_HAS_WIDE)
+#if 0//defined(SQLITE_WIN32_HAS_WIDE)
   { "GetFileAttributesExW",    (SYSCALL)GetFileAttributesExW,    0 },
 #else
   { "GetFileAttributesExW",    (SYSCALL)0,                       0 },
@@ -31366,6 +31418,163 @@ SQLITE_PRIVATE void sqlite3MemSetDefault(void){
 }
 #endif /* SQLITE_WIN32_MALLOC */
 
+/*** UTF16<-->UTF8 functions minicking MultiByteToWideChar/WideCharToMultiByte ***/
+int utf8GetMaskIndex(unsigned char n) {
+  if((unsigned char)(n + 2) < 0xc2) return 1; // 00~10111111, fe, ff
+  if(n < 0xe0)                      return 2; // 110xxxxx
+  if(n < 0xf0)                      return 3; // 1110xxxx
+  if(n < 0xf8)                      return 4; // 11110xxx
+  if(n < 0xfc)                      return 5; // 111110xx
+                                    return 6; // 1111110x
+}
+
+int wc2Utf8Len(wchar_t ** n, int *len) {
+  wchar_t *ch = *n, ch2;
+  int qch;
+  if((0xD800 <= *ch && *ch <= 0xDBFF) && *len) {
+    ch2 = *(ch + 1);
+    if(0xDC00 <= ch2 && ch2 <= 0xDFFF) {
+      qch = 0x10000 + (((*ch - 0xD800) & 0x3ff) << 10) + ((ch2 - 0xDC00) & 0x3ff);
+      (*n)++;
+      (*len)--;
+    }
+  }
+  else
+    qch = (int) *ch;
+
+  if (qch <= 0x7f)           return 1;
+  else if (qch <= 0x7ff)     return 2;
+  else if (qch <= 0xffff)    return 3;
+  else if (qch <= 0x1fffff)  return 4;
+  else if (qch <= 0x3ffffff) return 5;
+  else                       return 6;
+}
+
+int Utf8ToWideChar(unsigned int unused1, unsigned long unused2, char *sb, int ss, wchar_t * wb, int ws) {
+  static const unsigned char utf8mask[] = { 0, 0xff, 0x1f, 0x0f, 0x07, 0x03, 0x01 };
+  char *p = (char *)(sb);
+  char *e = (char *)(sb + ss);
+  wchar_t *w = wb;
+  int cnt = 0, t, qch;
+
+  if (ss < 1) {
+    ss = lstrlenA(sb);
+    e = (char *)(sb + ss);
+  }
+
+  if (wb && ws) {
+    for (; p < e; ++w) {
+      t = utf8GetMaskIndex(*p);
+      qch = (*p++ & utf8mask[t]);
+      while(p < e && --t)
+        qch <<= 6, qch |= (*p++) & 0x3f;
+      if(qch < 0x10000) {
+        if(cnt <= ws)
+          *w = (wchar_t) qch;
+        cnt++;
+      } else {
+        if (cnt + 2 <= ws) {
+          *w++ = (wchar_t) (0xD800 + (((qch - 0x10000) >> 10) & 0x3ff)),
+            *w = (wchar_t) (0xDC00 + (((qch - 0x10000)) & 0x3ff));
+        }
+        cnt += 2;
+      }
+    }
+    if(cnt < ws) {
+      *(wb+cnt) = 0;
+      return cnt;
+    } else {
+      *(wb+ws) = 0;
+      return ws;
+    }
+  } else {
+    for (t; p < e;) {
+      t = utf8GetMaskIndex(*p);
+      qch = (*p++ & utf8mask[t]);
+      while (p < e && --t)
+        qch <<= 6, qch |= (*p++) & 0x3f;
+      if (qch < 0x10000)
+        cnt++;
+      else
+        cnt += 2;
+    }
+    return cnt+1;
+  }
+}
+
+int WideCharToUtf8(unsigned int unused1, unsigned long unused2, wchar_t * wb, int ws, char *sb, int ss) {
+  wchar_t *p = (wchar_t *)(wb);
+  wchar_t *e = (wchar_t *)(wb + ws);
+  wchar_t *oldp;
+  char *s = sb;
+  int cnt = 0, qch, t;
+
+  if (ws < 1) {
+    ws = lstrlenW(wb);
+    e = (wchar_t *)(wb + ws);
+  }
+
+  if (sb && ss) {
+    for (t; p < e; ++p) {
+      oldp = p;
+      t = wc2Utf8Len(&p, &ws);
+
+      if (p != oldp) { /* unicode surrogates encountered */
+        qch = 0x10000 + (((*oldp - 0xD800) & 0x3ff) << 10) + ((*p - 0xDC00) & 0x3ff);
+      } else
+        qch = *p;
+
+      if (qch <= 0x7f)
+        *s++ = (char) (qch),
+        cnt++;
+      else if (qch <= 0x7ff)
+        *s++ = 0xc0 | (char) (qch >> 6),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 2;
+      else if (qch <= 0xffff)
+        *s++ = 0xe0 | (char) (qch >> 12),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 3;
+      else if (qch <= 0x1fffff)
+        *s++ = 0xf0 | (char) (qch >> 18),
+        *s++ = 0x80 | (char) ((qch >> 12) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 4;
+      else if (qch <= 0x3ffffff)
+        *s++ = 0xf8 | (char) (qch >> 24),
+        *s++ = 0x80 | (char) ((qch >> 18) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 12) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 5;
+      else
+        *s++ = 0xfc | (char) (qch >> 30),
+        *s++ = 0x80 | (char) ((qch >> 24) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 18) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 12) & 0x3f),
+        *s++ = 0x80 | (char) ((qch >> 6) & 0x3f),
+        *s++ = 0x80 | (char) (qch & 0x3f),
+        cnt += 6;
+    }
+    if(cnt < ss) {
+      *(sb+cnt) = 0;
+      return cnt;
+    } else {
+      *(sb+ss) = 0;
+      return ss;
+    }
+  } else {
+    for (t; p < e; ++p) {
+      t = wc2Utf8Len(&p, &ws);
+      cnt += t;
+    }
+    return cnt+1;
+  }
+}
+/*** Ends ***/
+
 /*
 ** Convert a UTF-8 string to Microsoft Unicode (UTF-16?). 
 **
@@ -31375,7 +31584,7 @@ static LPWSTR utf8ToUnicode(const char *zFilename){
   int nChar;
   LPWSTR zWideFilename;
 
-  nChar = osMultiByteToWideChar(CP_UTF8, 0, zFilename, -1, NULL, 0);
+  nChar = Utf8ToWideChar(CP_UTF8, 0, zFilename, -1, NULL, 0);
   if( nChar==0 ){
     return 0;
   }
@@ -31383,7 +31592,7 @@ static LPWSTR utf8ToUnicode(const char *zFilename){
   if( zWideFilename==0 ){
     return 0;
   }
-  nChar = osMultiByteToWideChar(CP_UTF8, 0, zFilename, -1, zWideFilename,
+  nChar = Utf8ToWideChar(CP_UTF8, 0, zFilename, -1, zWideFilename,
                                 nChar);
   if( nChar==0 ){
     sqlite3_free(zWideFilename);
@@ -31400,7 +31609,7 @@ static char *unicodeToUtf8(LPCWSTR zWideFilename){
   int nByte;
   char *zFilename;
 
-  nByte = osWideCharToMultiByte(CP_UTF8, 0, zWideFilename, -1, 0, 0, 0, 0);
+  nByte = WideCharToUtf8(CP_UTF8, 0, zWideFilename, -1, 0, 0, 0, 0);
   if( nByte == 0 ){
     return 0;
   }
@@ -31408,7 +31617,7 @@ static char *unicodeToUtf8(LPCWSTR zWideFilename){
   if( zFilename==0 ){
     return 0;
   }
-  nByte = osWideCharToMultiByte(CP_UTF8, 0, zWideFilename, -1, zFilename, nByte,
+  nByte = WideCharToUtf8(CP_UTF8, 0, zWideFilename, -1, zFilename, nByte,
                                 0, 0);
   if( nByte == 0 ){
     sqlite3_free(zFilename);
@@ -33683,16 +33892,7 @@ static int winIsDir(const void *zConverted){
   DWORD lastErrno;
 
   if( isNT() ){
-    int cnt = 0;
-    WIN32_FILE_ATTRIBUTE_DATA sAttrData;
-    memset(&sAttrData, 0, sizeof(sAttrData));
-    while( !(rc = osGetFileAttributesExW((LPCWSTR)zConverted,
-                             GetFileExInfoStandard,
-                             &sAttrData)) && retryIoerr(&cnt, &lastErrno) ){}
-    if( !rc ){
-      return 0; /* Invalid name? */
-    }
-    attr = sAttrData.dwFileAttributes;
+    attr = osGetFileAttributesW((WCHAR*)zConverted);
 #if SQLITE_OS_WINCE==0
   }else{
     attr = osGetFileAttributesA((char*)zConverted);
@@ -34088,6 +34288,9 @@ static int winAccess(
   int rc = 0;
   DWORD lastErrno;
   void *zConverted;
+  HANDLE hFile;
+  DWORD lFilesize;
+  int cnt = 0;
   UNUSED_PARAMETER(pVfs);
 
   SimulateIOError( return SQLITE_IOERR_ACCESS; );
@@ -34096,26 +34299,22 @@ static int winAccess(
     return SQLITE_IOERR_NOMEM;
   }
   if( isNT() ){
-    int cnt = 0;
-    WIN32_FILE_ATTRIBUTE_DATA sAttrData;
-    memset(&sAttrData, 0, sizeof(sAttrData));
-    while( !(rc = osGetFileAttributesExW((LPCWSTR)zConverted,
-                             GetFileExInfoStandard, 
-                             &sAttrData)) && retryIoerr(&cnt, &lastErrno) ){}
-    if( rc ){
+    if( attr = GetFileAttributesW((WCHAR*)zConverted) ){
       /* For an SQLITE_ACCESS_EXISTS query, treat a zero-length file
       ** as if it does not exist.
       */
-      if(    flags==SQLITE_ACCESS_EXISTS
-          && sAttrData.nFileSizeHigh==0 
-          && sAttrData.nFileSizeLow==0 ){
-        attr = INVALID_FILE_ATTRIBUTES;
-      }else{
-        attr = sAttrData.dwFileAttributes;
+      if( flags==SQLITE_ACCESS_EXISTS && attr != INVALID_FILE_ATTRIBUTES ){
+        hFile = CreateFileW((WCHAR*)zConverted, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        lFilesize = GetFileSize(hFile,NULL);
+        if(!lFilesize)
+          attr = INVALID_FILE_ATTRIBUTES;
+        CloseHandle(hFile);
+      /*}else{
+        attr = sAttrData.dwFileAttributes;*/
       }
     }else{
       logIoerr(cnt);
-      if( lastErrno!=ERROR_FILE_NOT_FOUND && lastErrno!=ERROR_PATH_NOT_FOUND ){
+      if( lastErrno!=ERROR_FILE_NOT_FOUND ){
         winLogError(SQLITE_IOERR_ACCESS, lastErrno, "winAccess", zFilename);
         sqlite3_free(zConverted);
         return SQLITE_IOERR_ACCESS;
