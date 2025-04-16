@@ -6,7 +6,7 @@ RetroZilla Suite is the primary target of RetroZilla, but code exists in the tre
 
 ## Building
 
-I currently do my builds on Windows 2000 SP4 with Visual Studio 6.0 and MozillaBuild 1.2. Building should also work on Windows XP/2003, and possibly Vista and above, but don't take my word on it.
+I currently do my release builds on Windows 2000 SP4 with Visual Studio 6.0 and MozillaBuild 1.2. This method works on Windows XP/2003 x86 as well.
 
 1. You're going to need to install VC6, [MozillaBuild 1.2](https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-1.2.exe), [VC6 SP5](https://github.com/rn10950/RetroZillaWeb/releases/download/0/vs6sp5.exe) (not SP6) and [VC6 Processor Pack](https://github.com/rn10950/RetroZillaWeb/releases/download/0/vcpp5.exe).
 
@@ -24,7 +24,17 @@ to
 If start-msvc6.bat can't find your VC6 installation, add the following line to start-msvc6.bat, after "SET MOZILLABUILD=..."
 `SET VC6DIR=C:\Program Files\Microsoft Visual Studio\VC98`
 
+### 64-bit Build OSes
+It is possible to build on Windows XP/2003 x64. The instructions from above are mostly the same, however you need to install [MozillaBuild 1.5](https://ftp.mozilla.org/pub/mozilla/libraries/win32/MozillaBuildSetup-1.5.exe) instead. 
+
+**Important:** start-msvc6.bat must be run from a 32-bit command prompt. The MSYS shell will run inside a win32 console window instead of rxvt. To start a 32-bit command prompt, you can paste the following into the run dialog: `C:\WINDOWS\SysWOW64\cmd.exe`
+
+I do not know if building works on Windows Vista/7/8.x/10/11. I suspect your biggest roadblock would be VC6.
+
 ## Incremental Builds
 If you have already built RetroZilla and you would like to save time by building only a small subset of the program to test a change you made, run make from the corresponding folder in your object directory. Depending on what you changed, building should only take a few minutes.
 
 EX: If you made a change to `retrozilla/xpfe/browser/resources/content/navigator.xul`, cd into `{OBJDIR}/xpfe/browser/resources/content` using MSYS shell and run `make`.
+
+## Other Platforms (Mac/Linux/etc)
+I do not have the time or resources to port to other platforms myself at this time, however I am more than willing to add patches to support other platforms as long as they don't break the main win32 version. All platform code from the Mozilla tree at 1.8.1 has been left in. Any ported binaries will be linked here as long as they are built without any uncommitted changes.
