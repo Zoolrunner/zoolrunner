@@ -55,6 +55,8 @@ FILES		= \
 	jeeves.src          \
 	startpage.png       \
 	startpage.src       \
+	ddg-lite.png        \
+	ddg-lite.src        \
 	$(NULL)
 endif
 
