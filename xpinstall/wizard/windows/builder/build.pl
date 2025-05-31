@@ -56,11 +56,13 @@ use File::Copy;
 use File::Path;
 use File::Basename;
 
-$DEPTH         = "../../../..";
+$DEPTH         = "../../../../../obj-sm95-release/";
+#$topsrcdir     = "/c/projects/moz95/mozilla";
 $topsrcdir     = GetTopSrcDir();
 # ensure that Packager.pm is in @INC, since we might not be called from
 # mozilla/xpinstall/packager
-push(@INC, "$topsrcdir/../mozilla/xpinstall/packager");
+# line below is "<source dir>/xpinstall/packager"
+push(@INC, "/c/projects/moz95/mozilla/xpinstall/packager");
 require StageUtils;
 
 ParseArgv(@ARGV);
@@ -72,7 +74,8 @@ $inStagePath      = "$topobjdir/stage"           if !defined($inStagePath);
 $inDistPath       = "$topobjdir/dist"            if !defined($inDistPath);
 $cwdBuilder       = "$topsrcdir/xpinstall/wizard/windows/builder";
 $gDistInstallPath = "$inDistPath/install";
-$gPackagerPath    = "$topsrcdir/xpinstall/packager";
+$gPackagerPath    = "/c/projects/moz95/mozilla/xpinstall/packager";
+
 
 if(defined($ENV{DEBUG_INSTALLER_BUILD}))
 {
@@ -277,4 +280,3 @@ sub GetTopSrcDir
   chdir($savedCwdDir);
   return($rootDir);
 }
-
