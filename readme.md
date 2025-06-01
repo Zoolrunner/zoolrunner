@@ -40,4 +40,4 @@ EX: If you made a change to `retrozilla/xpfe/browser/resources/content/navigator
 I do not have the time or resources to port to other platforms myself at this time, however I am more than willing to add patches to support other platforms as long as they don't break the main win32 version. All platform code from the Mozilla tree at 1.8.1 has been left in. Any ported binaries will be linked here as long as they are built without any uncommitted changes.
 
 ## Building an Installer
-When I originally did the conversion from SeaMonkey into RetroZilla, I hacked together the installer code pretty bad. At the moment, fixing this is a low priority and it is far easier for me to build installers the way I always have. If you are interested in building an installer, read commit de97722.
+From the xpinstall folder in your object directory, run `make installer`.
