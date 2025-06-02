@@ -63,12 +63,10 @@
 <!-- engines per category (Note that specific prefixes are required) -->
 
 
-  <RDF:Seq about="NC:SearchCategory?category=urn:search:category:1">
+  <RDF:Seq about="NC:SearchCategory?category=urn:search:category:3">
     <RDF:li resource="NC:SearchCategory?engine=urn:search:engine:google.src" />
-    <RDF:li resource="NC:SearchCategory?engine=urn:search:engine:dmoz.src" />
     <RDF:li resource="NC:SearchCategory?engine=urn:search:engine:jeeves.src" />
     <RDF:li resource="NC:SearchCategory?engine=urn:search:engine:ddg-lite.src" />
-    <!--<RDF:li resource="NC:SearchCategory?engine=urn:search:engine:startpage.src" />-->
   </RDF:Seq>
 
 </RDF:RDF>
