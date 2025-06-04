@@ -1,5 +1,2 @@
-* text=auto
-
-# Force CRLF endings on License document, fixes win32 installer
-/LICENSE text eol=crlf
-LICENSE text eol=crlf
+# force CRLF endings, simplifies a lot
+* text eol=crlf
