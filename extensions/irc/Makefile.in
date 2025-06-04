@@ -62,6 +62,9 @@ DIST_FILES = xpi/resources/install.rdf
 
 DEFINES += -DCHATZILLA_VERSION=$(CHATZILLA_VERSION)
 
+#RZ - define object directory/dist
+objDir = $(realpath $(DEPTH)/dist/)
+
 # include config.mk before using the AB_CD var it sets in an if statement
 include $(topsrcdir)/config/config.mk
 
@@ -78,6 +81,9 @@ libs realchrome:: locales/Makefile
 	for locale in $(BUILD_LOCALES); do   \
 	  $(MAKE) -C locales AB_CD=$$locale; \
 	done
+	#RZ: copy chatzilla.jar into proper dir:
+	cp -f $(objDir)/xpi-stage/chatzilla/chrome/chatzilla.jar $(objDir)/bin/chrome/chatzilla.jar
+	cp -f $(objDir)/xpi-stage/chatzilla/components/chatzilla-service.js $(objDir)/bin/components/chatzilla-service.js
 
 export::
 	$(NSINSTALL) -D $(FINAL_TARGET)/chrome/icons/default
