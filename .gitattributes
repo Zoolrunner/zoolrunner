@@ -1,2 +1,3 @@
 # Force CRLF endings on License document, fixes win32 installer
 /LICENSE text eol=crlf
+LICENSE text eol=crlf
