@@ -68,7 +68,6 @@
     <RDF:li resource="NC:SearchCategory?engine=urn:search:engine:google.src" />
     <RDF:li resource="NC:SearchCategory?engine=urn:search:engine:wiby.src" />
     <!--<RDF:li resource="NC:SearchCategory?engine=urn:search:engine:jeeves.src" />-->
-  
   </RDF:Seq>
 
 </RDF:RDF>
