@@ -4,6 +4,15 @@ RetroZilla is a fork of Gecko 1.8.1 for improved compatibility on the modern web
 
 RetroZilla Suite is the primary target of RetroZilla, but code exists in the tree to build RetroZilla Browser (Firefox 2) and xulrunner.
 
+### Supported Operating Systems
+* Windows 95
+* Windows 98
+* Windows Me
+* Windows NT 3.51
+* Windows NT 4.0
+
+This webpage is geared more towards building RetroZilla from source. To learn more about using RetroZilla, [Go to the RetroZilla website](https://rn10950.github.io/RetroZillaWeb/)
+
 ## Building
 
 I currently do my release builds on Windows 2000 SP4 with Visual Studio 6.0 and MozillaBuild 1.2. This method works on Windows XP/2003 x86 as well.
@@ -41,3 +50,6 @@ I do not have the time or resources to port to other platforms myself at this ti
 
 ## Building an Installer
 From the xpinstall folder in your object directory, run `make installer`.
+
+## Contributing to RetroZilla
+To learn more about contributing to RetroZilla, please read the [contributing page](contributing.md).
