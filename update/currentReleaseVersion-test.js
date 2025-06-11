@@ -5,5 +5,5 @@ function currentReleaseVersion() {
 	var upLink = document.getElementById('updateNotifier');
 	upLink.innerHTML = '<a href="' + url + '">New RetroZilla Version Available</a>';
 	
-	return 220;
+	return 230;
 }
