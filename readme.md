@@ -54,3 +54,6 @@ From the xpinstall folder in your object directory, run `make installer`.
 
 ## Contributing to RetroZilla
 To learn more about contributing to RetroZilla, please read the [contributing page](contributing.md).
+
+## Donating to RetroZilla
+While RetroZilla will always remain free, countless hours went into working on it. If you would like to give a tip to show your appreciation, you may do so at my [PayPal doation page](https://www.paypal.com/donate/?hosted_button_id=RAMWYD65G5X5J).
