@@ -292,11 +292,6 @@ NSPR_API(PRStatus) PR_ParseTimeString (
  * internationalization issues.  Might want to provide a US English version.
  */
 
-/**********************************************************************/
-/*********************** OLD COMPATIBILITYFUNCTIONS *******************/
-/**********************************************************************/
-#ifndef NO_NSPR_10_SUPPORT
-
 /* Format a time value into a buffer. Same semantics as strftime() */
 NSPR_API(PRUint32) PR_FormatTime(char *buf, int buflen, const char *fmt, 
                                            const PRExplodedTime *tm);
@@ -307,8 +302,6 @@ NSPR_API(PRUint32) PR_FormatTime(char *buf, int buflen, const char *fmt,
 NSPR_API(PRUint32)
 PR_FormatTimeUSEnglish( char* buf, PRUint32 bufSize,
                         const char* format, const PRExplodedTime* tm );
-
-#endif /* NO_NSPR_10_SUPPORT */
 
 PR_END_EXTERN_C
 
