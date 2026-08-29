@@ -181,14 +181,24 @@ nsView::nsView(nsViewManager* aViewManager, nsViewVisibility aVisibility)
 {
   MOZ_COUNT_CTOR(nsView);
 
+  mViewManager = aViewManager;
+  mParent = nsnull;
+  mWindow = nsnull;
+  mNextSibling = nsnull;
+  mFirstChild = nsnull;
+  mClientData = nsnull;
+  mZIndex = 0;
   mVis = aVisibility;
+  mPosX = 0;
+  mPosY = 0;
   // Views should be transparent by default. Not being transparent is
   // a promise that the view will paint all its pixels opaquely. Views
   // should make this promise explicitly by calling
   // SetViewContentTransparency.
   mVFlags = NS_VIEW_FLAG_TRANSPARENT;
   mOpacity = 1.0f;
-  mViewManager = aViewManager;
+  mZParent = nsnull;
+  mClipRect = nsnull;
   mChildRemoved = PR_FALSE;
   mDirtyRegion = nsnull;
   mDeletionObserver = nsnull;
