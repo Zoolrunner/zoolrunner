@@ -8468,6 +8468,7 @@ UpdateItem.prototype = {
 var gModule = {
   registerSelf: function(componentManager, fileSpec, location, type) {
     componentManager = componentManager.QueryInterface(Components.interfaces.nsIComponentRegistrar);
+    this._ensureFactories();
     
     for (var key in this._objects) {
       var obj = this._objects[key];
@@ -8487,6 +8488,7 @@ var gModule = {
     if (!iid.equals(Components.interfaces.nsIFactory))
       throw Components.results.NS_ERROR_NOT_IMPLEMENTED;
 
+    this._ensureFactories();
     for (var key in this._objects) {
       if (cid.equals(this._objects[key].CID))
         return this._objects[key].factory;
@@ -8495,7 +8497,14 @@ var gModule = {
     throw Components.results.NS_ERROR_NO_INTERFACE;
   },
   
-  _makeFactory: #1= function(ctor) {
+  _ensureFactories: function() {
+    if (!this._objects.manager.factory)
+      this._objects.manager.factory = this._makeFactory(ExtensionManager);
+    if (!this._objects.item.factory)
+      this._objects.item.factory = this._makeFactory(UpdateItem);
+  },
+
+  _makeFactory: function(ctor) {
     return { 
              createInstance: function (outer, iid) {
                if (outer != null)
@@ -8509,12 +8518,12 @@ var gModule = {
     manager: { CID        : ExtensionManager.prototype.classID,
                contractID : ExtensionManager.prototype.contractID,
                className  : ExtensionManager.prototype.classDescription,
-               factory    : #1#(ExtensionManager)
+               factory    : null
              },
     item:    { CID        : Components.ID("{F3294B1C-89F4-46F8-98A0-44E1EAE92518}"),
                contractID : "@mozilla.org/updates/item;1",
                className  : "Update Item",
-               factory    : #1#(UpdateItem)
+               factory    : null
              }
    },
 
