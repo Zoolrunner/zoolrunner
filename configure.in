@@ -7335,9 +7335,9 @@ AC_SUBST(CC_VERSION)
 AC_SUBST(CXX_VERSION)
 
 if test "$USING_HCC"; then
-   CC='${topsrcdir}/build/hcc'
+   CC="$topsrcdir/build/hcc"
    CC="$CC '$_OLDCC'"
-   CXX='${topsrcdir}/build/hcpp'
+   CXX="$topsrcdir/build/hcpp"
    CXX="$CXX '$_OLDCXX'"
    AC_SUBST(CC)
    AC_SUBST(CXX)

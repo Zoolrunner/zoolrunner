@@ -19954,9 +19954,9 @@ EOF
 
 
 if test "$USING_HCC"; then
-   CC='${topsrcdir}/build/hcc'
+   CC="$topsrcdir/build/hcc"
    CC="$CC '$_OLDCC'"
-   CXX='${topsrcdir}/build/hcpp'
+   CXX="$topsrcdir/build/hcpp"
    CXX="$CXX '$_OLDCXX'"
    
    

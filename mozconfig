@@ -24,3 +24,4 @@ ac_add_options --enable-canvas
 
 CFLAGS="-std=gnu89 -fcommon -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
 CXXFLAGS="-fcommon -fpermissive"
+export CFLAGS CXXFLAGS
