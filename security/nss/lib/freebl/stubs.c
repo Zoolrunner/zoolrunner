@@ -690,7 +690,13 @@ freebl_InitNSPR(void *lib)
     STUB_FETCH_FUNCTION(PR_Unlock);
     STUB_FETCH_FUNCTION(PR_Lock);
     STUB_FETCH_FUNCTION(PR_DestroyLock);
-    STUB_FETCH_FUNCTION(PR_GetEnvSecure);
+    ptr_PR_GetEnvSecure = (type_PR_GetEnvSecure)dlsym(lib, "PR_GetEnvSecure");
+    if (ptr_PR_GetEnvSecure == NULL) {
+        ptr_PR_GetEnvSecure = (type_PR_GetEnvSecure)dlsym(lib, "PR_GetEnv");
+        if (ptr_PR_GetEnvSecure == NULL) {
+            return SECFailure;
+        }
+    }
     return SECSuccess;
 }
 

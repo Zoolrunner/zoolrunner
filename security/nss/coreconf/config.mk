@@ -179,6 +179,7 @@ endif
 # executing the startup tests at library load time.
 ifndef NSS_FORCE_FIPS
 DEFINES += -DNSS_NO_INIT_SUPPORT
+DEFINES += -DNSS_FIPS_DISABLED
 endif
 
 ifdef NSS_SEED_ONLY_DEV_URANDOM

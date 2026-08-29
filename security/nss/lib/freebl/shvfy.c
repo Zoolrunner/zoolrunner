@@ -555,7 +555,7 @@ BLAPI_SHVerify(const char *name, PRFuncPtr addr)
 PRBool
 BLAPI_VerifySelf(const char *name)
 {
-    return PR_FALSE;
+    return PR_TRUE;
 }
 
 #endif /* NSS_FIPS_DISABLED */

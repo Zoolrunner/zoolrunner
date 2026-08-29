@@ -249,9 +249,9 @@ ifndef MOZ_NATIVE_NSS
 	$(MAKE) -C $(topsrcdir)/security/coreconf $(DEFAULT_GMAKE_FLAGS)
 endif
 ifeq ($(OS_ARCH),WINNT)
-	cd $(DIST)/lib; cp -f $(LIB_PREFIX)dbm$(MOZ_BITS).$(LIB_SUFFIX) $(LIB_PREFIX)dbm.$(LIB_SUFFIX)
+	cd $(DIST)/lib; rm -f $(LIB_PREFIX)dbm.$(LIB_SUFFIX); cp -f $(LIB_PREFIX)dbm$(MOZ_BITS).$(LIB_SUFFIX) $(LIB_PREFIX)dbm.$(LIB_SUFFIX)
 else
-	cd $(DIST)/lib; cp -f $(LIB_PREFIX)mozdbm_s.$(LIB_SUFFIX) $(LIB_PREFIX)dbm.$(LIB_SUFFIX); $(RANLIB) $(LIB_PREFIX)dbm.$(LIB_SUFFIX)
+	cd $(DIST)/lib; rm -f $(LIB_PREFIX)dbm.$(LIB_SUFFIX); cp -f $(LIB_PREFIX)mozdbm_s.$(LIB_SUFFIX) $(LIB_PREFIX)dbm.$(LIB_SUFFIX); $(RANLIB) $(LIB_PREFIX)dbm.$(LIB_SUFFIX)
 endif
 ifndef MOZ_NATIVE_NSS
 	$(MAKE) -C $(topsrcdir)/security/nss/lib $(DEFAULT_GMAKE_FLAGS)
@@ -374,4 +374,3 @@ echo-requires-recursive::
 	$(MAKE) -C ssl $@
 	$(MAKE) -C pki $@
 	$(MAKE) -C locales $@
-
