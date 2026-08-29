@@ -65,5 +65,6 @@
 #define PR_GetEnvSecure PR_GetEnvSecure_stub
 
 extern int FREEBL_InitStubs(void);
+extern char *PR_GetEnvSecure_stub(const char *var);
 
 #endif
