@@ -13572,6 +13572,7 @@ echo "configure:13572: checking MOZ_XFT_LIBS" >&5
             ## don't use --libs since that can do evil things like add
             ## -Wl,--export-dynamic
             MOZ_XFT_LIBS="`$PKG_CONFIG --libs-only-L \"xft\"` `$PKG_CONFIG --libs-only-l \"xft\"`"
+            MOZ_XFT_LIBS="$MOZ_XFT_LIBS `$PKG_CONFIG --libs-only-L fontconfig freetype2` `$PKG_CONFIG --libs-only-l fontconfig freetype2`"
             echo "$ac_t""$MOZ_XFT_LIBS" 1>&6
         else
             MOZ_XFT_CFLAGS=""
