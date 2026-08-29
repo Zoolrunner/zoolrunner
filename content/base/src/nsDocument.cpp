@@ -4721,6 +4721,8 @@ NS_IMETHODIMP
 nsDocument::WalkRadioGroup(const nsAString& aName,
                            nsIRadioVisitor* aVisitor)
 {
+  NS_ENSURE_ARG_POINTER(aVisitor);
+
   nsRadioGroupStruct* radioGroup = nsnull;
   GetRadioGroup(aName, &radioGroup);
   if (!radioGroup) {
@@ -4729,9 +4731,13 @@ nsDocument::WalkRadioGroup(const nsAString& aName,
 
   PRBool stop = PR_FALSE;
   for (int i = 0; i < radioGroup->mRadioButtons.Count(); i++) {
-    aVisitor->Visit(NS_STATIC_CAST(nsIFormControl *,
-                                   radioGroup->mRadioButtons.ElementAt(i)),
-                    &stop);
+    nsIFormControl* radio =
+      NS_STATIC_CAST(nsIFormControl *, radioGroup->mRadioButtons.ElementAt(i));
+    if (!radio) {
+      continue;
+    }
+
+    aVisitor->Visit(radio, &stop);
     if (stop) {
       return NS_OK;
     }

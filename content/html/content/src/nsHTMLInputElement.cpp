@@ -891,9 +891,12 @@ nsHTMLInputElement::SetCheckedChanged(PRBool aCheckedChanged)
 {
   if (mType == NS_FORM_INPUT_RADIO) {
     if (GET_BOOLBIT(mBitField, BF_CHECKED_CHANGED) != aCheckedChanged) {
-      nsCOMPtr<nsIRadioVisitor> visitor;
-      NS_GetRadioSetCheckedChangedVisitor(aCheckedChanged,
-                                          getter_AddRefs(visitor));
+      nsIRadioVisitor* rawVisitor = nsnull;
+      nsresult rv =
+        NS_GetRadioSetCheckedChangedVisitor(aCheckedChanged, &rawVisitor);
+      NS_ENSURE_SUCCESS(rv, rv);
+
+      nsCOMPtr<nsIRadioVisitor> visitor(dont_AddRef(rawVisitor));
       VisitGroup(visitor);
     }
   } else {
@@ -2785,10 +2788,12 @@ nsHTMLInputElement::AddedToRadioGroup(PRBool aNotify)
   // the same for this new element as for all the others in the group
   //
   PRBool checkedChanged = PR_FALSE;
-  nsCOMPtr<nsIRadioVisitor> visitor;
+  nsIRadioVisitor* rawVisitor = nsnull;
   nsresult rv = NS_GetRadioGetCheckedChangedVisitor(&checkedChanged, this,
-                                           getter_AddRefs(visitor));
+                                                    &rawVisitor);
   NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCOMPtr<nsIRadioVisitor> visitor(dont_AddRef(rawVisitor));
   
   VisitGroup(visitor);
   SetCheckedChangedInternal(checkedChanged);
@@ -2921,6 +2926,8 @@ nsHTMLInputElement::IsFocusable(PRInt32 *aTabIndex)
 nsresult
 nsHTMLInputElement::VisitGroup(nsIRadioVisitor* aVisitor)
 {
+  NS_ENSURE_ARG_POINTER(aVisitor);
+
   nsresult rv = NS_OK;
   nsCOMPtr<nsIRadioGroupContainer> container = GetRadioGroupContainer();
   if (container) {
@@ -2928,11 +2935,11 @@ nsHTMLInputElement::VisitGroup(nsIRadioVisitor* aVisitor)
     if (GetNameIfExists(name)) {
       rv = container->WalkRadioGroup(name, aVisitor);
     } else {
-      PRBool stop;
+      PRBool stop = PR_FALSE;
       aVisitor->Visit(this, &stop);
     }
   } else {
-    PRBool stop;
+    PRBool stop = PR_FALSE;
     aVisitor->Visit(this, &stop);
   }
   return rv;
@@ -3015,6 +3022,9 @@ public:
   {
     nsCOMPtr<nsIRadioControlElement> radio(do_QueryInterface(aRadio));
     NS_ASSERTION(radio, "Visit() passed a null button (or non-radio)!");
+    if (!radio) {
+      return NS_OK;
+    }
     radio->SetCheckedChangedInternal(mCheckedChanged);
     return NS_OK;
   }
@@ -3044,6 +3054,9 @@ public:
     }
     nsCOMPtr<nsIRadioControlElement> radio(do_QueryInterface(aRadio));
     NS_ASSERTION(radio, "Visit() passed a null button (or non-radio)!");
+    if (!radio) {
+      return NS_OK;
+    }
     radio->GetCheckedChanged(mCheckedChanged);
     *aStop = PR_TRUE;
     return NS_OK;

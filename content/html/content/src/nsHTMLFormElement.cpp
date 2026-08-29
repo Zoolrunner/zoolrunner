@@ -1676,6 +1676,8 @@ NS_IMETHODIMP
 nsHTMLFormElement::WalkRadioGroup(const nsAString& aName,
                                   nsIRadioVisitor* aVisitor)
 {
+  NS_ENSURE_ARG_POINTER(aVisitor);
+
   nsresult rv = NS_OK;
 
   PRBool stopIterating = PR_FALSE;
@@ -1690,6 +1692,9 @@ nsHTMLFormElement::WalkRadioGroup(const nsAString& aName,
     GetElementCount(&len);
     for (PRUint32 i=0; i<len; i++) {
       GetElementAt(i, getter_AddRefs(control));
+      if (!control) {
+        continue;
+      }
       if (control->GetType() == NS_FORM_INPUT_RADIO) {
         nsCOMPtr<nsIContent> controlContent(do_QueryInterface(control));
         if (controlContent) {
