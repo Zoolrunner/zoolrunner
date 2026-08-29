@@ -151,5 +151,8 @@ fi
 # if $OBJ and $OBJECT are the same we're done
 [ $OBJ = $OBJECT ] && exit 0
 
-[ -f $OBJ ] && mv -f $OBJ $OBJECT
+if [ -f $OBJ ]; then
+	mv -f $OBJ $OBJECT || exit $?
+fi
 
+exit 0
