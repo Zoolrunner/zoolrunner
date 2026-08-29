@@ -856,6 +856,14 @@ CONFIG_STATUS_DEPS := \
 	$(wildcard $(TOPSRCDIR)/config/chrome-versions.sh) \
 	$(NULL)
 
+ifdef BOOTSTRAP_IN_TREE_LIBIDL
+LIBIDL_BOOTSTRAP_CONFIG := $(OBJDIR)/build/unix/libIDL-prefix/bin/libIDL-config-2
+
+$(LIBIDL_BOOTSTRAP_CONFIG): $(TOPSRCDIR)/build/unix/bootstrap-libIDL.sh \
+                            $(TOPSRCDIR)/build/unix/libIDL/configure
+	@$(SHELL) $(TOPSRCDIR)/build/unix/bootstrap-libIDL.sh $(TOPSRCDIR) $(OBJDIR)
+endif
+
 # configure uses the program name to determine @srcdir@. Calling it without
 #   $(TOPSRCDIR) will set @srcdir@ to "."; otherwise, it is set to the full
 #   path of $(TOPSRCDIR).
@@ -869,7 +877,7 @@ ifdef MOZ_TOOLS
   CONFIGURE = $(TOPSRCDIR)/configure
 endif
 
-configure::
+configure:: $(LIBIDL_BOOTSTRAP_CONFIG)
 ifdef MOZ_BUILD_PROJECTS
 	@if test ! -d $(MOZ_OBJDIR); then $(MKDIR) $(MOZ_OBJDIR); else true; fi
 endif

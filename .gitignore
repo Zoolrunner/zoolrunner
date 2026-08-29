@@ -3,6 +3,7 @@
 mozconfig
 .mozconfig
 .mozconfig.mk
+.mozconfig.out
 .mozconfig-browser
 .mozconfig-suite
 mozconfig-browser

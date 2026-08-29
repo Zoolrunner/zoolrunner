@@ -1,11 +1,20 @@
-mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/../obj-retrozilla-linux
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-retrozilla-linux
 mk_add_options MOZ_MAKE_FLAGS="-j8"
+mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
 
-PATH="$RZ_DEPS_PREFIX/bin:$PATH"
-PKG_CONFIG_PATH="$RZ_DEPS_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-LD_LIBRARY_PATH="$RZ_DEPS_PREFIX/lib:$LD_LIBRARY_PATH"
-LDFLAGS="-Wl,-rpath,$RZ_DEPS_PREFIX/lib"
-export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH LDFLAGS
+RZ_TOPSRCDIR=${MOZCONFIG%/*}
+if test "$RZ_TOPSRCDIR" = "$MOZCONFIG"; then
+  RZ_TOPSRCDIR=`pwd`
+else
+  RZ_TOPSRCDIR=`cd "$RZ_TOPSRCDIR" && pwd`
+fi
+RZ_LIBIDL_PREFIX="$RZ_TOPSRCDIR/obj-retrozilla-linux/build/unix/libIDL-prefix"
+LIBIDL_CONFIG="$RZ_LIBIDL_PREFIX/bin/libIDL-config-2"
+HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
+PATH="$RZ_LIBIDL_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$RZ_LIBIDL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+LD_LIBRARY_PATH="$RZ_LIBIDL_PREFIX/lib:$LD_LIBRARY_PATH"
+export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH LD_LIBRARY_PATH
 
 ac_add_options --enable-application=browser
 ac_add_options --enable-default-toolkit=gtk2
