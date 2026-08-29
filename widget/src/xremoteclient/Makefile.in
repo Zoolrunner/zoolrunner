@@ -94,8 +94,8 @@ endif
 
 ifndef MOZ_ENABLE_PHOTON
 XRemoteClient_standalone.$(OBJ_SUFFIX): XRemoteClient.cpp
-	$(CXX) $(OUTOPTION)$@ -c $(COMPILE_CXXFLAGS) $<
+	$(CXX) $(OUTOPTION)./$@ -c $(COMPILE_CXXFLAGS) $<
 else
 XRemoteClient_standalone.$(OBJ_SUFFIX): PhRemoteClient.cpp
-	$(CXX) $(OUTOPTION)$@ -c $(COMPILE_CXXFLAGS) $<
+	$(CXX) $(OUTOPTION)./$@ -c $(COMPILE_CXXFLAGS) $<
 endif
