@@ -194,15 +194,13 @@ NS_NewXMLDocument(nsIDocument** aInstancePtrResult)
   return rv;
 }
 
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
-
 nsXMLDocument::nsXMLDocument() 
-  : mAsync(PR_TRUE)
+  : mChannelIsPending(PR_FALSE),
+    mLoadedAsData(PR_FALSE),
+    mLoadedAsInteractiveData(PR_FALSE),
+    mAsync(PR_TRUE),
+    mLoopingForSyncLoad(PR_FALSE)
 {
-
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
 }
 
 nsXMLDocument::~nsXMLDocument()

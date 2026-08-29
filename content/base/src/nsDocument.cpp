@@ -790,13 +790,21 @@ NS_IMPL_RELEASE_USING_AGGREGATOR(nsXPathDocumentTearoff, mDocument)
 // =
 // ==================================================================
 
-  // NOTE! nsDocument::operator new() zeroes out all members, so don't
-  // bother initializing members to 0.
-
 nsDocument::nsDocument()
   : nsIDocument(),
     nsIDocument_MOZILLA_1_8_BRANCH2(),
-    mVisible(PR_TRUE)
+    mSubDocuments(nsnull),
+    mHeaderData(nsnull),
+    mIsGoingAway(PR_FALSE),
+    mInDestructor(PR_FALSE),
+    mVisible(PR_TRUE),
+    mHasHadScriptHandlingObject(PR_FALSE),
+    mXMLDeclarationBits(0),
+    mDefaultElementType(0),
+    mBoxObjectTable(nsnull),
+    mXPathDocument(nsnull),
+    mOnloadBlockCount(0),
+    mUpdateNestLevel(0)
 {
   nsLayoutStatics::AddRef();
 

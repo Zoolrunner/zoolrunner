@@ -13,6 +13,7 @@ This section tracks larger source, build, and runtime compatibility changes made
 * Added an opt-in in-tree libIDL 0.8.14 bootstrap for systems without a suitable system libIDL. Existing builds can continue to use system libIDL by leaving `BOOTSTRAP_IN_TREE_LIBIDL` unset.
 * Updated browser packaging so the extension manager component and NSS private freebl runtime files are installed into the browser dist tree.
 * Fixed several startup and browsing crashes caused by undefined initialization or invalid ownership assumptions in old Gecko code.
+* Explicitly initialized document raw members that older code expected the allocator to zero.
 * Hardened XML document reset handling to avoid cancelling a cleared channel during navigation and Acid3-style stress loads.
 * Fixed a parallel build race in the xremote client helper when building with `-j8`.
 

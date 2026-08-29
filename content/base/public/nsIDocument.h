@@ -117,8 +117,13 @@ public:
 
   nsIDocument()
     : mCharacterSet(NS_LITERAL_CSTRING("ISO-8859-1")),
+      mCharacterSetSource(0),
+      mParentDocument(nsnull),
+      mRootContent(nsnull),
       mNextContentID(NS_CONTENT_ID_COUNTER_BASE),
       mNodeInfoManager(nsnull),
+      mCSSLoader(nsnull),
+      mBidiEnabled(PR_FALSE),
       mPartID(0)
   {
   }
