@@ -54,8 +54,8 @@
 #include "shsign.h"
 
 #define NUM_ELEM(array) (sizeof(array) / sizeof(array[0]))
-CK_BBOOL true = CK_TRUE;
-CK_BBOOL false = CK_FALSE;
+CK_BBOOL ckTrue = CK_TRUE;
+CK_BBOOL ckFalse = CK_FALSE;
 static PRBool verbose = PR_FALSE;
 
 static void
@@ -990,29 +990,29 @@ main(int argc, char **argv)
         goto cleanup;
     }
     dsaPubKeyTemplate[3].type = CKA_TOKEN;
-    dsaPubKeyTemplate[3].pValue = &false; /* session object */
-    dsaPubKeyTemplate[3].ulValueLen = sizeof(false);
+    dsaPubKeyTemplate[3].pValue = &ckFalse; /* session object */
+    dsaPubKeyTemplate[3].ulValueLen = sizeof(ckFalse);
     dsaPubKeyTemplate[4].type = CKA_VERIFY;
-    dsaPubKeyTemplate[4].pValue = &true;
-    dsaPubKeyTemplate[4].ulValueLen = sizeof(true);
+    dsaPubKeyTemplate[4].pValue = &ckTrue;
+    dsaPubKeyTemplate[4].ulValueLen = sizeof(ckTrue);
     dsaKeyPairGenMech.mechanism = CKM_DSA_KEY_PAIR_GEN;
     dsaKeyPairGenMech.pParameter = NULL;
     dsaKeyPairGenMech.ulParameterLen = 0;
     dsaPrivKeyTemplate[0].type = CKA_TOKEN;
-    dsaPrivKeyTemplate[0].pValue = &false; /* session object */
-    dsaPrivKeyTemplate[0].ulValueLen = sizeof(false);
+    dsaPrivKeyTemplate[0].pValue = &ckFalse; /* session object */
+    dsaPrivKeyTemplate[0].ulValueLen = sizeof(ckFalse);
     dsaPrivKeyTemplate[1].type = CKA_PRIVATE;
-    dsaPrivKeyTemplate[1].pValue = &true;
-    dsaPrivKeyTemplate[1].ulValueLen = sizeof(true);
+    dsaPrivKeyTemplate[1].pValue = &ckTrue;
+    dsaPrivKeyTemplate[1].ulValueLen = sizeof(ckTrue);
     dsaPrivKeyTemplate[2].type = CKA_SENSITIVE;
-    dsaPrivKeyTemplate[2].pValue = &true;
-    dsaPrivKeyTemplate[2].ulValueLen = sizeof(true);
+    dsaPrivKeyTemplate[2].pValue = &ckTrue;
+    dsaPrivKeyTemplate[2].ulValueLen = sizeof(ckTrue);
     dsaPrivKeyTemplate[3].type = CKA_SIGN,
-    dsaPrivKeyTemplate[3].pValue = &true;
-    dsaPrivKeyTemplate[3].ulValueLen = sizeof(true);
+    dsaPrivKeyTemplate[3].pValue = &ckTrue;
+    dsaPrivKeyTemplate[3].ulValueLen = sizeof(ckTrue);
     dsaPrivKeyTemplate[4].type = CKA_EXTRACTABLE;
-    dsaPrivKeyTemplate[4].pValue = &false;
-    dsaPrivKeyTemplate[4].ulValueLen = sizeof(false);
+    dsaPrivKeyTemplate[4].pValue = &ckFalse;
+    dsaPrivKeyTemplate[4].ulValueLen = sizeof(ckFalse);
 
     crv = pFunctionList->C_OpenSession(pSlotList[slotIndex],
                                        CKF_RW_SESSION | CKF_SERIAL_SESSION,
