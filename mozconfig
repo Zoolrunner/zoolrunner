@@ -1,6 +1,12 @@
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/../obj-retrozilla-linux
 mk_add_options MOZ_MAKE_FLAGS="-j4"
 
+PATH="$RZ_DEPS_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$RZ_DEPS_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+LD_LIBRARY_PATH="$RZ_DEPS_PREFIX/lib:$LD_LIBRARY_PATH"
+LDFLAGS="-Wl,-rpath,$RZ_DEPS_PREFIX/lib"
+export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH LDFLAGS
+
 ac_add_options --enable-application=browser
 ac_add_options --enable-default-toolkit=gtk2
 ac_add_options --enable-optimize="-O2"
