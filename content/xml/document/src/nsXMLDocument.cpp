@@ -248,9 +248,13 @@ void
 nsXMLDocument::ResetToURI(nsIURI *aURI, nsILoadGroup *aLoadGroup)
 {
   if (mChannelIsPending) {
+    nsCOMPtr<nsIChannel> channel = mChannel;
+    mChannelIsPending = PR_FALSE;
+
     StopDocumentLoad();
-    mChannel->Cancel(NS_BINDING_ABORTED);
-    mChannelIsPending = nsnull;
+    if (channel) {
+      channel->Cancel(NS_BINDING_ABORTED);
+    }
   }
   
   nsDocument::ResetToURI(aURI, aLoadGroup);
