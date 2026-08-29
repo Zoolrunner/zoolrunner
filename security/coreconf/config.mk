@@ -63,7 +63,7 @@ endif
 #######################################################################
 
 TARGET_OSES = FreeBSD BSD_OS NetBSD OpenUNIX OS2 QNX Darwin BeOS OpenBSD \
-              OpenVMS AIX RISCOS WINNT WIN95 WINCE
+              OpenVMS AIX RISCOS WINNT WIN95 WINCE Linux
 
 ifeq (,$(filter-out $(TARGET_OSES),$(OS_TARGET)))
 include $(CORE_DEPTH)/coreconf/$(OS_TARGET).mk
@@ -206,4 +206,3 @@ endif
 # in libnss3 which are present for binary compatibility only
 DEFINES += -DUSE_UTIL_DIRECTLY
 USE_UTIL_DIRECTLY = 1
-
