@@ -74,6 +74,11 @@ typedef void
 class nsPropertyTable
 {
  public:
+  nsPropertyTable()
+    : mPropertyList(nsnull)
+  {
+  }
+
   /**
    * Get the value of the property |aPropertyName| for node |aObject|.
    * |aResult|, if supplied, is filled in with a return status code.

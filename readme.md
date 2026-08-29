@@ -14,6 +14,7 @@ This section tracks larger source, build, and runtime compatibility changes made
 * Updated browser packaging so the extension manager component and NSS private freebl runtime files are installed into the browser dist tree.
 * Fixed several startup and browsing crashes caused by undefined initialization or invalid ownership assumptions in old Gecko code.
 * Explicitly initialized document raw members that older code expected the allocator to zero.
+* Explicitly initialized property tables used by documents and presentation contexts to avoid stale property-list traversal during teardown.
 * Hardened XML document reset handling to avoid cancelling a cleared channel during navigation and Acid3-style stress loads.
 * Fixed a parallel build race in the xremote client helper when building with `-j8`.
 
