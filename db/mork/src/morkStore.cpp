@@ -122,6 +122,7 @@
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
 
+
 // ````` ````` ````` ````` ````` 
 // { ===== begin morkNode interface =====
 
@@ -698,7 +699,7 @@ morkStore::CopyAtom(morkEnv* ev, const morkAtom* inAtom)
   if ( inAtom )
   {
     mdbYarn yarn;
-    if ( inAtom->AliasYarn(&yarn) )
+    if ( morkAtom::AliasYarn(inAtom, &yarn) )
       outAtom = this->YarnToAtom(ev, &yarn, PR_TRUE /* create */);
   }
   return outAtom;
@@ -817,7 +818,7 @@ morkStore::OidToYarn(morkEnv* ev, const mdbOid& inOid, mdbYarn* outYarn)
     morkAtomAidMap* map = &atomSpace->mAtomSpace_AtomAids;
     atom = map->GetAid(ev, (mork_aid) inOid.mOid_Id);
   }
-  atom->GetYarn(outYarn); // note this is safe even when atom==nil
+  morkAtom::GetYarn(atom, outYarn); // note this is safe even when atom==nil
 
   return ev->Good();
 }
@@ -868,7 +869,7 @@ morkStore::TokenToString(morkEnv* ev, mdb_token inToken, mdbYarn* outTokenName)
     if ( space )
       atom = space->mAtomSpace_AtomAids.GetAid(ev, (mork_aid) inToken);
       
-    atom->GetYarn(outTokenName); // note this is safe even when atom==nil
+    morkAtom::GetYarn(atom, outTokenName); // note this is safe even when atom==nil
   }
   else // token is an "immediate" single byte string representation?
     this->SmallTokenToOneByteYarn(ev, inToken, outTokenName);
@@ -2327,4 +2328,3 @@ morkStore::CompressCommit( // commit and make db smaller if possible
 
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
-

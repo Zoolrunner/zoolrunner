@@ -593,7 +593,7 @@ orkinRow::AddCell( // copy a cell from another row to this row
             mork_column col = cell->GetColumn();
             morkAtom* atom = cell->mCell_Atom;
             mdbYarn yarn;
-            atom->AliasYarn(&yarn); // works even when atom is nil
+            morkAtom::AliasYarn(atom, &yarn); // works even when atom is nil
             
             if ( store != cellStore )
               col = store->CopyToken(ev, col, cellStore);
@@ -746,7 +746,7 @@ orkinRow::GetCellYarn(
     if ( store )
     {
 	    morkAtom* atom = row->GetColumnAtom(ev, inColumn);
-	    atom->GetYarn(outYarn);
+	    morkAtom::GetYarn(atom, outYarn);
 	    // note nil atom works and sets yarn correctly
     }
       
@@ -771,7 +771,7 @@ orkinRow::AliasCellYarn(
     if ( store )
     {
 	    morkAtom* atom = row->GetColumnAtom(ev, inColumn);
-	    atom->AliasYarn(outYarn);
+	    morkAtom::AliasYarn(atom, outYarn);
 	    // note nil atom works and sets yarn correctly
     }
     outErr = ev->AsErr();
@@ -846,4 +846,3 @@ orkinRow::SeekCellYarn( // resembles nsIMdbRowCellCursor::SeekCell()
 
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
-

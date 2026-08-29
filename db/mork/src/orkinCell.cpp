@@ -415,7 +415,7 @@ orkinCell::GetYarn(nsIMdbEnv* mev,
   if ( ev )
   {
     morkAtom* atom = cell->GetAtom();
-    atom->GetYarn(outYarn);
+    morkAtom::GetYarn(atom, outYarn);
     outErr = ev->AsErr();
   }
     
@@ -434,7 +434,7 @@ orkinCell::AliasYarn(nsIMdbEnv* mev,
   if ( ev )
   {
     morkAtom* atom = cell->GetAtom();
-    atom->AliasYarn(outYarn);
+    morkAtom::AliasYarn(atom, outYarn);
     outErr = ev->AsErr();
   }
     

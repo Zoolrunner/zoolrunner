@@ -360,7 +360,7 @@ morkRowObject::AddCell( // copy a cell from another row to this row
             mork_column col = cell->GetColumn();
             morkAtom* atom = cell->mCell_Atom;
             mdbYarn yarn;
-            atom->AliasYarn(&yarn); // works even when atom is nil
+            morkAtom::AliasYarn(atom, &yarn); // works even when atom is nil
             
             if ( store != cellStore )
               col = store->CopyToken(ev, col, cellStore);
@@ -499,7 +499,7 @@ morkRowObject::GetCellYarn(
     if ( mRowObject_Store && mRowObject_Row)
     {
       morkAtom* atom = mRowObject_Row->GetColumnAtom(ev, inColumn);
-      atom->GetYarn(outYarn);
+      morkAtom::GetYarn(atom, outYarn);
       // note nil atom works and sets yarn correctly
     }
       
@@ -521,7 +521,7 @@ morkRowObject::AliasCellYarn(
     if ( mRowObject_Store && mRowObject_Row)
     {
       morkAtom* atom = mRowObject_Row->GetColumnAtom(ev, inColumn);
-      atom->AliasYarn(outYarn);
+      morkAtom::AliasYarn(atom, outYarn);
       // note nil atom works and sets yarn correctly
     }
     outErr = ev->AsErr();

@@ -109,6 +109,7 @@
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
 
+
 // ````` ````` ````` ````` ````` 
 // { ===== begin morkNode interface =====
 
@@ -474,7 +475,7 @@ morkWriter::WriteAtom(morkEnv* ev, const morkAtom* inAtom)
   mork_size outSize = 0;
   mdbYarn yarn; // to ref content inside atom
 
-  if ( inAtom->AliasYarn(&yarn) )
+  if ( morkAtom::AliasYarn(inAtom, &yarn) )
   {
     if ( mWriter_DidStartDict && yarn.mYarn_Form != mWriter_DictForm )
       this->ChangeDictForm(ev, yarn.mYarn_Form);  
@@ -482,7 +483,7 @@ morkWriter::WriteAtom(morkEnv* ev, const morkAtom* inAtom)
     outSize = this->WriteYarn(ev, &yarn);
     // mWriter_LineSize += stream->Write(ev, inYarn->mYarn_Buf, outSize);
   }
-  else
+  else if ( inAtom )
     inAtom->BadAtomKindError(ev);
     
   return outSize;
@@ -527,7 +528,7 @@ morkWriter::WriteAtomSpaceAsDict(morkEnv* ev, morkAtomSpace* ioSpace)
         {
           atom->SetAtomClean(); // neutralize change
           
-          atom->AliasYarn(&yarn);
+          morkAtom::AliasYarn(atom, &yarn);
           mork_size size = ev->TokenAsHex(idBuf, atom->mBookAtom_Id);
           
           if ( yarn.mYarn_Form != mWriter_DictForm )
@@ -1902,7 +1903,7 @@ morkWriter::PutRowDict(morkEnv* ev, morkRow* ioRow)
           stream->Write(ev->AsMdbEnv(), buf, size+1, &bytesWritten); // '('
           mWriter_LineSize += bytesWritten;
 
-          if ( atom->AliasYarn(&yarn) )
+          if ( morkAtom::AliasYarn(atom, &yarn) )
           {
             mork_scope atomScope = atom->GetBookAtomSpaceScope(ev);
             if ( atomScope && atomScope != mWriter_DictAtomScope )
@@ -1963,7 +1964,7 @@ morkWriter::PutVerboseCell(morkEnv* ev, morkCell* ioCell, mork_bool inWithVal)
   store->TokenToString(ev, col, colYarn);
   
   mdbYarn yarn; // to ref content inside atom
-  atom->AliasYarn(&yarn); // works even when atom==nil
+  morkAtom::AliasYarn(atom, &yarn); // works even when atom==nil
   
   if ( yarn.mYarn_Form != mWriter_RowForm )
     this->ChangeRowForm(ev, yarn.mYarn_Form);
@@ -2030,7 +2031,7 @@ morkWriter::PutCell(morkEnv* ev, morkCell* ioCell, mork_bool inWithVal)
   p += colSize;
 
   mdbYarn yarn; // to ref content inside atom
-  atom->AliasYarn(&yarn); // works even when atom==nil
+  morkAtom::AliasYarn(atom, &yarn); // works even when atom==nil
   
   if ( yarn.mYarn_Form != mWriter_RowForm )
     this->ChangeRowForm(ev, yarn.mYarn_Form);
@@ -2240,4 +2241,3 @@ morkWriter::PutRow(morkEnv* ev, morkRow* ioRow)
 }
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
-

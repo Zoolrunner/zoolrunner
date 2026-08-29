@@ -61,6 +61,19 @@
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
 
+
+mork_bool
+morkAtom::GetYarn(const morkAtom* inAtom, mdbYarn* outYarn)
+{
+  if ( inAtom )
+    return inAtom->GetYarn(outYarn);
+
+  outYarn->mYarn_Fill = 0;
+  outYarn->mYarn_More = 0;
+  outYarn->mYarn_Form = 0;
+  return morkBool_kFalse;
+}
+
 mork_bool
 morkAtom::GetYarn(mdbYarn* outYarn) const
 {
@@ -168,6 +181,20 @@ morkAtom::AsBuf(morkBuf& outBuf) const
     outBuf.mBuf_Fill = 0;
   }
   return ( atom != 0 );
+}
+
+mork_bool
+morkAtom::AliasYarn(const morkAtom* inAtom, mdbYarn* outYarn)
+{
+  if ( inAtom )
+    return inAtom->AliasYarn(outYarn);
+
+  outYarn->mYarn_Buf = 0;
+  outYarn->mYarn_Fill = 0;
+  outYarn->mYarn_Size = 0;
+  outYarn->mYarn_More = 0;
+  outYarn->mYarn_Form = 0;
+  return morkBool_kFalse;
 }
 
 mork_bool
@@ -601,4 +628,3 @@ void morkFarBookAtom::InitFarBookAtom(morkEnv* ev, const morkBuf& inBuf,
 }
 
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
-

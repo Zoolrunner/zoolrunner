@@ -324,6 +324,11 @@ nsScriptNameSpaceManager::FillHashWithDOMInterfaces()
     NS_ENSURE_SUCCESS(rv, rv);
 
     nsCOMPtr<nsIInterfaceInfo> if_info(do_QueryInterface(entry));
+    if (!if_info) {
+      NS_WARNING("Interface enumeration entry not an nsIInterfaceInfo!");
+      continue;
+    }
+
     if_info->GetName(getter_Copies(if_name));
     if_info->GetIIDShared(&iid);
     rv = RegisterInterface(if_name.get() + sizeof(NS_DOM_INTERFACE_PREFIX) - 1,

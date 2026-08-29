@@ -1185,6 +1185,7 @@ nsJSContext::EvaluateString(const nsAString& aScript,
   return rv;
 }
 
+
 nsresult
 nsJSContext::CompileScript(const PRUnichar* aText,
                            PRInt32 aTextLength,
@@ -2535,9 +2536,11 @@ NS_CreateScriptContext(nsIScriptGlobalObject *aGlobal,
   nsresult rv = nsJSEnvironment::Init();
   NS_ENSURE_SUCCESS(rv, rv);
 
-  nsCOMPtr<nsIScriptContext> scriptContext;
-  rv = nsJSEnvironment::CreateNewContext(getter_AddRefs(scriptContext));
+  nsIScriptContext *rawContext = nsnull;
+  rv = nsJSEnvironment::CreateNewContext(&rawContext);
   NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCOMPtr<nsIScriptContext> scriptContext(dont_AddRef(rawContext));
 
   scriptContext->WillInitializeContext();
 
@@ -2557,4 +2560,3 @@ NS_CreateScriptContext(nsIScriptGlobalObject *aGlobal,
 
   return rv;
 }
-

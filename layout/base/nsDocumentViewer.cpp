@@ -506,7 +506,26 @@ void DocumentViewerImpl::PrepareToStartLoad()
 // Note: operator new zeros our memory, so no need to init things to null.
 DocumentViewerImpl::DocumentViewerImpl(nsPresContext* aPresContext)
   : mPresContext(aPresContext),
+    mParentWidget(nsnull),
+    mNumURLStarts(0),
+    mDestroyRefCount(0),
+    mEnableRendering(PR_FALSE),
+    mStopped(PR_FALSE),
+    mLoaded(PR_FALSE),
+    mDeferredWindowClose(PR_FALSE),
     mIsSticky(PR_TRUE),
+    mInPermitUnload(PR_FALSE),
+#ifdef NS_PRINTING
+    mClosingWhilePrinting(PR_FALSE),
+#ifdef NS_PRINT_PREVIEW
+    mPrintIsPending(PR_FALSE),
+    mPrintDocIsFullyLoaded(PR_FALSE),
+#endif
+    mPrintEngine(nsnull),
+#ifdef NS_DEBUG
+    mDebugFile(nsnull),
+#endif
+#endif
     mHintCharsetSource(kCharsetUninitialized)
 {
   PrepareToStartLoad();

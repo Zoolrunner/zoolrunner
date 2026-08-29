@@ -124,6 +124,9 @@ public: // yarns
   mork_bool   AliasYarn(mdbYarn* outYarn) const;
   mork_bool   GetYarn(mdbYarn* outYarn) const;
 
+  static mork_bool AliasYarn(const morkAtom* inAtom, mdbYarn* outYarn);
+  static mork_bool GetYarn(const morkAtom* inAtom, mdbYarn* outYarn);
+
 private: // copying is not allowed
   morkAtom(const morkAtom& other);
   morkAtom& operator=(const morkAtom& other);
@@ -395,4 +398,3 @@ private: // copying is not allowed
 //3456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789
 
 #endif /* _MORKATOM_ */
-

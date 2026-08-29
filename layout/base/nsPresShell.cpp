@@ -6569,12 +6569,13 @@ PresShell::HandleEventInternal(nsEvent* aEvent, nsIView *aView,
           if (aView) {
             NS_ASSERTION(mViewManager,
                          "How did GetCurrentEventFrame() succeed?");
-            nsIView* rootView;
+            nsIView* rootView = nsnull;
             mViewManager->GetRootView(rootView);
-            nsIView* frameView;
+            nsIView* frameView = nsnull;
             nsPoint pt;
             mCurrentEventFrame->GetOffsetFromView(pt, &frameView);
-            offset = frameView->GetOffsetTo(rootView) - offsetOfaView;
+            if (frameView)
+              offset = frameView->GetOffsetTo(rootView) - offsetOfaView;
           }
   
           // Transform aEvent->point from aView's coordinate system to
