@@ -94546,13 +94546,17 @@ SQLITE_PRIVATE Select *sqlite3SelectNew(
   Expr *pOffset         /* OFFSET value.  NULL means no offset */
 ){
   Select *pNew;
+  Select *pAlloc;
   Select standin;
+  int isStandin = 0;
   sqlite3 *db = pParse->db;
-  pNew = sqlite3DbMallocZero(db, sizeof(*pNew) );
+  pAlloc = sqlite3DbMallocZero(db, sizeof(*pNew) );
+  pNew = pAlloc;
   assert( db->mallocFailed || !pOffset || pLimit ); /* OFFSET implies LIMIT */
   if( pNew==0 ){
     assert( db->mallocFailed );
     pNew = &standin;
+    isStandin = 1;
     memset(pNew, 0, sizeof(*pNew));
   }
   if( pEList==0 ){
@@ -94573,15 +94577,15 @@ SQLITE_PRIVATE Select *sqlite3SelectNew(
   pNew->addrOpenEphm[0] = -1;
   pNew->addrOpenEphm[1] = -1;
   pNew->addrOpenEphm[2] = -1;
-  if( db->mallocFailed ) {
+  if( db->mallocFailed || isStandin ) {
     clearSelect(db, pNew);
-    if( pNew!=&standin ) sqlite3DbFree(db, pNew);
-    pNew = 0;
+    if( pAlloc ) sqlite3DbFree(db, pAlloc);
+    pAlloc = 0;
   }else{
     assert( pNew->pSrc!=0 || pParse->nErr>0 );
   }
   assert( pNew!=&standin );
-  return pNew;
+  return pAlloc;
 }
 
 /*
