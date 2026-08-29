@@ -578,6 +578,25 @@ typedef struct _cairo_scaled_font cairo_scaled_font_t;
 typedef struct _cairo_font_face cairo_font_face_t;
 
 /**
+ * cairo_font_type_t:
+ * @CAIRO_FONT_TYPE_TOY: The font was created using cairo's toy font API.
+ * @CAIRO_FONT_TYPE_FT: The font is of type FreeType.
+ * @CAIRO_FONT_TYPE_WIN32: The font is of type Win32.
+ * @CAIRO_FONT_TYPE_ATSUI: The font is of type ATSUI.
+ *
+ * #cairo_font_type_t is used to describe the type of a given font
+ * face or scaled font. This type was added after cairo 1.0.2, but
+ * modern GTK/Pango headers reference it in declarations even when this
+ * bundled cairo is used.
+ **/
+typedef enum _cairo_font_type {
+    CAIRO_FONT_TYPE_TOY,
+    CAIRO_FONT_TYPE_FT,
+    CAIRO_FONT_TYPE_WIN32,
+    CAIRO_FONT_TYPE_ATSUI
+} cairo_font_type_t;
+
+/**
  * cairo_glyph_t:
  * @index: glyph index in the font. The exact interpretation of the
  *      glyph index depends on the font technology being used.
