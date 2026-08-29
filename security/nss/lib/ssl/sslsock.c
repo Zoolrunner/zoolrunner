@@ -56,32 +56,25 @@ static const sslSocketOps ssl_secure_ops = { /* SSL. */
 */
 static sslOptions ssl_defaults = {
     { siBuffer, NULL, 0 }, /* nextProtoNego */
-    1 << 16,
     MAX_FRAGMENT_LENGTH + 1,
+    1 << 16,
     PR_TRUE,    /* useSecurity        */
     PR_FALSE,   /* useSocks           */
     PR_FALSE,   /* requestCertificate */
-    2,          /* requireCertificate */
+    SSL_REQUIRE_FIRST_HANDSHAKE,
     PR_FALSE,   /* handshakeAsClient  */
     PR_FALSE,   /* handshakeAsServer  */
-    PR_FALSE,   /* enableSSL2         */ /* now defaults to off in NSS 3.13 */
-    PR_FALSE,   /* unusedBit9         */
-    PR_FALSE,   /* unusedBit10        */
     PR_FALSE,   /* noCache            */
     PR_FALSE,   /* fdx                */
-    PR_FALSE,   /* v2CompatibleHello  */ /* now defaults to off in NSS 3.13 */
     PR_TRUE,    /* detectRollBack     */
-    PR_FALSE,   /* noStepDown         */
-    PR_FALSE,   /* bypassPKCS11       */
     PR_FALSE,   /* noLocks            */
     PR_FALSE,   /* enableSessionTickets */
     PR_FALSE,   /* enableDeflate      */
-    2,          /* enableRenegotiation (default: requires extension) */
+    SSL_RENEGOTIATE_REQUIRES_XTN,
     PR_FALSE,   /* requireSafeNegotiation */
     PR_FALSE,   /* enableFalseStart   */
     PR_TRUE,    /* cbcRandomIV        */
     PR_FALSE,   /* enableOCSPStapling */
-    PR_TRUE,    /* enableNPN          */
     PR_FALSE,   /* enableALPN         */
     PR_TRUE,    /* reuseServerECDHEKey */
     PR_FALSE,   /* enableFallbackSCSV */

@@ -358,7 +358,7 @@ SSLExp_SetESNIKeyPair(PRFileDesc *fd,
     PLArenaPool *arena = NULL;
     PRUint64 asuite;
     sslReader csrdr;
-    ssl3CipherSuiteCfg *suiteCfg;
+    const ssl3CipherSuiteCfg *suiteCfg;
     TLS13KeyShareEntry *entry;
     /* Make sure the cipher suite is OK. */
     SSLVersionRange vrange = { SSL_LIBRARY_VERSION_TLS_1_3,
