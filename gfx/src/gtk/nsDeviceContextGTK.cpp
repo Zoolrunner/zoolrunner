@@ -67,7 +67,9 @@
 
 #ifdef MOZ_WIDGET_GTK2
 #include <pango/pango.h>
+#ifdef HAVE_PANGO_PANGOX_H
 #include <pango/pangox.h>
+#endif
 #include <pango/pango-fontmap.h>
 #endif
 
@@ -962,11 +964,11 @@ nsSystemFontsGTK::GetSystemFontInfo(GtkWidget *aWidget, nsFont* aFont,
 
 #ifdef MOZ_WIDGET_GTK2
 
-#ifdef MOZ_ENABLE_COREXFONTS
+#if defined(MOZ_ENABLE_COREXFONTS) && defined(HAVE_PANGO_PANGOX_H)
 static void xlfd_from_pango_font_description(GtkWidget *aWidget,
                                              const PangoFontDescription *aFontDesc,
                                              nsString& aFontName);
-#endif /* MOZ_ENABLE_COREXFONTS */
+#endif /* MOZ_ENABLE_COREXFONTS && HAVE_PANGO_PANGOX_H */
 
 nsresult
 nsSystemFontsGTK::GetSystemFontInfo(GtkWidget *aWidget, nsFont* aFont,
@@ -996,12 +998,12 @@ nsSystemFontsGTK::GetSystemFontInfo(GtkWidget *aWidget, nsFont* aFont,
   }
 #endif /* MOZ_ENABLE_XFT */
 
-#ifdef MOZ_ENABLE_COREXFONTS
+#if defined(MOZ_ENABLE_COREXFONTS) && defined(HAVE_PANGO_PANGOX_H)
   // if name already set by Xft, do nothing
   if (!aFont->name.Length()) {
     xlfd_from_pango_font_description(aWidget, desc, aFont->name);
   }
-#endif /* MOZ_ENABLE_COREXFONTS */
+#endif /* MOZ_ENABLE_COREXFONTS && HAVE_PANGO_PANGOX_H */
   aFont->weight = pango_font_description_get_weight(desc);
 
   float size = float(pango_font_description_get_size(desc) / PANGO_SCALE);
@@ -1103,7 +1105,7 @@ GetXftDPI(void)
 }
 #endif /* MOZ_ENABLE_XFT */
 
-#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_ENABLE_COREXFONTS)
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_ENABLE_COREXFONTS) && defined(HAVE_PANGO_PANGOX_H)
 // xlfd_from_pango_font_description copied from vte, which was
 // written by nalin@redhat.com, and added some codes.
 static void
@@ -1226,4 +1228,4 @@ xlfd_from_pango_font_description(GtkWidget *aWidget,
   g_free(spec);
   g_object_unref(font);
 }
-#endif /* MOZ_WIDGET_GTK2 && MOZ_ENABLE_COREXFONTS */
+#endif /* MOZ_WIDGET_GTK2 && MOZ_ENABLE_COREXFONTS && HAVE_PANGO_PANGOX_H */
