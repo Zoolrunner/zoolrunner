@@ -83,7 +83,7 @@ while ($line = <>) {
 }
 
 # Test dependencies
-foreach $obj (keys %alldeps) {
+foreach $obj (sort keys %alldeps) {
   $deps = $alldeps{$obj};
 
   $mtime = (stat $obj)[9] or next;
@@ -104,11 +104,11 @@ foreach $obj (keys %alldeps) {
 
 # Output objects to rebuild (if needed).
 if (@objs) {
-  $new_output = "@objs: FORCE\n";
+  $new_output = join(' ', sort @objs) . ": FORCE\n";
 
   # Read in the current dependencies file.
   open(OLD, "<$outfile")
-    and $old_output = <OLD>;
+    and $old_output = join('', <OLD>);
   close(OLD);
 
   # Only write out the dependencies if they are different.

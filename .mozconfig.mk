@@ -4,7 +4,7 @@
 #   http://webtools.mozilla.org/build/config.cgi
 
 MOZ_OBJDIR=$(TOPSRCDIR)/../obj-retrozilla-linux
-MOZ_MAKE_FLAGS=-j4
+MOZ_MAKE_FLAGS=-j8
 # --enable-application=browser is used by configure (not client.mk)
 # --enable-default-toolkit=gtk2 is used by configure (not client.mk)
 # --enable-optimize=-O2 is used by configure (not client.mk)
