@@ -4,6 +4,17 @@ RetroZilla is a fork of Gecko 1.8.1 for improved compatibility on the modern web
 
 RetroZilla Suite is the primary target of RetroZilla, but code exists in the tree to build RetroZilla Browser (Firefox 2) and xulrunner.
 
+## Major Changes
+
+This section tracks larger source, build, and runtime compatibility changes made after the original RetroZilla baseline.
+
+* Added initial LoongArch64 Linux build support, including an xptcall backend.
+* Added a browser-focused Linux mozconfig that builds into `obj-retrozilla-linux` inside the source tree.
+* Added an opt-in in-tree libIDL 0.8.14 bootstrap for systems without a suitable system libIDL. Existing builds can continue to use system libIDL by leaving `BOOTSTRAP_IN_TREE_LIBIDL` unset.
+* Updated browser packaging so the extension manager component and NSS private freebl runtime files are installed into the browser dist tree.
+* Fixed several startup and browsing crashes caused by undefined initialization or invalid ownership assumptions in old Gecko code.
+* Fixed a parallel build race in the xremote client helper when building with `-j8`.
+
 ### Supported Operating Systems
 * Windows 95
 * Windows 98
