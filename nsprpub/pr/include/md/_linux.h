@@ -61,6 +61,8 @@
 #define _PR_SI_ARCHITECTURE "ia64"
 #elif defined(__x86_64__)
 #define _PR_SI_ARCHITECTURE "x86-64"
+#elif defined(__loongarch64)
+#define _PR_SI_ARCHITECTURE "loongarch64"
 #elif defined(__mc68000__)
 #define _PR_SI_ARCHITECTURE "m68k"
 #elif defined(__sparc__) && defined(__arch64__)
