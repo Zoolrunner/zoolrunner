@@ -4088,6 +4088,9 @@ fi
 if test "$MOZ_ENABLE_GTK2"
 then
     PKG_CHECK_MODULES(MOZ_GTK2, gtk+-2.0 >= 1.3.7)
+    if $PKG_CONFIG --exists gthread-2.0; then
+        MOZ_GTK2_LIBS="$MOZ_GTK2_LIBS `$PKG_CONFIG --libs-only-L gthread-2.0` `$PKG_CONFIG --libs-only-l gthread-2.0`"
+    fi
     _SAVE_CPPFLAGS="$CPPFLAGS"
     CPPFLAGS="$CPPFLAGS $MOZ_GTK2_CFLAGS"
     AC_CHECK_HEADER(pango/pangox.h)
