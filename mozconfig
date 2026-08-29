@@ -16,6 +16,7 @@ ac_add_options --disable-installer
 ac_add_options --disable-updater
 ac_add_options --disable-gnomevfs
 ac_add_options --disable-dbus
+ac_add_options --disable-pango
 ac_add_options --without-system-jpg
 ac_add_options --without-system-zlib
 ac_add_options --enable-crypto

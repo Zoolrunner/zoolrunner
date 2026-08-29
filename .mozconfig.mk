@@ -14,6 +14,7 @@ MOZ_MAKE_FLAGS=-j8
 # --disable-updater is used by configure (not client.mk)
 # --disable-gnomevfs is used by configure (not client.mk)
 # --disable-dbus is used by configure (not client.mk)
+# --disable-pango is used by configure (not client.mk)
 # --without-system-jpg is used by configure (not client.mk)
 # --without-system-zlib is used by configure (not client.mk)
 # --enable-crypto is used by configure (not client.mk)
