@@ -22,9 +22,10 @@
 #include <string.h>
 #include <time.h>
 
-#ifndef _MSC_VER // [
-#error "Use this header only with Microsoft Visual C++ compilers!"
-#endif // _MSC_VER ]
+#ifndef _MSC_VER
+#include <stdint.h>
+#include <inttypes.h>
+#else
 
 #if _MSC_VER >= 1800 // [ VS2013 (VC12) provides inttypes.h
 #include <inttypes.h>
@@ -193,6 +194,8 @@ imaxdiv_t __cdecl imaxdiv(intmax_t numer, intmax_t denom)
 #define wcstoumax _wcstoui64
 
 #endif // _MSC_VER >= 1800 ]
+
+#endif /* _MSC_VER */
 
 #if defined(_MSC_VER) && _MSC_VER <= 1700
 /* stdbool.h standard header */

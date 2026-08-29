@@ -117,7 +117,7 @@ Hacl_Bignum_Fmul_mul_shift_reduce_(uint64_t *output, uint32_t *input, uint32_t *
     uint32_t i;
     uint32_t input2i; 
     for (i = (uint32_t)0U; i < (uint32_t)4U; i = i + (uint32_t)1U) {
-        uint32_t input2i = input2[i];
+        input2i = input2[i];
         Hacl_Bignum_Fproduct_sum_scalar_multiplication_(output, input, input2i);
         Hacl_Bignum_Fmul_shift_reduce(input);
     }
