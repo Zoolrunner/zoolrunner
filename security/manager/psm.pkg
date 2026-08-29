@@ -3,9 +3,11 @@ dist/bin/@NSS3_LIB@
 dist/bin/@SMIME3_LIB@
 dist/bin/@SSL3_LIB@
 dist/bin/@SOFTOKEN3_LIB@
+dist/bin/@NSSDBM3_LIB@
 dist/bin/@LOADABLE_ROOT_MODULE@
 #if HAVE_FREEBL_LIBS
 dist/bin/libfreebl3@DLLS@
+!optional dist/bin/@FREEBL_PRIV_LIB@
 #endif
 #if HAVE_FREEBL_LIBS_32
 dist/bin/libfreebl_32fpu_3@DLLS@
@@ -54,3 +56,5 @@ dist/bin/libfreebl_64int_3@DLLS@
 dist/bin/shlibsign@BINS@
 !optional dist/bin/mangle@BINS@
 dist/bin/@SOFTOKEN3_CHK@
+!optional dist/bin/@NSSDBM3_CHK@
+!optional dist/bin/@FREEBL_PRIV_CHK@
