@@ -52,7 +52,8 @@
 </script>
   
 <tree id="prefsTree" seltype="single" hidecolumnpicker="true"
-          onselect="if( hPrefWindow ) hPrefWindow.switchPage();">
+          onselect="if( hPrefWindow ) hPrefWindow.switchPage();"
+          onmouseup="if( hPrefWindow ) hPrefWindow.switchPageForEvent(event);">
   <treecols>
     <treecol id="categoryCol" flex="1" primary="true" hideheader="true"/>
   </treecols>

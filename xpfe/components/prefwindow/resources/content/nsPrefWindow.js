@@ -329,13 +329,36 @@ nsPrefWindow.prototype =
         function ()
           {
             var prefPanelTree = document.getElementById( "prefsTree" );
-            var selectedIndex = prefPanelTree.currentIndex;
-            if ( selectedIndex < 0 )
+            this.switchPageAtIndex( prefPanelTree.currentIndex );
+          },
+
+      switchPageForEvent:
+        function ( aEvent )
+          {
+            var prefPanelTree = document.getElementById( "prefsTree" );
+            var row = {};
+            var col = {};
+            var obj = {};
+            var treeBoxObject = prefPanelTree.treeBoxObject;
+
+            treeBoxObject.getCellAt( aEvent.clientX, aEvent.clientY, row, col, obj );
+            if ( row.value < 0 || !col.value || obj.value == "twisty" )
               return;
 
+            prefPanelTree.view.selection.select( row.value );
+            this.switchPageAtIndex( row.value );
+          },
+
+      switchPageAtIndex:
+        function ( aIndex )
+          {
+            if ( aIndex < 0 )
+              return;
+
+            var prefPanelTree = document.getElementById( "prefsTree" );
             var contentView = prefPanelTree.contentView
                                            .QueryInterface(Components.interfaces.nsITreeContentView);
-            var selectedItem = contentView.getItemAtIndex(selectedIndex);
+            var selectedItem = contentView.getItemAtIndex(aIndex);
             if ( !selectedItem )
               return;
 
