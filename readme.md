@@ -182,6 +182,8 @@ Bundled dependency versions verified directly from the source tree include:
 * libpng: `1.2.35`, in `modules/libimg/png/png.h`.
 * zlib used by the Mozilla tree: `1.3.2`, in `modules/zlib/src/zlib.h`.
 * zlib bundled inside NSS: `1.2.5`, in `security/nss/lib/zlib/zlib.h`.
+* bzip2/libbzip2: updated from `1.0.3` to `1.0.8`, in
+  `modules/libbz2/src/bzlib_private.h`.
 * IJG JPEG library: version `6b`, represented by `JPEG_LIB_VERSION 62` in
   `jpeg/jpeglib.h`.
 * cairo: `1.0.2`, in `gfx/cairo/cairo/src/cairo-features.h.in` and documented

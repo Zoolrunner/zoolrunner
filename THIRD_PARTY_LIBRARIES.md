@@ -17,7 +17,7 @@ noted.
 | IJG JPEG | `6b`; `JPEG_LIB_VERSION 62` | `jpeg/jversion.h`, `jpeg/jpeglib.h` |
 | SQLite, Mozilla storage copy | `3.3.5` | `db/sqlite3/src/sqlite3.h`; `db/sqlite3/README.MOZILLA` still says `3.3.4` |
 | SQLite, NSS copy | `3.7.15` | `security/nss/lib/sqlite/sqlite3.h`; `security/nss/lib/sqlite/README` says `3.10.2`, but `sqlite3.h` and `sqlite3.c` define `3.7.15` |
-| bzip2 / libbzip2 | `1.0.3`, `15-Feb-2005` | `modules/libbz2/src/bzlib_private.h` |
+| bzip2 / libbzip2 | `1.0.8`, `13-Jul-2019` | `modules/libbz2/src/bzlib_private.h` |
 | Expat | `1.95.7` | `parser/expat/lib/expat.h` |
 | cairo | `1.0.2` | `gfx/cairo/cairo/src/cairo-features.h.in` |
 | libpixman | snapshot `0.1.4`, `2005-03-07` | `gfx/cairo/libpixman/NEWS` |
