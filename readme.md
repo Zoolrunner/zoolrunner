@@ -209,8 +209,9 @@ Bundled dependency versions verified directly from the source tree include:
 * zlib bundled inside NSS: `1.2.5`, in `security/nss/lib/zlib/zlib.h`.
 * bzip2/libbzip2: updated from `1.0.3` to `1.0.8`, in
   `modules/libbz2/src/bzlib_private.h`.
-* IJG JPEG library: version `6b`, represented by `JPEG_LIB_VERSION 62` in
-  `jpeg/jpeglib.h`.
+* JPEG library: updated from IJG libjpeg `6b` to libjpeg-turbo `3.2.0`,
+  configured for the traditional libjpeg 6b-compatible API with
+  `JPEG_LIB_VERSION 62`.
 * cairo: `1.0.2`, in `gfx/cairo/cairo/src/cairo-features.h.in` and documented
   in `gfx/cairo/README`.
 * libIDL: `0.8.14`, vendored under `build/unix/libIDL`.
