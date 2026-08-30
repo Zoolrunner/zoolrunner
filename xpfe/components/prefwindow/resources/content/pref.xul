@@ -39,7 +39,7 @@
     </vbox>
     <vbox flex="1">
       <dialogheader id="header"/>
-      <iframe id="panelFrame" name="panelFrame" style="width: 0px" flex="1"/>
+      <iframe id="panelFrame" name="panelFrame" flex="1"/>
    </vbox>
   </hbox>
 
