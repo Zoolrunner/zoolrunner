@@ -172,7 +172,7 @@ Bundled dependency versions verified directly from the source tree include:
   `db/sqlite3/src/sqlite3.h`.
 * SQLite bundled inside NSS: `3.7.15`, in `security/nss/lib/sqlite/sqlite3.h`.
 * libpng: `1.2.35`, in `modules/libimg/png/png.h`.
-* zlib used by the Mozilla tree: `1.2.8`, in `modules/zlib/src/zlib.h`.
+* zlib used by the Mozilla tree: `1.3.2`, in `modules/zlib/src/zlib.h`.
 * zlib bundled inside NSS: `1.2.5`, in `security/nss/lib/zlib/zlib.h`.
 * IJG JPEG library: version `6b`, represented by `JPEG_LIB_VERSION 62` in
   `jpeg/jpeglib.h`.

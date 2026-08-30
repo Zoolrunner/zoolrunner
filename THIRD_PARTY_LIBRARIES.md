@@ -10,7 +10,7 @@ noted.
 
 | Library or code | Version found | Location and notes |
 | --- | --- | --- |
-| zlib | `1.2.8` | `modules/zlib/src/zlib.h` |
+| zlib | `1.3.2` | `modules/zlib/src/zlib.h` |
 | zlib inside NSS | `1.2.5` | `security/nss/lib/zlib/zlib.h` |
 | old NSS jar zlib header/API copy | `1.0.4` | `security/nss/lib/jar/jzlib.h` |
 | libpng | `1.2.35` | `modules/libimg/png/png.h` |

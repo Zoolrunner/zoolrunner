@@ -8,16 +8,19 @@ EXPORTS
     MOZ_Z_inflateEnd
 ; advanced functions
     MOZ_Z_deflateSetDictionary
+    MOZ_Z_deflateGetDictionary
     MOZ_Z_deflateCopy
     MOZ_Z_deflateReset
     MOZ_Z_deflateParams
     MOZ_Z_deflateTune
     MOZ_Z_deflateBound
+    MOZ_Z_deflateBound_z
     MOZ_Z_deflatePending
+    MOZ_Z_deflateUsed
     MOZ_Z_deflatePrime
     MOZ_Z_deflateSetHeader
-    MOZ_Z_inflateGetDictionary
     MOZ_Z_inflateSetDictionary
+    MOZ_Z_inflateGetDictionary
     MOZ_Z_inflateSync
     MOZ_Z_inflateCopy
     MOZ_Z_inflateReset
@@ -31,14 +34,22 @@ EXPORTS
 ; utility functions
     MOZ_Z_compress
     MOZ_Z_compress2
+    MOZ_Z_compress_z
+    MOZ_Z_compress2_z
     MOZ_Z_compressBound
+    MOZ_Z_compressBound_z
     MOZ_Z_uncompress
+    MOZ_Z_uncompress2
+    MOZ_Z_uncompress_z
+    MOZ_Z_uncompress2_z
     MOZ_Z_gzopen
     MOZ_Z_gzdopen
     MOZ_Z_gzbuffer
     MOZ_Z_gzsetparams
     MOZ_Z_gzread
+    MOZ_Z_gzfread
     MOZ_Z_gzwrite
+    MOZ_Z_gzfwrite
     MOZ_Z_gzprintf
     MOZ_Z_gzvprintf
     MOZ_Z_gzputs
@@ -65,22 +76,29 @@ EXPORTS
     MOZ_Z_gzoffset64
     MOZ_Z_adler32_combine64
     MOZ_Z_crc32_combine64
+    MOZ_Z_crc32_combine_gen64
 ; checksum functions
     MOZ_Z_adler32
+    MOZ_Z_adler32_z
     MOZ_Z_crc32
+    MOZ_Z_crc32_z
     MOZ_Z_adler32_combine
     MOZ_Z_crc32_combine
+    MOZ_Z_crc32_combine_gen
+    MOZ_Z_crc32_combine_op
 ; various hacks, don't look :)
     MOZ_Z_deflateInit_
     MOZ_Z_deflateInit2_
     MOZ_Z_inflateInit_
     MOZ_Z_inflateInit2_
     MOZ_Z_inflateBackInit_
+    MOZ_Z_gzgetc_
     MOZ_Z_zError
     MOZ_Z_inflateSyncPoint
     MOZ_Z_get_crc_table
     MOZ_Z_inflateUndermine
+    MOZ_Z_inflateValidate
+    MOZ_Z_inflateCodesUsed
     MOZ_Z_inflateResetKeep
     MOZ_Z_deflateResetKeep
-    MOZ_Z_gzgetc_
     MOZ_Z_gzopen_w

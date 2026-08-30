@@ -110,6 +110,7 @@
 #define inflate_copyright MOZ_Z_inflate_copyright
 #define inflate_fast MOZ_Z_inflate_fast
 #define inflate_table MOZ_Z_inflate_table
+#define inflate_fixed MOZ_Z_inflate_fixed
 #define z_errmsg MOZ_Z_z_errmsg
 #define zcalloc MOZ_Z_zcalloc
 #define zcfree MOZ_Z_zcfree
@@ -158,5 +159,27 @@
 #define _tr_flush_bits MOZ_Z__tr_flush_bits
 #define gzvprintf MOZ_Z_gzvprintf
 #define inflateGetDictionary MOZ_Z_inflateGetDictionary
+
+/* New as of zlib-1.2.9 and later */
+#define adler32_z MOZ_Z_adler32_z
+#define compress_z MOZ_Z_compress_z
+#define compress2_z MOZ_Z_compress2_z
+#define compressBound_z MOZ_Z_compressBound_z
+#define crc32_z MOZ_Z_crc32_z
+#define deflateBound_z MOZ_Z_deflateBound_z
+#define inflateValidate MOZ_Z_inflateValidate
+#define uncompress2 MOZ_Z_uncompress2
+#define uncompress_z MOZ_Z_uncompress_z
+#define uncompress2_z MOZ_Z_uncompress2_z
+
+/* New as of zlib-1.3.x */
+#define crc32_combine_gen MOZ_Z_crc32_combine_gen
+#define crc32_combine_gen64 MOZ_Z_crc32_combine_gen64
+#define crc32_combine_op MOZ_Z_crc32_combine_op
+#define deflateGetDictionary MOZ_Z_deflateGetDictionary
+#define deflateUsed MOZ_Z_deflateUsed
+#define gzfread MOZ_Z_gzfread
+#define gzfwrite MOZ_Z_gzfwrite
+#define inflateCodesUsed MOZ_Z_inflateCodesUsed
 
 #endif
