@@ -7,16 +7,16 @@
 // XPCOM preferences integration
 var prefs = Components.classes["@mozilla.org/preferences-service;1"].getService(Components.interfaces.nsIPrefBranch);
 
-var aboutHomeAutofocus = prefs.getBoolPref("rzHome.autofocus");
+var aboutHomeAutofocus = prefs.getBoolPref("zrHome.autofocus");
 var searchEngineURL = prefs.getCharPref("keyword.URL");
-var currentUsedVersion = prefs.getIntPref("retrozilla.version");
+var currentUsedVersion = prefs.getIntPref("zoolrunner.version");
 
 //check to see if custom search pref url exists
 var prefServiceBranch = Components.classes["@mozilla.org/preferences-service;1"]
 	.getService(Components.interfaces.nsIPrefService).getBranch("");
-if(prefServiceBranch.getPrefType('rzHome.customsearch')){
+if(prefServiceBranch.getPrefType('zrHome.customsearch')){
 	//key exist!
-	var searchEngineURL = prefs.getCharPref("rzHome.customsearch");
+	var searchEngineURL = prefs.getCharPref("zrHome.customsearch");
 } else {
 	// use DuckDuckGo Lite for now because Google does not want to play nice
 	searchEngineURL = "https://duckduckgo.com/lite/?q=";

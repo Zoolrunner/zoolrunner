@@ -126,7 +126,7 @@
 	    <checkbox id="zrHomeAutofocus"
           label="&zrHomeAutofocus.label;"
           accesskey="&zrHomeAutofocus.accesskey;"
-          prefstring="rzHome.autofocus"/>
+          prefstring="zrHome.autofocus"/>
 	  </hbox>
     </vbox>
   </groupbox>

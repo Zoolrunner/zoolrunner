@@ -582,7 +582,7 @@ nsHttpHandler::BuildUserAgent()
         mUserAgent += mProduct;
         if (!mProductSub.IsEmpty()) {
             mUserAgent += '/';
-            //mUserAgent += mProductSub; // RZ github issue 79 - below line added
+            //mUserAgent += mProductSub; // GitHub issue 79 - below line added
             mUserAgent.AppendLiteral("20100101");
         }
         if (!mProductComment.IsEmpty()) {

@@ -72,8 +72,8 @@
       <preference id="pref.browser.homepage.disable_button.bookmark_page"
                   name="pref.browser.homepage.disable_button.bookmark_page"
                   type="bool"/>
-      <preference id="rzHome.autofocus"
-                  name="rzHome.autofocus"
+      <preference id="zrHome.autofocus"
+                  name="zrHome.autofocus"
                   type="bool"/>
 
       <!-- Downloads -->
@@ -153,7 +153,7 @@
 	    <checkbox id="zrHomeAutofocus"
           label="&zrHomeAutofocus.label;"
           accesskey="&zrHomeAutofocus.accesskey;"
-          prefstring="rzHome.autofocus"/>
+          prefstring="zrHome.autofocus"/>
 	  </hbox>
     </groupbox>
 

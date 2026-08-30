@@ -49,8 +49,8 @@
 #endif
 
 // ZoolRunner-Specific Preferences
-pref("retrozilla.version", 220);
-pref("rzHome.autofocus", true);
+pref("zoolrunner.version", 220);
+pref("zrHome.autofocus", true);
 
 
 

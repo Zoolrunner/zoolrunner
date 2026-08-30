@@ -41,8 +41,8 @@
 # Build a mozilla application.
 #
 # To checkout and build a tree,
-#    1. cvs co RetroZilla/client.mk
-#    2. cd mozilla
+#    1. cvs co ZoolRunner/client.mk
+#    2. cd ZoolRunner
 #    3. create your .mozconfig file with
 #       mk_add_options MOZ_CO_PROJECT=suite,browser,mail,minimo,xulrunner
 #    4. gmake -f client.mk 
@@ -67,9 +67,9 @@
 #     macbrowser (aka Camino)
 #
 # Other common MOZ_CO_MODULE options include the following:
-#   RetroZilla/other-licenses/libart_lgpl
-#   RetroZilla/other-licenses/bsdiff
-#   RetroZilla/tools/codesighs
+#   ZoolRunner/other-licenses/libart_lgpl
+#   ZoolRunner/other-licenses/bsdiff
+#   ZoolRunner/tools/codesighs
 #
 # Other targets (gmake -f client.mk [targets...]),
 #    checkout
@@ -116,20 +116,20 @@ AVAILABLE_PROJECTS = \
 
 MODULES_core :=                                 \
   SeaMonkeyAll                                  \
-  RetroZilla/browser/config/version.txt            \
-  RetroZilla/mail/config/version.txt               \
-  RetroZilla/calendar/sunbird/config/version.txt   \
-  RetroZilla/ipc/ipcd                              \
-  RetroZilla/modules/libpr0n                       \
-  RetroZilla/modules/libmar                        \
-  RetroZilla/modules/libbz2                        \
-  RetroZilla/accessible                            \
-  RetroZilla/security/manager                      \
-  RetroZilla/toolkit                               \
-  RetroZilla/storage                               \
-  RetroZilla/db/sqlite3                            \
-  RetroZilla/db/morkreader                         \
-  RetroZilla/tools/test-harness                    \
+  ZoolRunner/browser/config/version.txt            \
+  ZoolRunner/mail/config/version.txt               \
+  ZoolRunner/calendar/sunbird/config/version.txt   \
+  ZoolRunner/ipc/ipcd                              \
+  ZoolRunner/modules/libpr0n                       \
+  ZoolRunner/modules/libmar                        \
+  ZoolRunner/modules/libbz2                        \
+  ZoolRunner/accessible                            \
+  ZoolRunner/security/manager                      \
+  ZoolRunner/toolkit                               \
+  ZoolRunner/storage                               \
+  ZoolRunner/db/sqlite3                            \
+  ZoolRunner/db/morkreader                         \
+  ZoolRunner/tools/test-harness                    \
   $(NULL)
 
 LOCALES_core :=                                 \
@@ -139,7 +139,7 @@ LOCALES_core :=                                 \
 
 MODULES_toolkit :=                              \
   $(MODULES_core)                               \
-  RetroZilla/chrome                                \
+  ZoolRunner/chrome                                \
   $(NULL)
 
 LOCALES_toolkit :=                              \
@@ -150,7 +150,7 @@ LOCALES_toolkit :=                              \
 
 MODULES_suite :=                                \
   $(MODULES_core)                               \
-  RetroZilla/suite                                 \
+  ZoolRunner/suite                                 \
   $(NULL)
 
 LOCALES_suite :=                                \
@@ -159,9 +159,9 @@ LOCALES_suite :=                                \
 
 MODULES_browser :=                              \
   $(MODULES_toolkit)                            \
-  RetroZilla/browser                               \
-  RetroZilla/other-licenses/branding/firefox       \
-  RetroZilla/other-licenses/7zstub/firefox         \
+  ZoolRunner/browser                               \
+  ZoolRunner/other-licenses/branding/firefox       \
+  ZoolRunner/other-licenses/7zstub/firefox         \
   $(NULL)
 
 LOCALES_browser :=                              \
@@ -172,11 +172,11 @@ LOCALES_browser :=                              \
   other-licenses/branding/firefox               \
   $(NULL)
 
-BOOTSTRAP_browser := RetroZilla/browser/config/mozconfig
+BOOTSTRAP_browser := ZoolRunner/browser/config/mozconfig
 
 MODULES_minimo :=                               \
   $(MODULES_toolkit)                            \
-  RetroZilla/minimo                                \
+  ZoolRunner/minimo                                \
   $(NULL)
 
 LOCALES_minimo :=                               \
@@ -186,9 +186,9 @@ LOCALES_minimo :=                               \
 
 MODULES_mail :=                                 \
   $(MODULES_toolkit)                            \
-  RetroZilla/mail                                  \
-  RetroZilla/other-licenses/branding/thunderbird   \
-  RetroZilla/other-licenses/7zstub/thunderbird     \
+  ZoolRunner/mail                                  \
+  ZoolRunner/other-licenses/branding/thunderbird   \
+  ZoolRunner/other-licenses/7zstub/thunderbird     \
   $(NULL)
 
 LOCALES_mail :=                                 \
@@ -199,20 +199,20 @@ LOCALES_mail :=                                 \
   extensions/spellcheck                         \
   $(NULL)
 
-BOOTSTRAP_mail := RetroZilla/mail/config/mozconfig
+BOOTSTRAP_mail := ZoolRunner/mail/config/mozconfig
 
 MODULES_composer :=                             \
   $(MODULES_toolkit)                            \
-  RetroZilla/composer                              \
+  ZoolRunner/composer                              \
   $(NULL)
 
 MODULES_calendar :=                             \
   $(MODULES_toolkit)                            \
-  RetroZilla/storage                               \
-  RetroZilla/db/sqlite3                            \
-  RetroZilla/calendar                              \
-  RetroZilla/other-licenses/branding/sunbird       \
-  RetroZilla/other-licenses/7zstub/sunbird         \
+  ZoolRunner/storage                               \
+  ZoolRunner/db/sqlite3                            \
+  ZoolRunner/calendar                              \
+  ZoolRunner/other-licenses/branding/sunbird       \
+  ZoolRunner/other-licenses/7zstub/sunbird         \
   $(NULL)
 
 LOCALES_calendar :=                             \
@@ -221,35 +221,35 @@ LOCALES_calendar :=                             \
   other-licenses/branding/sunbird               \
   $(NULL)
 
-BOOTSTRAP_calendar := RetroZilla/calendar/sunbird/config/mozconfig
+BOOTSTRAP_calendar := ZoolRunner/calendar/sunbird/config/mozconfig
 
 MODULES_xulrunner :=                            \
   $(MODULES_toolkit)                            \
-  RetroZilla/xulrunner                             \
+  ZoolRunner/xulrunner                             \
   $(NULL)
 
 LOCALES_xulrunner :=                            \
   $(LOCALES_toolkit)                            \
   $(NULL)
 
-BOOTSTRAP_xulrunner := RetroZilla/xulrunner/config/mozconfig
+BOOTSTRAP_xulrunner := ZoolRunner/xulrunner/config/mozconfig
 
 MODULES_macbrowser :=                           \
   $(MODULES_core)                               \
-  RetroZilla/camino                                \
+  ZoolRunner/camino                                \
   $(NULL)
 
-BOOTSTRAP_macbrowser := RetroZilla/camino/config/mozconfig
+BOOTSTRAP_macbrowser := ZoolRunner/camino/config/mozconfig
 
 MODULES_all :=                                  \
-  RetroZilla/other-licenses/bsdiff                 \
-  RetroZilla/other-licenses/libart_lgpl            \
-  RetroZilla/tools/trace-malloc                    \
-  RetroZilla/tools/jprof                           \
-  RetroZilla/tools/codesighs                       \
-  RetroZilla/tools/update-packaging                \
-  RetroZilla/other-licenses/branding               \
-  RetroZilla/other-licenses/7zstub                 \
+  ZoolRunner/other-licenses/bsdiff                 \
+  ZoolRunner/other-licenses/libart_lgpl            \
+  ZoolRunner/tools/trace-malloc                    \
+  ZoolRunner/tools/jprof                           \
+  ZoolRunner/tools/codesighs                       \
+  ZoolRunner/tools/update-packaging                \
+  ZoolRunner/other-licenses/branding               \
+  ZoolRunner/other-licenses/7zstub                 \
   $(NULL)
 
 #######################################################################
@@ -278,13 +278,13 @@ CWD   := /.
 endif
 
 ifneq (, $(wildcard client.mk))
-# Ran from mozilla directory
+# Ran from source directory
 ROOTDIR   := $(shell dirname $(CWD))
 TOPSRCDIR := $(CWD)
 else
-# Ran from RetroZilla/.. directory (?)
+# Ran from ZoolRunner/.. directory (?)
 ROOTDIR   := $(CWD)
-TOPSRCDIR := $(CWD)/mozilla
+TOPSRCDIR := $(CWD)/ZoolRunner
 endif
 
 # on os2, TOPSRCDIR may have two forward slashes in a row, which doesn't
@@ -345,16 +345,16 @@ LOCALES_CVSROOT ?= :pserver:anonymous@cvs-mirror.mozilla.org:/l10n
 
 # See build pages, http://www.mozilla.org/build/ for how to set up mozconfig.
 
-MOZCONFIG_LOADER := RetroZilla/build/autoconf/mozconfig2client-mk
-MOZCONFIG_FINDER := RetroZilla/build/autoconf/mozconfig-find 
-MOZCONFIG_MODULES := RetroZilla/build/unix/modules.mk RetroZilla/build/unix/uniq.pl
+MOZCONFIG_LOADER := $(TOPSRCDIR)/build/autoconf/mozconfig2client-mk
+MOZCONFIG_FINDER := $(TOPSRCDIR)/build/autoconf/mozconfig-find
+MOZCONFIG_MODULES := $(TOPSRCDIR)/build/unix/modules.mk $(TOPSRCDIR)/build/unix/uniq.pl
 run_for_side_effects := \
   $(shell cd $(ROOTDIR); \
      if test "$(_IS_FIRST_CHECKOUT)"; then \
         $(CVSCO) $(MOZCONFIG_FINDER) $(MOZCONFIG_LOADER) $(MOZCONFIG_MODULES); \
      else true; \
      fi; \
-     $(MOZCONFIG_LOADER) $(TOPSRCDIR) RetroZilla/.mozconfig.mk > RetroZilla/.mozconfig.out)
+     $(MOZCONFIG_LOADER) $(TOPSRCDIR) $(TOPSRCDIR)/.mozconfig.mk > $(TOPSRCDIR)/.mozconfig.out)
 include $(TOPSRCDIR)/.mozconfig.mk
 include $(TOPSRCDIR)/build/unix/modules.mk
 
@@ -423,8 +423,8 @@ endif # MOZ_BUILD_PROJECTS
 # CVS defines for NSS
 #
 NSS_CO_MODULE =               \
-		RetroZilla/security/nss      \
-		RetroZilla/security/coreconf \
+		ZoolRunner/security/nss      \
+		ZoolRunner/security/coreconf \
 		$(NULL)
 
 NSS_CO_FLAGS := -P
@@ -443,7 +443,7 @@ endif
 ####################################
 # CVS defines for NSPR
 #
-NSPR_CO_MODULE = RetroZilla/nsprpub
+NSPR_CO_MODULE = ZoolRunner/nsprpub
 NSPR_CO_FLAGS := -P
 ifdef MOZ_CO_FLAGS
   NSPR_CO_FLAGS := $(MOZ_CO_FLAGS)
@@ -460,7 +460,7 @@ endif
 ####################################
 # CVS defines for the C LDAP SDK
 #
-LDAPCSDK_CO_MODULE = RetroZilla/directory/c-sdk
+LDAPCSDK_CO_MODULE = ZoolRunner/directory/c-sdk
 LDAPCSDK_CO_FLAGS := -P
 ifdef MOZ_CO_FLAGS
   LDAPCSDK_CO_FLAGS := $(MOZ_CO_FLAGS)
@@ -479,8 +479,8 @@ else
   STANDALONE_CO_MODULE += allmakefiles.sh client.mk aclocal.m4 configure configure.in
   STANDALONE_CO_MODULE += Makefile.in
 
-	MOZ_MODULE_LIST += $(addprefix RetroZilla/,$(STANDALONE_CO_MODULE))
-  NOSUBDIRS_MODULE := $(addprefix RetroZilla/,$(BUILD_MODULE_CVS_NS))
+	MOZ_MODULE_LIST += $(addprefix ZoolRunner/,$(STANDALONE_CO_MODULE))
+  NOSUBDIRS_MODULE := $(addprefix ZoolRunner/,$(BUILD_MODULE_CVS_NS))
 
 ifeq (,$(filter $(NSPRPUB_DIR), $(BUILD_MODULE_CVS))$(MOZ_CO_PROJECT))
   CVSCO_NSPR :=
@@ -498,11 +498,11 @@ endif
 #
 
 ifdef MOZ_MAPINFO
-$(warning MOZ_MAPINFO is obsolete, use MOZ_CO_MODULE=RetroZilla/tools/codesighs instead.)
-MOZ_MODULE_LIST += RetroZilla/tools/codesighs
+$(warning MOZ_MAPINFO is obsolete, use MOZ_CO_MODULE=ZoolRunner/tools/codesighs instead.)
+MOZ_MODULE_LIST += ZoolRunner/tools/codesighs
 endif
 ifdef MOZ_INTERNAL_LIBART_LGPL
-$(error MOZ_INTERNAL_LIBART_LGPL is obsolete, use MOZ_CO_MODULE=RetroZilla/other-licenses/libart_lgpl instead.)
+$(error MOZ_INTERNAL_LIBART_LGPL is obsolete, use MOZ_CO_MODULE=ZoolRunner/other-licenses/libart_lgpl instead.)
 endif
 ifdef MOZ_PHOENIX
 $(warning MOZ_PHOENIX is obsolete.)
@@ -566,9 +566,9 @@ else
 override MOZ_CO_LOCALES := $(subst $(comma), ,$(MOZ_CO_LOCALES))
 
 ifeq (all,$(MOZ_CO_LOCALES))
-MOZCONFIG_MODULES += $(foreach project,$(MOZ_PROJECT_LIST),RetroZilla/$(project)/locales/all-locales)
+MOZCONFIG_MODULES += $(foreach project,$(MOZ_PROJECT_LIST),ZoolRunner/$(project)/locales/all-locales)
 
-LOCALE_CO_DIRS := $(sort $(foreach project,$(MOZ_PROJECT_LIST),$(foreach locale,$(shell cat RetroZilla/$(project)/locales/all-locales),$(foreach dir,$(LOCALES_$(project)),l10n/$(locale)/$(dir)))))
+LOCALE_CO_DIRS := $(sort $(foreach project,$(MOZ_PROJECT_LIST),$(foreach locale,$(shell cat ZoolRunner/$(project)/locales/all-locales),$(foreach dir,$(LOCALES_$(project)),l10n/$(locale)/$(dir)))))
 else # MOZ_CO_LOCALES != all
 LOCALE_CO_DIRS = $(sort $(foreach locale,$(MOZ_CO_LOCALES),$(foreach dir,$(LOCALE_DIRS),l10n/$(locale)/$(dir))))
 endif
@@ -620,14 +620,14 @@ checkout::
 ifdef RUN_AUTOCONF_LOCALLY
 	@echo "Removing local configures" ; \
 	cd $(ROOTDIR) && \
-	$(RM) -f RetroZilla/configure RetroZilla/nsprpub/configure \
-		RetroZilla/directory/c-sdk/configure
+	$(RM) -f ZoolRunner/configure ZoolRunner/nsprpub/configure \
+		ZoolRunner/directory/c-sdk/configure
 endif
 	@echo "checkout start: "`date` | tee $(CVSCO_LOGFILE)
-	@echo '$(CVSCO) $(CVS_CO_DATE_FLAGS) RetroZilla/client.mk $(MOZCONFIG_MODULES)'; \
+	@echo '$(CVSCO) $(CVS_CO_DATE_FLAGS) ZoolRunner/client.mk $(MOZCONFIG_MODULES)'; \
         cd $(ROOTDIR) && \
-	$(CVSCO) $(CVS_CO_DATE_FLAGS) RetroZilla/client.mk $(MOZCONFIG_MODULES)
-	@cd $(ROOTDIR) && $(MAKE) -f RetroZilla/client.mk real_checkout
+	$(CVSCO) $(CVS_CO_DATE_FLAGS) ZoolRunner/client.mk $(MOZCONFIG_MODULES)
+	@cd $(ROOTDIR) && $(MAKE) -f ZoolRunner/client.mk real_checkout
 
 #	Start the checkout. Split the output to the tty and a log file.
 
@@ -643,7 +643,7 @@ real_checkout:
 	$(CHECKOUT_LOCALES);
 	@echo "checkout finish: "`date` | tee -a $(CVSCO_LOGFILE)
 # update the NSS checkout timestamp
-	@if test `egrep -c '^(U|C) RetroZilla/security/(nss|coreconf)' $(CVSCO_LOGFILE) 2>/dev/null` != 0; then \
+	@if test `egrep -c '^(U|C) ZoolRunner/security/(nss|coreconf)' $(CVSCO_LOGFILE) 2>/dev/null` != 0; then \
 		touch $(TOPSRCDIR)/security/manager/.nss.checkout; \
 	fi
 #	@: Check the log for conflicts. ;
@@ -671,13 +671,13 @@ fast-update:
 ifdef RUN_AUTOCONF_LOCALLY
 	@echo "Removing local configures" ; \
 	cd $(ROOTDIR) && \
-	$(RM) -f RetroZilla/configure RetroZilla/nsprpub/configure \
-		RetroZilla/directory/c-sdk/configure
+	$(RM) -f ZoolRunner/configure ZoolRunner/nsprpub/configure \
+		ZoolRunner/directory/c-sdk/configure
 endif
 	@echo "checkout start: "`date` | tee $(CVSCO_LOGFILE)
-	@echo '$(CVSCO) RetroZilla/client.mk $(MOZCONFIG_MODULES)'; \
+	@echo '$(CVSCO) ZoolRunner/client.mk $(MOZCONFIG_MODULES)'; \
         cd $(ROOTDIR) && \
-	$(CVSCO) RetroZilla/client.mk $(MOZCONFIG_MODULES)
+	$(CVSCO) ZoolRunner/client.mk $(MOZCONFIG_MODULES)
 	@cd $(TOPSRCDIR) && \
 	$(MAKE) -f client.mk real_fast-update
 
@@ -690,14 +690,14 @@ real_fast-update:
 	fast_update $(CVSCO_NSPR); \
 	cd $(ROOTDIR); \
 	cvs_co $(CVSCO_NSS); \
-	cd mozilla; \
+	cd ZoolRunner; \
 	fast_update $(CVSCO_LDAPCSDK); \
 	$(FASTUPDATE_MODULES); \
 	$(FASTUPDATE_MODULES_NS); \
 	$(FASTUPDATE_LOCALES);
 	@echo "fast_update finish: "`date` | tee -a $(CVSCO_LOGFILE)
 # update the NSS checkout timestamp
-	@if test `egrep -c '^(U|C) RetroZilla/security/(nss|coreconf)' $(CVSCO_LOGFILE) 2>/dev/null` != 0; then \
+	@if test `egrep -c '^(U|C) ZoolRunner/security/(nss|coreconf)' $(CVSCO_LOGFILE) 2>/dev/null` != 0; then \
 		touch $(TOPSRCDIR)/security/manager/.nss.checkout; \
 	fi
 #	@: Check the log for conflicts. ;
@@ -726,24 +726,24 @@ l10n-checkout:
 	else true; \
 	fi
 	@echo "checkout start: "`date` | tee $(CVSCO_LOGFILE_L10N)
-	@echo '$(CVSCO) $(CVS_CO_DATE_FLAGS) RetroZilla/client.mk $(MOZCONFIG_MODULES)'; \
+	@echo '$(CVSCO) $(CVS_CO_DATE_FLAGS) ZoolRunner/client.mk $(MOZCONFIG_MODULES)'; \
         cd $(ROOTDIR) && \
-	$(CVSCO) $(CVS_CO_DATE_FLAGS) RetroZilla/client.mk $(MOZCONFIG_MODULES)
-	@cd $(ROOTDIR) && $(MAKE) -f RetroZilla/client.mk real_l10n-checkout
+	$(CVSCO) $(CVS_CO_DATE_FLAGS) ZoolRunner/client.mk $(MOZCONFIG_MODULES)
+	@cd $(ROOTDIR) && $(MAKE) -f ZoolRunner/client.mk real_l10n-checkout
 
-EN_US_CO_DIRS := $(sort $(foreach dir,$(LOCALE_DIRS),RetroZilla/$(dir)/locales)) \
-  $(foreach mod,$(MOZ_PROJECT_LIST),RetroZilla/$(mod)/config) \
-  RetroZilla/client.mk        \
+EN_US_CO_DIRS := $(sort $(foreach dir,$(LOCALE_DIRS),ZoolRunner/$(dir)/locales)) \
+  $(foreach mod,$(MOZ_PROJECT_LIST),ZoolRunner/$(mod)/config) \
+  ZoolRunner/client.mk        \
   $(MOZCONFIG_MODULES)     \
-  RetroZilla/configure        \
-  RetroZilla/configure.in     \
-  RetroZilla/allmakefiles.sh  \
-  RetroZilla/build            \
-  RetroZilla/config           \
+  ZoolRunner/configure        \
+  ZoolRunner/configure.in     \
+  ZoolRunner/allmakefiles.sh  \
+  ZoolRunner/build            \
+  ZoolRunner/config           \
   $(NULL)
 
 EN_US_CO_FILES_NS :=          \
-  RetroZilla/toolkit/mozapps/installer \
+  ZoolRunner/toolkit/mozapps/installer \
   $(NULL)
 
 #	Start the checkout. Split the output to the tty and a log file.

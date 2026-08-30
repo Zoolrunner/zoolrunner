@@ -2520,7 +2520,7 @@ sftk_oldVersionExists(const char *dir, int version)
  * the current system codepage.
  */
 
-/* hack to fix build breaking - retrozilla #81 */
+/* hack to fix build breaking - ZoolRunner issue #81 */
 #ifndef WC_NO_BEST_FIT_CHARS
 #define WC_NO_BEST_FIT_CHARS      0x00000400
 #endif
