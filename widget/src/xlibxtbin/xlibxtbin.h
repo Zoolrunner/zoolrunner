@@ -41,6 +41,7 @@
 #ifndef __XLIB_XTBIN_H__
 #define __XLIB_XTBIN_H__
 
+#include "nscore.h"
 #include "xlibrgb.h"
 
 #include <X11/Intrinsic.h>
@@ -98,7 +99,7 @@ typedef struct _WidgetRec {
 }
 #endif /* __cplusplus */
 
-class xtbin {
+class NS_EXPORT xtbin {
 public:
   xtbin();
   ~xtbin();
@@ -127,4 +128,3 @@ private:
 
 
 #endif /* __XLIB_XTBIN_H__ */
-

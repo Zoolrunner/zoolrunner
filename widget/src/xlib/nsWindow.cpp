@@ -270,8 +270,10 @@ PRBool nsWindow::OnExpose(nsPaintEvent &event)
 NS_IMETHODIMP nsWindow::Show(PRBool bState)
 {
   // don't show if we are too small
-  if (mIsTooSmall)
+  if (bState && mIsTooSmall) {
+    mIsShown = PR_TRUE;
     return NS_OK;
+  }
 
   if (bState) {
     if (mIsToplevel) {
@@ -426,6 +428,15 @@ NS_IMETHODIMP nsWindow::Resize(PRInt32 aWidth,
   /* PRInt32 sizeHeight = aHeight;
   PRInt32 sizeWidth = aWidth; */
 
+  if ((mWindowType == eWindowType_toplevel ||
+       mWindowType == eWindowType_dialog) &&
+      (aWidth <= 1 || aHeight <= 1)) {
+    if (aWidth <= 1)
+      aWidth = 610;
+    if (aHeight <= 1)
+      aHeight = 450;
+  }
+
   mBounds.width  = aWidth;
   mBounds.height = aHeight;
 
@@ -438,7 +449,7 @@ NS_IMETHODIMP nsWindow::Resize(PRInt32 aWidth,
     aWidth = 1;
     aHeight = 1;
     mIsTooSmall = PR_TRUE;
-    Show(PR_FALSE);
+    Unmap();
   }
   else
   {
@@ -481,6 +492,29 @@ NS_IMETHODIMP nsWindow::Resize(PRInt32 aX,
                                PRBool   aRepaint)
 {
   //printf("nsWindow::Resize aX=%i, aY=%i, aWidth=%i, aHeight=%i\n", aX,aY,aWidth,aHeight);
+  PRBool NeedToShow = PR_FALSE;
+
+  if ((mWindowType == eWindowType_toplevel ||
+       mWindowType == eWindowType_dialog) &&
+      (aWidth <= 1 || aHeight <= 1)) {
+    if (aWidth <= 1)
+      aWidth = 610;
+    if (aHeight <= 1)
+      aHeight = 450;
+  }
+
+  if (aWidth <= 1 || aHeight <= 1) {
+    aWidth = 1;
+    aHeight = 1;
+    mIsTooSmall = PR_TRUE;
+    Unmap();
+  }
+  else {
+    if (mIsTooSmall) {
+      NeedToShow = mIsShown;
+      mIsTooSmall = PR_FALSE;
+    }
+  }
 
   nsWidget::Resize(aX, aY, aWidth, aHeight, aRepaint);
 
@@ -492,6 +526,10 @@ NS_IMETHODIMP nsWindow::Resize(PRInt32 aX,
   AddRef();
   OnResize(sevent);
   Release();
+  if (NeedToShow)
+    Show(PR_TRUE);
+  if (aRepaint)
+    Invalidate(PR_FALSE);
   return NS_OK;
 }
 
@@ -799,5 +837,3 @@ ChildWindow::ChildWindow(): nsWindow()
 {
   mName.AssignLiteral("nsChildWindow");
 }
-
-

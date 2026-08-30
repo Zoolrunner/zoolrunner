@@ -122,6 +122,18 @@ nsFontMetricsXlibContext      *nsDeviceContextXlib::mFontMetricsContext = nsnull
 nsRenderingContextXlibContext *nsDeviceContextXlib::mRCContext          = nsnull;
 int                            nsDeviceContextXlib::mContextCounter     = 0;
 
+void
+nsDeviceContextXlib::GetFontMetricsContext(nsFontMetricsXlibContext *&aContext)
+{
+  aContext = mFontMetricsContext;
+}
+
+void
+nsDeviceContextXlib::GetRCContext(nsRenderingContextXlibContext *&aContext)
+{
+  aContext = mRCContext;
+}
+
 NS_IMETHODIMP nsDeviceContextXlib::Init(nsNativeWidget aNativeWidget)
 {
   PR_LOG(DeviceContextXlibLM, PR_LOG_DEBUG, ("nsDeviceContextXlib::Init()\n"));
@@ -174,17 +186,18 @@ nsDeviceContextXlib::CommonInit(void)
     nsresult res;
     nsCOMPtr<nsIPref> prefs(do_GetService(kPrefCID, &res));
     if (NS_SUCCEEDED(res) && prefs) {
-      PRInt32 intVal = 96;
+      PRInt32 intVal = -1;
       res = prefs->GetIntPref("layout.css.dpi", &intVal);
       if (NS_SUCCEEDED(res)) {
-        if (intVal) {
+        if (intVal > 0) {
           dpi = intVal;
         }
-        else {
+        else if (intVal == 0) {
           // Compute dpi of display
           float screenWidth = float(XWidthOfScreen(mScreen));
           float screenWidthIn = float(XWidthMMOfScreen(mScreen)) / 25.4f;
-          dpi = nscoord(screenWidth / screenWidthIn);
+          if (screenWidthIn > 0.0f)
+            dpi = nscoord(screenWidth / screenWidthIn);
         }
       }
     }
@@ -538,5 +551,3 @@ NS_IMETHODIMP nsDeviceContextXlib::CreateFontCache()
   }
   return mFontCache->Init(this);
 }
-
-

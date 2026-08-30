@@ -86,8 +86,8 @@ public:
              { aHandle =  mXlibRgbHandle; return NS_OK; }
   XlibRgbHandle *GetXlibRgbHandle() { return mXlibRgbHandle; }
   NS_IMETHOD GetDepth( PRUint32 &depth ) { depth = (PRUint32)mDepth; return NS_OK; }
-  virtual void GetFontMetricsContext(nsFontMetricsXlibContext *&aContext) { aContext = mFontMetricsContext; };
-  virtual void GetRCContext(nsRenderingContextXlibContext *&aContext) { aContext = mRCContext; };
+  virtual void GetFontMetricsContext(nsFontMetricsXlibContext *&aContext);
+  virtual void GetRCContext(nsRenderingContextXlibContext *&aContext);
 
 protected:
   virtual ~nsDeviceContextXlib();
@@ -113,4 +113,3 @@ private:
 };
 
 #endif /* !nsDeviceContextXlib_h__ */
-

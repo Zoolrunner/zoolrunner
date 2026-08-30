@@ -9533,6 +9533,50 @@ else
   echo "$ac_t""no" 1>&6
 fi
 
+if test "$FT2_CONFIG" = "no" ; then
+  # Extract the first word of "pkg-config", so it can be a program name with args.
+set dummy pkg-config; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:9537: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_path_PKG_CONFIG'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  case "$PKG_CONFIG" in
+  /*)
+  ac_cv_path_PKG_CONFIG="$PKG_CONFIG" # Let the user override the test with a path.
+  ;;
+  ?:/*)
+  ac_cv_path_PKG_CONFIG="$PKG_CONFIG" # Let the user override the test with a dos path.
+  ;;
+  *)
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
+  ac_dummy="$PATH"
+  for ac_dir in $ac_dummy; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_path_PKG_CONFIG="$ac_dir/$ac_word"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+  test -z "$ac_cv_path_PKG_CONFIG" && ac_cv_path_PKG_CONFIG="no"
+  ;;
+esac
+fi
+PKG_CONFIG="$ac_cv_path_PKG_CONFIG"
+if test -n "$PKG_CONFIG"; then
+  echo "$ac_t""$PKG_CONFIG" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+  if test "$PKG_CONFIG" != "no" && $PKG_CONFIG --exists freetype2 ; then
+    FT2_CONFIG="$PKG_CONFIG"
+    ft_config_args="freetype2"
+    ft_config_version_args="--modversion freetype2"
+  fi
+fi
+
 
 min_ft_version=6.1.0
 echo $ac_n "checking for FreeType - version >= $min_ft_version""... $ac_c" 1>&6
@@ -9543,11 +9587,14 @@ if test "$FT2_CONFIG" = "no" ; then
 else
   FT2_CFLAGS=`$FT2_CONFIG $ft_config_args --cflags`
   FT2_LIBS=`$FT2_CONFIG $ft_config_args --libs`
-  ft_config_major_version=`$FT2_CONFIG $ft_config_args --version | \
+  if test -z "$ft_config_version_args" ; then
+    ft_config_version_args="$ft_config_args --version"
+  fi
+  ft_config_major_version=`$FT2_CONFIG $ft_config_version_args | \
          sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\1/'`
-  ft_config_minor_version=`$FT2_CONFIG $ft_config_args --version | \
+  ft_config_minor_version=`$FT2_CONFIG $ft_config_version_args | \
          sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\2/'`
-  ft_config_micro_version=`$FT2_CONFIG $ft_config_args --version | \
+  ft_config_micro_version=`$FT2_CONFIG $ft_config_version_args | \
          sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\3/'`
   ft_min_major_version=`echo $min_ft_version | \
          sed 's/\([0-9]*\).\([0-9]*\).\([0-9]*\)/\1/'`
@@ -9580,37 +9627,38 @@ else
       ac_save_LIBS="$LIBS"
       CFLAGS="$CFLAGS $FT2_CFLAGS"
       LIBS="$FT2_LIBS $LIBS"
-      if test "$cross_compiling" = yes; then
-  echo $ac_n "cross compiling; assumed OK... $ac_c"
-else
-  cat > conftest.$ac_ext <<EOF
+      cat > conftest.$ac_ext <<EOF
 #line 9588 "configure"
 #include "confdefs.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_CACHE_H
+#include FT_CACHE_IMAGE_H
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 int
 main()
 {
   FT_Library library;
   FT_Error error;
-
+  FTC_Image_Cache image_cache;
+  FTC_Image_Desc image_desc;
+  FTC_Font font;
+  image_cache = 0;
+  memset(&image_desc, 0, sizeof(image_desc));
+  memset(&font, 0, sizeof(font));
   error = FT_Init_FreeType(&library);
-
   if (error)
     return 1;
-  else
-  {
-    FT_Done_FreeType(library);
-    return 0;
-  }
+  FT_Done_FreeType(library);
+  return 0;
 }
 
 EOF
-if { (eval echo configure:9614: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext} && (./conftest; exit) 2>/dev/null
+if { (eval echo configure:9614: \"$ac_link\") 1>&5; (eval $ac_link) 2>&5; } && test -s conftest${ac_exeext}
 then
   :
 else
@@ -9620,7 +9668,6 @@ else
   no_ft=yes
 fi
 rm -fr conftest*
-fi
 
       CFLAGS="$ac_save_CFLAGS"
       LIBS="$ac_save_LIBS"
@@ -9634,7 +9681,7 @@ if test "x$ft_config_is_lt" != "xyes" ; then
   else
      echo "$ac_t""no" 1>&6
      if test "$FT2_CONFIG" = "no" ; then
-       echo "*** The freetype-config script installed by FreeType 2 could not be found."
+       echo "*** Neither freetype-config nor pkg-config metadata for FreeType 2 could be found."
        echo "*** If FreeType 2 was installed in PREFIX, make sure PREFIX/bin is in"
        echo "*** your path, or set the FT2_CONFIG environment variable to the"
        echo "*** full path to freetype-config."

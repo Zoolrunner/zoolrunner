@@ -598,9 +598,11 @@ void nsRenderingContextXlib::UpdateGC()
    values.foreground = color;
    valuesMask |= GCForeground;
 
-   if (mCurrentFont && mCurrentFont->GetXFontStruct()) {
+   nsXFont *xFont = mCurrentFont ? mCurrentFont->GetXFont() : nsnull;
+   XFontStruct *xFontStruct = xFont ? xFont->GetXFontStruct() : nsnull;
+   if (xFontStruct) {
      valuesMask |= GCFont;
-     values.font = mCurrentFont->GetXFontStruct()->fid;
+     values.font = xFontStruct->fid;
    }
  
    values.line_style = mLineStyle;
@@ -2534,4 +2536,3 @@ nsRenderingContextXlib::ReleaseBackbuffer(void)
    * the backbuffer as needed and it doesn't cause a performance hit. @see bug 95952 */
   return DestroyCachedBackbuffer();
 }
-

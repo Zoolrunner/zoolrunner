@@ -110,6 +110,18 @@ NS_IMPL_ISUPPORTS_INHERITED1(nsDeviceContextXp,
                              DeviceContextImpl,
                              nsIDeviceContextXp)
 
+void
+nsDeviceContextXp::GetFontMetricsContext(nsFontMetricsXlibContext *&aContext)
+{
+  aContext = mFontMetricsContext;
+}
+
+void
+nsDeviceContextXp::GetRCContext(nsRenderingContextXlibContext *&aContext)
+{
+  aContext = mRCContext;
+}
+
 /** ---------------------------------------------------
  *  See documentation in nsDeviceContextXp.h
  * 
@@ -412,5 +424,4 @@ NS_IMETHODIMP nsDeviceContextXp::CreateFontCache()
   }
   return mFontCache->Init(this);
 }
-
 

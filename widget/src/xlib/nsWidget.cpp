@@ -649,6 +649,8 @@ NS_IMETHODIMP nsWidget::Show(PRBool bState)
   PR_LOG(XlibWidgetsLM, PR_LOG_DEBUG, ("nsWidget::Show()\n"));
   PR_LOG(XlibWidgetsLM, PR_LOG_DEBUG, ("state is %d\n", bState));
 
+  mIsShown = bState;
+
   if (bState) {
         Map();
   } else {
@@ -1534,4 +1536,3 @@ NS_IMETHODIMP nsWidget::CaptureRollupEvents(nsIRollupListener * aListener, PRBoo
 {
   return NS_OK;
 }
-

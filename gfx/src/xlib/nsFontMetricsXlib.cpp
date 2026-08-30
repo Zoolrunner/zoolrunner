@@ -1756,6 +1756,9 @@ nsXFontNormal::DrawText8(Drawable aDrawable, GC aGC,
                          PRInt32 aX, PRInt32 aY,
                          const char *aString, PRUint32 aLength)
 {
+  if (!mXFont || !aGC || !aString || aLength == 0)
+    return;
+
   XDrawString(mDisplay, aDrawable, aGC, aX, aY, aString, PR_MIN(aLength, 32767));
 }
 
@@ -1764,6 +1767,9 @@ nsXFontNormal::DrawText16(Drawable aDrawable, GC aGC,
                           PRInt32 aX, PRInt32 aY,
                           const XChar2b *aString, PRUint32 aLength)
 {
+  if (!mXFont || !aGC || !aString || aLength == 0)
+    return;
+
   XDrawString16(mDisplay, aDrawable, aGC, aX, aY, aString, PR_MIN(aLength, 32767));
 }
 
@@ -1772,6 +1778,8 @@ nsXFontNormal::GetXFontProperty(Atom aAtom, unsigned long *aValue)
 {
   NS_ASSERTION(mXFont, "GetXFontProperty called before font loaded");
   if (mXFont==nsnull)
+    return PR_FALSE;
+  if (mXFont->n_properties <= 0 || mXFont->properties == nsnull)
     return PR_FALSE;
 
   return ::XGetFontProperty(mXFont, aAtom, aValue);
@@ -2197,7 +2205,7 @@ void nsFontMetricsXlib::RealizeFont()
     printf("xHeight=%d\n", mXHeight);
 #endif
   }
-  else 
+  else
   {
     // 56% of ascent, best guess for non-true type
     mXHeight = NSToCoordRound((float) fontInfo->ascent* f * 0.56f);
@@ -3166,6 +3174,22 @@ MOZ_DECL_CTOR_COUNTER(nsFontXlib)
 nsFontXlib::nsFontXlib()
 {
   MOZ_COUNT_CTOR(nsFontXlib);
+  mFontMetricsContext = nsnull;
+  mCCMap = nsnull;
+  mCharSetInfo = nsnull;
+  mName = nsnull;
+  mUserDefinedFont = nsnull;
+  mSize = 0;
+#ifdef USE_AASB
+  mAABaseSize = 0;
+#endif /* USE_AASB */
+  mBaselineAdjust = 0;
+  mMaxAscent = 0;
+  mMaxDescent = 0;
+  mFont = nsnull;
+  mFontHolder = nsnull;
+  mXFont = nsnull;
+  mAlreadyCalledLoadFont = PR_FALSE;
 }
 
 nsFontXlib::~nsFontXlib()
@@ -3242,6 +3266,9 @@ nsFontXlibNormal::GetWidth(const PRUnichar* aString, PRUint32 aLength)
       return 0;
     }
   }
+  if (!mXFont || !mXFont->GetXFontStruct()) {
+    return 0;
+  }
 
   XChar2b buf[512];
   char *p;
@@ -3250,6 +3277,10 @@ nsFontXlibNormal::GetWidth(const PRUnichar* aString, PRUint32 aLength)
                          aString, aLength, buf, sizeof(buf), bufLen);
   int len = mCharSetInfo->Convert(mCharSetInfo, mXFont->GetXFontStruct(),
                                   aString, aLength, p, bufLen);
+  if (len <= 0) {
+    ENCODER_BUFFER_FREE_IF_NEEDED(p, buf);
+    return 0;
+  }
   int outWidth;
   if (mXFont->IsSingleByte())
     outWidth = mXFont->TextWidth8(p, len);
@@ -3270,6 +3301,11 @@ nsFontXlibNormal::DrawString(nsRenderingContextXlib* aContext,
     if (!mFont) {
       return 0;
     }
+    aContext->SetCurrentFont(this);
+    aContext->UpdateGC();
+  }
+  if (!mXFont || !mXFont->GetXFontStruct()) {
+    return 0;
   }
 
   XChar2b buf[512];
@@ -3279,7 +3315,15 @@ nsFontXlibNormal::DrawString(nsRenderingContextXlib* aContext,
                          aString, aLength, buf, sizeof(buf), bufLen);
   int len = mCharSetInfo->Convert(mCharSetInfo, mXFont->GetXFontStruct(),
                                   aString, aLength, p, bufLen);
+  if (len <= 0) {
+    ENCODER_BUFFER_FREE_IF_NEEDED(p, buf);
+    return 0;
+  }
   xGC *gc = aContext->GetGC();
+  if (!gc) {
+    ENCODER_BUFFER_FREE_IF_NEEDED(p, buf);
+    return 0;
+  }
   int outWidth;
   if (mXFont->IsSingleByte()) {
     mXFont->DrawText8(aSurface->GetDrawable(), *gc, aX,
@@ -3588,12 +3632,19 @@ nsFontXlibUserDefined::Convert(const PRUnichar* aSrc, PRInt32 aSrcLen,
 int
 nsFontXlibUserDefined::GetWidth(const PRUnichar* aString, PRUint32 aLength)
 {
+  if (!mXFont || !mXFont->GetXFontStruct())
+    return 0;
+
   char buf[1024];
   char *p;
   PRInt32 bufLen;
   ENCODER_BUFFER_ALLOC_IF_NEEDED(p, mFontMetricsContext->mUserDefinedConverter,
                          aString, aLength, buf, sizeof(buf), bufLen);
   PRUint32 len = Convert(aString, aLength, p, bufLen);
+  if (len == 0) {
+    ENCODER_BUFFER_FREE_IF_NEEDED(p, buf);
+    return 0;
+  }
 
   int outWidth;
   if (mXFont->IsSingleByte())
@@ -3610,13 +3661,26 @@ nsFontXlibUserDefined::DrawString(nsRenderingContextXlib* aContext,
                                   nscoord aX, nscoord aY,
                                   const PRUnichar* aString, PRUint32 aLength)
 {
+  if (!mXFont || !mXFont->GetXFontStruct())
+    return 0;
+
   char  buf[1024];
   char *p;
   PRInt32 bufLen;
   ENCODER_BUFFER_ALLOC_IF_NEEDED(p, mFontMetricsContext->mUserDefinedConverter,
                          aString, aLength, buf, sizeof(buf), bufLen);
   PRUint32 len = Convert(aString, aLength, p, bufLen);
+  if (len == 0) {
+    ENCODER_BUFFER_FREE_IF_NEEDED(p, buf);
+    return 0;
+  }
+  aContext->SetCurrentFont(this);
+  aContext->UpdateGC();
   xGC *gc = aContext->GetGC();
+  if (!gc) {
+    ENCODER_BUFFER_FREE_IF_NEEDED(p, buf);
+    return 0;
+  }
 
   int outWidth;
   if (mXFont->IsSingleByte()) {

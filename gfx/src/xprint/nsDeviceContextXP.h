@@ -100,8 +100,8 @@ public:
 
   NS_IMETHOD         CreateFontCache();
 
-  virtual void GetFontMetricsContext(nsFontMetricsXlibContext *&aContext) { aContext = mFontMetricsContext; };
-  virtual void GetRCContext(nsRenderingContextXlibContext *&aContext) { aContext = mRCContext; };
+  virtual void GetFontMetricsContext(nsFontMetricsXlibContext *&aContext);
+  virtual void GetRCContext(nsRenderingContextXlibContext *&aContext);
  
 protected:
   virtual         ~nsDeviceContextXp();
