@@ -329,14 +329,29 @@ nsPrefWindow.prototype =
         function ()
           {
             var prefPanelTree = document.getElementById( "prefsTree" );
-            var selectedItem = prefPanelTree.contentView.getItemAtIndex(prefPanelTree.currentIndex);
+            var selectedIndex = prefPanelTree.currentIndex;
+            if ( selectedIndex < 0 )
+              return;
+
+            var contentView = prefPanelTree.contentView
+                                           .QueryInterface(Components.interfaces.nsITreeContentView);
+            var selectedItem = contentView.getItemAtIndex(selectedIndex);
+            if ( !selectedItem )
+              return;
 
             var oldURL = document.getElementById( this.contentFrame ).getAttribute("tag");
             if( !oldURL )
                 oldURL = document.getElementById( this.contentFrame ).getAttribute("src");
             this.wsm.savePageData( oldURL );      // save data from the current page. 
-            var newURL = selectedItem.firstChild.firstChild.getAttribute("url");
-            var newTag = selectedItem.firstChild.firstChild.getAttribute("tag");
+            var selectedCell = selectedItem.getElementsByTagName("treecell")[0];
+            if ( !selectedCell )
+              return;
+
+            var newURL = selectedCell.getAttribute("url");
+            var newTag = selectedCell.getAttribute("tag");
+            if ( !newURL )
+              return;
+
             if( newURL != oldURL )
               {
                 document.getElementById( this.contentFrame ).setAttribute( "src", newURL );
@@ -414,10 +429,12 @@ nsPrefWindow.prototype =
           var panelTree = document.getElementById( "prefsTree" );
           var selectItem = document.getElementById( aSelectItem );
           var selectItemroot = document.getElementById( aComponentName );
-          var parentIndex = panelTree.contentView.getIndexOfItem( selectItemroot );
+          var contentView = panelTree.contentView
+                                     .QueryInterface(Components.interfaces.nsITreeContentView);
+          var parentIndex = contentView.getIndexOfItem( selectItemroot );
           if (parentIndex != -1 && !panelTree.view.isContainerOpen(parentIndex))
              panelTree.view.toggleOpenState(parentIndex);
-          var index = panelTree.view.getIndexOfItem( selectItem );
+          var index = contentView.getIndexOfItem( selectItem );
           if (index == -1)
             return;
           panelTree.view.selection.select( index );

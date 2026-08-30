@@ -185,6 +185,8 @@ Significant work completed after the RetroZilla baseline includes:
   traversal, invalid ownership assumptions, and LP64/64-bit assumptions.
 * Hardened selected XML/navigation teardown paths and malformed-content handling
   so unsupported content is less likely to crash the process.
+* Fixed XPFE Preferences category switching so selecting pages in the left-hand
+  tree updates the displayed preference pane.
 * Restored the xlib browser build far enough to create and paint browser
   windows on the current Linux development system, including fixes for popup
   menu positioning in the xlib widget backend.
