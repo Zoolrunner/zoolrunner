@@ -408,29 +408,17 @@ NS_IMETHODIMP nsWidget::Move(PRInt32 aX, PRInt32 aY)
   mBounds.y = aY;
 
   if (mWindowType == eWindowType_popup) {
-    nsRect aRect, transRect;
     PRInt32 screenWidth = WidthOfScreen(mScreen);
     PRInt32 screenHeight = HeightOfScreen(mScreen);
 
-    if (aX >= screenWidth)
+    if (aX + mBounds.width > screenWidth)
       aX = screenWidth - mBounds.width;
-    if (aY >= screenHeight)
+    if (aY + mBounds.height > screenHeight)
       aY = screenHeight - mBounds.height;
-
-    aRect.x = aX;
-    aRect.y = aY;
-
-    if (mParentWidget) {
-      mParentWidget->WidgetToScreen(aRect, transRect);
-    } else if (mParentWindow) {
-      Window child;
-      XTranslateCoordinates(mDisplay, mParentWindow,
-                            XRootWindowOfScreen(mScreen),
-                            aX, aY, &transRect.x, &transRect.y,
-                            &child);
-    }
-    aX = transRect.x;
-    aY = transRect.y;
+    if (aX < 0)
+      aX = 0;
+    if (aY < 0)
+      aY = 0;
   }
 
   mRequestedSize.x = aX;
