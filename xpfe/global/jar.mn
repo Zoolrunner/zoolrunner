@@ -22,8 +22,6 @@ toolkit.jar:
         content/global/aboutAbout.html              (resources/content/aboutAbout.html)
         content/global/aboutCredits.html            (resources/content/aboutCredits.html)
         content/global/aboutCredits.css             (resources/content/aboutCredits.css)
-        content/global/aboutChangelog.html          (resources/content/aboutChangelog.html)
-        content/global/aboutChangelog.css           (resources/content/aboutChangelog.css)
         content/global/aboutDebug.html              (resources/content/aboutDebug.html)
         content/global/aboutDebug.js                (resources/content/aboutDebug.js)
         content/global/aboutHome.html               (resources/content/aboutHome.html)

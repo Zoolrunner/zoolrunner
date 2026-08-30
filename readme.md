@@ -148,6 +148,8 @@ Significant work completed after the RetroZilla baseline includes:
   and pkg-config layouts.
 * Added or repaired runtime packaging for browser components and NSS private
   freebl libraries needed by the built application.
+* Removed the obsolete in-product changelog page and changed release/startup
+  links that referenced it to use the active ZoolRunner information page.
 * Fixed several startup and browsing crashes caused by undefined initialization,
   ownership, and teardown assumptions in old Gecko code.
 * Fixed categories of memory-safety and portability defects exposed while

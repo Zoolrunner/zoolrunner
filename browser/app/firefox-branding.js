@@ -1,5 +1,5 @@
-pref("startup.homepage_override_url","about:changelog");
-pref("startup.homepage_welcome_url","about:changelog");
+pref("startup.homepage_override_url","about:zoolrunner");
+pref("startup.homepage_welcome_url","about:zoolrunner");
 // URL user can browse to manually if for some reason all update installation
 // attempts fail.
 pref("app.update.url.manual", "about:zoolrunner");
@@ -7,7 +7,7 @@ pref("app.update.url.manual", "about:zoolrunner");
 // supplied in the "An update is available" page of the update wizard. 
 
 // Release notes URL
-pref("app.releaseNotesURL", "about:changelog");
+pref("app.releaseNotesURL", "about:zoolrunner");
 
 // Search codes belong only in builds with official branding
 pref("browser.search.param.yahoo-fr", "");

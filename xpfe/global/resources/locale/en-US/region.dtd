@@ -1,5 +1,5 @@
 <!-- brand.dtd -->
 <!ENTITY  vendorURL             "about:zoolrunner">
-#expand <!ENTITY  releaseURL            "about:changelog">
+#expand <!ENTITY  releaseURL            "about:zoolrunner">
 <!ENTITY  getNewThemesURL       "http://www.mozilla.org/themes/download/">
 #expand <!ENTITY  content.version       "__MOZILLA_REGION_VERSION__">

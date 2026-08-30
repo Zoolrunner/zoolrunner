@@ -1291,7 +1291,6 @@ nsScriptSecurityManager::GetBaseURIScheme(nsIURI* aURI,
         NS_ENSURE_SUCCESS(rv, rv);
         if (path.EqualsLiteral("blank")   ||
             path.EqualsLiteral("mozilla") ||
-            path.EqualsLiteral("changelog") ||
             path.EqualsLiteral("zoolrunner") ||
             path.EqualsLiteral("debug") ||
             path.EqualsLiteral("logo")    ||
@@ -3821,4 +3820,3 @@ nsScriptSecurityManager::PrintPolicyDB()
     printf("############## End Capabilities ###############\n");
 }
 #endif
-
