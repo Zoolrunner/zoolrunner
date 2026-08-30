@@ -123,6 +123,11 @@ The build configuration is intentionally kept inside the source tree and uses
 `obj-zoolrunner-linux` as the object directory. When the optional in-tree libIDL
 bootstrap is enabled, libIDL is also built inside that object directory.
 
+An experimental xlib browser build is also available through `mozconfig.xlib`.
+It builds into `obj-zoolrunner-xlib` and is used to exercise the restored
+low-dependency X11 widget path. This backend is less complete than the GTK2
+build and should currently be treated as development work.
+
 Run the browser test application from the built dist directory:
 
 ```sh
@@ -157,6 +162,9 @@ Significant work completed after the RetroZilla baseline includes:
   traversal, invalid ownership assumptions, and LP64/64-bit assumptions.
 * Hardened selected XML/navigation teardown paths and malformed-content handling
   so unsupported content is less likely to crash the process.
+* Restored the xlib browser build far enough to create and paint browser
+  windows on the current Linux development system, including fixes for popup
+  menu positioning in the xlib widget backend.
 
 This list is intentionally not a commit log. Individual bug fixes remain in Git
 history and should be tracked there or in a separate changelog.
@@ -198,6 +206,7 @@ current build status varies by target.
 Currently verified in this development branch:
 
 * Linux browser build on LoongArch64 with GCC and GTK2.
+* Experimental Linux browser build on LoongArch64 with GCC and xlib.
 
 Source-present or inherited targets include:
 
