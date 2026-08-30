@@ -201,8 +201,9 @@ Bundled dependency versions verified directly from the source tree include:
 * NSS: `3.42` with the tree's customized beta marker, in
   `security/nss/lib/nss/nss.h`.
 * NSPR: `4.7.7`, in `nsprpub/pr/include/prinit.h`.
-* SQLite used by the Mozilla storage layer: `3.3.5`, in
-  `db/sqlite3/src/sqlite3.h`.
+* SQLite used by the Mozilla storage layer: updated from `3.3.5` to `3.53.4`,
+  in `db/sqlite3/src/sqlite3.h`.  The old copy's README incorrectly claimed
+  `3.3.4`.
 * SQLite bundled inside NSS: `3.7.15`, in `security/nss/lib/sqlite/sqlite3.h`.
 * libpng: `1.2.35`, in `modules/libimg/png/png.h`.
 * zlib used by the Mozilla tree: `1.3.2`, in `modules/zlib/src/zlib.h`.

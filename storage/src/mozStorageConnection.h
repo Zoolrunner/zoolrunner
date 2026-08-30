@@ -79,8 +79,7 @@ protected:
     nsCOMPtr<nsIMutableArray> mFunctions;
 
     // This isn't accessed but is used to make sure that the connections do
-    // not outlive the service. The service, for example, owns certain locks
-    // in mozStorageAsyncIO file that the connections depend on.
+    // not outlive the service.
     nsCOMPtr<mozIStorageService> mStorageService;
 };
 

@@ -45,7 +45,6 @@
 #include "plstr.h"
 
 #include "sqlite3.h"
-#include "sqlite3file.h"
 
 NS_IMPL_THREADSAFE_ISUPPORTS2(mozStorageService, mozIStorageService, nsIObserver)
 
@@ -67,10 +66,9 @@ mozStorageService::~mozStorageService()
 nsresult
 mozStorageService::Init()
 {
-    // The service must be initialized on the main thread. The
-    // InitStorageAsyncIO function creates a thread which is joined with the
-    // main thread during shutdown. If the thread is created from a random
-    // thread, we'll join to the wrong parent.
+    // Keep service initialization on the main thread. Historical builds used
+    // this point to install SQLite async I/O hooks; modern SQLite uses its VFS
+    // directly and the hook methods are synchronous no-ops.
     NS_ENSURE_STATE(nsIThread::IsMainThread());
 
     // this makes multiple connections to the same database share the same pager
