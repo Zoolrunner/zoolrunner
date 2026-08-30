@@ -219,7 +219,8 @@
           // collecting the child nodes could trigger constructors
           // which would blow away our list.
           var radioChildren = [];
-          var iterator = this.ownerDocument.createTreeWalker(this, NodeFilter.SHOW_ELEMENT, this._filterRadioGroup, true);
+          var showElement = Components.interfaces.nsIDOMNodeFilter.SHOW_ELEMENT;
+          var iterator = this.ownerDocument.createTreeWalker(this, showElement, this._filterRadioGroup, true);
           while (iterator.nextNode())
             radioChildren.push(iterator.currentNode);
           return this.mRadioChildren = radioChildren;
@@ -231,10 +232,10 @@
         <body>
         <![CDATA[
           switch (node.localName) {
-            case "radio": return NodeFilter.FILTER_ACCEPT;
+            case "radio": return Components.interfaces.nsIDOMNodeFilter.FILTER_ACCEPT;
             case "template":
-            case "radiogroup": return NodeFilter.FILTER_REJECT;
-            default: return NodeFilter.FILTER_SKIP;
+            case "radiogroup": return Components.interfaces.nsIDOMNodeFilter.FILTER_REJECT;
+            default: return Components.interfaces.nsIDOMNodeFilter.FILTER_SKIP;
           }
         ]]>
         </body>

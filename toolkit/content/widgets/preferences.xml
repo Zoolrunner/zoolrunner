@@ -583,7 +583,21 @@
             this._fireEvent("paneload", panes[i]);
           }
         }
-        this.showPane(paneToLoad);
+        var prefWindow = this;
+        this._selector.addEventListener("select", function() {
+          if (prefWindow._selectingPane)
+            return;
+
+          var paneButton = prefWindow._selector.selectedItem;
+          if (!paneButton || !paneButton.hasAttribute("pane"))
+            return;
+
+          var pane = document.getElementById(paneButton.getAttribute("pane"));
+          if (pane && pane != prefWindow.currentPane)
+            prefWindow.showPane(pane);
+        }, false);
+        window.addEventListener("load",
+          function() { prefWindow.showPane(paneToLoad); }, false);
 
         if (panes.length == 1)
           this._selector.setAttribute("collapsed", "true");
@@ -605,6 +619,7 @@
       </destructor>
 
       <field name="instantApply">false</field>
+      <field name="_selectingPane">false</field>
       
       <property name="preferencePanes"
                 onget="return this.getElementsByTagName('prefpane');"/>
@@ -646,7 +661,13 @@
         <parameter name="aPaneElement"/>
         <body>
         <![CDATA[
-          this._selector.selectedItem = document.getAnonymousElementByAttribute(this, "pane", aPaneElement.id);
+          this._selectingPane = true;
+          try {
+            this._selector.selectedItem = document.getAnonymousElementByAttribute(this, "pane", aPaneElement.id);
+          }
+          finally {
+            this._selectingPane = false;
+          }
           if (!aPaneElement.loaded) {
             function OverlayLoadObserver(aPane)
             {
@@ -729,6 +750,9 @@
                   if (this._shouldAnimate) {
                     aPaneElement.style.opacity = 0.0;
                     this.animate(oldPane, aPaneElement);
+                  }
+                  else {
+                    aPaneElement.style.opacity = 1.0;
                   }
                   this._initialized = true;
                 }
@@ -1049,10 +1073,19 @@
       ]]>
       </handler>
       <handler event="command">
-        if (event.originalTarget.hasAttribute("pane")) {
-          var pane = document.getElementById(event.originalTarget.getAttribute("pane"));
-          event.originalTarget.parentNode.parentNode.showPane(pane);
+      <![CDATA[
+        var paneButton = event.originalTarget;
+        while (paneButton && paneButton != this &&
+               (!paneButton.hasAttribute ||
+                !paneButton.hasAttribute("pane")))
+          paneButton = paneButton.parentNode;
+
+        if (paneButton && paneButton != this &&
+            paneButton.hasAttribute("pane")) {
+          var pane = document.getElementById(paneButton.getAttribute("pane"));
+          document.documentElement.showPane(pane);
         }
+      ]]>
       </handler>
 
       <handler event="keypress" key="&windowClose.key;" modifiers="accel" phase="capturing">
