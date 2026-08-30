@@ -848,7 +848,7 @@ void nsSpecialSystemDirectory::operator = (SystemDirectories aSystemSystemDirect
               GetCurrentProcessDirectory(*this);
             else
               *this = tPath;
-            PrfWriteProfileString(HINI_USERPROFILE, "RetroZilla", "Home", *this);
+            PrfWriteProfileString(HINI_USERPROFILE, "ZoolRunner", "Home", *this);
             break;
         }
 

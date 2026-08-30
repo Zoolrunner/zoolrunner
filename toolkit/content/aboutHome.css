@@ -6,7 +6,7 @@ body, html {
 	border: 0px;
 	margin: 0px;
 }
-#rzLogo {
+#zrLogo {
 	display: block;
 	margin-left: auto;
 	margin-right: auto;
@@ -20,15 +20,15 @@ body, html {
 	display: block;
 	text-align: center;
 }
-#rzSearch {
+#zrSearch {
 	width: 70%;
 }
-#rzFooter {
+#zrFooter {
 	position: absolute;
 	bottom: 0px;
 	width: 100%;
 }
-#rzFooterText {
+#zrFooterText {
 	text-align: center;
 }
  /* updater styles */

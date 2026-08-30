@@ -1,19 +1,19 @@
-mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-retrozilla-linux
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-linux
 mk_add_options MOZ_MAKE_FLAGS="-j8"
 mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
 
-RZ_TOPSRCDIR=${MOZCONFIG%/*}
-if test "$RZ_TOPSRCDIR" = "$MOZCONFIG"; then
-  RZ_TOPSRCDIR=`pwd`
+ZR_TOPSRCDIR=${MOZCONFIG%/*}
+if test "$ZR_TOPSRCDIR" = "$MOZCONFIG"; then
+  ZR_TOPSRCDIR=`pwd`
 else
-  RZ_TOPSRCDIR=`cd "$RZ_TOPSRCDIR" && pwd`
+  ZR_TOPSRCDIR=`cd "$ZR_TOPSRCDIR" && pwd`
 fi
-RZ_LIBIDL_PREFIX="$RZ_TOPSRCDIR/obj-retrozilla-linux/build/unix/libIDL-prefix"
-LIBIDL_CONFIG="$RZ_LIBIDL_PREFIX/bin/libIDL-config-2"
+ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-linux/build/unix/libIDL-prefix"
+LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
 HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
-PATH="$RZ_LIBIDL_PREFIX/bin:$PATH"
-PKG_CONFIG_PATH="$RZ_LIBIDL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
-LD_LIBRARY_PATH="$RZ_LIBIDL_PREFIX/lib:$LD_LIBRARY_PATH"
+PATH="$ZR_LIBIDL_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$ZR_LIBIDL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+LD_LIBRARY_PATH="$ZR_LIBIDL_PREFIX/lib:$LD_LIBRARY_PATH"
 export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH LD_LIBRARY_PATH
 
 ac_add_options --enable-application=browser

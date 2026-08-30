@@ -48,7 +48,7 @@
 #endif
 #endif
 
-// RetroZilla-Specific Preferences
+// ZoolRunner-Specific Preferences
 pref("retrozilla.version", 220);
 pref("rzHome.autofocus", true);
 

@@ -5098,7 +5098,7 @@ TARGET_MD_ARCH=unix
 DIRENT_INO=d_ino
 CYGWIN_WRAPPER=
 WIN_TOP_SRC=
-MOZ_USER_DIR=".retrozilla"
+MOZ_USER_DIR=".zoolrunner"
 HOST_AR='$(AR)'
 HOST_AR_FLAGS='$(AR_FLAGS)'
 
@@ -6001,7 +6001,7 @@ fi
     _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-multichar"
     _MOZ_USE_RTTI=1
     USE_DEPENDENT_LIBS=
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
     ;;
 
 *-bsdi*)
@@ -6317,7 +6317,7 @@ EOF
     USE_SHORT_LIBNAME=1
     MOZ_ENABLE_COREXFONTS=
     MOZ_ENABLE_POSTSCRIPT=
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
 ;;
 
 
@@ -6444,7 +6444,7 @@ EOF
     BIN_SUFFIX='.exe'
     USE_SHORT_LIBNAME=1
     MOZ_ENABLE_POSTSCRIPT=
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
 
         TARGET_NSPR_MDCPUCFG='\"md/_win95.cfg\"'
 
@@ -6715,7 +6715,7 @@ EOF
     MOZ_ENABLE_POSTSCRIPT=
     RC=rc.exe
     RCFLAGS='-n'
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
 
     if test "$MOZTOOLS"; then
         MOZ_TOOLS_DIR=`echo $MOZTOOLS | sed -e 's|\\\\|/|g'`
@@ -12310,7 +12310,7 @@ mac|cocoa)
     TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
     CFLAGS="$CFLAGS $TK_CFLAGS"
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
     cat >> confdefs.h <<\EOF
 #define XP_MACOSX 1
 EOF
@@ -13118,8 +13118,8 @@ fi
 
 case "$MOZ_BUILD_APP" in
 suite)
-  MOZ_APP_NAME=retrozilla
-  MOZ_APP_DISPLAYNAME=RetroZilla
+  MOZ_APP_NAME=zoolrunner
+  MOZ_APP_DISPLAYNAME=ZoolRunner
   MOZ_MAIL_NEWS=1
   MOZ_LDAP_XPCOM=1
   MOZ_COMPOSER=1
@@ -13134,8 +13134,8 @@ EOF
   ;;
 
 browser)
-  MOZ_APP_NAME=rzbrowser
-  MOZ_APP_DISPLAYNAME="RetroZilla Browser"
+  MOZ_APP_NAME=zrbrowser
+  MOZ_APP_DISPLAYNAME="ZoolRunner Browser"
   MOZ_XUL_APP=1
   MOZ_PHOENIX=1
   MOZ_SAFE_BROWSING=1
@@ -13440,7 +13440,7 @@ if test "${enable_official_branding+set}" = set; then
     case "$MOZ_BUILD_APP" in
 browser)
     MOZ_BRANDING_DIRECTORY=other-licenses/branding/firefox
-    MOZ_APP_DISPLAYNAME=RetroZilla
+    MOZ_APP_DISPLAYNAME=ZoolRunner
     ;;
 
 calendar)

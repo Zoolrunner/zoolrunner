@@ -36,13 +36,13 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
- // RETROZILLA-SPECIFIC PREFS
+ // ZOOLRUNNER-SPECIFIC PREFS
 
 #expand pref("general.useragent.extra.__MOZ_APP_NAME__", "__MOZ_APP_DISPLAYNAME__/__MOZ_APP_VERSION__ SeaMonkey/1.1.19 Firefox/2.0.20");
 pref("rzHome.autofocus", true);
 pref("retrozilla.version", 230);
 
-// RETROZILLA SESSION RESTORE PREFERENCES
+// ZOOLRUNNER SESSION RESTORE PREFERENCES
 pref("extensions.crashrecovery.interval", 10000);
 pref("extensions.crashrecovery.postdata", -1);
 pref("extensions.crashrecovery.privacy_level", 1);

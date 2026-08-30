@@ -55,7 +55,7 @@
   <![CDATA[
     var _elementIDs = ["startupPage", "newWinPage", "newTabPage",
                        "bookmarksButton", "goButton", "homeButton",
-                       "printButton", "searchButton", "rzHomeAutofocus", "rzSessionRestoreCB" ];
+                       "printButton", "searchButton", "zrHomeAutofocus", "zrSessionRestoreCB" ];
   ]]>
   </script>
   
@@ -123,9 +123,9 @@
                 prefstring="pref.browser.homepage.disable_button.default_page"/>
       </hbox>
 	  <hbox align="center">
-	    <checkbox id="rzHomeAutofocus"
-          label="&rzHomeAutofocus.label;"
-          accesskey="&rzHomeAutofocus.accesskey;"
+	    <checkbox id="zrHomeAutofocus"
+          label="&zrHomeAutofocus.label;"
+          accesskey="&zrHomeAutofocus.accesskey;"
           prefstring="rzHome.autofocus"/>
 	  </hbox>
     </vbox>
@@ -136,9 +136,9 @@
     <caption label="&header3.label;"/>
     <vbox flex="1">
 	  <hbox align="center">
-	    <checkbox id="rzSessionRestoreCB"
-          label="&rzSessionRestore.label;"
-          accesskey="&rzSessionRestore.accesskey;"
+	    <checkbox id="zrSessionRestoreCB"
+          label="&zrSessionRestore.label;"
+          accesskey="&zrSessionRestore.accesskey;"
           prefstring="extensions.crashrecovery.resume_session"/>
 	  </hbox>
     </vbox>

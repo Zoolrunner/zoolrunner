@@ -46,12 +46,12 @@
 static const nsXREAppData kAppData = {
   sizeof(nsXREAppData),
   nsnull,
-  "RetroZilla",
+  "ZoolRunner",
   "Browser",
   NS_STRINGIFY(APP_VERSION),
   NS_STRINGIFY(BUILD_ID),
   "{ec8030f7-c20a-464f-9b0e-13a3a9e97384}",
-  "Copyright (c) 1998 - 2019 RetroZilla",
+  "Copyright (c) 1998 - 2019 Mozilla, RetroZilla, and ZoolRunner contributors",
   NS_XRE_ENABLE_PROFILE_MIGRATOR |
   NS_XRE_ENABLE_EXTENSION_MANAGER
 };

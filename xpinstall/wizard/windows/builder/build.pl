@@ -59,7 +59,7 @@ use File::Basename;
 $DEPTH         = "../../../..";
 $topsrcdir     = GetTopSrcDir();
 
-# RZ: determine object directory
+# ZoolRunner: determine object directory
 # WARNING: this is the extent of my perl knowledge
 # Fixes long-standing installer creation bug
 $cd = getcwd;

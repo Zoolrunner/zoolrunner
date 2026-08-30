@@ -97,7 +97,7 @@ function getPlatform()
 
 var srDest = $SpaceRequired$;
 
-var err = initInstall("RetroZilla Myspell Spellchecker", "Spellchecker", "$Version$"); 
+var err = initInstall("ZoolRunner Myspell Spellchecker", "Spellchecker", "$Version$");
 logComment("initInstall: " + err);
 
 fProgram  = getFolder("Program");
@@ -114,7 +114,7 @@ if (verifyDiskSpace(fProgram, srDest))
             "");
 
     if (err==SUCCESS)
-        performInstall(); 
+        performInstall();
     else
         cancelInstall(err);
 }

@@ -67,7 +67,7 @@ bin\isp\SpamPal.sfd
 bin\README.txt,bin\readme.txt
 bin\LICENSE,bin\license.txt
 bin\jpeg3250.dll
-bin\retrozilla.exe
+bin\zoolrunner.exe
 bin\regxpcom.exe
 bin\xpicleanup.exe
 bin\components\AcctIdl.dll

@@ -5,7 +5,7 @@ var fDesktop;
 var szFolderDesktop;
 
 srDest = $SpaceRequired$;
-err    = initInstall("RetroZilla Installer", "/RetroZilla Installer", "$Version$"); 
+err    = initInstall("ZoolRunner Installer", "/ZoolRunner Installer", "$Version$");
 logComment("initInstall: " + err);
 
 // Find the current user's desktop
@@ -24,19 +24,19 @@ if(verifyDiskSpace(fDesktop, srDest))
 
   err =  addFile("",
                  "",
-                 "retroZ\zilla-win32-stub-installer.exe", // dir name in jar to extract 
-                 fDesktop,             // Where to put this file (Returned from getFolder) 
+                 "retroZ\zilla-win32-stub-installer.exe", // dir name in jar to extract
+                 fDesktop,             // Where to put this file (Returned from getFolder)
                  "");                  // subdir name to create relative to fProgram
 
   logComment("addFile() returned: " + err);
 
-  err = execute("retrozilla-win32-stub-installer.exe", "", false);
+  err = execute("zoolrunner-win32-stub-installer.exe", "", false);
   logComment("execute() returned: " + err);
 
   // check return value
   if(err==SUCCESS)
   {
-    err = performInstall(); 
+    err = performInstall();
     logComment("performInstall() returned: " + err);
   }
   else

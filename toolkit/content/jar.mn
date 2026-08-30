@@ -20,7 +20,7 @@ toolkit.jar:
 *+ content/global/globalOverlay.js            (globalOverlay.js)
 *+ content/global/inlineSpellCheckUI.js       (inlineSpellCheckUI.js)
 +  content/global/mozilla.xhtml               (mozilla.xhtml)
-+  content/global/retrozilla.xhtml            (retrozilla.xhtml)
++  content/global/zoolrunner.xhtml            (zoolrunner.xhtml)
 +  content/global/aboutDebug.html             (aboutDebug.html)
 +  content/global/aboutDebug.js               (aboutDebug.js)
 +  content/global/aboutCredits.html           (aboutCredits.html)

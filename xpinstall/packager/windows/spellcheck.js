@@ -97,7 +97,7 @@ function getPlatform()
 
 var srDest = 1;
 
-var err = initInstall("RetroZilla Myspell Spellchecker", "Spellchecker", "2.3.0.0000000000"); 
+var err = initInstall("ZoolRunner Myspell Spellchecker", "Spellchecker", "2.3.0.0000000000");
 logComment("initInstall: " + err);
 
 fProgram  = getFolder("Program");
@@ -114,7 +114,7 @@ if (verifyDiskSpace(fProgram, srDest))
             "");
 
     if (err==SUCCESS)
-        performInstall(); 
+        performInstall();
     else
         cancelInstall(err);
 }

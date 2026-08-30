@@ -844,7 +844,7 @@ WIN_TOP_SRC=
 :i
 
 
-MOZ_USER_DIR=".retrozilla"
+MOZ_USER_DIR=".zoolrunner"
 HOST_AR='$(AR)'
 HOST_AR_FLAGS='$(AR_FLAGS)'
 
@@ -1500,7 +1500,7 @@ case "$target" in
     _WARNINGS_CXXFLAGS="${_WARNINGS_CXXFLAGS} -Wno-multichar"
     _MOZ_USE_RTTI=1
     USE_DEPENDENT_LIBS=
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
     ;;
 
 *-bsdi*)
@@ -1754,7 +1754,7 @@ case "$target" in
     USE_SHORT_LIBNAME=1
     MOZ_ENABLE_COREXFONTS=
     MOZ_ENABLE_POSTSCRIPT=
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
 ;;
 
 
@@ -1845,7 +1845,7 @@ case "$target" in
     BIN_SUFFIX='.exe'
     USE_SHORT_LIBNAME=1
     MOZ_ENABLE_POSTSCRIPT=
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
 
     dnl Hardcode to win95 for now - cls
     TARGET_NSPR_MDCPUCFG='\"md/_win95.cfg\"'
@@ -2080,7 +2080,7 @@ case "$target" in
     MOZ_ENABLE_POSTSCRIPT=
     RC=rc.exe
     RCFLAGS='-n'
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
 
     if test "$MOZTOOLS"; then
         MOZ_TOOLS_DIR=`echo $MOZTOOLS | sed -e 's|\\\\|/|g'`
@@ -4040,7 +4040,7 @@ mac|cocoa)
     TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
     CFLAGS="$CFLAGS $TK_CFLAGS"
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
-    MOZ_USER_DIR="RetroZilla"
+    MOZ_USER_DIR="ZoolRunner"
     AC_DEFINE(XP_MACOSX)
     AC_DEFINE(TARGET_CARBON)
     AC_DEFINE(TARGET_API_MAC_CARBON)
@@ -4317,8 +4317,8 @@ MOZ_ARG_ENABLE_STRING(application,
 
 case "$MOZ_BUILD_APP" in
 suite)
-  MOZ_APP_NAME=retrozilla
-  MOZ_APP_DISPLAYNAME=RetroZilla
+  MOZ_APP_NAME=zoolrunner
+  MOZ_APP_DISPLAYNAME=ZoolRunner
   MOZ_MAIL_NEWS=1
   MOZ_LDAP_XPCOM=1
   MOZ_COMPOSER=1
@@ -4330,8 +4330,8 @@ suite)
   ;;
 
 browser)
-  MOZ_APP_NAME=rzbrowser
-  MOZ_APP_DISPLAYNAME="RetroZilla Browser"
+  MOZ_APP_NAME=zrbrowser
+  MOZ_APP_DISPLAYNAME="ZoolRunner Browser"
   MOZ_XUL_APP=1
   MOZ_PHOENIX=1
   MOZ_SAFE_BROWSING=1
@@ -4460,8 +4460,8 @@ xulrunner)
   ;;
 
 macbrowser) 
-  MOZ_APP_NAME=retrozilla
-  MOZ_APP_DISPLAYNAME=RetroZilla
+  MOZ_APP_NAME=zoolrunner
+  MOZ_APP_DISPLAYNAME=ZoolRunner
   MOZ_APP_VERSION=$MOZILLA_VERSION
   MOZ_STORAGE=1
   MOZ_EXTENSIONS_DEFAULT=" cookie xmlextras universalchardet typeaheadfind transformiix permissions spellcheck auth"
@@ -4469,8 +4469,8 @@ macbrowser)
   ;;
 
 standalone) 
-  MOZ_APP_NAME=retrozilla
-  MOZ_APP_DISPLAYNAME=RetroZilla
+  MOZ_APP_NAME=zoolrunner
+  MOZ_APP_DISPLAYNAME=ZoolRunner
   MOZ_APP_VERSION=$MOZILLA_VERSION
   ;;
 
@@ -4587,7 +4587,7 @@ MOZ_ARG_ENABLE_BOOL(official-branding,
 [case "$MOZ_BUILD_APP" in
 browser)
     MOZ_BRANDING_DIRECTORY=other-licenses/branding/firefox
-    MOZ_APP_DISPLAYNAME=RetroZilla
+    MOZ_APP_DISPLAYNAME=ZoolRunner
     ;;
 
 calendar)

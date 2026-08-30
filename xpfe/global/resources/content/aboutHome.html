@@ -2,34 +2,34 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<title>RetroZilla Home</title>
+		<title>ZoolRunner Home</title>
 		<link rel="stylesheet" type="text/css" href="chrome://global/content/aboutHome.css">
 		<!--<script src="aboutHome.js"></script>-->
 		<script src="chrome://global/content/aboutHome.js" type="application/x-javascript"></script>
 	</head>
 	<body>
 		<div id="logoContainer">
-			<img src="chrome://global/content/logo.png" id="rzLogo" alt="RetroZilla Logo">
+			<img src="chrome://global/content/logo.png" id="zrLogo" alt="ZoolRunner Logo">
 		</div>
 		<div id="searchContainer">
 			<!-- add input box with a keypress event for the enter key to trigger submit button -->
-			<input type="text" name="rzSearch" id="rzSearch" onkeydown = "if (event.keyCode == 13)
-              document.getElementById('rzSearchSubmit').click()">
-			<button id="rzSearchSubmit" onClick="rzSearch();">Search</button>
+			<input type="text" name="zrSearch" id="zrSearch" onkeydown = "if (event.keyCode == 13)
+              document.getElementById('zrSearchSubmit').click()">
+			<button id="zrSearchSubmit" onClick="zrSearch();">Search</button>
 		</div>
-		<div id="rzFooter">
+		<div id="zrFooter">
 			<p id="updateNotifier">
-				<a href="https://rn10950.github.io/RetroZillaWeb/update.html">
-					New RetroZilla Version Available
+				<a href="about:zoolrunner">
+					New ZoolRunner Version Available
 				</a>
 			</p>
-			<p id="rzFooterText">
-				<a href="https://rn10950.github.io/RetroZillaWeb/" class="rzFooterlink">
-					RetroZilla
+			<p id="zrFooterText">
+				<a href="about:zoolrunner" class="zrFooterlink">
+					ZoolRunner
 				</a>
 				 - 
 				 Copyright 1998-<span id="currentYear"></span>,
-				 <a href="about:credits" class="rzFooterLink">
+				 <a href="about:credits" class="zrFooterLink">
 					Contributors
 				 </a>
 			</p>

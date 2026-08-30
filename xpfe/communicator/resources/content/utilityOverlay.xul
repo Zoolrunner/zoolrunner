@@ -297,7 +297,7 @@
                 accesskey="&contributeCmd.accesskey;"
                 label="&contributeCmd.label;"
                 id="contributeCmd"
-                oncommand="openTopWin('https://github.com/rn10950/RetroZilla')"/>
+                oncommand="openTopWin('about:zoolrunner')"/>
 				
       <menuitem class="about"
                 accesskey="&aboutCommPluginsCmd.accesskey;"

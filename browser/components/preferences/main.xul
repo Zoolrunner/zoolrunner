@@ -150,9 +150,9 @@
                 preference="pref.browser.homepage.disable_button.restore_default"/>
       </hbox>
 	  <hbox align="center">
-	    <checkbox id="rzHomeAutofocus"
-          label="&rzHomeAutofocus.label;"
-          accesskey="&rzHomeAutofocus.accesskey;"
+	    <checkbox id="zrHomeAutofocus"
+          label="&zrHomeAutofocus.label;"
+          accesskey="&zrHomeAutofocus.accesskey;"
           prefstring="rzHome.autofocus"/>
 	  </hbox>
     </groupbox>

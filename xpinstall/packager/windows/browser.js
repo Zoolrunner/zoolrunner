@@ -101,21 +101,21 @@ function registerProgramFolderKey(winreg, fFolderPath)
   var err;
 
   /* set the Program Folder Path in the Mozilla key in the Windows Registry */
-  winreg.createKey("SOFTWARE\\RetroZilla","");
+  winreg.createKey("SOFTWARE\\ZoolRunner","");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "CurrentVersion", "2.3 (en)");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)";
   winreg.createKey(subkey,"");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Main";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Main";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "Program Folder Path", fFolderPath);
 }
 
-function createShortcuts() 
+function createShortcuts()
 {
   var subkey;
   var valname;
@@ -152,17 +152,17 @@ function createShortcuts()
   fWindows             = getFolder("Windows");
   fProgram             = getFolder("Program");
   fDefShortcuts        = getFolder("Program","defaults/shortcuts");
-  fTemp                = fProgram + "RetroZilla.exe";
+  fTemp                = fProgram + "ZoolRunner.exe";
   fileExe              = getFolder("file:///", fTemp);
   fileReadme           = getFolder("file:///", fProgram + "readme.txt");
   fileLicense          = getFolder("file:///", fProgram + "license.txt");
-  scExeDesc            = "RetroZilla";
+  scExeDesc            = "ZoolRunner";
   scReadmeDesc         = "Readme";
   scLicenseDesc        = "License";
   scProfileDesc        = "Profile Manager";
   scProfileDescParam   = "-ProfileManager";
-  scFolderName         = "RetroZilla";
-  if(winreg != null) 
+  scFolderName         = "ZoolRunner";
+  if(winreg != null)
   {
     /* determine if the script is running under NT or not */
     winreg.setRootKey(winreg.HKEY_LOCAL_MACHINE);
@@ -219,7 +219,7 @@ function createShortcuts()
     }
     logComment("folderQuickLaunchExists: " + folderQuickLaunchExists);
 
-    subkey              = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Main";
+    subkey              = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Main";
     fFolderPathStr      = winreg.getValueString(subkey, "Program Folder Path");
     if((fFolderPathStr == "") || (fFolderPathStr == null))
     {
@@ -269,7 +269,7 @@ function createShortcuts()
       registerProgramFolderKey(winreg, fFolderPath);
 
       // This is so that Windows Media Player works with us
-      var subkey = "SOFTWARE\\Microsoft\\MediaPlayer\\ShimInclusionList\\RetroZilla.exe";
+      var subkey = "SOFTWARE\\Microsoft\\MediaPlayer\\ShimInclusionList\\ZoolRunner.exe";
       winreg.createKey(subkey, "");
       subkey = "SOFTWARE\\Microsoft\\MediaPlayer\\ShimInclusionList\\SEAMON~1.exe"
       winreg.createKey(subkey, "");
@@ -281,46 +281,46 @@ function createShortcuts()
     /* remove turbo mode shortcut */
 
     fFolderPath = getFolder("file:///", szStartupFolder);
-									
+
     /* remove shortcut from the startup folder */
 
-    basename = "RetroZilla.exe"
+    basename = "ZoolRunner.exe"
     fTemp = fFolderPath + basename + ".lnk";
     fFolderPath = getFolder("file:///", fTemp);
-    if (File.exists(fFolderPath)) 
-    { 
+    if (File.exists(fFolderPath))
+    {
         logComment("Removing Quick Launch shortcut from Windows startup folder\n");
         fileDelete(fFolderPath);
     }
 
-    subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Setup";
+    subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Setup";
     regvalue = winreg.getValueString(subkey, "browserargs");
 
     /* log this so if the user turns on turbo mode in the browser the uninstaller will undo it */
 
-    logComment( "store registry value string: HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run [RetroZilla Quick Launch]");
-    if (regvalue && regvalue != undefined && regvalue.length != 0) 
+    logComment( "store registry value string: HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run [ZoolRunner Quick Launch]");
+    if (regvalue && regvalue != undefined && regvalue.length != 0)
     {
         var value = new String(regvalue);
         var index = value.indexOf("turbo");
-        if (index != -1) 
+        if (index != -1)
         {
             var index2 = value.indexOf("=", index);
-            if (index2 != -1) 
+            if (index2 != -1)
             {
                 turboarg = value.slice(index2 + 1, index2 + 2);
                 winreg.setRootKey(winreg.HKEY_CURRENT_USER);
                 subkey = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-                valname = "RetroZilla Quick Launch";
-                if ( turboarg == "Y" || turboarg == "y") 
+                valname = "ZoolRunner Quick Launch";
+                if ( turboarg == "Y" || turboarg == "y")
                 {
                     fTemp = fileExe;
                     fileExe = getFolder("file:///", fTemp);
                     newKey = '"' + fileExe + '"' + ' -turbo';
                     winreg.createKey(subkey,"");
                     winreg.setValueString(subkey, valname, newKey);
-                } 
-                else 
+                }
+                else
                 {
                     winreg.deleteValue(subkey, valname);
                 }
@@ -362,16 +362,16 @@ function registerMainKeys(winreg)
   var data;
   var err;
 
-  winreg.createKey("SOFTWARE\\RetroZilla","");
+  winreg.createKey("SOFTWARE\\ZoolRunner","");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "CurrentVersion", "2.3 (en)");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)";
   winreg.createKey(subkey,"");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Main";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Main";
   winreg.createKey(subkey,"");
 
   err     = winreg.setValueString(subkey, "Install Directory", fProgram);
@@ -379,26 +379,26 @@ function registerMainKeys(winreg)
   // The following keys are required to be created to supply information
   // about the location of the Gecko Embedded Client to 3rd party apps.
   // "SOFTWARE\\Mozilla" must not be localized!
-  subkey  = "SOFTWARE\\Mozilla\\RetroZilla 2.3";
+  subkey  = "SOFTWARE\\Mozilla\\ZoolRunner 2.3";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "GeckoVer", "$GreVersion$");
 
-  subkey  = "SOFTWARE\\Mozilla\\RetroZilla 2.3\\Extensions";
+  subkey  = "SOFTWARE\\Mozilla\\ZoolRunner 2.3\\Extensions";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "Components", fProgram + "Components");
   err     = winreg.setValueString(subkey, "Plugins", fProgram + "Plugins");
 
-  subkey  = "SOFTWARE\\Mozilla\\RetroZilla 2.3\\bin";
+  subkey  = "SOFTWARE\\Mozilla\\ZoolRunner 2.3\\bin";
   winreg.createKey(subkey,"");
-  err     = winreg.setValueString(subkey, "PathToExe", fProgram + "RetroZilla.exe");
+  err     = winreg.setValueString(subkey, "PathToExe", fProgram + "ZoolRunner.exe");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Main";
-  err     = winreg.setValueString(subkey, "PathToExe", fProgram + "RetroZilla.exe");
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Main";
+  err     = winreg.setValueString(subkey, "PathToExe", fProgram + "ZoolRunner.exe");
 
   // Register as a windows XP internet browser
   if( IsWinnt() )
   {
-    subkey = "Software\\Clients\\StartMenuInternet\\RetroZilla.exe";
+    subkey = "Software\\Clients\\StartMenuInternet\\ZoolRunner.exe";
     winreg.setRootKey(winreg.HKEY_LOCAL_MACHINE);
 
     winreg.createKey(subkey, "");
@@ -407,24 +407,24 @@ function registerMainKeys(winreg)
     winreg.createKey(subkey + "\\shell\\open", "");
     winreg.createKey(subkey + "\\shell\\open\\command", "");
     winreg.createKey(subkey + "\\InstallInfo", "");
-    winreg.setValueString(subkey, "", "RetroZilla");
+    winreg.setValueString(subkey, "", "ZoolRunner");
 
     // path does not need to be quoted per MS doc
-    data = fProgram + "RetroZilla.exe,0";
+    data = fProgram + "ZoolRunner.exe,0";
     winreg.setValueString(subkey + "\\DefaultIcon", "", data);
 
-    data = "\"" + fProgram + "RetroZilla.exe\"";
+    data = "\"" + fProgram + "ZoolRunner.exe\"";
     winreg.setValueString(subkey + "\\shell\\open\\command", "", data);
 
-    data = "\"" + fProgram + "uninstall\\retrozillaUninstall.exe\" /ua \"2.3 (en)\" /hs browser";
+    data = "\"" + fProgram + "uninstall\\zoolrunnerUninstall.exe\" /ua \"2.3 (en)\" /hs browser";
     winreg.setValueString(subkey + "\\InstallInfo", "HideIconsCommand", data);
 
     winreg.setValueNumber(subkey + "\\InstallInfo", "IconsVisible", 1);
 
-    data = "\"" + fProgram + "RetroZilla.exe\" -silent -nosplash -setDefaultBrowser ";
+    data = "\"" + fProgram + "ZoolRunner.exe\" -silent -nosplash -setDefaultBrowser ";
     winreg.setValueString(subkey + "\\InstallInfo", "ReinstallCommand", data);
 
-    data = "\"" + fProgram + "uninstall\\retrozillaUninstall.exe\" /ua \"2.3 (en)\" /ss browser";
+    data = "\"" + fProgram + "uninstall\\zoolrunnerUninstall.exe\" /ua \"2.3 (en)\" /ss browser";
     winreg.setValueString(subkey + "\\InstallInfo", "ShowIconsCommand", data);
   }
 }
@@ -439,7 +439,7 @@ function updateWinReg()
   var err;
   var ikwDefined;
 
-  if(winreg != null) 
+  if(winreg != null)
   {
     /* This will check to see if the user has restricted access or not.
      * It checks to see if HKEY_LOCALMACHINE\SOFTWARE is writable.  If
@@ -464,9 +464,9 @@ function updateWinReg()
       registerMainKeys(winreg);
 
       // set the App Paths key here
-      subkey  = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\RetroZilla.exe";
+      subkey  = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\ZoolRunner.exe";
       winreg.createKey(subkey,"");
-      err     = winreg.setValueString(subkey, "", fProgram + "RetroZilla.exe");
+      err     = winreg.setValueString(subkey, "", fProgram + "ZoolRunner.exe");
       err     = winreg.setValueString(subkey, "Path", fProgram);
     }
 
@@ -566,7 +566,7 @@ function upgradeCleanup()
 
   if(!gGreLocal)
   {
-    // If GRE is not local, meaning it's installed in a 
+    // If GRE is not local, meaning it's installed in a
     // global area, then cleanup  obsolete files that are
     // now part of the GRE installer package.
     deleteThisFile("Program",    "gkgfx.dll");
@@ -725,7 +725,7 @@ if(args == "-greLocal")
   gGreLocal = true;
 
 srDest = 1;
-err    = initInstall("RetroZilla", "Browser", "2.3.0.0000000000"); 
+err    = initInstall("ZoolRunner", "Browser", "2.3.0.0000000000");
 logComment("initInstall: " + err);
 
 fProgram  = getFolder("Program");
@@ -739,10 +739,10 @@ if(verifyDiskSpace(fProgram, srDest))
   upgradeCleanup();
   err = addDirectory("",
                      "2.3.0.0000000000",
-                     "bin",              // dir name in jar to extract 
-                     fProgram,           // Where to put this file (Returned from GetFolder) 
+                     "bin",              // dir name in jar to extract
+                     fProgram,           // Where to put this file (Returned from GetFolder)
                      "",                 // subdir name to create relative to fProgram
-                     true);              // Force Flag 
+                     true);              // Force Flag
   logComment("addDirectory() of Program returned: " + err);
 
   // check return value
@@ -796,11 +796,11 @@ if(verifyDiskSpace(fProgram, srDest))
     // We're checking to see if they exist first in case
     // they were not built and packaged up.
     var pki = getFolder("Chrome", "pippki.jar");
-    if(File.exists(pki)) 
+    if(File.exists(pki))
       registerChrome(CONTENT | DELAYED_CHROME, pki, "content/pippki/");
 
     var nss = getFolder("Chrome", "pipnss.jar");
-    if(File.exists(nss)) 
+    if(File.exists(nss))
       registerChrome(CONTENT | DELAYED_CHROME, nss, "content/pipnss/");
 
     /* Log files that are created after the installer is done, so they can be uninstalled */

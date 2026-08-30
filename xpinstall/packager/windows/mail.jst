@@ -41,7 +41,7 @@ function registerProgramFolderKey(winreg, fFolderPath)
   err     = winreg.setValueString(subkey, "Program Folder Path", fFolderPath);
 }
 
-function createShortcuts() 
+function createShortcuts()
 {
   var subkey;
   var szStartMenuPrograms;
@@ -87,7 +87,7 @@ function createShortcuts()
   scParam                   = "-mail";
   scFolderName              = "$ProductName$";
   folderPalmSyncName        = "Palm Tools";
-  if(winreg != null) 
+  if(winreg != null)
   {
     /* This will check to see if the user has restricted access or not.
      * It checks to see if HKEY_LOCALMACHINE\SOFTWARE is writable.  If
@@ -289,7 +289,7 @@ function updateMapi()
   var mailDefaultDescription = "$ProductName$ Mail";
 
   winreg = getWinRegistry();
-  if(winreg != null) 
+  if(winreg != null)
   {
     mainExePath = getFolder("Program", "$MainExeFile$");
     programMozMapi32File = getFolder("Program", "mozMapi32.dll");
@@ -311,8 +311,8 @@ function updateMapi()
       // appropriate previous Mapi32.dll.
       addFile("",
               "$Version$",
-              "bin/mozMapi32.dll",           // file name in jar to extract 
-              getFolder("Win System"),       // Where to put this file (Returned from getFolder) 
+              "bin/mozMapi32.dll",           // file name in jar to extract
+              getFolder("Win System"),       // Where to put this file (Returned from getFolder)
               "Mapi32.dll",                  // new name when installed
               DO_NOT_UNINSTALL);
     }
@@ -376,7 +376,7 @@ var err;
 var fProgram;
 
 srDest = $SpaceRequired$:bin;
-err    = initInstall("RetroZilla Mail", "Mail", "$Version$"); 
+err    = initInstall("ZoolRunner Mail", "Mail", "$Version$");
 logComment("initInstall: " + err);
 
 fProgram = getFolder("Program");
@@ -389,10 +389,10 @@ if(verifyDiskSpace(fProgram, srDest))
   upgradeCleanup();
   err = addDirectory("",
                      "$Version$",
-                     "bin",              // dir name in jar to extract 
-                     fProgram,           // Where to put this file (Returned from GetFolder) 
+                     "bin",              // dir name in jar to extract
+                     fProgram,           // Where to put this file (Returned from GetFolder)
                      "",                 // subdir name to create relative to fProgram
-                     true);              // Force Flag 
+                     true);              // Force Flag
   logComment("addDirectory() returned: " + err);
 
   // check return value
@@ -406,7 +406,7 @@ if(verifyDiskSpace(fProgram, srDest))
     resetError();
 
     // register chrome
-    registerChrome(CONTENT | DELAYED_CHROME, 
+    registerChrome(CONTENT | DELAYED_CHROME,
                    getFolder("Chrome","messenger.jar"),
                    "content/messenger/");
     registerChrome(CONTENT | DELAYED_CHROME,
@@ -448,7 +448,7 @@ if(verifyDiskSpace(fProgram, srDest))
     err = getLastError();
     if(err == SUCCESS)
     {
-      err = performInstall(); 
+      err = performInstall();
       logComment("performInstall() returned: " + err);
 
       // Commenting this out for now until bug 182423 is fixed. This will at least prevent

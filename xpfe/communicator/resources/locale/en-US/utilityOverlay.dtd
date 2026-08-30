@@ -71,7 +71,7 @@
 <!ENTITY aboutCommPluginsCmd.label			"About Plug-ins">
 <!ENTITY aboutCommPluginsCmd.accesskey			"p">
 
-<!ENTITY contributeCmd.label			"Contribute to RetroZilla">
+<!ENTITY contributeCmd.label			"Contribute to ZoolRunner">
 <!ENTITY contributeCmd.accesskey			"o">
 
 <!ENTITY direct.label                                   "Online (Proxy: None)">

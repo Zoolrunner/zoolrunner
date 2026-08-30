@@ -1,5 +1,5 @@
 #expand <!ENTITY  lang.version          "__MOZILLA_LOCALE_VERSION__">
-<!ENTITY  brandFullName         "RetroZilla">
-<!ENTITY  brandShortName        "RetroZilla">
-<!ENTITY  vendorShortName       "RetroZilla">
+<!ENTITY  brandFullName         "ZoolRunner">
+<!ENTITY  brandShortName        "ZoolRunner">
+<!ENTITY  vendorShortName       "ZoolRunner">
 <!ENTITY  sidebarName           "Sidebar">

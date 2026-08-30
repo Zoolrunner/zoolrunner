@@ -1,5 +1,5 @@
 #
-#  RETROZILLA BROWSER (FIREFOX) MOZCONFIG
+#  ZOOLRUNNER BROWSER (FIREFOX) MOZCONFIG
 #
 
 # Make Options
@@ -22,6 +22,6 @@ ac_add_options --enable-svg
 ac_add_options --enable-canvas
 
 # Branding Options
-ac_add_options --with-app-name=rzbrowser
-ac_add_options --with-app-basename=rzbrowser
-ac_add_options --with-app-displayname=rzbrowser
+ac_add_options --with-app-name=zrbrowser
+ac_add_options --with-app-basename=zrbrowser
+ac_add_options --with-app-displayname=zrbrowser

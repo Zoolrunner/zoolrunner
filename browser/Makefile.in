@@ -50,10 +50,10 @@ include $(topsrcdir)/config/rules.mk
 # The installer is currently disabled due to issues while building
 # caused by installer/windows/nsis/uninstall.nsi
 #
-# RetroZilla Browser is not really maintained aside from branding.
+# ZoolRunner Browser is not really maintained aside from branding.
 # There is no official release. If you want to build the installer
 # for a third-party build (or if you want to attempt to fix the bug)
-# you are more than welcome to fix it and submit your fix to RetroZilla.
+# you are more than welcome to fix it and submit your fix to ZoolRunner.
 
 ifeq ($(OS_ARCH),WINNT)
 ifdef MOZ_INSTALLER

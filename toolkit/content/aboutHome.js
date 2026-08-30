@@ -25,35 +25,12 @@ if(prefServiceBranch.getPrefType('rzHome.customsearch')){
 
 // autofocus function
 function autoFocus() {
-	document.getElementById("rzSearch").focus();
+	document.getElementById("zrSearch").focus();
 }
 
 // update checker function
 function checkForUpdate() {
-    var img = document.createElement("img");
-    img.onload = function() {
-        // connected
-		
-		// add JS file with newest version # to page
-		var h = document.getElementsByTagName('head').item(0);
-		var newScript = document.createElement('script');
-		newScript.src = "https://raw.githubusercontent.com/rn10950/RetroZilla/master/update/currentReleaseVersion.js";
-		h.appendChild(newScript);
-		// wait for script to load
-		setTimeout(function () {
-			//alert(currentReleaseVersion()); // used for debug
-			//var currentUsedVersion = 1; // used for debug
-			if(currentUsedVersion < currentReleaseVersion()) {
-				// used version older or equal 
-				//alert("using older version");  // used for debug
-				document.getElementById("updateNotifier").setAttribute("class", "showUpdate");
-			}
-		}, 500);
-    };
-    img.onerror = function() {
-        // not connected
-    };
-    img.src = "https://raw.githubusercontent.com/rn10950/RetroZilla/master/update/ping.gif";
+    // No ZoolRunner release endpoint is configured yet.
 }
 
 // onload function (used to allow for autofocus)
@@ -70,8 +47,8 @@ window.onload = function() {
 };
 
 // function that runs when the "Search" button is clicked
-function rzSearch() {
-	var searchQuery = document.getElementById("rzSearch").value;
+function zrSearch() {
+	var searchQuery = document.getElementById("zrSearch").value;
 	var searchURL = searchEngineURL + searchQuery;
 	//alert("Location: " + searchURL); // for debug purposes
 	window.location.replace(searchURL);

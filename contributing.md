@@ -1,8 +1,8 @@
-# Contributing to RetroZilla
+# Contributing to ZoolRunner
 ## Git Branches
 * `master` - Current stable release
 * `beta` - Most of the time a mirror of `master`, this branch is used in the days leading up to a release.
-* `nightly` - The working branch of RetroZilla, this should be used as the target for pull requests
+* `nightly` - The working branch of ZoolRunner, this should be used as the target for pull requests
 * `oldmaster` - The original master branch, obsolete and provided for historical reasons only. Does not build.
 
 ## Contributing:

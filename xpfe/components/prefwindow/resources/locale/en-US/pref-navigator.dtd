@@ -22,14 +22,14 @@
 <!ENTITY  useCurrentGroup.accesskey "G">
 <!ENTITY  browseFile.label          "Choose File...">
 <!ENTITY  browseFile.accesskey      "C">
-<!ENTITY  useDefault.label          "Use RetroZilla Home">
+<!ENTITY  useDefault.label          "Use ZoolRunner Home">
 <!ENTITY  useDefault.accesskey      "R">
-<!ENTITY  rzHomeAutofocus.label     "Automatically focus search bar on RetroZilla Home">
-<!ENTITY  rzHomeAutofocus.accesskey "t">
+<!ENTITY  zrHomeAutofocus.label     "Automatically focus search bar on ZoolRunner Home">
+<!ENTITY  zrHomeAutofocus.accesskey "t">
 
 <!ENTITY  header3.label     "Session Restore">
-<!ENTITY  rzSessionRestore.label     "Restore your previous session when starting RetroZilla">
-<!ENTITY  rzSessionRestore.accesskey "i">
+<!ENTITY  zrSessionRestore.label     "Restore your previous session when starting ZoolRunner">
+<!ENTITY  zrSessionRestore.accesskey "i">
 
 <!ENTITY  toolbarIntro.label        "Select the buttons you want to see in the toolbars:">
 

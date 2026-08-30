@@ -3,7 +3,7 @@
 # To create a new .mozconfig file, you can visit,
 #   http://webtools.mozilla.org/build/config.cgi
 
-MOZ_OBJDIR=$(TOPSRCDIR)/obj-retrozilla-linux
+MOZ_OBJDIR=$(TOPSRCDIR)/obj-zoolrunner-linux
 MOZ_MAKE_FLAGS=-j8
 BOOTSTRAP_IN_TREE_LIBIDL=1
 # --enable-application=browser is used by configure (not client.mk)

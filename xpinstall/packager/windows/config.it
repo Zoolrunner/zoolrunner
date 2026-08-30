@@ -7,9 +7,9 @@
 ;            values.
 Run Mode=Normal
 
-Company Name=RetroZilla
-Product Name=RetroZilla
-Product NameInternal=RetroZilla
+Company Name=ZoolRunner
+Product Name=ZoolRunner
+Product NameInternal=ZoolRunner
 User Agent=$UserAgent$
 
 ; Destination Path values:
@@ -17,7 +17,7 @@ User Agent=$UserAgent$
 ;   WINDISK
 ;   WINDIR
 ;   WINSYSDIR
-Path=[PROGRAMFILESDIR]\RetroZilla
+Path=[PROGRAMFILESDIR]\ZoolRunner
 
 ; Sub Path, when set will indicate to Setup to create a subfolder from
 ; what is offered to the user to change.  It will not be shown to the user
@@ -33,7 +33,7 @@ Sub Path=
 ; Default value is FALSE;
 Lock Path=FALSE
 
-Program Name=RetroZilla.exe
+Program Name=ZoolRunner.exe
 
 ; Program Folder Path values:
 ;   COMMON_STARTUP
@@ -68,7 +68,7 @@ Program Name=RetroZilla.exe
 ;   MEDIAPATH
 ;   CONFIGPATH (supported only under Windows95 and Windows98)
 ;   DEVICEPATH
-Program Folder Name=RetroZilla
+Program Folder Name=ZoolRunner
 Program Folder Path=[PROGRAMS]
 
 Uninstall Filename=$UninstallFile$
@@ -117,7 +117,7 @@ GRE ID=$GreUniqueID$
 ; config.ini file) will be appended as follows:
 ;
 ;   Software\mozilla.org\GRE_1.4a_0000000000_PRIVATE_[Product Name Internal]
-GRE Private Key=Software\mozilla.org\GRE_$GreUniqueID$_PRIVATE_RetroZilla
+GRE Private Key=Software\mozilla.org\GRE_$GreUniqueID$_PRIVATE_ZoolRunner
 
 ; Controls the display of the banner image in the download and install progress dialogs.
 ; Default value is TRUE.
@@ -165,7 +165,7 @@ url=http://orb.mcom.com/install/error.cgi
 ;
 ; Default value is TRUE if nothing is set.
 Show Confirmation=TRUE
-Confirmation Message=There was an error encountered during installation of RetroZilla.  The following information will be sent back to us to help us improve the product: %s
+Confirmation Message=There was an error encountered during installation of ZoolRunner.  The following information will be sent back to us to help us improve the product: %s
 
 
 
@@ -186,7 +186,7 @@ Verify Existence=
 [Dialog Welcome]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Welcome
+Title=ZoolRunner Setup - Welcome
 ;*** LOCALIZE ME BABY ***
 Message0=Welcome to %s Setup.  You are about to install %s version $Version$.
 ;*** LOCALIZE ME BABY ***
@@ -197,7 +197,7 @@ Message2=Click Cancel to quit Setup and then close any programs you have running
 [Dialog License]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Software License Agreement
+Title=ZoolRunner Setup - Software License Agreement
 License File=license.txt
 ;*** LOCALIZE ME BABY ***
 Message0=Please read the following license agreement.  Use the scroll bar to view the rest of this agreement.
@@ -207,7 +207,7 @@ Message1=Click Accept if you accept the terms of the preceeding license agreemen
 [Dialog Setup Type]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Setup Type
+Title=ZoolRunner Setup - Setup Type
 ;*** LOCALIZE ME BABY ***
 Message0=Click the type of setup you prefer, then click Next.
 Readme Filename=readme.txt
@@ -296,14 +296,14 @@ C13=Component RPT
 [Dialog Select Components]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Select Components
+Title=ZoolRunner Setup - Select Components
 ;*** LOCALIZE ME BABY ***
 Message0=The browser is always installed.  Select or clear the additional components you want to install.
 
 [Dialog Select Additional Components]
 Show Dialog=FALSE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Select Additional Components
+Title=ZoolRunner Setup - Select Additional Components
 ;*** LOCALIZE ME BABY ***
 Message0=Select or clear the additional components you want to install.
 
@@ -311,7 +311,7 @@ Message0=Select or clear the additional components you want to install.
 ; do not localize this part because it is not currently being used
 [Dialog Windows Integration]
 Show Dialog=FALSE
-Title=RetroZilla Setup - Windows Integration
+Title=ZoolRunner Setup - Windows Integration
 Message0=Check the options you would like Setup to perform.
 Message1=These settings allow you to set default Internet preferences for browsing and searching.  They affect browsers installed on your machine, including SeaMonkey, Mozilla, Netscape and Microsoft Internet Explorer.
 
@@ -319,31 +319,31 @@ Message1=These settings allow you to set default Internet preferences for browsi
 ; shows up as a checkbox in the Windows Integration dialog.
 [Windows Integration-Item0]
 CheckBoxState=FALSE
-Description=Make RetroZilla my default Internet browser
+Description=Make ZoolRunner my default Internet browser
 Archive=
 
 [Windows Integration-Item1]
 CheckBoxState=FALSE
-Description=Make RetroZilla Netcenter my home page
+Description=Make ZoolRunner Netcenter my home page
 Archive=
 
 [Windows Integration-Item2]
 CheckBoxState=FALSE
-Description=Use RetroZilla Netcenter to search the Web
+Description=Use ZoolRunner Netcenter to search the Web
 Archive=
 ;*** DO NOT LOCALIZE - END ***
 
 [Dialog Program Folder]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Select Program Folder
+Title=ZoolRunner Setup - Select Program Folder
 ;*** LOCALIZE ME BABY ***
 Message0=Setup will add program icons to the Program Folder listed below.  You may type a new folder name, or select one from the Existing Folders list.  Click Next to continue.
 
 [Dialog Additional Options]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Additional Options
+Title=ZoolRunner Setup - Additional Options
 ;*** LOCALIZE ME BABY ***
 Message1=Select the following option if you wish to save downloaded Setup files on your own computer.  This allows you to re-run Setup without downloading the files again.  The Setup files will be saved to the path below.
 Save Installer=
@@ -358,7 +358,7 @@ Recapture Homepage=FALSE
 [Dialog Advanced Settings]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Advanced Settings
+Title=ZoolRunner Setup - Advanced Settings
 ;*** LOCALIZE ME BABY ***
 Message0=If your Internet connection requires a proxy server, enter your server name and port information.  If your Internet connection doesn't require a proxy server, leave the fields blank.
 Proxy Server=
@@ -381,9 +381,9 @@ Show Protocols=TRUE
 [Dialog Quick Launch]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Quick Launch
+Title=ZoolRunner Setup - Quick Launch
 ;*** LOCALIZE ME BABY ***
-Message0=Quick Launch starts RetroZilla faster by keeping portions of the program in computer memory.
+Message0=Quick Launch starts ZoolRunner faster by keeping portions of the program in computer memory.
 ;*** LOCALIZE ME BABY ***
 Message1=You can access Quick Launch through the icon on the Windows taskbar tray.
 ;*** LOCALIZE ME BABY ***
@@ -400,7 +400,7 @@ Turbo Mode Enabled=TRUE
 [Dialog Start Install]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Start Install
+Title=ZoolRunner Setup - Start Install
 ;*** LOCALIZE ME BABY ***
 Message Install=Setup has enough information to start copying the program files.  If you want to review or change settings, click Back.  If you are satisfied with the current settings, click Install to begin copying files.
 ;*** LOCALIZE ME BABY ***
@@ -409,7 +409,7 @@ Message Download=Setup has enough information to start downloading and copying t
 [Dialog Download]
 Show Dialog=TRUE
 ;*** LOCALIZE ME BABY ***
-Title=RetroZilla Setup - Download
+Title=ZoolRunner Setup - Download
 ;*** LOCALIZE ME BABY ***
 Message Download0=Setup is downloading the required files now.  This may take some time depending on your network connection speed.
 ;*** LOCALIZE ME BABY ***
@@ -427,25 +427,25 @@ Message Retry0=Some files have failed the CRC check and are being downloaded aga
 Show Dialog=AUTO
 
 [Check Instance0]
-Class Name=RetroZillaMessageWindow
+Class Name=ZoolRunnerMessageWindow
 Window Name=
-Process Name=RetroZilla.exe
-Pretty Name=RetroZilla
+Process Name=ZoolRunner.exe
+Pretty Name=ZoolRunner
 ;*** LOCALIZE ME BABY ***
-Message=Download of RetroZilla was successful. RetroZilla must be closed to proceed with installation. Click OK to exit RetroZilla automatically and to begin installation.
+Message=Download of ZoolRunner was successful. ZoolRunner must be closed to proceed with installation. Click OK to exit ZoolRunner automatically and to begin installation.
 ;*** LOCALIZE ME BABY ***
-Message Full Installer=RetroZilla must be closed to proceed with installation. Click OK to exit RetroZilla automatically and to begin installation.
+Message Full Installer=ZoolRunner must be closed to proceed with installation. Click OK to exit ZoolRunner automatically and to begin installation.
 ;*** LOCALIZE ME BABY ***
-Message wait=Shutting down RetroZilla.  Please wait...
+Message wait=Shutting down ZoolRunner.  Please wait...
 
 ; This key indicates whether or not to close all the windows associated with
 ; the process id of this app instance window found.
 Close All Process Windows=TRUE
 
 ; These keys are not normally necessary for checking instances.  They are
-; set here because RetroZilla requires a way to shut down its turbo mode.
+; set here because ZoolRunner requires a way to shut down its turbo mode.
 Extra Cmd0 Reg Key Root=HKEY_LOCAL_MACHINE
-Extra Cmd0 Reg Key=Software\Microsoft\Windows\CurrentVersion\App Paths\RetroZilla.exe
+Extra Cmd0 Reg Key=Software\Microsoft\Windows\CurrentVersion\App Paths\ZoolRunner.exe
 Extra Cmd0 Reg Name=
 Extra Cmd0 Parameter=-kill
 
@@ -455,7 +455,7 @@ Window Name=
 Process Name=Mozilla.exe
 Pretty Name=Mozilla
 ;*** LOCALIZE ME BABY ***
-Message=Download of RetroZilla was successful. Mozilla must be closed to proceed with installation. Click OK to exit Mozilla automatically and to begin installation.
+Message=Download of ZoolRunner was successful. Mozilla must be closed to proceed with installation. Click OK to exit Mozilla automatically and to begin installation.
 ;*** LOCALIZE ME BABY ***
 Message Full Installer=Mozilla must be closed to proceed with installation. Click OK to exit Mozilla automatically and to begin installation.
 ;*** LOCALIZE ME BABY ***
@@ -466,7 +466,7 @@ Message wait=Shutting down Mozilla.  Please wait...
 Close All Process Windows=TRUE
 
 ; These keys are not normally necessary for checking instances.  They are
-; set here because RetroZilla requires a way to shut down its turbo mode.
+; set here because ZoolRunner requires a way to shut down its turbo mode.
 Extra Cmd0 Reg Key Root=HKEY_LOCAL_MACHINE
 Extra Cmd0 Reg Key=Software\Microsoft\Windows\CurrentVersion\App Paths\Mozilla.exe
 Extra Cmd0 Reg Name=
@@ -478,7 +478,7 @@ Window Name=
 Process Name=Netscp.exe
 Pretty Name=Netscape
 ;*** LOCALIZE ME BABY ***
-Message=Download of RetroZilla was successful. However, Netscape must be closed to proceed with this installation. Click OK to exit Netscape automatically and to begin installation.
+Message=Download of ZoolRunner was successful. However, Netscape must be closed to proceed with this installation. Click OK to exit Netscape automatically and to begin installation.
 ;*** LOCALIZE ME BABY ***
 Message Full Installer=Netscape must be closed to proceed with this installation. Click OK to exit Netscape automatically and to begin installation.
 ;*** LOCALIZE ME BABY ***
@@ -618,7 +618,7 @@ $InstallSizeSystem$
 $InstallSizeArchive$:gre-win32-installer.zip
 Attributes=SELECTED|UNCOMPRESS|SUPERSEDE|LAUNCHAPP|INVISIBLE
 ;*** LOCALIZE ME BABY ***
-Parameter=-mmi -ms -app "RetroZilla $UserAgent$" -app_path "[SETUP PATH]\RetroZilla.exe"
+Parameter=-mmi -ms -app "ZoolRunner $UserAgent$" -app_path "[SETUP PATH]\ZoolRunner.exe"
 SupersedeType=GRE
 SupersedeWinReg0=HKEY_LOCAL_MACHINE\Software\mozilla.org\GRE
 SupersedeVersion0=$GreFileVersion$
@@ -640,7 +640,7 @@ $InstallSize$:browser
 $InstallSizeSystem$
 $InstallSizeArchive$:browser.xpi
 Attributes=SELECTED|DISABLED|FORCE_UPGRADE
-Force Upgrade File0=[SETUP PATH]\RetroZilla.exe
+Force Upgrade File0=[SETUP PATH]\ZoolRunner.exe
 
 
 [Component MailNews]
@@ -666,9 +666,9 @@ Attributes=SELECTED|FORCE_UPGRADE
 Force Upgrade File0=[SETUP PATH]\myspell.dll
 
 [Component Uninstaller]
-Description Short=RetroZilla Uninstaller
+Description Short=ZoolRunner Uninstaller
 ;*** LOCALIZE ME BABY ***
-Description Long=Uninstaller for RetroZilla
+Description Long=Uninstaller for ZoolRunner
 Archive=$UninstallFileZip$
 $InstallSize$:$UninstallFileZip$
 $InstallSizeSystem$
@@ -764,7 +764,7 @@ Force Upgrade File0=[SETUP PATH]\chrome\US.jar
 [Component QFA]
 Description Short=Quality Feedback Agent
 ;*** LOCALIZE ME BABY ***
-Description Long=for reporting RetroZilla crash information
+Description Long=for reporting ZoolRunner crash information
 Archive=talkback.xpi
 Install Size=870
 Install Size System=1
@@ -979,7 +979,7 @@ Destination=[SETUP PATH]\install_wizard.log
 [RunApp0]
 Timing=depend reboot
 Wait=FALSE
-Target=[SETUP PATH]\RetroZilla.exe
+Target=[SETUP PATH]\ZoolRunner.exe
 Parameters=-installer
 WorkingDir=[SETUP PATH]
 ;  Additional Options dialog.
@@ -988,7 +988,7 @@ Condition=not RecaptureHPChecked
 [RunApp1]
 Timing=depend reboot
 Wait=FALSE
-Target=[SETUP PATH]\RetroZilla.exe
+Target=[SETUP PATH]\ZoolRunner.exe
 Parameters=-installer -resetPref browser.startup.homepage
 WorkingDir=[SETUP PATH]
 ;  Additional Options dialog.
@@ -997,7 +997,7 @@ Condition=RecaptureHPChecked
 [Windows Registry0]
 Root Key=HKEY_LOCAL_MACHINE
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla
+Key=Software\ZoolRunner
 Name=
 Name Value=
 Type=REG_SZ
@@ -1011,7 +1011,7 @@ Timing=pre smartupdate
 [Windows Registry1]
 Root Key=HKEY_LOCAL_MACHINE
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla
+Key=Software\ZoolRunner\ZoolRunner
 Name=
 Name Value=
 Type=REG_SZ
@@ -1025,7 +1025,7 @@ Timing=pre smartupdate
 [Windows Registry2]
 Root Key=HKEY_LOCAL_MACHINE
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$
 Name=
 Name Value=
 Type=REG_SZ
@@ -1039,7 +1039,7 @@ Timing=pre smartupdate
 [Windows Registry3]
 Root Key=HKEY_LOCAL_MACHINE
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$\Main
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$\Main
 Name=Program Folder Path
 Name Value=[Default Folder]
 Type=REG_SZ
@@ -1053,9 +1053,9 @@ Timing=pre smartupdate
 [Windows Registry4]
 Root Key=HKEY_LOCAL_MACHINE
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$\Uninstall
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$\Uninstall
 Name=Description
-Name Value=RetroZilla ($UserAgentShort$)
+Name Value=ZoolRunner ($UserAgentShort$)
 Type=REG_SZ
 Decrypt Key=FALSE
 Decrypt Name=FALSE
@@ -1067,7 +1067,7 @@ Timing=pre smartupdate
 [Windows Registry5]
 Root Key=HKEY_LOCAL_MACHINE
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$\Uninstall
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$\Uninstall
 Name=Uninstall Log Folder
 Name Value=[SETUP PATH]\uninstall
 Type=REG_SZ
@@ -1081,7 +1081,7 @@ Timing=pre smartupdate
 [Windows Registry6]
 Root Key=HKEY_CURRENT_USER
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla
+Key=Software\ZoolRunner
 Name=
 Name Value=
 Type=REG_SZ
@@ -1095,7 +1095,7 @@ Timing=pre smartupdate
 [Windows Registry7]
 Root Key=HKEY_CURRENT_USER
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla
+Key=Software\ZoolRunner\ZoolRunner
 Name=
 Name Value=
 Type=REG_SZ
@@ -1109,7 +1109,7 @@ Timing=pre smartupdate
 [Windows Registry8]
 Root Key=HKEY_CURRENT_USER
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$
 Name=
 Name Value=
 Type=REG_SZ
@@ -1123,7 +1123,7 @@ Timing=pre smartupdate
 [Windows Registry9]
 Root Key=HKEY_CURRENT_USER
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$\Main
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$\Main
 Name=Program Folder Path
 Name Value=[Default Folder]
 Type=REG_SZ
@@ -1137,9 +1137,9 @@ Timing=pre smartupdate
 [Windows Registry10]
 Root Key=HKEY_CURRENT_USER
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$\Uninstall
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$\Uninstall
 Name=Description
-Name Value=RetroZilla ($UserAgentShort$)
+Name Value=ZoolRunner ($UserAgentShort$)
 Type=REG_SZ
 Decrypt Key=FALSE
 Decrypt Name=FALSE
@@ -1151,7 +1151,7 @@ Timing=pre smartupdate
 [Windows Registry11]
 Root Key=HKEY_CURRENT_USER
 ;*** LOCALIZE ME BABY ***
-Key=Software\RetroZilla\RetroZilla\$UserAgent$\Uninstall
+Key=Software\ZoolRunner\ZoolRunner\$UserAgent$\Uninstall
 Name=Uninstall Log Folder
 Name Value=[SETUP PATH]\uninstall
 Type=REG_SZ
@@ -1164,9 +1164,9 @@ Timing=pre smartupdate
 
 [Windows Registry12]
 Root Key=HKEY_LOCAL_MACHINE
-Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\RetroZilla ($UserAgentShort$)
+Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\ZoolRunner ($UserAgentShort$)
 Name=DisplayName
-Name Value=RetroZilla ($UserAgentShort$)
+Name Value=ZoolRunner ($UserAgentShort$)
 Type=REG_SZ
 Decrypt Key=FALSE
 Decrypt Name=FALSE
@@ -1177,7 +1177,7 @@ Timing=post smartupdate
 
 [Windows Registry13]
 Root Key=HKEY_LOCAL_MACHINE
-Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\RetroZilla ($UserAgentShort$)
+Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\ZoolRunner ($UserAgentShort$)
 Name=UninstallString
 ;*** LOCALIZE ME BABY ***
 Name Value=[WINDIR]\$UninstallFile$ /ua "$UserAgent$"
@@ -1206,13 +1206,13 @@ Timing=pre smartupdate
 
 [Cleanup Previous Product RegKeys]
 Reg Key Root0=HKEY_LOCAL_MACHINE
-Product Name0=RetroZilla
-Product Reg Key0=Software\RetroZilla\RetroZilla
+Product Name0=ZoolRunner
+Product Reg Key0=Software\ZoolRunner\ZoolRunner
 Current Version0=$UserAgent$
 
 Reg Key Root1=HKEY_CURRENT_USER
-Product Name1=RetroZilla
-Product Reg Key1=Software\RetroZilla\RetroZilla
+Product Name1=ZoolRunner
+Product Reg Key1=Software\ZoolRunner\ZoolRunner
 Current Version1=$UserAgent$
 
 
@@ -1251,7 +1251,7 @@ Program Folder=[Default Folder]
 File=[SETUP PATH]\uninstall\$UninstallFile$
 Arguments=/ua "$UserAgent$"
 Working Dir=[SETUP PATH]
-Description=Uninstall RetroZilla
+Description=Uninstall ZoolRunner
 Icon Path=[SETUP PATH]\uninstall\$UninstallFile$
 Icon Id=0
 
@@ -1264,11 +1264,11 @@ Icon Id=0
 Restricted Access=ONLY_RESTRICTED
 
 ;[Program Folder0-Shortcut1]
-;File=[SETUP PATH]\RetroZilla.exe
+;File=[SETUP PATH]\ZoolRunner.exe
 ;Arguments=-ProfileManager
 ;Working Dir=[SETUP PATH]
 ;Description=Profile Manager
-;Icon Path=[SETUP PATH]\RetroZilla.exe
+;Icon Path=[SETUP PATH]\ZoolRunner.exe
 ;Icon Id=0
 
 ;[Program Folder0-Shortcut2]
@@ -1306,9 +1306,9 @@ Message Unfinished Download Restart=A previous session of Setup did not finish d
 ;*** LOCALIZE ME BABY ***
 Message Unfinished Install Xpi Restart=A previous session of Setup did not finish with installation of all the necessary files.  Would you like to use the files previously downloaded, to avoid downloading them again?
 ;*** LOCALIZE ME BABY ***
-Error Corrupted Archives Detected=Setup has detected that the following archives within this Setup are corrupted:%sYou will need to obtain another copy of the RetroZilla Setup in order for installation to proceed.
+Error Corrupted Archives Detected=Setup has detected that the following archives within this Setup are corrupted:%sYou will need to obtain another copy of the ZoolRunner Setup in order for installation to proceed.
 ;*** LOCALIZE ME BABY ***
-Error Corrupted Archives Detected AUTO mode=Setup has detected that at least one archive within this Setup is corrupt.  You will need to obtain another copy of the RetroZilla Setup in order for installation to proceed.
+Error Corrupted Archives Detected AUTO mode=Setup has detected that at least one archive within this Setup is corrupt.  You will need to obtain another copy of the ZoolRunner Setup in order for installation to proceed.
 ;*** LOCALIZE ME BABY ***
 Error Too Many CRC Failures=Too many download failures.  Setup will cancel.  Any files already downloaded will not be deleted.  The next time Setup is run, these files will be taken into account during the download.
 ;*** LOCALIZE ME BABY ***
@@ -1350,13 +1350,13 @@ IDC Turbo Mode=&Use Quick Launch for faster startup times when possible
 ;*** LOCALIZE ME BABY ***
 Message Download Paused=Setup has encountered a network problem and has paused the download.  If you have just lost your network connection, please click Resume once your network has been reestablished.
 ;*** LOCALIZE ME BABY ***
-Message NORMAL Restricted Access=Setup has detected that you do not have the appropriate Administrator privileges to this system.  It is highly recommended that you do not continue with the installation of RetroZilla, or it may not function properly.  Would you still like to continue?
+Message NORMAL Restricted Access=Setup has detected that you do not have the appropriate Administrator privileges to this system.  It is highly recommended that you do not continue with the installation of ZoolRunner, or it may not function properly.  Would you still like to continue?
 ;*** LOCALIZE ME BABY ***
-Message AUTO Restricted Access=Setup has detected that you do not have the appropriate Administrator privileges to this system.  Setup cannot continue with the installation of RetroZilla.
+Message AUTO Restricted Access=Setup has detected that you do not have the appropriate Administrator privileges to this system.  Setup cannot continue with the installation of ZoolRunner.
 ;*** LOCALIZE ME BABY ***
-Message Cleanup On Upgrade=A previous RetroZilla installation has been found in the chosen directory.\n\nUnrecognized 3rd party components will be removed from this directory to prevent version incompatibilities and will have to be re-installed.  Your RetroZilla profile information will not be affected.
+Message Cleanup On Upgrade=A previous ZoolRunner installation has been found in the chosen directory.\n\nUnrecognized 3rd party components will be removed from this directory to prevent version incompatibilities and will have to be re-installed.  Your ZoolRunner profile information will not be affected.
 ;*** LOCALIZE ME BABY ***
-Message Cleanup On Upgrade Windir=Setup has detected that the previous installation of RetroZilla was installed to a folder within your Windows folder.  Setup will not attempt to cleanup the previous installation of RetroZilla due to the potential removal of critical system files.
+Message Cleanup On Upgrade Windir=Setup has detected that the previous installation of ZoolRunner was installed to a folder within your Windows folder.  Setup will not attempt to cleanup the previous installation of ZoolRunner due to the potential removal of critical system files.
 ;*** LOCALIZE ME BABY ***
 Cleanup On Upgrade Path Box String=Path to be cleaned up:
 

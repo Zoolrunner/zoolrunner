@@ -2,7 +2,7 @@ pref("startup.homepage_override_url","about:changelog");
 pref("startup.homepage_welcome_url","about:changelog");
 // URL user can browse to manually if for some reason all update installation
 // attempts fail.
-pref("app.update.url.manual", "https://github.com/rn10950/RetroZilla/releases");
+pref("app.update.url.manual", "about:zoolrunner");
 // A default value for the "More information about this update" link
 // supplied in the "An update is available" page of the update wizard. 
 

@@ -124,21 +124,21 @@ function registerProgramFolderKey(winreg, fFolderPath)
   var err;
 
   /* set the Program Folder Path in the Mozilla key in the Windows Registry */
-  winreg.createKey("SOFTWARE\\RetroZilla", "");
+  winreg.createKey("SOFTWARE\\ZoolRunner", "");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "CurrentVersion", "2.3 (en)");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)";
   winreg.createKey(subkey,"");
 
-  subkey  = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Main";
+  subkey  = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Main";
   winreg.createKey(subkey,"");
   err     = winreg.setValueString(subkey, "Program Folder Path", fFolderPath);
 }
 
-function createShortcuts() 
+function createShortcuts()
 {
   var subkey;
   var szStartMenuPrograms;
@@ -173,7 +173,7 @@ function createShortcuts()
   winreg                    = getWinRegistry();
   fWindows                  = getFolder("Windows");
   fProgram                  = getFolder("Program");
-  fileExe                   = getFolder("Program", "RetroZilla.exe");
+  fileExe                   = getFolder("Program", "ZoolRunner.exe");
   filePalmSyncInstallExe    = getFolder("Program", "PalmSyncInstall.exe");
   scDescPalmSyncInstall     = "Address Book Palm Sync Install";
   scDescPalmSyncUninstall   = "Address Book Palm Sync Uninstall";
@@ -182,9 +182,9 @@ function createShortcuts()
   fileMailIcon              = getFolder("Chrome", "icons/default/messengerWindow.ico");
   scExeDesc                 = "Mail";
   scParam                   = "-mail";
-  scFolderName              = "RetroZilla";
+  scFolderName              = "ZoolRunner";
   folderPalmSyncName        = "Palm Tools";
-  if(winreg != null) 
+  if(winreg != null)
   {
     /* This will check to see if the user has restricted access or not.
      * It checks to see if HKEY_LOCALMACHINE\SOFTWARE is writable.  If
@@ -256,7 +256,7 @@ function createShortcuts()
     }
     logComment("folderQuickLaunchExists: " + folderQuickLaunchExists);
 
-    subkey              = "SOFTWARE\\RetroZilla\\RetroZilla\\2.3 (en)\\Main";
+    subkey              = "SOFTWARE\\ZoolRunner\\ZoolRunner\\2.3 (en)\\Main";
     fFolderPathStr      = winreg.getValueString(subkey, "Program Folder Path");
     if((fFolderPathStr == "") || (fFolderPathStr == null))
     {
@@ -332,7 +332,7 @@ function createShortcuts()
     // Register as a windows XP mail application
     if( IsWinnt() )
     {
-      subkey = "Software\\Clients\\Mail\\RetroZilla";
+      subkey = "Software\\Clients\\Mail\\ZoolRunner";
       winreg.setRootKey(winreg.HKEY_LOCAL_MACHINE);
 
       winreg.createKey(subkey,"");
@@ -342,25 +342,25 @@ function createShortcuts()
       winreg.createKey(subkey + "\\shell\\open\\command", "");
       winreg.createKey(subkey + "\\InstallInfo","");
 
-      winreg.setValueString(subkey, "", "RetroZilla Mail");
+      winreg.setValueString(subkey, "", "ZoolRunner Mail");
 
       // path does not need to be quoted per MS doc
       data = fProgram + "chrome\\icons\\default\\messengerWindow.ico,0";
       winreg.setValueString(subkey + "\\DefaultIcon", "", data);
 
-      data = "\"" + fProgram + "RetroZilla.exe\" -mail";
+      data = "\"" + fProgram + "ZoolRunner.exe\" -mail";
       winreg.setValueString(subkey + "\\shell\\open\\command", "", data);
 
-      data = "\"" + fProgram + "uninstall\\retrozillaUninstall.exe\" /ua \"2.3 (en)\" /hs mail";
+      data = "\"" + fProgram + "uninstall\\zoolrunnerUninstall.exe\" /ua \"2.3 (en)\" /hs mail";
       winreg.setValueString(subkey + "\\InstallInfo", "HideIconsCommand", data);
 
       // set this value to 0 because we're not creating the mail shortcuts yet.
       winreg.setValueNumber(subkey + "\\InstallInfo", "IconsVisible", 0);
 
-      data = "\"" + fProgram + "RetroZilla.exe\" -silent -nosplash -setDefaultMail";
+      data = "\"" + fProgram + "ZoolRunner.exe\" -silent -nosplash -setDefaultMail";
       winreg.setValueString(subkey + "\\InstallInfo", "ReinstallCommand", data);
 
-      data = "\"" + fProgram + "uninstall\\retrozillaUninstall.exe\" /ua \"2.3 (en)\" /ss mail";
+      data = "\"" + fProgram + "uninstall\\zoolrunnerUninstall.exe\" /ua \"2.3 (en)\" /ss mail";
       winreg.setValueString(subkey + "\\InstallInfo", "ShowIconsCommand", data);
     }
   }
@@ -383,12 +383,12 @@ function updateMapi()
   var winsysMapi32File;
   var mapiProxyFile;
   var subkey;
-  var mailDefaultDescription = "RetroZilla Mail";
+  var mailDefaultDescription = "ZoolRunner Mail";
 
   winreg = getWinRegistry();
-  if(winreg != null) 
+  if(winreg != null)
   {
-    mainExePath = getFolder("Program", "RetroZilla.exe");
+    mainExePath = getFolder("Program", "ZoolRunner.exe");
     programMozMapi32File = getFolder("Program", "mozMapi32.dll");
     winsysMapi32File = getFolder("Win System", "Mapi32.dll");
     winreg.setRootKey(winreg.HKEY_LOCAL_MACHINE);
@@ -401,15 +401,15 @@ function updateMapi()
     logComment("szMapiBackupDll: " + szMapiBackupDll);
     logComment("szDefaultMailClient: " + szDefaultMailClient);
     if((szMapiBackupDll != null) && (szMapiBackupDll != "") &&
-       (szDefaultMailClient != null) && (szDefaultMailClient == "RetroZilla"))
+       (szDefaultMailClient != null) && (szDefaultMailClient == "ZoolRunner"))
     {
       // We do not want to log this file to be uninstalled because the
       // uninstaller already has a special way to deal with restoring the
       // appropriate previous Mapi32.dll.
       addFile("",
               "2.3.0.0000000000",
-              "bin/mozMapi32.dll",           // file name in jar to extract 
-              getFolder("Win System"),       // Where to put this file (Returned from getFolder) 
+              "bin/mozMapi32.dll",           // file name in jar to extract
+              getFolder("Win System"),       // Where to put this file (Returned from getFolder)
               "Mapi32.dll",                  // new name when installed
               DO_NOT_UNINSTALL);
     }
@@ -417,7 +417,7 @@ function updateMapi()
     sfpProgramMozMapi32File = File.windowsGetShortName(programMozMapi32File);
     sfpMainExePath = File.windowsGetShortName(mainExePath);
 
-    subkey  = "SOFTWARE\\Clients\\Mail\\RetroZilla";
+    subkey  = "SOFTWARE\\Clients\\Mail\\ZoolRunner";
     winreg.createKey(subkey, "");
     winreg.setValueString(subkey, "", mailDefaultDescription);
     winreg.setValueString(subkey, "DLLPath", sfpProgramMozMapi32File);
@@ -473,7 +473,7 @@ var err;
 var fProgram;
 
 srDest = 1;
-err    = initInstall("RetroZilla Mail", "Mail", "2.3.0.0000000000"); 
+err    = initInstall("ZoolRunner Mail", "Mail", "2.3.0.0000000000");
 logComment("initInstall: " + err);
 
 fProgram = getFolder("Program");
@@ -486,10 +486,10 @@ if(verifyDiskSpace(fProgram, srDest))
   upgradeCleanup();
   err = addDirectory("",
                      "2.3.0.0000000000",
-                     "bin",              // dir name in jar to extract 
-                     fProgram,           // Where to put this file (Returned from GetFolder) 
+                     "bin",              // dir name in jar to extract
+                     fProgram,           // Where to put this file (Returned from GetFolder)
                      "",                 // subdir name to create relative to fProgram
-                     true);              // Force Flag 
+                     true);              // Force Flag
   logComment("addDirectory() returned: " + err);
 
   // check return value
@@ -503,7 +503,7 @@ if(verifyDiskSpace(fProgram, srDest))
     resetError();
 
     // register chrome
-    registerChrome(CONTENT | DELAYED_CHROME, 
+    registerChrome(CONTENT | DELAYED_CHROME,
                    getFolder("Chrome","messenger.jar"),
                    "content/messenger/");
     registerChrome(CONTENT | DELAYED_CHROME,
@@ -524,28 +524,28 @@ if(verifyDiskSpace(fProgram, srDest))
 
     // log comments for uninstalling the registry keys created by mail for setting
     // itself up in WinXP's Start menu
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla []");
-    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla []");
-    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla [DLLPath]");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\DefaultIcon []");
-    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\DefaultIcon []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols\\mailto []");
-    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols\\mailto []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols\\mailto\\shell []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols\\mailto\\shell\\open []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols\\mailto\\shell\\open\\command []");
-    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\protocols\\mailto\\shell\\open\\command []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\shell []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\shell\\open []");
-    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\shell\\open\\command []");
-    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\RetroZilla\\shell\\open\\command []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner []");
+    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner []");
+    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner [DLLPath]");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\DefaultIcon []");
+    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\DefaultIcon []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols\\mailto []");
+    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols\\mailto []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols\\mailto\\shell []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols\\mailto\\shell\\open []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols\\mailto\\shell\\open\\command []");
+    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\protocols\\mailto\\shell\\open\\command []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\shell []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\shell\\open []");
+    logComment("Create Registry Key: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\shell\\open\\command []");
+    logComment("Store Registry Value: HKEY_LOCAL_MACHINE\\Software\\Clients\\Mail\\ZoolRunner\\shell\\open\\command []");
 
     // check return value
     err = getLastError();
     if(err == SUCCESS)
     {
-      err = performInstall(); 
+      err = performInstall();
       logComment("performInstall() returned: " + err);
 
       // Commenting this out for now until bug 182423 is fixed. This will at least prevent
