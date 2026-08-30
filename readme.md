@@ -128,12 +128,33 @@ It builds into `obj-zoolrunner-xlib` and is used to exercise the restored
 low-dependency X11 widget path. This backend is less complete than the GTK2
 build and should currently be treated as development work.
 
+The XPFE suite can be built on the same Linux/GTK2 development system through
+`mozconfig.suite`:
+
+```sh
+MOZCONFIG=/path/to/ZoolRunner/mozconfig.suite make -f client.mk build
+```
+
+That configuration builds into `obj-zoolrunner-suite` and enables the suite
+application, MailNews, Composer, LDAP, S/MIME, Chatzilla, SVG, canvas, bundled
+JPEG/zlib, crypto, and the optional in-tree libIDL bootstrap.
+
 Run the browser test application from the built dist directory:
 
 ```sh
 cd obj-zoolrunner-linux/dist/bin
 sh ./run-mozilla.sh ./zrbrowser
 ```
+
+Run the built suite browser from its dist directory:
+
+```sh
+cd obj-zoolrunner-suite/dist/bin
+LD_LIBRARY_PATH=. MOZ_NO_REMOTE=1 ./zoolrunner -browser
+```
+
+MailNews and Composer can be started from the same suite build with `-mail` and
+`-edit`.
 
 ## Changes from RetroZilla
 
@@ -142,6 +163,8 @@ Significant work completed after the RetroZilla baseline includes:
 * Added initial LoongArch64 Linux support, including NSPR platform metadata and
   an xptcall backend.
 * Added a Linux browser build configuration for contemporary distributions,
+  using GTK2 and an in-tree object directory.
+* Added a Linux suite build configuration for contemporary distributions,
   using GTK2 and an in-tree object directory.
 * Added an opt-in in-tree libIDL bootstrap for systems without a suitable system
   libIDL package. Existing configurations can continue to use system libIDL by
@@ -208,6 +231,7 @@ current build status varies by target.
 Currently verified in this development branch:
 
 * Linux browser build on LoongArch64 with GCC and GTK2.
+* Linux XPFE suite build on LoongArch64 with GCC and GTK2.
 * Experimental Linux browser build on LoongArch64 with GCC and xlib.
 
 Source-present or inherited targets include:
