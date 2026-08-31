@@ -729,24 +729,6 @@ The tree contains a historical Qt 3 backend.
 
 Preserve genuine Qt 3 compatibility where practical.
 
-## TQt
-
-TQt compatibility is desirable.
-
-TQt is intended to preserve the Qt 3 programming model and may provide a maintained implementation suitable for ZoolRunner's historical Qt backend.
-
-Ideally:
-
-```
-Mozilla Qt backend
-    /        \
-  Qt 3       TQt
-```
-
-Avoid converting the backend into a TQt-only implementation if reasonable compatibility with genuine Qt 3 can be preserved.
-
-Isolate TQt-specific compatibility code rather than scattering conditionals throughout the backend.
-
 ## Motif
 
 A Motif backend may be interesting but is not currently required if the existing Xlib backend provides the desired minimal X11 fallback.
@@ -772,5 +754,5 @@ maintained GTK2-compatible implementations such as gtk2-ng to serve as modern
 providers of that API/ABI.
 
 For environments where GTK2 is unavailable or inappropriate, prefer restoring
-or maintaining historical alternatives such as Xlib and Qt 3/TQt rather than
+or maintaining historical alternatives such as Xlib and Qt 3 rather than
 porting ZoolRunner to GTK3 or GTK4.
