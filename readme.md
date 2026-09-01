@@ -116,23 +116,34 @@ browser application on contemporary Linux with GTK2 into an in-tree object
 directory. On this system the working configuration uses:
 
 ```sh
-MOZCONFIG=/path/to/ZoolRunner/mozconfig make -f client.mk build
+cp mozconfigs/linux/loongarch64/gtk2_browser_gcc.mozconfig mozconfig
+make -f client.mk build
 ```
 
 The build configuration is intentionally kept inside the source tree and uses
 `obj-zoolrunner-linux` as the object directory. When the optional in-tree libIDL
 bootstrap is enabled, libIDL is also built inside that object directory.
 
-An experimental xlib browser build is also available through `mozconfig.xlib`.
-It builds into `obj-zoolrunner-xlib` and is used to exercise the restored
-low-dependency X11 widget path. This backend is less complete than the GTK2
-build and should currently be treated as development work.
-
-The XPFE suite can be built on the same Linux/GTK2 development system through
-`mozconfig.suite`:
+An experimental xlib browser build is also available through
+`mozconfigs/linux/loongarch64/xlib_browser_gcc.mozconfig`. It builds into
+`obj-zoolrunner-xlib` and is used to exercise the restored low-dependency X11
+widget path. This backend is less complete than the GTK2 build and should
+currently be treated as development work.
 
 ```sh
-MOZCONFIG=/path/to/ZoolRunner/mozconfig.suite make -f client.mk build
+cp mozconfigs/linux/loongarch64/xlib_browser_gcc.mozconfig mozconfig
+make -f client.mk build
+```
+
+The XPFE suite can also be built against the Xlib backend with
+`mozconfigs/linux/loongarch64/xlib_suite_gcc.mozconfig`.
+
+The XPFE suite can be built on the same Linux/GTK2 development system through
+`mozconfigs/linux/loongarch64/gtk2_suite_gcc.mozconfig`:
+
+```sh
+cp mozconfigs/linux/loongarch64/gtk2_suite_gcc.mozconfig mozconfig
+make -f client.mk build
 ```
 
 That configuration builds into `obj-zoolrunner-suite` and enables the suite
@@ -343,12 +354,14 @@ Mozilla codebase undergoing substantial stabilization and modernization.
 The currently used Linux development build is:
 
 ```sh
-MOZCONFIG=/path/to/ZoolRunner/mozconfig make -f client.mk build
+cp mozconfigs/linux/loongarch64/gtk2_browser_gcc.mozconfig mozconfig
+make -f client.mk build
 ```
 
-The checked-in Linux `mozconfig` currently builds the browser application with
-`-j8`, GTK2, bundled JPEG/zlib, crypto, SVG, canvas, and an optional in-tree
-libIDL bootstrap.
+The checked-in Linux mozconfig examples currently cover the GTK2 browser, GTK2
+suite, GTK2 XULRunner, Xlib browser, and Xlib suite builds. The GTK2 browser
+configuration uses `-j8`, bundled JPEG/zlib, crypto, SVG, canvas, and the
+optional in-tree libIDL bootstrap.
 
 Legacy Windows build documentation inherited from RetroZilla uses Visual Studio
 6.0-era tooling. Keep those paths working when making changes that affect Win32
