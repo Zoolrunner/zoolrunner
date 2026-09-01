@@ -271,6 +271,10 @@ BUILD_MODULES = all
 CVS = cvs
 comma := ,
 
+# ZoolRunner is normally built from a complete source checkout.  Keep the
+# historical CVS machinery available only when explicitly requested.
+ZR_CVS_CHECKOUT ?= 0
+
 CWD := $(shell pwd)
 
 ifeq "$(CWD)" "/"
@@ -351,8 +355,9 @@ MOZCONFIG_MODULES := $(TOPSRCDIR)/build/unix/modules.mk $(TOPSRCDIR)/build/unix/
 run_for_side_effects := \
   $(shell cd $(ROOTDIR); \
      if test "$(_IS_FIRST_CHECKOUT)"; then \
-        $(CVSCO) $(MOZCONFIG_FINDER) $(MOZCONFIG_LOADER) $(MOZCONFIG_MODULES); \
-     else true; \
+        if test "$(ZR_CVS_CHECKOUT)" = "1"; then \
+           $(CVSCO) $(MOZCONFIG_FINDER) $(MOZCONFIG_LOADER) $(MOZCONFIG_MODULES); \
+        fi; \
      fi; \
      $(MOZCONFIG_LOADER) $(TOPSRCDIR) $(TOPSRCDIR)/.mozconfig.mk > $(TOPSRCDIR)/.mozconfig.out)
 include $(TOPSRCDIR)/.mozconfig.mk
@@ -592,9 +597,17 @@ all build checkout clean depend distclean export libs install realclean::
 	fi
 
 ifdef _IS_FIRST_CHECKOUT
+ifeq ($(ZR_CVS_CHECKOUT),1)
 all:: checkout build
 else
+all:: build
+endif
+else
+ifeq ($(ZR_CVS_CHECKOUT),1)
 all:: checkout alldep
+else
+all:: alldep
+endif
 endif
 
 # Windows equivalents
@@ -603,15 +616,25 @@ build_all: build
 build_all_dep: alldep
 build_all_depend: alldep
 clobber clobber_all: clean
+ifeq ($(ZR_CVS_CHECKOUT),1)
 pull_and_build_all: checkout alldep
 
 # Do everything from scratch
 everything: checkout clean build
+else
+pull_and_build_all: alldep
+
+# Do everything from scratch
+everything: clean build
+endif
 
 ####################################
 # CVS checkout
 #
 checkout::
+ifneq ($(ZR_CVS_CHECKOUT),1)
+	@echo "CVS checkout disabled. Set ZR_CVS_CHECKOUT=1 to use the historical checkout target."
+else
 #	@: Backup the last checkout log.
 	@if test -f $(CVSCO_LOGFILE) ; then \
 	  mv $(CVSCO_LOGFILE) $(CVSCO_LOGFILE).old; \
@@ -661,8 +684,12 @@ ifdef RUN_AUTOCONF_LOCALLY
 	cd $(TOPSRCDIR)/nsprpub && $(AUTOCONF) && \
 	cd $(TOPSRCDIR)/directory/c-sdk && $(AUTOCONF)
 endif
+endif
 
 fast-update:
+ifneq ($(ZR_CVS_CHECKOUT),1)
+	@echo "CVS update disabled. Set ZR_CVS_CHECKOUT=1 to use the historical fast-update target."
+else
 #	@: Backup the last checkout log.
 	@if test -f $(CVSCO_LOGFILE) ; then \
 	  mv $(CVSCO_LOGFILE) $(CVSCO_LOGFILE).old; \
@@ -715,11 +742,15 @@ ifdef RUN_AUTOCONF_LOCALLY
 	cd $(TOPSRCDIR)/nsprpub && $(AUTOCONF) && \
 	cd $(TOPSRCDIR)/directory/c-sdk && $(AUTOCONF)
 endif
+endif
 
 CVSCO_LOGFILE_L10N := $(ROOTDIR)/cvsco-l10n.log
 CVSCO_LOGFILE_L10N := $(shell echo $(CVSCO_LOGFILE_L10N) | sed s%//%/%)
 
 l10n-checkout:
+ifneq ($(ZR_CVS_CHECKOUT),1)
+	@echo "CVS checkout disabled. Set ZR_CVS_CHECKOUT=1 to use the historical l10n-checkout target."
+else
 #	@: Backup the last checkout log.
 	@if test -f $(CVSCO_LOGFILE_L10N) ; then \
 	  mv $(CVSCO_LOGFILE_L10N) $(CVSCO_LOGFILE_L10N).old; \
@@ -764,6 +795,7 @@ real_l10n-checkout:
 	  false; \
 	else true; \
 	fi
+endif
 
 #####################################################
 # First Checkout
