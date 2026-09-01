@@ -70,9 +70,18 @@ CSRCS		= \
 		pngwutil.c \
 		$(NULL)
 
-EXPORTS		= png.h pngconf.h mozpngconf.h
+EXPORTS		= png.h pngconf.h pnglibconf.h mozpngconf.h
 
 LOCAL_INCLUDES	= -I$(srcdir)
+
+DEFINES		+= \
+		-DPNG_ARM_NEON_OPT=0 \
+		-DPNG_INTEL_SSE_OPT=0 \
+		-DPNG_LOONGARCH_LSX_OPT=0 \
+		-DPNG_MIPS_MSA_OPT=0 \
+		-DPNG_POWERPC_VSX_OPT=0 \
+		-DPNG_RISCV_RVV_OPT=0 \
+		$(NULL)
 
 FORCE_STATIC_LIB = 1
 # This library is used by other shared libs in a static build

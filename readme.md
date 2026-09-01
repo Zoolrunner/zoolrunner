@@ -216,7 +216,7 @@ Bundled dependency versions verified directly from the source tree include:
   in `db/sqlite3/src/sqlite3.h`.  The old copy's README incorrectly claimed
   `3.3.4`.
 * SQLite bundled inside NSS: `3.7.15`, in `security/nss/lib/sqlite/sqlite3.h`.
-* libpng: `1.2.35`, in `modules/libimg/png/png.h`.
+* libpng: `1.6.58`, in `modules/libimg/png/png.h`.
 * zlib used by the Mozilla tree: `1.3.2`, in `modules/zlib/src/zlib.h`.
 * zlib bundled inside NSS: `1.2.5`, in `security/nss/lib/zlib/zlib.h`.
 * bzip2/libbzip2: updated from `1.0.3` to `1.0.8`, in

@@ -1,6 +1,23 @@
 
 Changes made to pristine png source by mozilla.org developers.
 
+2026/09/01  -- Synced with libpng-1.6.58 tree
+
+               Preserved Mozilla build integration in Makefile.in.
+
+               Replaced the old hand-maintained mozpngconf.h feature
+               pruning and symbol-mangling table with upstream-generated
+               pnglibconf.h and pngprefix.h using the MOZ_PNG_ prefix.
+
+               Did not carry the old 1.2-era local security patches forward:
+               the too-small error-message buffer, gamma-shift array, and
+               png_ptr->num_trans CRC-error fixes are obsolete because the
+               affected code has been replaced upstream.
+
+               Did not carry the stale APNG symbol-mangling entries forward.
+               The ZoolRunner image decoder did not contain APNG integration
+               before this import.
+
 2009/02/19  -- Synced with libpng-1.2.35 tree
 
 2007/05/05  -- Zero png_ptr->num_trans on CRC error (bug 374810)

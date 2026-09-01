@@ -13,7 +13,7 @@ noted.
 | zlib | `1.3.2` | `modules/zlib/src/zlib.h` |
 | zlib inside NSS | `1.2.5` | `security/nss/lib/zlib/zlib.h` |
 | old NSS jar zlib header/API copy | `1.0.4` | `security/nss/lib/jar/jzlib.h` |
-| libpng | `1.2.35` | `modules/libimg/png/png.h` |
+| libpng | `1.6.58` | `modules/libimg/png/png.h` |
 | JPEG / libjpeg API | libjpeg-turbo `3.2.0`, configured with `JPEG_LIB_VERSION 62` for libjpeg 6b API compatibility | `jpeg/jconfig.h`, `jpeg/jconfigint.h`, `jpeg/jversion.h`; replaced IJG JPEG `6b` |
 | SQLite, Mozilla storage copy | `3.53.4` | `db/sqlite3/src/sqlite3.h`; updated from the previous `3.3.5` copy, whose `README.MOZILLA` metadata incorrectly said `3.3.4` |
 | SQLite, NSS copy | `3.7.15` | `security/nss/lib/sqlite/sqlite3.h`; `security/nss/lib/sqlite/README` says `3.10.2`, but `sqlite3.h` and `sqlite3.c` define `3.7.15` |

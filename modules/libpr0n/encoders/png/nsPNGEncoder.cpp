@@ -111,9 +111,9 @@ NS_IMETHODIMP nsPNGEncoder::InitFromData(const PRUint8* aData,
 
   // initialize
   png_struct* png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                                                png_voidp_NULL,
-                                                png_error_ptr_NULL,
-                                                png_error_ptr_NULL);
+                                                NULL,
+                                                NULL,
+                                                NULL);
   if (! png_ptr)
     return NS_ERROR_OUT_OF_MEMORY;
   png_info* info_ptr = png_create_info_struct(png_ptr);
@@ -317,9 +317,28 @@ nsPNGEncoder::WriteCallback(png_structp png, png_bytep data, png_size_t size)
   if (! that->mImageBuffer)
     return;
 
-  if (that->mImageBufferUsed + size > that->mImageBufferSize) {
-    // expand buffer, just double each time
-    that->mImageBufferSize *= 2;
+  if (size > PR_UINT32_MAX ||
+      that->mImageBufferUsed > PR_UINT32_MAX - NS_STATIC_CAST(PRUint32, size)) {
+    PR_Free(that->mImageBuffer);
+    that->mImageBuffer = nsnull;
+    that->mImageBufferSize = 0;
+    that->mImageBufferUsed = 0;
+    png_error(png, "PNG output too large");
+    return;
+  }
+
+  PRUint32 writeSize = NS_STATIC_CAST(PRUint32, size);
+  PRUint32 minSize = that->mImageBufferUsed + writeSize;
+
+  if (minSize > that->mImageBufferSize) {
+    do {
+      if (that->mImageBufferSize > PR_UINT32_MAX / 2) {
+        that->mImageBufferSize = minSize;
+        break;
+      }
+      that->mImageBufferSize *= 2;
+    } while (minSize > that->mImageBufferSize);
+
     PRUint8* newBuf = (PRUint8*)PR_Realloc(that->mImageBuffer,
                                            that->mImageBufferSize);
     if (! newBuf) {
@@ -332,5 +351,5 @@ nsPNGEncoder::WriteCallback(png_structp png, png_bytep data, png_size_t size)
     that->mImageBuffer = newBuf;
   }
   memcpy(&that->mImageBuffer[that->mImageBufferUsed], data, size);
-  that->mImageBufferUsed += size;
+  that->mImageBufferUsed += writeSize;
 }
