@@ -41,15 +41,15 @@
 
 #define PREFIX(ident) little2_ ## ident
 #define BYTE_TYPE(p) LITTLE2_BYTE_TYPE(XmlGetUtf16InternalEncodingNS(), p)
-#define IS_NAME_CHAR_MINBPC(p) LITTLE2_IS_NAME_CHAR_MINBPC(0, p)
-#define IS_NMSTRT_CHAR_MINBPC(p) LITTLE2_IS_NMSTRT_CHAR_MINBPC(0, p)
+#define IS_NAME_CHAR_MINBPC(p) LITTLE2_IS_NAME_CHAR_MINBPC(p)
+#define IS_NMSTRT_CHAR_MINBPC(p) LITTLE2_IS_NMSTRT_CHAR_MINBPC(p)
 
 #else
 
 #define PREFIX(ident) big2_ ## ident
 #define BYTE_TYPE(p) BIG2_BYTE_TYPE(XmlGetUtf16InternalEncodingNS(), p)
-#define IS_NAME_CHAR_MINBPC(p) BIG2_IS_NAME_CHAR_MINBPC(0, p)
-#define IS_NMSTRT_CHAR_MINBPC(p) BIG2_IS_NMSTRT_CHAR_MINBPC(0, p)
+#define IS_NAME_CHAR_MINBPC(p) BIG2_IS_NAME_CHAR_MINBPC(p)
+#define IS_NMSTRT_CHAR_MINBPC(p) BIG2_IS_NMSTRT_CHAR_MINBPC(p)
 
 #endif
 
@@ -127,6 +127,7 @@ int MOZ_XMLIsLetter(const char* ptr)
     if (!IS_NMSTRT_CHAR_MINBPC(ptr)) {
       return 0;
     }
+    /* fall through */
   case BT_NMSTRT:
   case BT_HEX:
     return 1;
@@ -142,6 +143,7 @@ int MOZ_XMLIsNCNameChar(const char* ptr)
     if (!IS_NAME_CHAR_MINBPC(ptr)) {
       return 0;
     }
+    /* fall through */
   case BT_NMSTRT:
   case BT_HEX:
   case BT_DIGIT:

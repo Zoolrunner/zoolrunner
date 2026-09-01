@@ -51,6 +51,12 @@ CSRCS		= \
 		xmltok.c \
 		$(NULL)
 
+ifeq ($(OS_ARCH),WINNT)
+CSRCS		+= random_rand_s.c
+else
+CSRCS		+= random_dev_urandom.c
+endif
+
 EXPORTS		= expat.h
 
 # We want only the static lib, not the shared lib
@@ -59,3 +65,6 @@ FORCE_STATIC_LIB = 1
 include $(topsrcdir)/config/rules.mk
 
 DEFINES += -DHAVE_EXPAT_CONFIG_H
+DEFINES += -DwriteRandomBytes_dev_urandom=MOZ_writeRandomBytes_dev_urandom
+DEFINES += -DwriteRandomBytes_rand_s=MOZ_writeRandomBytes_rand_s
+CFLAGS := $(filter-out -std=gnu89,$(CFLAGS)) -std=gnu99

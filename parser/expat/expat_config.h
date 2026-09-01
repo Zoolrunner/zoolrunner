@@ -49,10 +49,6 @@
 #define BYTEORDER 4321
 #endif /* IS_LITTLE_ENDIAN */
 
-#if PR_BYTES_PER_INT != 4
-#define int int32
-#endif /* PR_BYTES_PER_INT != 4 */
-
 /* Other Mozilla code relies on memmove already, so we assume it's available */
 #define HAVE_MEMMOVE 1
 
@@ -61,13 +57,15 @@
 #define XMLIMPORT
 
 #define XML_UNICODE
-typedef PRUnichar XML_Char;
-typedef char XML_LChar;
-#define XML_T(x) (PRUnichar)x
-#define XML_L(x) x
 
-#define XML_DTD
-#define XML_NS
+#define XML_DTD 1
+#define XML_GE 1
+#define XML_NS 1
+#define XML_CONTEXT_BYTES 1024
+
+#ifdef XP_UNIX
+#define XML_DEV_URANDOM 1
+#endif
 
 /* avoid conflicts with system version of libexpat */
 
@@ -130,6 +128,7 @@ typedef char XML_LChar;
 #define XML_GetBase MOZ_XML_GetBase
 #define XML_GetSpecifiedAttributeCount MOZ_XML_GetSpecifiedAttributeCount
 #define XML_GetIdAttributeIndex MOZ_XML_GetIdAttributeIndex
+#define XML_GetAttributeInfo MOZ_XML_GetAttributeInfo
 #define XML_Parse MOZ_XML_Parse
 #define XML_GetBuffer MOZ_XML_GetBuffer
 #define XML_ParseBuffer MOZ_XML_ParseBuffer
@@ -141,6 +140,7 @@ typedef char XML_LChar;
 #define XML_GetCurrentByteIndex MOZ_XML_GetCurrentByteIndex
 #define XML_GetCurrentByteCount MOZ_XML_GetCurrentByteCount
 #define XML_GetInputContext MOZ_XML_GetInputContext
+#define XML_GetParsingStatus MOZ_XML_GetParsingStatus
 #define XML_FreeContentModel MOZ_XML_FreeContentModel
 #define XML_MemMalloc MOZ_XML_MemMalloc
 #define XML_MemRealloc MOZ_XML_MemRealloc
@@ -150,6 +150,18 @@ typedef char XML_LChar;
 #define XML_ExpatVersion MOZ_XML_ExpatVersion
 #define XML_ExpatVersionInfo MOZ_XML_ExpatVersionInfo
 #define XML_GetFeatureList MOZ_XML_GetFeatureList
+#define XML_StopParser MOZ_XML_StopParser
+#define XML_ResumeParser MOZ_XML_ResumeParser
+#define XML_SetHashSalt MOZ_XML_SetHashSalt
+#define XML_SetHashSalt16Bytes MOZ_XML_SetHashSalt16Bytes
+#define XML_SetBillionLaughsAttackProtectionMaximumAmplification MOZ_XML_SetBillionLaughsAttackProtectionMaximumAmplification
+#define XML_SetBillionLaughsAttackProtectionActivationThreshold MOZ_XML_SetBillionLaughsAttackProtectionActivationThreshold
+#define XML_SetAllocTrackerMaximumAmplification MOZ_XML_SetAllocTrackerMaximumAmplification
+#define XML_SetAllocTrackerActivationThreshold MOZ_XML_SetAllocTrackerActivationThreshold
+#define XML_SetReparseDeferralEnabled MOZ_XML_SetReparseDeferralEnabled
+
+#define writeRandomBytes_dev_urandom MOZ_writeRandomBytes_dev_urandom
+#define writeRandomBytes_rand_s MOZ_writeRandomBytes_rand_s
 
 /* xmlrole.h */
 #define XmlPrologStateInit MOZ_XmlPrologStateInit
@@ -162,11 +174,16 @@ typedef char XML_LChar;
 /* xmltok.h */
 #define XmlParseXmlDecl MOZ_XmlParseXmlDecl
 #define XmlInitEncoding MOZ_XmlInitEncoding
+#define XmlInitEncodingNS MOZ_XmlInitEncodingNS
 #define XmlGetUtf8InternalEncoding MOZ_XmlGetUtf8InternalEncoding
 #define XmlGetUtf16InternalEncoding MOZ_XmlGetUtf16InternalEncoding
+#define XmlGetUtf8InternalEncodingNS MOZ_XmlGetUtf8InternalEncodingNS
+#define XmlGetUtf16InternalEncodingNS MOZ_XmlGetUtf16InternalEncodingNS
 #define XmlUtf8Encode MOZ_XmlUtf8Encode
 #define XmlUtf16Encode MOZ_XmlUtf16Encode
 #define XmlSizeOfUnknownEncoding MOZ_XmlSizeOfUnknownEncoding
 #define XmlInitUnknownEncoding MOZ_XmlInitUnknownEncoding
+#define XmlInitUnknownEncodingNS MOZ_XmlInitUnknownEncodingNS
+#define XmlParseXmlDeclNS MOZ_XmlParseXmlDeclNS
 
 #endif /* __expat_config_h__ */
