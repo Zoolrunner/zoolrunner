@@ -951,6 +951,12 @@ ifdef SHARED_LIBRARY_LIBS
 	@for lib in $(SHARED_LIBRARY_LIBS); do $(AR_EXTRACT) $${lib}; $(CLEANUP2); done
 endif
 endif
+	@for obj in $(OBJS) $(LOBJS) $(SUB_LOBJS); do \
+		if test ! -s "$${obj}"; then \
+			echo "ERROR: invalid static library input: $${obj}"; \
+			exit 1; \
+		fi; \
+	done
 	$(AR) $(AR_FLAGS) $(OBJS) $(LOBJS) $(SUB_LOBJS)
 	$(RANLIB) $@
 	@rm -f foodummyfilefoo $(SUB_LOBJS)
@@ -986,6 +992,12 @@ endif # OS/2
 
 $(HOST_LIBRARY): $(HOST_OBJS) Makefile
 	rm -f $@
+	@for obj in $(HOST_OBJS); do \
+		if test ! -s "$${obj}"; then \
+			echo "ERROR: invalid host static library input: $${obj}"; \
+			exit 1; \
+		fi; \
+	done
 	$(HOST_AR) $(HOST_AR_FLAGS) $(HOST_OBJS)
 	$(HOST_RANLIB) $@
 
@@ -1063,10 +1075,18 @@ endif # !COMPILER_DEPEND
 
 endif # MOZ_AUTO_DEPS
 
+define CHECK_OBJECT_OUTPUT
+@if test ! -s $@; then \
+	echo "ERROR: compiler did not create a valid object: $@"; \
+	exit 1; \
+fi
+endef
+
 # Rules for building native targets must come first because of the host_ prefix
 host_%.$(OBJ_SUFFIX): %.c Makefile Makefile.in
 	$(REPORT_BUILD)
 	$(ELOG) $(HOST_CC) $(OUTOPTION)$@ -c $(HOST_CFLAGS) $(INCLUDES) $(NSPR_CFLAGS) $(_VPATH_SRCS)
+	$(CHECK_OBJECT_OUTPUT)
 
 %: %.c Makefile Makefile.in
 	$(REPORT_BUILD)
@@ -1077,6 +1097,7 @@ host_%.$(OBJ_SUFFIX): %.c Makefile Makefile.in
 	$(REPORT_BUILD)
 	@$(MAKE_DEPS_AUTO)
 	$(ELOG) $(CC) $(OUTOPTION)$@ -c $(COMPILE_CFLAGS) $(_VPATH_SRCS)
+	$(CHECK_OBJECT_OUTPUT)
 
 moc_%.cpp: %.h Makefile Makefile.in
 	$(MOC) $< $(OUTOPTION)$@ 
@@ -1089,9 +1110,11 @@ ifeq ($(MOZ_OS2_TOOLS),VACPP)
 else
 	$(AS) -o $@ $(ASFLAGS) $(AS_DASH_C_FLAG) $(_VPATH_SRCS)
 endif
+	$(CHECK_OBJECT_OUTPUT)
 
 %.$(OBJ_SUFFIX): %.S Makefile Makefile.in
 	$(AS) -o $@ $(ASFLAGS) -c $<
+	$(CHECK_OBJECT_OUTPUT)
 
 %: %.cpp Makefile Makefile.in
 	@$(MAKE_DEPS_AUTO)
@@ -1104,6 +1127,7 @@ endif
 	$(REPORT_BUILD)
 	@$(MAKE_DEPS_AUTO)
 	$(ELOG) $(CCC) $(OUTOPTION)$@ -c $(COMPILE_CXXFLAGS) $(_VPATH_SRCS)
+	$(CHECK_OBJECT_OUTPUT)
 
 %.$(OBJ_SUFFIX): %.cpp Makefile Makefile.in
 	$(REPORT_BUILD)
@@ -1111,20 +1135,24 @@ endif
 ifdef STRICT_CPLUSPLUS_SUFFIX
 	echo "#line 1 \"$*.cpp\"" | cat - $*.cpp > t_$*.cc
 	$(ELOG) $(CCC) -o $@ -c $(COMPILE_CXXFLAGS) t_$*.cc
+	$(CHECK_OBJECT_OUTPUT)
 	rm -f t_$*.cc
 else
 	$(ELOG) $(CCC) $(OUTOPTION)$@ -c $(COMPILE_CXXFLAGS) $(_VPATH_SRCS)
+	$(CHECK_OBJECT_OUTPUT)
 endif #STRICT_CPLUSPLUS_SUFFIX
 
 $(OBJ_PREFIX)%.$(OBJ_SUFFIX): %.mm Makefile Makefile.in
 	$(REPORT_BUILD)
 	@$(MAKE_DEPS_AUTO)
 	$(ELOG) $(CCC) -o $@ -c $(COMPILE_CXXFLAGS) $(_VPATH_SRCS)
+	$(CHECK_OBJECT_OUTPUT)
 
 $(OBJ_PREFIX)%.$(OBJ_SUFFIX): %.m Makefile Makefile.in
 	$(REPORT_BUILD)
 	@$(MAKE_DEPS_AUTO)
 	$(ELOG) $(CC) -o $@ -c $(COMPILE_CFLAGS) $(_VPATH_SRCS)
+	$(CHECK_OBJECT_OUTPUT)
 
 %.s: %.cpp
 	$(CCC) -S $(COMPILE_CXXFLAGS) $(_VPATH_SRCS)
