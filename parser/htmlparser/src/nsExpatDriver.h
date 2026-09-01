@@ -119,6 +119,7 @@ private:
   PRPackedBool     mInCData;
   PRPackedBool     mInInternalSubset;
   PRPackedBool     mInExternalDTD;
+  PRPackedBool     mParserSuspended;
 
   // Number of bytes parsed in the current buffer.
   PRInt32          mBytePosition;

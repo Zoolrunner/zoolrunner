@@ -392,6 +392,7 @@ nsExpatDriver::nsExpatDriver()
     mInCData(PR_FALSE),
     mInInternalSubset(PR_FALSE),
     mInExternalDTD(PR_FALSE),
+    mParserSuspended(PR_FALSE),
     mBytePosition(0),
     mInternalState(NS_OK),
     mBytesParsed(0),
@@ -441,7 +442,9 @@ nsExpatDriver::HandleEndElement(const PRUnichar *aValue)
   if (mSink &&
       mSink->HandleEndElement(aValue) == NS_ERROR_HTMLPARSER_BLOCK) {
     mInternalState = NS_ERROR_HTMLPARSER_BLOCK;
-    MOZ_XML_StopParser(mExpatParser, XML_TRUE);
+    if (MOZ_XML_StopParser(mExpatParser, XML_TRUE) == XML_STATUS_OK) {
+      mParserSuspended = PR_TRUE;
+    }
   }
 
   return NS_OK;
@@ -508,7 +511,9 @@ nsExpatDriver::HandleProcessingInstruction(const PRUnichar *aTarget,
            mSink->HandleProcessingInstruction(aTarget, aData) ==
            NS_ERROR_HTMLPARSER_BLOCK) {
     mInternalState = NS_ERROR_HTMLPARSER_BLOCK;
-    MOZ_XML_StopParser(mExpatParser, XML_TRUE);
+    if (MOZ_XML_StopParser(mExpatParser, XML_TRUE) == XML_STATUS_OK) {
+      mParserSuspended = PR_TRUE;
+    }
   }
 
   return NS_OK;
@@ -960,7 +965,9 @@ nsExpatDriver::ParseBuffer(const char* aBuffer,
                   "Consumed part of a PRUnichar?");
 
   if (mExpatParser && mInternalState == NS_OK) {
-    XML_Bool parsedAll = XML_Parse(mExpatParser, aBuffer, aLength, aIsFinal);
+    enum XML_Status status =
+      XML_Parse(mExpatParser, aBuffer, aLength, aIsFinal);
+    PRBool parsedAll = status == XML_STATUS_OK;
 
     PRInt32 parserBytesConsumed = XML_GetCurrentByteIndex(mExpatParser);
 
@@ -1077,8 +1084,15 @@ nsExpatDriver::ConsumeToken(nsScanner& aScanner,
   // Ask the scanner to send us all the data it has
   // scanned and pass that data to expat.
 
-  mInternalState = NS_OK; // Resume in case we're blocked.
-  MOZ_XML_ResumeParser(mExpatParser);
+  mInternalState = NS_OK;
+  if (mParserSuspended) {
+    if (MOZ_XML_ResumeParser(mExpatParser) == XML_STATUS_OK) {
+      mParserSuspended = PR_FALSE;
+    }
+    else {
+      return HandleError();
+    }
+  }
 
   nsScannerIterator start, end;
   aScanner.CurrentPosition(start);
