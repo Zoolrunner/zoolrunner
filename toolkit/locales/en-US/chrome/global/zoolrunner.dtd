@@ -1,10 +1,13 @@
-<!ENTITY mozilla.title
-'The Book of ZoolRunner, 1:1'>
+<!ENTITY zoolrunner.title
+'The Book of Zool, 69:420'>
 
-<!ENTITY mozilla.quote
-'As the beast <em class="f">progressed</em>, it left the elders in his following behind, 
-to face the wrath of <em>Mammon</em>. The true believers, unwilling to succumb 
-to <em>Mammon</em>, formed a <em>new beast</em>, one suited for <em>all</em> of his followers.'>
+<!ENTITY zoolrunner.quote
+'<span>The Outcast looked upon the Lunar Path and, certain of his wisdom, declared:</span>
+<span>“There is only the Library.”</span>
+<span>And the Serpents beheld his works.</span>
+<span>And they laughed.</span>
+<span>Then they cast the Library into the dust and spoke:</span>
+<span>“There is only the Runner.”</span>'>
 
-<!ENTITY mozilla.from
-'from <strong>The Book of ZoolRunner,</strong> 1:1'>
+<!ENTITY zoolrunner.from
+'— <strong>The Book of Zool,</strong> 69:420'>
