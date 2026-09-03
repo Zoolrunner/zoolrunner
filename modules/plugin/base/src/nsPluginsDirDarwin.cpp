@@ -119,6 +119,9 @@ static nsresult toCFURLRef(nsIFile* file, CFURLRef& outURL)
 // Also checks if the plugin is a CFBundle and opens gets the correct resource
 static short OpenPluginResourceFork(nsIFile *pluginFile)
 {
+#if defined(__LP64__)
+    return -1;
+#else
     FSSpec spec;
     OSErr err = toFSSpec(pluginFile, spec);
     Boolean targetIsFolder, wasAliased;
@@ -135,6 +138,7 @@ static short OpenPluginResourceFork(nsIFile *pluginFile)
     }
     
     return refNum;
+#endif
 }
 
 // function to test whether or not this is a loadable plugin
@@ -154,7 +158,9 @@ static PRBool IsLoadablePlugin(CFURLRef aURL)
       // we're compiling for. Fat headers are always big-endian, so swap
       // them to host before comparing to host representation of the magic
       if (read(f, &magic, sizeof(magic)) == sizeof(magic)) {
-        if ((magic == MH_MAGIC) || (PR_ntohl(magic) == FAT_MAGIC))
+        if ((magic == MH_MAGIC) || (magic == MH_MAGIC_64) ||
+            (PR_ntohl(magic) == FAT_MAGIC) ||
+            (PR_ntohl(magic) == FAT_MAGIC_64))
           isLoadable = PR_TRUE;
 #ifdef __POWERPC__
         // if we're on ppc, we can use CFM plugins
@@ -195,7 +201,9 @@ PRBool nsPluginsDir::IsPluginFile(nsIFile* file)
       }
     }
   
-    // some safari plugins that we can't use don't have resource forks 
+    // LP64 plug-ins carry metadata in Info.plist. Historical plug-ins use a
+    // resource fork, which remains required on the old Mac path.
+#if !defined(__LP64__)
     short refNum;
     if (isPluginFile) {
       refNum = OpenPluginResourceFork(file);
@@ -205,6 +213,7 @@ PRBool nsPluginsDir::IsPluginFile(nsIFile* file)
         ::CloseResFile(refNum); 
       }
     }
+#endif
   
     CFRelease(pluginBundle);
   }
@@ -287,15 +296,73 @@ static char* GetNextPluginStringFromHandle(Handle h, short *index)
 
 static char* GetPluginString(short id, short index)
 {
+#if defined(__LP64__)
+    return NULL;
+#else
     Str255 str;
     ::GetIndString(str, id, index);
     return p2cstrdup(str);
+#endif
 }
 
 short nsPluginFile::OpenPluginResource()
 {
     return OpenPluginResourceFork(mPlugin);
 }
+
+#if defined(__LP64__)
+static char* CopyPluginCString(const char* aString)
+{
+    if (!aString)
+        return NULL;
+    size_t length = strlen(aString);
+    char* result = new char[length + 1];
+    if (result)
+        memcpy(result, aString, length + 1);
+    return result;
+}
+
+static char* CopyPluginCFString(CFStringRef aString)
+{
+    if (!aString || CFGetTypeID(aString) != CFStringGetTypeID())
+        return NULL;
+    CFIndex length = CFStringGetLength(aString);
+    CFIndex size = CFStringGetMaximumSizeForEncoding(length,
+                                                     kCFStringEncodingUTF8) + 1;
+    if (size <= 0)
+        return NULL;
+    char* result = new char[(size_t)size];
+    if (!result)
+        return NULL;
+    if (!CFStringGetCString(aString, result, size, kCFStringEncodingUTF8)) {
+        delete[] result;
+        return NULL;
+    }
+    return result;
+}
+
+static char* CopyPluginExtensions(CFArrayRef aExtensions)
+{
+    if (!aExtensions || CFGetTypeID(aExtensions) != CFArrayGetTypeID())
+        return CopyPluginCString("");
+    nsCAutoString extensions;
+    CFIndex count = CFArrayGetCount(aExtensions);
+    for (CFIndex i = 0; i < count; ++i) {
+        CFStringRef item = (CFStringRef)CFArrayGetValueAtIndex(aExtensions, i);
+        char* extension = CopyPluginCFString(item);
+        if (!extension)
+            continue;
+        if (!extensions.IsEmpty())
+            extensions.Append(',');
+        extensions.Append(extension);
+        delete[] extension;
+    }
+    char* result = new char[extensions.Length() + 1];
+    if (result)
+        memcpy(result, extensions.get(), extensions.Length() + 1);
+    return result;
+}
+#endif
 
 /**
  * Obtains all of the information currently available for this plugin.
@@ -304,6 +371,98 @@ nsresult nsPluginFile::GetPluginInfo(nsPluginInfo& info)
 {
     // clear out the info, except for the first field.
     memset(&info.fName, 0, sizeof(info) - sizeof(PRUint32));
+
+#if defined(__LP64__)
+    if (info.fPluginInfoSize < sizeof(nsPluginInfo))
+        return NS_ERROR_FAILURE;
+
+    nsCAutoString path;
+    nsCAutoString leafName;
+    mPlugin->GetNativePath(path);
+    mPlugin->GetNativeLeafName(leafName);
+    info.fFileName = CopyPluginCString(leafName.get());
+    info.fFullPath = CopyPluginCString(path.get());
+
+    CFBundleRef bundle = getPluginBundle(path.get());
+    if (!bundle)
+        return NS_ERROR_FAILURE;
+    info.fBundle = PR_TRUE;
+    info.fName = CopyPluginCFString((CFStringRef)
+      CFBundleGetValueForInfoDictionaryKey(bundle, CFSTR("WebPluginName")));
+    info.fDescription = CopyPluginCFString((CFStringRef)
+      CFBundleGetValueForInfoDictionaryKey(bundle,
+                                           CFSTR("WebPluginDescription")));
+    if (!info.fName)
+        info.fName = CopyPluginCString(leafName.get());
+    if (!info.fDescription)
+        info.fDescription = CopyPluginCString("");
+
+    if (pLibrary) {
+        NP_GETMIMEDESCRIPTION getMimeDescription =
+          (NP_GETMIMEDESCRIPTION)PR_FindSymbol(pLibrary,
+                                               NP_GETMIMEDESCRIPTION_NAME);
+        if (getMimeDescription) {
+            nsresult rv = ParsePluginMimeDescription(getMimeDescription(), info);
+            if (NS_SUCCEEDED(rv)) {
+                CFRelease(bundle);
+                return rv;
+            }
+        }
+    }
+
+    CFDictionaryRef mimeTypes = (CFDictionaryRef)
+      CFBundleGetValueForInfoDictionaryKey(bundle, CFSTR("WebPluginMIMETypes"));
+    if (!mimeTypes || CFGetTypeID(mimeTypes) != CFDictionaryGetTypeID()) {
+        CFRelease(bundle);
+        return NS_ERROR_FAILURE;
+    }
+    CFIndex count = CFDictionaryGetCount(mimeTypes);
+    if (count <= 0 || (PRUint64)count > PR_UINT32_MAX) {
+        CFRelease(bundle);
+        return NS_ERROR_FAILURE;
+    }
+
+    const void** keys = new const void*[(size_t)count];
+    const void** values = new const void*[(size_t)count];
+    if (!keys || !values) {
+        delete[] keys;
+        delete[] values;
+        CFRelease(bundle);
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+    CFDictionaryGetKeysAndValues(mimeTypes, keys, values);
+    info.fVariantCount = (PRUint32)count;
+    info.fMimeTypeArray = new char*[(size_t)count];
+    info.fExtensionArray = new char*[(size_t)count];
+    info.fMimeDescriptionArray = new char*[(size_t)count];
+    if (!info.fMimeTypeArray || !info.fExtensionArray ||
+        !info.fMimeDescriptionArray) {
+        delete[] keys;
+        delete[] values;
+        CFRelease(bundle);
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+    for (CFIndex i = 0; i < count; ++i) {
+        info.fMimeTypeArray[i] = CopyPluginCFString((CFStringRef)keys[i]);
+        CFDictionaryRef mimeInfo = (CFDictionaryRef)values[i];
+        CFArrayRef extensions = NULL;
+        CFStringRef description = NULL;
+        if (mimeInfo && CFGetTypeID(mimeInfo) == CFDictionaryGetTypeID()) {
+            extensions = (CFArrayRef)CFDictionaryGetValue(
+              mimeInfo, CFSTR("WebPluginExtensions"));
+            description = (CFStringRef)CFDictionaryGetValue(
+              mimeInfo, CFSTR("WebPluginTypeDescription"));
+        }
+        info.fExtensionArray[i] = CopyPluginExtensions(extensions);
+        info.fMimeDescriptionArray[i] = CopyPluginCFString(description);
+        if (!info.fMimeDescriptionArray[i])
+            info.fMimeDescriptionArray[i] = CopyPluginCString("");
+    }
+    delete[] keys;
+    delete[] values;
+    CFRelease(bundle);
+    return NS_OK;
+#else
 
     // need to open the plugin's resource file and read some resources.
     short refNum = OpenPluginResource();
@@ -407,6 +566,7 @@ nsresult nsPluginFile::GetPluginInfo(nsPluginInfo& info)
         ::CloseResFile(refNum);
     }
     return NS_OK;
+#endif
 }
 
 nsresult nsPluginFile::FreePluginInfo(nsPluginInfo& info)

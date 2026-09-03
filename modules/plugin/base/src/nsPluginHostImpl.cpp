@@ -21,7 +21,7 @@
  *
  * Contributor(s):
  *   Sean Echevarria <sean@beatnik.com>
- *   Håkan Waara <hwaara@chello.se>
+ *   HÃ‚kan Waara <hwaara@chello.se>
  *   Josh Aas <josh@mozillafoundation.org>
  *
  * Alternatively, the contents of this file may be used under the terms of
@@ -4727,7 +4727,7 @@ NS_IMETHODIMP nsPluginHostImpl::GetPluginFactory(const char *aMimeType, nsIPlugi
       }
     }
 
-#if defined (XP_MACOSX)
+#if defined(XP_MACOSX) && !defined(__LP64__)
    /* Flash 6.0 r50 and older on Mac has a bug which calls ::UseInputWindow(NULL, true)
       which turn off all our inline IME. Turn it back after the plugin
       initializtion and hope that future versions will be fixed. See bug 159016
