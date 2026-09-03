@@ -478,7 +478,7 @@ nsresult nsProfileLock::Lock(nsILocalFile* aProfileDir,
         struct LockProcessInfo
         {
             ProcessSerialNumber psn;
-            unsigned long launchDate;
+            PRUint32 launchDate;
         };
 
         PRFileDesc *fd = nsnull;
@@ -497,7 +497,11 @@ nsresult nsProfileLock::Lock(nsILocalFile* aProfileDir,
 
             if (ioBytes == sizeof(LockProcessInfo))
             {
+#ifdef __LP64__
+                processInfo.processAppRef = nsnull;
+#else
                 processInfo.processAppSpec = nsnull;
+#endif
                 processInfo.processName = nsnull;
                 processInfo.processInfoLength = sizeof(ProcessInfoRec);
                 if (::GetProcessInformation(&lockProcessInfo.psn, &processInfo) == noErr &&
