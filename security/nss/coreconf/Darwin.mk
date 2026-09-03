@@ -18,7 +18,18 @@ ifndef CPU_ARCH
 CPU_ARCH	:= $(shell uname -p)
 endif
 
-ifeq (,$(filter-out i%86,$(CPU_ARCH)))
+ifeq ($(CPU_ARCH),arm)
+ifeq ($(OS_TEST),arm64)
+# uname -p reports "arm" on Apple Silicon. NSS calls the 64-bit architecture
+# aarch64 when selecting its portable ARM implementations.
+override CPU_ARCH = aarch64
+endif
+endif
+
+ifeq ($(CPU_ARCH),aarch64)
+CC              += -arch arm64
+CCC             += -arch arm64
+else ifeq (,$(filter-out i%86,$(CPU_ARCH)))
 ifdef USE_64
 CC              += -arch x86_64
 CCC             += -arch x86_64
@@ -30,13 +41,9 @@ CCC             += -arch i386
 override CPU_ARCH	= x86
 endif
 else
-ifeq (arm,$(CPU_ARCH))
-# Nothing set for arm currently.
-else
 OS_REL_CFLAGS	= -Dppc
 CC              += -arch ppc
 CCC             += -arch ppc
-endif
 endif
 
 ifneq (,$(MACOS_SDK_DIR))

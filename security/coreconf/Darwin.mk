@@ -49,7 +49,17 @@ ifndef CPU_ARCH
 CPU_ARCH	:= $(shell uname -p)
 endif
 
-ifeq (,$(filter-out i%86,$(CPU_ARCH)))
+ifeq ($(CPU_ARCH),arm)
+ifeq ($(OS_TEST),arm64)
+# uname -p reports "arm" on Apple Silicon, while NSS uses aarch64 for its
+# 64-bit ARM source selection.
+CPU_ARCH	= aarch64
+endif
+endif
+
+ifeq ($(CPU_ARCH),aarch64)
+OS_REL_CFLAGS	=
+else ifeq (,$(filter-out i%86,$(CPU_ARCH)))
 ifdef USE_64
 CC              += -arch x86_64
 else
@@ -60,6 +70,13 @@ OS_REL_CFLAGS	= -Dppc
 endif
 
 ifneq (,$(MACOS_SDK_DIR))
+  ifeq ($(OS_TEST),arm64)
+    # Current Apple Clang supplies compiler headers such as stdarg.h from its
+    # resource directory.  Modern SDKs no longer contain the GCC header tree
+    # used by the historical -nostdinc configuration below.
+    DARWIN_SDK_CFLAGS = -isysroot $(MACOS_SDK_DIR)
+    DARWIN_SDK_SHLIBFLAGS = -isysroot $(MACOS_SDK_DIR)
+  else
     GCC_VERSION_FULL := $(shell $(CC) -v 2>&1 | grep "gcc version" | sed -e "s/^.*gcc version[  ]*//" | awk '{ print $$1 }')
     GCC_VERSION_MAJOR := $(shell echo $(GCC_VERSION_FULL) | awk -F. '{ print $$1 }')
     GCC_VERSION_MINOR := $(shell echo $(GCC_VERSION_FULL) | awk -F. '{ print $$2 }')
@@ -91,6 +108,7 @@ ifneq (,$(MACOS_SDK_DIR))
             DARWIN_SDK_SHLIBFLAGS = $(DARWIN_SDK_LDFLAGS)
         endif
     endif
+  endif
 
     LDFLAGS += $(DARWIN_SDK_LDFLAGS)
 endif
