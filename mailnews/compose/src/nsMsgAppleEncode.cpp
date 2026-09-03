@@ -58,6 +58,29 @@
 #if defined(XP_MAC) || defined(XP_MACOSX)
 
 #include <Errors.h>
+#ifdef __LP64__
+#include <Carbon/Carbon.h>
+
+static OSErr
+ReadAppleDoubleFork(FSIORefNum aFork, long* aCount, void* aBuffer)
+{
+  ByteCount actualCount = 0;
+  OSErr err = FSReadFork(aFork, fsAtMark, 0, (ByteCount)*aCount, aBuffer,
+                         &actualCount);
+  *aCount = (long)actualCount;
+  return err;
+}
+
+static PRInt32
+AppleDoubleSeconds(const UTCDateTime& aDate)
+{
+  CFAbsoluteTime absoluteTime = 0;
+  if (UCConvertUTCDateTimeToCFAbsoluteTime(&aDate, &absoluteTime) != noErr)
+    return 0;
+  /* AppleDouble uses 2000-01-01; CFAbsoluteTime uses 2001-01-01. */
+  return (PRInt32)(absoluteTime + 31622400.0);
+}
+#endif
 
 /*
 **	Local Functions prototypes.
@@ -151,6 +174,76 @@ int fill_apple_mime_header(
 int ap_encode_file_infor(
 	appledouble_encode_object *p_ap_encode_obj)
 {
+#ifdef __LP64__
+	FSCatalogInfo catalogInfo;
+	ap_header head;
+	ap_entry entries[NUM_ENTRIES];
+	ap_dates dates;
+	FInfo *finderInfo;
+	short i;
+	int status;
+	const PRInt32 nameLength = (PRInt32)strlen(p_ap_encode_obj->fname);
+	const FSCatalogInfoBitmap wantedInfo = kFSCatInfoDataSizes |
+		kFSCatInfoRsrcSizes | kFSCatInfoFinderInfo | kFSCatInfoFinderXInfo |
+		kFSCatInfoCreateDate | kFSCatInfoContentMod | kFSCatInfoBackupDate;
+
+	if (FSGetCatalogInfo(&p_ap_encode_obj->fileRef, wantedInfo, &catalogInfo,
+	                     nsnull, nsnull, nsnull) != noErr ||
+	    catalogInfo.rsrcLogicalSize > 0x7fffffffULL ||
+	    catalogInfo.dataLogicalSize > 0x7fffffffULL)
+		return errFileOpen;
+
+	head.magic = APPLEDOUBLE_MAGIC;
+	head.version = VERSION;
+	memset(head.fill, '\0', sizeof(head.fill));
+	head.entries = NUM_ENTRIES - 1;
+	status = to64(p_ap_encode_obj, (char *)&head, sizeof(head));
+	if (status != noErr)
+		return status;
+
+	entries[0].offset = sizeof(head) + sizeof(ap_entry) * head.entries;
+	entries[0].id = ENT_NAME;
+	entries[0].length = nameLength;
+	entries[1].id = ENT_FINFO;
+	entries[1].length = sizeof(FInfo) + sizeof(FXInfo);
+	entries[2].id = ENT_DATES;
+	entries[2].length = sizeof(ap_dates);
+	entries[3].id = ENT_COMMENT;
+	entries[3].length = 0;
+	entries[4].id = ENT_RFORK;
+	entries[4].length = (PRInt32)catalogInfo.rsrcLogicalSize;
+	entries[5].id = ENT_DFORK;
+	entries[5].length = (PRInt32)catalogInfo.dataLogicalSize;
+	for (i = 1; i < NUM_ENTRIES; ++i)
+		entries[i].offset = entries[i - 1].offset + entries[i - 1].length;
+
+	status = to64(p_ap_encode_obj, (char *)entries,
+	              sizeof(ap_entry) * head.entries);
+	if (status != noErr)
+		return status;
+	status = to64(p_ap_encode_obj, p_ap_encode_obj->fname, nameLength);
+	if (status != noErr)
+		return status;
+	status = to64(p_ap_encode_obj, (char *)catalogInfo.finderInfo,
+	              sizeof(FInfo));
+	if (status != noErr)
+		return status;
+	status = to64(p_ap_encode_obj, (char *)catalogInfo.extFinderInfo,
+	              sizeof(FXInfo));
+	if (status != noErr)
+		return status;
+
+	dates.create = AppleDoubleSeconds(catalogInfo.createDate);
+	dates.modify = AppleDoubleSeconds(catalogInfo.contentModDate);
+	dates.backup = AppleDoubleSeconds(catalogInfo.backupDate);
+	dates.access = (PRInt32)(CFAbsoluteTimeGetCurrent() + 31622400.0);
+	status = to64(p_ap_encode_obj, (char *)&dates, sizeof(dates));
+
+	finderInfo = (FInfo *)catalogInfo.finderInfo;
+	if (finderInfo->fdType == 'TEXT' || finderInfo->fdType == 'text')
+		p_ap_encode_obj->text_file_type = true;
+	return status;
+#else
 	CInfoPBRec cipbr;
 	HFileInfo *fpb = (HFileInfo *)&cipbr;
 	ap_header	head;
@@ -297,6 +390,7 @@ int ap_encode_file_infor(
 	}
 	
 	return status;	
+#endif
 }
 /*
 **	ap_encode_header
@@ -308,9 +402,15 @@ int ap_encode_header(
 	appledouble_encode_object* p_ap_encode_obj, 
 	PRBool  firstime)
 {
+#ifndef __LP64__
 	Str255 	name;
+#endif
 	char   	rd_buff[256];
+#ifdef __LP64__
+	FSIORefNum fileId;
+#else
 	short   fileId;
+#endif
 	OSErr	retval = noErr;
 	int    	status;
 	long	inCount;
@@ -332,6 +432,14 @@ int ap_encode_header(
 		/*
 		** preparing to encode the resource fork.
 		*/
+#ifdef __LP64__
+		HFSUniStr255 forkName;
+		if (FSGetResourceForkName(&forkName) != noErr ||
+		    FSOpenFork(&p_ap_encode_obj->fileRef, forkName.length,
+		               forkName.unicode, fsRdPerm,
+		               &p_ap_encode_obj->fileId) != noErr)
+			return errFileOpen;
+#else
 		name[0] = strlen(p_ap_encode_obj->fname);
 		strcpy((char *)name+1, p_ap_encode_obj->fname);
 		if (HOpenRF(p_ap_encode_obj->vRefNum, p_ap_encode_obj->dirId,
@@ -340,6 +448,7 @@ int ap_encode_header(
 		{
 			return errFileOpen;			
 		}
+#endif
 	}
 
 	fileId = p_ap_encode_obj->fileId;
@@ -349,7 +458,11 @@ int ap_encode_header(
 			break;
 			
 		inCount = 256;
+#ifdef __LP64__
+		retval = ReadAppleDoubleFork(fileId, &inCount, rd_buff);
+#else
 		retval = FSRead(fileId, &inCount, rd_buff);
+#endif
 		if (inCount)
 		{
 			status = to64(p_ap_encode_obj,
@@ -362,7 +475,11 @@ int ap_encode_header(
 	
 	if (retval == eofErr)
 	{
+#ifdef __LP64__
+		FSCloseFork(fileId);
+#else
 		FSClose(fileId);
+#endif
 
 		status = finish64(p_ap_encode_obj);
 		if (status != noErr)
@@ -454,9 +571,15 @@ int ap_encode_data(
 	appledouble_encode_object* p_ap_encode_obj, 
 	PRBool firstime)
 {
+#ifndef __LP64__
 	Str255		name;
+#endif
 	char   		rd_buff[256];
+#ifdef __LP64__
+	FSIORefNum fileId;
+#else
 	short		fileId;
+#endif
 	OSErr		retval = noErr;
 	long		in_count;
 	int			status;
@@ -468,6 +591,13 @@ int ap_encode_data(
 		/*
 		** preparing to encode the data fork.
 		*/
+#ifdef __LP64__
+		HFSUniStr255 forkName;
+		if (FSGetDataForkName(&forkName) != noErr ||
+		    FSOpenFork(&p_ap_encode_obj->fileRef, forkName.length,
+		               forkName.unicode, fsRdPerm, &fileId) != noErr)
+			return errFileOpen;
+#else
 		name[0] = strlen(p_ap_encode_obj->fname);
     PL_strcpy((char*)name+1, p_ap_encode_obj->fname);
 		if (HOpen( 	p_ap_encode_obj->vRefNum,
@@ -478,6 +608,7 @@ int ap_encode_data(
 		{
 			return errFileOpen;
 		}
+#endif
 		p_ap_encode_obj->fileId = fileId;
 			
 		
@@ -487,11 +618,19 @@ int ap_encode_data(
       **	do a smart check for the file type.
       */
       in_count = 256;
+#ifdef __LP64__
+      retval = ReadAppleDoubleFork(fileId, &in_count, rd_buff);
+#else
       retval 	 = FSRead(fileId, &in_count, rd_buff);
+#endif
       magic_type = magic_look(rd_buff, in_count);
       
       /* don't forget to rewind the index to start point. */ 
+#ifdef __LP64__
+      FSSetForkPosition(fileId, fsFromStart, 0);
+#else
       SetFPos(fileId, fsFromStart, 0L);
+#endif
       /* and reset retVal just in case... */
       if (retval == eofErr)
         retval = noErr;
@@ -523,9 +662,14 @@ int ap_encode_data(
 			break;
 			
 		in_count = 256;
+#ifdef __LP64__
+		retval = ReadAppleDoubleFork(p_ap_encode_obj->fileId,
+		                             &in_count, rd_buff);
+#else
 		retval = FSRead(p_ap_encode_obj->fileId, 
 						&in_count, 
 						rd_buff);
+#endif
 		if (in_count)
 		{
 /*			replace(rd_buff, in_count, '\r', '\n');	 						*/
@@ -540,7 +684,11 @@ int ap_encode_data(
 	
 	if (retval == eofErr)
 	{
+#ifdef __LP64__
+		FSCloseFork(p_ap_encode_obj->fileId);
+#else
 		FSClose(p_ap_encode_obj->fileId);
+#endif
 
 		status = finish64(p_ap_encode_obj);
 		if (status != noErr)

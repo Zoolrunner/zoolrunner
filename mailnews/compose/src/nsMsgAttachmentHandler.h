@@ -50,6 +50,9 @@
 #if defined(XP_MAC) || defined(XP_MACOSX)
 
 #include "nsMsgAppleDouble.h"
+#ifdef XP_MACOSX
+#include <Carbon/Carbon.h>
+#endif
 
 typedef struct _AppledoubleEncodeObject
 {
@@ -91,7 +94,11 @@ private:
   void                  AnalyzeDataChunk (const char *chunk, PRInt32 chunkSize);
   nsresult              LoadDataFromFile(nsFileSpec& fSpec, nsString &sigData, PRBool charsetConversion); //A similar function already exist in nsMsgCompose!
 #if defined(XP_MAC) || defined(XP_MACOSX)
+#ifdef __LP64__
+  PRBool HasResourceFork(FSRef *fsRef);
+#else
   PRBool HasResourceFork(FSSpec *fsSpec);
+#endif
 #endif
 
   //////////////////////////////////////////////////////////////////////

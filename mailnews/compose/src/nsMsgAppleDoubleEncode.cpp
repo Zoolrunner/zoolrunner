@@ -88,6 +88,16 @@ MacGetFileType(nsFileSpec   *fs,
 	FInfo		fndrInfo;
 #if defined(XP_MAC)
   OSErr err = FSpGetFInfo( fs->GetFSSpecPtr(), &fndrInfo );
+#elif defined(__LP64__)
+  FSRef fsRef;
+  FinderInfo finderInfo;
+  Boolean isDirectory;
+  OSErr err = FSPathMakeRef((const UInt8 *)fs->GetNativePathCString(),
+                            &fsRef, &isDirectory);
+  if (err == noErr)
+    err = FSGetFinderInfo(&fsRef, &finderInfo, nsnull, &isDirectory);
+  if (err == noErr)
+    memcpy(&fndrInfo, &finderInfo, sizeof(fndrInfo));
 #else
   FSSpec fsSpec;
   FSPathMakeFSSpec((UInt8 *)fs->GetNativePathCString(), &fsSpec, NULL);
@@ -137,26 +147,40 @@ int ap_encode_init( appledouble_encode_object *p_ap_encode_obj,
                     const char                *fname,
                     char                      *separator)
 {
+#ifndef __LP64__
 	FSSpec	fspec;
+#endif
 	
 	nsFileSpec  mySpec(fname);
 	if (!mySpec.Exists())
 		return -1;
 
+	memset(p_ap_encode_obj, 0, sizeof(appledouble_encode_object));
+
 #if defined(XP_MAC)
 	fspec = mySpec.GetFSSpec();
+#elif defined(__LP64__)
+	if (FSPathMakeRef((const UInt8 *)fname, &p_ap_encode_obj->fileRef,
+	                  nsnull) != noErr)
+		return errFileOpen;
 #else
 	FSPathMakeFSSpec((const UInt8 *)fname, &fspec, NULL);
 #endif
-	memset(p_ap_encode_obj, 0, sizeof(appledouble_encode_object));
 	
 	/*
 	**	Fill out the source file inforamtion.
 	*/	
+#ifdef __LP64__
+	const char *leafName = strrchr(fname, '/');
+	leafName = leafName ? leafName + 1 : fname;
+	PL_strncpyz(p_ap_encode_obj->fname, leafName,
+	            sizeof(p_ap_encode_obj->fname));
+#else
 	memcpy(p_ap_encode_obj->fname, fspec.name+1, *fspec.name);
 	p_ap_encode_obj->fname[*fspec.name] = '\0';
 	p_ap_encode_obj->vRefNum = fspec.vRefNum;
 	p_ap_encode_obj->dirId   = fspec.parID;
+#endif
 	
 	p_ap_encode_obj->boundary = nsCRT::strdup(separator);
 	return noErr;
@@ -305,7 +329,11 @@ int ap_encode_end(
 		return noErr;
 
 	if (p_ap_encode_obj->fileId)			/* close the file if it is open.	*/
+#ifdef __LP64__
+		FSCloseFork(p_ap_encode_obj->fileId);
+#else
 		FSClose(p_ap_encode_obj->fileId);
+#endif
 
 	PR_FREEIF(p_ap_encode_obj->boundary);		/* the boundary string.				*/
 	
@@ -313,4 +341,3 @@ int ap_encode_end(
 }
 
 #endif	/* the ifdef of XP_MAC */
-

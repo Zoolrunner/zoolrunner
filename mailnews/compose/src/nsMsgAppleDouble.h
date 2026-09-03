@@ -54,6 +54,9 @@
 #include "nsFileSpec.h"
 #include "nsFileStream.h"
 #include "nsMsgComposeStringBundle.h"
+#ifdef XP_MACOSX
+#include <Carbon/Carbon.h>
+#endif
 
 
 #define NOERR			0
@@ -85,9 +88,14 @@ enum
 typedef struct _appledouble_encode_object 
 {
 	char	fname[64];
+#ifdef __LP64__
+	FSRef	fileRef;
+	FSIORefNum fileId;
+#else
 	PRInt32	dirId; 
 	PRInt16	vRefNum;
 	PRInt16	fileId;				/* the id for the open file (data/resource fork) */
+#endif
 
 	int 	state;
 	int		text_file_type;		/* if the file has a text file type with it.	*/

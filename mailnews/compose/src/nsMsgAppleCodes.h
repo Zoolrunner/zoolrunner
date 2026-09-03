@@ -59,7 +59,11 @@
 #endif /* XP_MAC */
 
 #if defined(XP_MACOSX)
+#ifdef __LP64__
+#pragma pack(push, 2)
+#else
 #pragma options align=mac68k
+#endif
 #endif /* XP_MACOSX */
 
 #define APPLESINGLE_MAGIC	0x00051600L
@@ -144,7 +148,11 @@ PR_END_EXTERN_C
 #endif /* XP_MAC */
 
 #if defined(XP_MACOSX)
+#ifdef __LP64__
+#pragma pack(pop)
+#else
 #pragma options align=reset
+#endif
 #endif /* XP_MACOSX */
 
 #endif /* ad_codes_h */

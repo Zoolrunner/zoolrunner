@@ -654,13 +654,29 @@ done:
 }
 
 #if defined(XP_MAC) || defined(XP_MACOSX)
-PRBool nsMsgAttachmentHandler::HasResourceFork(FSSpec *fsSpec)
+PRBool nsMsgAttachmentHandler::HasResourceFork(
+#ifdef __LP64__
+  FSRef *fsRef)
+#else
+  FSSpec *fsSpec)
+#endif
 {
+#ifndef __LP64__
   FSRef fsRef;
   if (::FSpMakeFSRef(fsSpec, &fsRef) == noErr)
+#else
+  if (fsRef)
+#endif
   {
     FSCatalogInfo catalogInfo;
-    OSErr err = ::FSGetCatalogInfo(&fsRef, kFSCatInfoDataSizes + kFSCatInfoRsrcSizes, &catalogInfo, nsnull, nsnull, nsnull);
+    OSErr err = ::FSGetCatalogInfo(
+#ifdef __LP64__
+      fsRef,
+#else
+      &fsRef,
+#endif
+      kFSCatInfoDataSizes + kFSCatInfoRsrcSizes, &catalogInfo, nsnull,
+      nsnull, nsnull);
     return (err == noErr && catalogInfo.rsrcLogicalSize != 0);
   }
   return PR_FALSE;
@@ -731,6 +747,18 @@ nsMsgAttachmentHandler::SnarfAttachment(nsMsgCompFields *compFields)
 
     //We need to retrieve the file type and creator...
     nsFileSpec scr_fileSpec(escapedFilename.get());
+    FInfo info;
+#ifdef __LP64__
+    FSRef fsRef;
+    Boolean isDir;
+    FinderInfo finderInfo;
+    OSErr fileInfoErr = FSPathMakeRef((const UInt8 *)escapedFilename.get(),
+                                      &fsRef, &isDir);
+    if (fileInfoErr == noErr)
+      fileInfoErr = FSGetFinderInfo(&fsRef, &finderInfo, nsnull, &isDir);
+    if (fileInfoErr == noErr)
+      memcpy(&info, &finderInfo, sizeof(info));
+#else
     FSSpec fsSpec;
 #if defined(XP_MAC)
     fsSpec = scr_fileSpec.GetFSSpec();
@@ -738,8 +766,9 @@ nsMsgAttachmentHandler::SnarfAttachment(nsMsgCompFields *compFields)
     Boolean isDir;
     FSPathMakeFSSpec((UInt8 *)escapedFilename.get(), &fsSpec, &isDir);
 #endif
-    FInfo info;
-    if (FSpGetFInfo (&fsSpec, &info) == noErr)
+    OSErr fileInfoErr = FSpGetFInfo(&fsSpec, &info);
+#endif
+    if (fileInfoErr == noErr)
     {
       char filetype[32];
       PR_snprintf(filetype, sizeof(filetype), "%X", info.fdType);
@@ -754,6 +783,7 @@ nsMsgAttachmentHandler::SnarfAttachment(nsMsgCompFields *compFields)
     PRBool sendResourceFork = PR_TRUE;
     PRBool icGaveNeededInfo = PR_FALSE;
     nsCOMPtr<nsIInternetConfigService> icService (do_GetService(NS_INTERNETCONFIGSERVICE_CONTRACTID));
+#ifndef __LP64__
     if (icService)
     {
       PRInt32 icFlags;
@@ -775,12 +805,19 @@ nsMsgAttachmentHandler::SnarfAttachment(nsMsgCompFields *compFields)
         icGaveNeededInfo = PR_TRUE;
       }
     }
+#endif
     
     if (! icGaveNeededInfo)
     {
       // If InternetConfig cannot help us, then just try our best...
       // first check if we have a resource fork
-      sendResourceFork = HasResourceFork(&fsSpec);
+      sendResourceFork = HasResourceFork(
+#ifdef __LP64__
+        &fsRef
+#else
+        &fsSpec
+#endif
+      );
 
       // then, if we have a resource fork, check the filename extension, maybe we don't need the resource fork!
       if (sendResourceFork)
