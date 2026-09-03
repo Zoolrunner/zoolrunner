@@ -1523,8 +1523,17 @@ NS_IMETHODIMP nsLocalFile::Reveal()
           if (err == noErr) {
             err = ::AEPutParamDesc(&aeEvent, keyDirectObject, &fileList);
             if (err == noErr) {
+#ifdef __LP64__
+              // AESend remains part of the legacy HIToolbox interface.  The
+              // equivalent CoreServices entry point is available to 64-bit
+              // applications and does not require linking the Carbon UI
+              // umbrella solely to reveal a file in the Finder.
+              err = ::AESendMessage(&aeEvent, &aeReply, kAENoReply,
+                                    kAEDefaultTimeout);
+#else
               err = ::AESend(&aeEvent, &aeReply, kAENoReply,
                              kAENormalPriority, kAEDefaultTimeout, nil, nil);
+#endif
               if (err == noErr)
                 ::SetFrontProcess(&process);
             }
