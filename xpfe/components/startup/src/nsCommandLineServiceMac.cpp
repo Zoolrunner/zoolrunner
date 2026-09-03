@@ -65,6 +65,10 @@
 #include "nsAEEventHandling.h"
 #include "nsXPFEComponentsCID.h"
 
+#ifdef __LP64__
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 // NSPR
 #include "prmem.h"
 #include "plstr.h"
@@ -161,6 +165,7 @@ nsresult nsMacCommandLine::Initialize(int& argc, char**& argv)
   // 2. If they are any other kind of document, convert them into -url command-line
   //    parameters or -print parameters, with file URLs.
 
+#ifndef __LP64__
   EventRecord anEvent;
   for (short i = 1; i < 5; i++)
     ::WaitNextEvent(0, &anEvent, 0, nsnull);
@@ -175,8 +180,14 @@ nsresult nsMacCommandLine::Initialize(int& argc, char**& argv)
       err = ::AEProcessAppleEvent(&anEvent);
     }
   }
+#endif
   
+#ifdef __LP64__
+  if (::CGEventSourceFlagsState(kCGEventSourceStateCombinedSessionState) &
+      kCGEventFlagMaskAlternate)
+#else
   if (GetCurrentKeyModifiers() & optionKey)
+#endif
     AddToCommandLine("-p");
 
   // we've started up now

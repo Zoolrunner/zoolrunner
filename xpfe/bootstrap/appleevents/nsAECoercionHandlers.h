@@ -56,8 +56,8 @@ public:
 
 protected:
 
-	static pascal OSErr TextToPascalStringCoercion(const AEDesc *fromDesc, DescType toType, long handlerRefcon, AEDesc *toDesc);
-	static pascal OSErr PascalStringToTextCoercion(const AEDesc *fromDesc, DescType toType, long handlerRefcon, AEDesc *toDesc);
+	static pascal OSErr TextToPascalStringCoercion(const AEDesc *fromDesc, DescType toType, SRefCon handlerRefcon, AEDesc *toDesc);
+	static pascal OSErr PascalStringToTextCoercion(const AEDesc *fromDesc, DescType toType, SRefCon handlerRefcon, AEDesc *toDesc);
 	
 	
 protected:

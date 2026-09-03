@@ -64,7 +64,7 @@ AECoercionHandlers::AECoercionHandlers()
 
 	err = ::AEInstallCoercionHandler(typeChar, typePascalString,
 								(AECoercionHandlerUPP) mTextDescToPascalString,
-								(long)this,
+								(SRefCon)this,
 								true,			/* Pass a pointer not a descriptor */
 								false );		/* Application table, not System */
 	ThrowIfOSErr(err);
@@ -74,7 +74,7 @@ AECoercionHandlers::AECoercionHandlers()
 
 	err = ::AEInstallCoercionHandler(typePascalString, typeChar,
 								(AECoercionHandlerUPP) mPascalStringDescToText,
-								(long)this,
+								(SRefCon)this,
 								true,			/* Pass a pointer not a descriptor */
 								false );		/* Application table, not System */
 	ThrowIfOSErr(err);
@@ -109,7 +109,7 @@ AECoercionHandlers::~AECoercionHandlers()
 	TextToPascalStringCoercion 
 	
 ----------------------------------------------------------------------------*/
-pascal OSErr AECoercionHandlers::TextToPascalStringCoercion(const AEDesc *fromDesc, DescType toType, long handlerRefcon, AEDesc *toDesc)
+pascal OSErr AECoercionHandlers::TextToPascalStringCoercion(const AEDesc *fromDesc, DescType toType, SRefCon handlerRefcon, AEDesc *toDesc)
 {
 	OSErr	err = noErr;
 	
@@ -137,7 +137,7 @@ pascal OSErr AECoercionHandlers::TextToPascalStringCoercion(const AEDesc *fromDe
 	
 ----------------------------------------------------------------------------*/
 
-pascal OSErr AECoercionHandlers::PascalStringToTextCoercion(const AEDesc *fromDesc, DescType toType, long handlerRefcon, AEDesc *toDesc)
+pascal OSErr AECoercionHandlers::PascalStringToTextCoercion(const AEDesc *fromDesc, DescType toType, SRefCon handlerRefcon, AEDesc *toDesc)
 {
 	OSErr	err = noErr;
 	
@@ -224,4 +224,3 @@ OSErr ShutdownCoercionHandlers()
 	AECoercionHandlers::sAECoercionHandlers = nil;
 	return noErr;
 }
-

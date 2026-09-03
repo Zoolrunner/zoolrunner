@@ -78,19 +78,19 @@ public:
 	void					ResumeEventHandling(const AppleEvent *appleEvent, AppleEvent *reply, Boolean dispatchEvent);
 	
 	// AE Handlers
-	static pascal OSErr		SuspendEventHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
-	static pascal OSErr		RequiredSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
-	static pascal OSErr		CoreSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
-	static pascal OSErr		CreateElementHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
+	static pascal OSErr		SuspendEventHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
+	static pascal OSErr		RequiredSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
+	static pascal OSErr		CoreSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
+	static pascal OSErr		CreateElementHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
 
 	// Handler for Mozilla Suite events
-	static pascal OSErr		MozillaSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
+	static pascal OSErr		MozillaSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
 
 	// Handler for GetURL events
-	static pascal OSErr		GetURLSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
+	static pascal OSErr		GetURLSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
 
 	// Handler for GetURL events
-	static pascal OSErr		SpyglassSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SInt32 refCon);
+	static pascal OSErr		SpyglassSuiteHandler(const AppleEvent *appleEvent, AppleEvent *reply, SRefCon refCon);
 
 
 	AEDispatchHandler*		GetDispatchHandler(DescType dispatchClass);
@@ -138,7 +138,7 @@ public:
 					 								DescType			keyForm,
 				    									const AEDesc*		keyData,
 					 								AEDesc*			resultToken,
-					 								long 				refCon);
+									SRefCon 			refCon);
 
 	static pascal OSErr		AnythingFromAppAccessor(		DescType			desiredClass,
 					 								const AEDesc*		containerToken,
@@ -146,7 +146,7 @@ public:
 					 								DescType			keyForm,
 				    									const AEDesc*		keyData,
 					 								AEDesc*			resultToken,
-					 								long 				refCon);
+									SRefCon 			refCon);
 
 	static pascal OSErr		CompareObjectsCallback(			DescType			comparisonOperator, 	// operator to use
 													const AEDesc *		object,				// left-hand side
@@ -204,4 +204,3 @@ public:
 #endif	//__cplusplus
 
 #endif /* __AECORECLASS__ */
-

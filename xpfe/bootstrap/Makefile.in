@@ -503,7 +503,7 @@ libs:: $(PROGRAM)
 # go away once that bug has been closed for a while.
 	rm -rf $(DIST)/$(APP_NAME).app/Contents/Plug-Ins/PrintPDE.plugin
 	rsync -a --copy-unsafe-links $(DIST)/package/PrintPDE.plugin $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
-	cp -RL $(DIST)/package/mozillaSuite.rsrc $(DIST)/$(APP_NAME).app/Contents/Resources/$(PROGRAM).rsrc
+	if test "$(CPU_ARCH)" != aarch64; then cp -RL $(DIST)/package/mozillaSuite.rsrc $(DIST)/$(APP_NAME).app/Contents/Resources/$(PROGRAM).rsrc; fi
 	echo -n APPLMOZZ > $(DIST)/$(APP_NAME).app/Contents/PkgInfo
 
 clean clobber::
@@ -528,4 +528,3 @@ else
 endif
 endif
 	$(INSTALL) $(topsrcdir)/LICENSE $(DIST)/bin
-

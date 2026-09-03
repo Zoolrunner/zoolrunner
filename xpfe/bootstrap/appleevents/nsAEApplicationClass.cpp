@@ -553,9 +553,13 @@ void AEApplicationClass::GetDataFromObject(const AEDesc *token, AEDesc *desiredT
 	
 	ProcessSerialNumber		applicationProcessNumber;
 	ProcessInfoRec				applicationInfo;
+#ifdef __LP64__
+	FSRef					appFSRef;
+#else
 	FSSpec					appFSSpec;
+#endif
 
-	Boolean           				isFrontProcess 		= true;	// еее !gInBackground;
+	Boolean           				isFrontProcess 		= true;	// ... !gInBackground;
 	
 	DescType					aDescType		= cApplication;
 	
@@ -575,12 +579,20 @@ void AEApplicationClass::GetDataFromObject(const AEDesc *token, AEDesc *desiredT
 	{
 		applicationInfo.processInfoLength 	= sizeof(ProcessInfoRec);
 		applicationInfo.processName 		= applicationName;
+#ifdef __LP64__
+		applicationInfo.processAppRef 	= &appFSRef;
+#else
 		applicationInfo.processAppSpec 	= &appFSSpec;
+#endif
 		err = GetProcessInformation(&applicationProcessNumber, &applicationInfo);
 	}
 				
 	GetShortVersionString(2, versionString);
+#ifdef __LP64__
+	free = contiguous = 0;
+#else
 	PurgeSpace(&free, &contiguous);
+#endif
 				
 	ticks = TickCount();
 

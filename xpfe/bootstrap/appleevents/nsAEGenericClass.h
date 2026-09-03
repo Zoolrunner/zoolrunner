@@ -70,7 +70,7 @@ public:
 													DescType			keyForm,
 													const AEDesc*		keyData,
 													AEDesc*			resultToken,
-													long 				refCon);
+													SRefCon 			refCon);
 
 protected:	
 	
@@ -215,4 +215,3 @@ protected:
 
 
 #endif /* __AEGENERICCLASS__ */
-

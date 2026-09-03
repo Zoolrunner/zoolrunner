@@ -61,7 +61,7 @@ AEGenericClass::AEGenericClass(DescType classType, DescType containerClass)
 	OSErr	err;
 	err = AEInstallObjectAccessor(mClass,	 	containerClass, 
 										mItemFromContainerAccessor, 
-										(long)this, 
+										(SRefCon)this,
 										false);
 
 	// although items of a given class can't contain other items of the same class, 
@@ -70,7 +70,7 @@ AEGenericClass::AEGenericClass(DescType classType, DescType containerClass)
 	// either the item before or after that item
 	err = AEInstallObjectAccessor(mClass, 		mClass, 
 										mItemFromContainerAccessor, 
-										(long)this, 
+										(SRefCon)this,
 										false);
 	ThrowIfOSErr(err);
 
@@ -235,7 +235,7 @@ pascal OSErr AEGenericClass::ItemFromContainerAccessor(	DescType			desiredClass,
 												DescType			keyForm,
 												const AEDesc*		keyData,
 												AEDesc*			resultToken,		// specified window is returned in result
-												long 				refCon)
+												SRefCon 			refCon)
 {
 	AEGenericClass*	itemClass = reinterpret_cast<AEGenericClass *>(refCon);
 	if (!itemClass) return paramErr;
@@ -981,4 +981,3 @@ void AEGenericClass::MakeNewObject(				const DescType		insertionPosition,
 {
 	ThrowOSErr(errAEEventNotHandled);
 }
-

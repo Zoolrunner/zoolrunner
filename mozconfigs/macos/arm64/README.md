@@ -25,3 +25,10 @@ for arm64. It implements Apple's retired Carbon Print Dialog Extension ABI,
 which is not available to 64-bit applications. The arm64 build uses the Cocoa
 print and page-setup panels and preserves the native PrintCore settings used by
 the existing Mozilla printing interfaces.
+
+The XPFE AppleScript object-model implementation is preserved for historical
+Mac targets. Its window and document handlers require 32-bit-only QuickDraw,
+FSSpec, AEPackObject, and resource-fork interfaces, so arm64 currently provides
+only the existing startup entry points and lets Cocoa handle ordinary
+application lifecycle events. Unsupported legacy scripting events fail without
+entering another architecture's implementation.
