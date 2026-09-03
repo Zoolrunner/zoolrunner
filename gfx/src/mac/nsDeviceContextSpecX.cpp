@@ -56,7 +56,9 @@ nsDeviceContextSpecX::nsDeviceContextSpecX()
 : mPrintSession(0)
 , mPageFormat(kPMNoPageFormat)
 , mPrintSettings(kPMNoPrintSettings)
+#ifndef __LP64__
 , mSavedPort(0)
+#endif
 , mBeganPrinting(PR_FALSE)
 {
 }
@@ -120,7 +122,11 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(PRUnichar*  aTitle,
     if (aTitle) {
       CFStringRef cfString = ::CFStringCreateWithCharacters(NULL, aTitle, nsCRT::strlen(aTitle));
       if (cfString) {
+#ifdef __LP64__
+        ::PMPrintSettingsSetJobName(mPrintSettings, cfString);
+#else
         ::PMSetJobNameCFString(mPrintSettings, cfString);
+#endif
         ::CFRelease(cfString);
       }
     }
@@ -131,16 +137,27 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(PRUnichar*  aTitle,
     status = ::PMSetLastPage(mPrintSettings, aEndPage, false);
     NS_ASSERTION(status == noErr, "PMSetLastPage failed");
 
+#ifdef __LP64__
+    status = ::PMSessionBeginCGDocumentNoDialog(mPrintSession, mPrintSettings,
+                                                mPageFormat);
+#else
     status = ::PMSessionBeginDocument(mPrintSession, mPrintSettings, mPageFormat);
+#endif
     if (status != noErr) return NS_ERROR_ABORT;
-    
+
+    mBeganPrinting = PR_TRUE;
     return NS_OK;
 }
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndDocument()
 {
-    ::PMSessionEndDocument(mPrintSession);
-    return NS_OK;
+#ifdef __LP64__
+    OSStatus status = ::PMSessionEndDocumentNoDialog(mPrintSession);
+#else
+    OSStatus status = ::PMSessionEndDocument(mPrintSession);
+#endif
+    mBeganPrinting = PR_FALSE;
+    return status == noErr ? NS_OK : NS_ERROR_ABORT;
 }
 
 NS_IMETHODIMP nsDeviceContextSpecX::AbortDocument()
@@ -150,30 +167,52 @@ NS_IMETHODIMP nsDeviceContextSpecX::AbortDocument()
 
 NS_IMETHODIMP nsDeviceContextSpecX::BeginPage()
 {
+#ifdef __LP64__
+    OSStatus status = ::PMSessionBeginPageNoDialog(mPrintSession, mPageFormat, NULL);
+#else
     OSStatus status = ::PMSessionBeginPage(mPrintSession, mPageFormat, NULL);
+#endif
     if (status != noErr) return NS_ERROR_ABORT;
-    
+
+#ifndef __LP64__
     ::GetPort(&mSavedPort);
     void *graphicsContext;
     status = ::PMSessionGetGraphicsContext(mPrintSession, kPMGraphicsContextQuickdraw, &graphicsContext);
     if (status != noErr)
       return NS_ERROR_ABORT;
     ::SetPort((CGrafPtr)graphicsContext);
+#endif
     return NS_OK;
 }
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndPage()
 {
+#ifdef __LP64__
+    OSStatus status = ::PMSessionEndPageNoDialog(mPrintSession);
+#else
     OSStatus status = ::PMSessionEndPage(mPrintSession);
+#endif
+#ifndef __LP64__
     if (mSavedPort)
     {
         ::SetPort(mSavedPort);
         mSavedPort = 0;
     }
+#endif
     if (status != noErr)
       return NS_ERROR_ABORT;
     return NS_OK;
 }
+
+#ifdef __LP64__
+CGContextRef nsDeviceContextSpecX::GetCGContext()
+{
+    CGContextRef context = NULL;
+    if (::PMSessionGetCGGraphicsContext(mPrintSession, &context) != noErr)
+      return NULL;
+    return context;
+}
+#endif
 
 NS_IMETHODIMP nsDeviceContextSpecX::GetPrinterResolution(double* aResolution)
 {
@@ -183,7 +222,12 @@ NS_IMETHODIMP nsDeviceContextSpecX::GetPrinterResolution(double* aResolution)
       return NS_ERROR_FAILURE;
       
     PMResolution defaultResolution;
+#ifdef __LP64__
+    status = ::PMPrinterGetOutputResolution(printer, mPrintSettings,
+                                            &defaultResolution);
+#else
     status = ::PMPrinterGetPrinterResolution(printer, kPMDefaultResolution, &defaultResolution);
+#endif
     if (status != noErr)
       return NS_ERROR_FAILURE;
     

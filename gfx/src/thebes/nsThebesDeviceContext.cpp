@@ -74,6 +74,9 @@ static nsSystemFontsWin *gSystemFonts = nsnull;
 #include <Usp10.h>
 #elif XP_MACOSX
 #include "nsSystemFontsMac.h"
+#include "nsIPrintingContext.h"
+#include "nsDeviceContextSpecX.h"
+#include "gfxQuartzSurface.h"
 static nsSystemFontsMac *gSystemFonts = nsnull;
 #else
 #error Need to declare gSystemFonts!
@@ -498,32 +501,53 @@ nsThebesDeviceContext::PrepareNativeWidget(nsIWidget* aWidget, void** aOut)
 }
 
 
-/*
- * below methods are for printing and are not implemented
- */
 NS_IMETHODIMP
 nsThebesDeviceContext::GetDeviceContextFor(nsIDeviceContextSpec *aDevice,
                                            nsIDeviceContext *&aContext)
 {
+    NS_ENSURE_ARG_POINTER(aDevice);
+    aContext = nsnull;
     nsThebesDeviceContext *newDevCon = new nsThebesDeviceContext();
+    nsCOMPtr<nsIDeviceContext> newContext;
 
     if (newDevCon) {
-        // this will ref count it
-        nsresult rv = newDevCon->QueryInterface(NS_GET_IID(nsIDeviceContext), (void**)&aContext);
+        nsresult rv = newDevCon->QueryInterface(NS_GET_IID(nsIDeviceContext),
+                                                getter_AddRefs(newContext));
         NS_ASSERTION(NS_SUCCEEDED(rv), "This has to support nsIDeviceContext");
+        NS_ENSURE_SUCCESS(rv, rv);
     } else {
         return NS_ERROR_OUT_OF_MEMORY;
     }
     
-    NS_ADDREF(aDevice);
-
     newDevCon->mPrinter = PR_TRUE;
+    newDevCon->mSpec = aDevice;
 
-    /* The 1.8 branch predates the Thebes printing-surface extension to
-     * nsIDeviceContextSpec. Leave printing unavailable until the Cocoa print
-     * context is adapted; screen rendering remains fully enabled. */
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIPrintingContext> printingContext = do_QueryInterface(aDevice);
+    NS_ENSURE_TRUE(printingContext, NS_ERROR_NO_INTERFACE);
+
+    double top, left, bottom, right;
+    nsresult rv = printingContext->GetPageRect(&top, &left, &bottom, &right);
+    NS_ENSURE_SUCCESS(rv, rv);
+    newDevCon->mWidth = NSToIntRound(float(right - left));
+    newDevCon->mHeight = NSToIntRound(float(bottom - top));
+    NS_ENSURE_TRUE(newDevCon->mWidth > 0 && newDevCon->mHeight > 0,
+                   NS_ERROR_FAILURE);
+    newDevCon->mDepth = 24;
+    newDevCon->mPrintingSurface =
+        new gfxQuartzSurface(gfxASurface::ImageFormatARGB32, 1, 1);
+    NS_ENSURE_TRUE(newDevCon->mPrintingSurface, NS_ERROR_OUT_OF_MEMORY);
+#endif
 
     newDevCon->Init(nsnull);
+
+#ifdef XP_MACOSX
+    /* Quartz page geometry is expressed in 72 point-per-inch units. */
+    newDevCon->mDpi = 72;
+    newDevCon->mPixelsToTwips =
+        float(NSIntPointsToTwips(72)) / float(newDevCon->mDpi);
+    newDevCon->mTwipsToPixels = 1.0f / newDevCon->mPixelsToTwips;
+#endif
 
     float newscale = newDevCon->TwipsToDevUnits();
     float origscale = this->TwipsToDevUnits();
@@ -536,6 +560,8 @@ nsThebesDeviceContext::GetDeviceContextFor(nsIDeviceContextSpec *aDevice,
     newDevCon->SetAppUnitsToDevUnits((a2d / t2d) * newDevCon->mTwipsToPixels);
     newDevCon->SetDevUnitsToAppUnits(1.0f / newDevCon->mAppUnitsToDevUnits);
 
+    aContext = newContext;
+    NS_ADDREF(aContext);
     return NS_OK;
 }
 
@@ -554,46 +580,96 @@ nsThebesDeviceContext::BeginDocument(PRUnichar*  aTitle,
                                      PRInt32     aStartPage, 
                                      PRInt32     aEndPage)
 {
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIPrintingContext> printingContext = do_QueryInterface(mSpec);
+    NS_ENSURE_TRUE(printingContext, NS_ERROR_FAILURE);
+    return printingContext->BeginDocument(aTitle, aPrintToFileName,
+                                          aStartPage, aEndPage);
+#else
     static const PRUnichar kEmpty[] = { '\0' };
     nsRefPtr<gfxContext> thebes = new gfxContext(mPrintingSurface);
     thebes->BeginPrinting(nsDependentString(aTitle ? aTitle : kEmpty),
                           nsDependentString(aPrintToFileName ? aPrintToFileName : kEmpty));
     return NS_OK;
+#endif
 }
 
 
 NS_IMETHODIMP
 nsThebesDeviceContext::EndDocument(void)
 {
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIPrintingContext> printingContext = do_QueryInterface(mSpec);
+    NS_ENSURE_TRUE(printingContext, NS_ERROR_FAILURE);
+    return printingContext->EndDocument();
+#else
     nsRefPtr<gfxContext> thebes = new gfxContext(mPrintingSurface);
     thebes->EndPrinting();
     return NS_OK;
+#endif
 }
 
 
 NS_IMETHODIMP
 nsThebesDeviceContext::AbortDocument(void)
 {
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIPrintingContext> printingContext = do_QueryInterface(mSpec);
+    NS_ENSURE_TRUE(printingContext, NS_ERROR_FAILURE);
+    mPrintingSurface = nsnull;
+    return printingContext->EndDocument();
+#else
     nsRefPtr<gfxContext> thebes = new gfxContext(mPrintingSurface);
     thebes->AbortPrinting();
     return NS_OK;
+#endif
 }
 
 
 NS_IMETHODIMP
 nsThebesDeviceContext::BeginPage(void)
 {
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIPrintingContext> printingContext = do_QueryInterface(mSpec);
+    NS_ENSURE_TRUE(printingContext, NS_ERROR_FAILURE);
+    nsresult rv = printingContext->BeginPage();
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsDeviceContextSpecX *spec = (nsDeviceContextSpecX *)mSpec.get();
+    CGContextRef context = spec->GetCGContext();
+    if (!context) {
+        printingContext->EndPage();
+        return NS_ERROR_FAILURE;
+    }
+    mPrintingSurface = new gfxQuartzSurface(context, mWidth, mHeight, PR_TRUE);
+    if (!mPrintingSurface) {
+        printingContext->EndPage();
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+    return NS_OK;
+#else
     nsRefPtr<gfxContext> thebes = new gfxContext(mPrintingSurface);
     thebes->BeginPage();
     return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP
 nsThebesDeviceContext::EndPage(void)
 {
+#ifdef XP_MACOSX
+    nsCOMPtr<nsIPrintingContext> printingContext = do_QueryInterface(mSpec);
+    NS_ENSURE_TRUE(printingContext, NS_ERROR_FAILURE);
+    if (mPrintingSurface)
+        mPrintingSurface->Flush();
+    mPrintingSurface =
+        new gfxQuartzSurface(gfxASurface::ImageFormatARGB32, 1, 1);
+    return printingContext->EndPage();
+#else
     nsRefPtr<gfxContext> thebes = new gfxContext(mPrintingSurface);
     thebes->EndPage();
     return NS_OK;
+#endif
 }
 
 

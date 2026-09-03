@@ -114,7 +114,14 @@ OS_LIBS		+= $(call EXPAND_LIBNAME,$(_OS_LIBS))
 endif
 
 ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
-CPPSRCS          += nsSystemFontsMac.cpp
+VPATH             += $(srcdir)/../mac
+CPPSRCS           += nsSystemFontsMac.cpp \
+		     nsDeviceContextSpecFactoryM.cpp \
+		     nsDeviceContextSpecX.cpp \
+		     nsPrintOptionsX.cpp \
+		     nsPrintSettingsX.cpp \
+		     nsPrintSessionX.cpp \
+		     $(NULL)
  ifdef MOZ_ENABLE_GLITZ
   REQUIRES         += glitzagl
   EXTRA_DSO_LDOPTS += -lmozglitzagl -framework OpenGL -framework AGL
@@ -128,6 +135,10 @@ LOCAL_INCLUDES	= \
 		-I$(srcdir)/.. \
 		-I$(srcdir)/../shared \
 		$(NULL)
+
+ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
+LOCAL_INCLUDES	+= -I$(srcdir)/../mac
+endif
 
 EXTRA_DSO_LDOPTS += \
 		$(EXTRA_DSO_LIBS) \

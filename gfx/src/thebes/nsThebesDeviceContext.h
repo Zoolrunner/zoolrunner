@@ -149,10 +149,11 @@ private:
 
     PRBool mPrinter;
 
+    nsCOMPtr<nsIDeviceContextSpec> mSpec;
+
     nsRefPtrHashtable<nsISupportsHashKey, gfxASurface> mWidgetSurfaceCache;
 
     nsRefPtr<gfxASurface> mPrintingSurface;
 };
 
 #endif /* _NS_CAIRODEVICECONTEXT_H_ */
-

@@ -52,6 +52,13 @@
 #include "nsThebesFontMetrics.h"
 #include "nsThebesFontEnumerator.h"
 
+#ifdef XP_MACOSX
+#include "nsDeviceContextSpecX.h"
+#include "nsDeviceContextSpecFactoryM.h"
+#include "nsPrintOptionsX.h"
+#include "nsPrintSessionX.h"
+#endif
+
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsThebesFontMetrics)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsThebesBlender)
 NS_GENERIC_FACTORY_CONSTRUCTOR(gfxImageFrame)
@@ -60,6 +67,12 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsThebesRenderingContext)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsThebesImage)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsThebesRegion)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsThebesFontEnumerator)
+#ifdef XP_MACOSX
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsDeviceContextSpecX)
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsDeviceContextSpecFactoryMac)
+NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsPrintOptionsX, Init)
+NS_GENERIC_FACTORY_CONSTRUCTOR_INIT(nsPrintSessionX, Init)
+#endif
 
 static NS_IMETHODIMP nsScriptableRegionConstructor(nsISupports *aOuter, REFNSIID aIID, void **aResult)
 {
@@ -140,6 +153,24 @@ static const nsModuleComponentInfo components[] =
     GFX_IMAGEFRAME_CID,
     "@mozilla.org/gfx/image/frame;2",
     gfxImageFrameConstructor },
+#ifdef XP_MACOSX
+  { "Mac Device Context Spec",
+    NS_DEVICE_CONTEXT_SPEC_CID,
+    "@mozilla.org/gfx/devicecontextspec;1",
+    nsDeviceContextSpecXConstructor },
+  { "Mac Device Context Spec Factory",
+    NS_DEVICE_CONTEXT_SPEC_FACTORY_CID,
+    "@mozilla.org/gfx/devicecontextspecfactory;1",
+    nsDeviceContextSpecFactoryMacConstructor },
+  { "Mac Print Settings Service",
+    NS_PRINTSETTINGSSERVICE_CID,
+    "@mozilla.org/gfx/printsettings-service;1",
+    nsPrintOptionsXConstructor },
+  { "Mac Print Session",
+    NS_PRINTSESSION_CID,
+    "@mozilla.org/gfx/printsession;1",
+    nsPrintSessionXConstructor },
+#endif
 };
 
 PR_STATIC_CALLBACK(void)
@@ -148,4 +179,3 @@ nsThebesGfxModuleDtor(nsIModule *self)
 }
 
 NS_IMPL_NSGETMODULE_WITH_DTOR(nsGfxModule, components, nsThebesGfxModuleDtor)
-

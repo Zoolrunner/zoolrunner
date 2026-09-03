@@ -46,8 +46,6 @@
 #include "plbase64.h"
 #include "prmem.h"
 #include "prnetdb.h"
-#include "nsGfxUtils.h"
-
 // This struct should be represented identically on all architectures, and
 // there shouldn't be any padding before the data field.
 struct FrozenHandle {
@@ -279,17 +277,33 @@ NS_IMETHODIMP nsPrintSettingsX::ReadPageFormatFromPrefs()
     return NS_ERROR_FAILURE;
   }
 
-  Handle    decodedDataHandle = nsnull;
+  OSStatus      status;
+  PMPageFormat  newPageFormat = kPMNoPageFormat;
+
+#ifdef __LP64__
+  CFDataRef pageFormatData =
+    ::CFDataCreate(NULL, (const UInt8*)frozenHandle->data, handleSize);
+  PR_Free(frozenHandle);
+  if (!pageFormatData)
+    return NS_ERROR_OUT_OF_MEMORY;
+
+  status = ::PMPageFormatCreateWithDataRepresentation(pageFormatData,
+                                                       &newPageFormat);
+  ::CFRelease(pageFormatData);
+  if (status == noErr) {
+    if (mPageFormat)
+      status = ::PMRelease(mPageFormat);
+    mPageFormat = newPageFormat;
+  }
+#else
+  Handle decodedDataHandle = nsnull;
   OSErr err = ::PtrToHand(frozenHandle->data, &decodedDataHandle, handleSize);
   PR_Free(frozenHandle);
   if (err != noErr)
     return NS_ERROR_OUT_OF_MEMORY;
 
-  StHandleOwner   handleOwner(decodedDataHandle);  
+  StHandleOwner handleOwner(decodedDataHandle);
 
-  OSStatus      status;
-  PMPageFormat  newPageFormat = kPMNoPageFormat;
-  
   status = ::PMCreatePageFormat(&newPageFormat);
   if (status == noErr) { 
     status = ::PMUnflattenPageFormat(decodedDataHandle, &newPageFormat);
@@ -299,6 +313,7 @@ NS_IMETHODIMP nsPrintSettingsX::ReadPageFormatFromPrefs()
       mPageFormat = newPageFormat; // PMCreatePageFormat returned it with a refcnt of 1
     }
   }
+#endif
   return (status == noErr) ? NS_OK : NS_ERROR_FAILURE;
 }
 
@@ -318,27 +333,51 @@ NS_IMETHODIMP nsPrintSettingsX::WritePageFormatToPrefs()
   if (NS_FAILED(rv))
     return rv;
 
-  Handle    pageFormatHandle = nsnull;
-  OSStatus  err = ::PMFlattenPageFormat(mPageFormat, &pageFormatHandle);
+#ifdef __LP64__
+  CFDataRef pageFormatData = NULL;
+  OSStatus err = ::PMPageFormatCreateDataRepresentation(
+    mPageFormat, &pageFormatData, kPMDataFormatXMLDefault);
   if (err != noErr)
     return NS_ERROR_FAILURE;
-    
-  StHandleOwner   handleOwner(pageFormatHandle);
-  StHandleLocker  handleLocker(pageFormatHandle);
+
+  CFIndex cfDataSize = ::CFDataGetLength(pageFormatData);
+  if (cfDataSize < 0 || (PRUint64)cfDataSize > PR_UINT32_MAX) {
+    ::CFRelease(pageFormatData);
+    return NS_ERROR_FAILURE;
+  }
+  PRUint32 dataSize = (PRUint32)cfDataSize;
+  const UInt8 *pageFormatBytes = ::CFDataGetBytePtr(pageFormatData);
+#else
+  Handle pageFormatHandle = nsnull;
+  OSStatus err = ::PMFlattenPageFormat(mPageFormat, &pageFormatHandle);
+  if (err != noErr)
+    return NS_ERROR_FAILURE;
+
+  StHandleOwner handleOwner(pageFormatHandle);
+  StHandleLocker handleLocker(pageFormatHandle);
+  PRUint32 dataSize = ::GetHandleSize(pageFormatHandle);
+  const UInt8 *pageFormatBytes = (const UInt8*)*pageFormatHandle;
+#endif
 
   // Save the handle in a struct that identifies the data length and
   // the data itself, and wrap it all up in base64.  The length must be
   // included because PL_DecodeBase64 doesn't return the size of the
   // decoded data, and the handle will need to be reconstructed later with
   // the correct size.
-  PRUint32 dataSize = ::GetHandleSize(pageFormatHandle);
   PRUint32 frozenDataSize = sizeof(FrozenHandle) + dataSize;
   FrozenHandle* frozenHandle = (FrozenHandle*)PR_Malloc(frozenDataSize);
-  if (!frozenHandle)
+  if (!frozenHandle) {
+#ifdef __LP64__
+    ::CFRelease(pageFormatData);
+#endif
     return NS_ERROR_OUT_OF_MEMORY;
+  }
 
   frozenHandle->size = PR_htonl(dataSize);
-  memcpy(&frozenHandle->data, *pageFormatHandle, dataSize);
+  memcpy(&frozenHandle->data, pageFormatBytes, dataSize);
+#ifdef __LP64__
+  ::CFRelease(pageFormatData);
+#endif
 
   nsXPIDLCString  encodedData;
   encodedData.Adopt(::PL_Base64Encode((char*)frozenHandle, frozenDataSize,
@@ -411,4 +450,3 @@ OSStatus nsPrintSettingsX::CreateDefaultPrintSettings(PMPrintSession aSession, P
   }
   return status;  
 }
-

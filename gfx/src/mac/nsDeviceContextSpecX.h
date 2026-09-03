@@ -41,7 +41,6 @@
 
 #include "nsIDeviceContextSpec.h"
 #include "nsIPrintingContext.h"
-#include "nsDeviceContextMac.h"
 
 #ifdef __LP64__
 #include <ApplicationServices/ApplicationServices.h>
@@ -99,6 +98,10 @@ public:
     NS_IMETHOD GetPrinterResolution(double* aResolution);
     
     NS_IMETHOD GetPageRect(double* aTop, double* aLeft, double* aBottom, double* aRight);
+
+#ifdef __LP64__
+    CGContextRef GetCGContext();
+#endif
 protected:
 /**
  * Destuct a nsDeviceContextSpecMac, this will release the printrecord
@@ -111,7 +114,9 @@ protected:
     PMPrintSession    mPrintSession;              // printing context.
     PMPageFormat      mPageFormat;                // page format.
     PMPrintSettings   mPrintSettings;             // print settings.
+#ifndef __LP64__
     CGrafPtr          mSavedPort;                 // saved graphics port.
+#endif
     PRBool            mBeganPrinting;
 };
 
