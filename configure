@@ -3987,6 +3987,9 @@ case "$target" in
             i*86*)
                                 export MACOSX_DEPLOYMENT_TARGET=10.4
                 ;;
+            aarch64* | arm64*)
+                                export MACOSX_DEPLOYMENT_TARGET=11.0
+                ;;
         esac
     fi
     ;;
@@ -5376,6 +5379,9 @@ Darwin)
     i*86*)
         OS_TEST=i386
         ;;
+    aarch64* | arm64*)
+        OS_TEST=aarch64
+        ;;
     *)
         if test -z "$CROSS_COMPILE" ; then
             OS_TEST=`uname -p`
@@ -5408,8 +5414,12 @@ sun4u)
     CPU_ARCH=sparc
     ;;
 
-x86_64 | sparc | ppc | ia64)
-    CPU_ARCH="$OS_TEST"
+x86_64 | aarch64 | arm64 | sparc | ppc | ia64)
+    if test "$OS_TEST" = "arm64"; then
+        CPU_ARCH=aarch64
+    else
+        CPU_ARCH="$OS_TEST"
+    fi
     ;;
 esac
 
@@ -5436,8 +5446,8 @@ if test "$GNU_CC"; then
     DSO_PIC_CFLAGS='-fPIC'
     _MOZ_RTTI_FLAGS_ON=${_COMPILER_PREFIX}-frtti
     _MOZ_RTTI_FLAGS_OFF=${_COMPILER_PREFIX}-fno-rtti
-    _MOZ_EXCEPTIONS_FLAGS_ON='-fhandle-exceptions'
-    _MOZ_EXCEPTIONS_FLAGS_OFF='-fno-handle-exceptions'
+    _MOZ_EXCEPTIONS_FLAGS_ON='-fexceptions'
+    _MOZ_EXCEPTIONS_FLAGS_OFF='-fno-exceptions'
 
     # Turn on GNU specific features
     # -Wall - turn on all warnings
@@ -10921,12 +10931,12 @@ echo "configure:10871: checking for C++ exceptions flag" >&5
 else
   echo "int main() { return 0; }" | cat > conftest.C
 
-  ${CXX-g++} ${CXXFLAGS} -c -fno-handle-exceptions conftest.C > conftest.out 2>&1
+  ${CXX-g++} ${CXXFLAGS} -c -fno-exceptions conftest.C > conftest.out 2>&1
 
   if egrep "warning.*renamed" conftest.out >/dev/null; then
     ac_cv_cxx_exceptions_flags=${_COMPILER_PREFIX}-fno-exceptions
   else
-    ac_cv_cxx_exceptions_flags=${_COMPILER_PREFIX}-fno-handle-exceptions
+    ac_cv_cxx_exceptions_flags=${_COMPILER_PREFIX}-fno-exceptions
   fi
 
   rm -f conftest*
@@ -12272,7 +12282,8 @@ fi
         -o "$_DEFAULT_TOOLKIT" = "windows" \
         -o "$_DEFAULT_TOOLKIT" = "cocoa" \
         -o "$_DEFAULT_TOOLKIT" = "cairo-gtk2" \
-        -o "$_DEFAULT_TOOLKIT" = "cairo-xlib"
+        -o "$_DEFAULT_TOOLKIT" = "cairo-xlib" \
+        -o "$_DEFAULT_TOOLKIT" = "cairo-cocoa"
     then
                         MOZ_WIDGET_TOOLKIT=`echo "$_DEFAULT_TOOLKIT" | sed -e "s/,.*$//"`
     else
@@ -12354,7 +12365,11 @@ EOF
     ;;
 mac|cocoa)
     TK_LIBS='-framework Carbon'
-    TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
+    if test -d "${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"; then
+        TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
+    else
+        TK_CFLAGS="-include ${srcdir}/config/macos/CarbonCompat.h -I${srcdir}/config/macos -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework/Frameworks/HIToolbox.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreFoundation.framework/Headers"
+    fi
     CFLAGS="$CFLAGS $TK_CFLAGS"
     CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
     MOZ_USER_DIR="ZoolRunner"
@@ -12403,6 +12418,33 @@ cairo-xlib)
 #define MOZ_WIDGET_XLIB 1
 EOF
 
+    ;;
+cairo-cocoa)
+    MOZ_WIDGET_TOOLKIT=cocoa
+    MOZ_GFX_TOOLKIT=cairo
+    MOZ_ENABLE_CAIRO_GFX=1
+    MOZ_ENABLE_COCOA=1
+    MOZ_USER_DIR="ZoolRunner"
+    cat >> confdefs.h <<\EOF
+#define XP_MACOSX 1
+EOF
+    cat >> confdefs.h <<\EOF
+#define TARGET_CARBON 1
+EOF
+    cat >> confdefs.h <<\EOF
+#define TARGET_API_MAC_CARBON 1
+EOF
+    cat >> confdefs.h <<\EOF
+#define MOZ_WIDGET_COCOA 1
+EOF
+    TK_LIBS='-framework Cocoa -framework ApplicationServices -framework CoreServices'
+    if test -d "${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"; then
+        TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
+    else
+        TK_CFLAGS="-include ${srcdir}/config/macos/CarbonCompat.h -I${srcdir}/config/macos -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework/Frameworks/HIToolbox.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreFoundation.framework/Headers"
+    fi
+    CFLAGS="$CFLAGS $TK_CFLAGS"
+    CXXFLAGS="$CXXFLAGS $TK_CFLAGS"
     ;;
 esac
 
@@ -19302,6 +19344,7 @@ EOF
        fi
        if test "$MOZ_WIDGET_TOOLKIT" = "mac" -o "$MOZ_WIDGET_TOOLKIT" = "cocoa"; then
            QUARTZ_SURFACE_FEATURE="#define CAIRO_HAS_QUARTZ_SURFACE 1"
+           QUARTZGL_SURFACE_FEATURE="#define CAIRO_HAS_QUARTZGL_SURFACE 1"
            ATSUI_FONT_FEATURE="#define CAIRO_HAS_ATSUI_FONT 1"
        fi
        if test "$MOZ_WIDGET_TOOLKIT" = "windows"; then
@@ -20678,6 +20721,7 @@ s%@PS_SURFACE_FEATURE@%$PS_SURFACE_FEATURE%g
 s%@PDF_SURFACE_FEATURE@%$PDF_SURFACE_FEATURE%g
 s%@XLIB_SURFACE_FEATURE@%$XLIB_SURFACE_FEATURE%g
 s%@QUARTZ_SURFACE_FEATURE@%$QUARTZ_SURFACE_FEATURE%g
+s%@QUARTZGL_SURFACE_FEATURE@%$QUARTZGL_SURFACE_FEATURE%g
 s%@XCB_SURFACE_FEATURE@%$XCB_SURFACE_FEATURE%g
 s%@WIN32_SURFACE_FEATURE@%$WIN32_SURFACE_FEATURE%g
 s%@OS2_SURFACE_FEATURE@%$OS2_SURFACE_FEATURE%g

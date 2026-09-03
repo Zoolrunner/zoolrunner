@@ -52,6 +52,8 @@
 #define _PR_SI_ARCHITECTURE "x86"
 #elif defined(__x86_64__)
 #define _PR_SI_ARCHITECTURE "x86-64"
+#elif defined(__aarch64__) || defined(__arm64__)
+#define _PR_SI_ARCHITECTURE "aarch64"
 #elif defined(__ppc__)
 #define _PR_SI_ARCHITECTURE "ppc"
 #endif
@@ -64,7 +66,7 @@
 
 #undef  HAVE_STACK_GROWING_UP
 #define HAVE_DLL
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__) || defined(__arm64__)
 #define USE_DLFCN
 #else
 #define USE_MACH_DYLD
@@ -147,6 +149,15 @@ extern PRInt32 _PR_Darwin_x86_64_AtomicSet(PRInt32 *val, PRInt32 newval);
 extern PRInt32 _PR_Darwin_x86_64_AtomicAdd(PRInt32 *ptr, PRInt32 val);
 #define _MD_ATOMIC_ADD(ptr, val)    _PR_Darwin_x86_64_AtomicAdd(ptr, val)
 #endif /* __x86_64__ */
+
+#if defined(__aarch64__) || defined(__arm64__)
+#define _PR_HAVE_ATOMIC_OPS
+#define _MD_INIT_ATOMIC()
+#define _MD_ATOMIC_INCREMENT(val) __sync_add_and_fetch((val), 1)
+#define _MD_ATOMIC_DECREMENT(val) __sync_sub_and_fetch((val), 1)
+#define _MD_ATOMIC_SET(val, newval) __sync_lock_test_and_set((val), (newval))
+#define _MD_ATOMIC_ADD(ptr, val) __sync_add_and_fetch((ptr), (val))
+#endif /* __aarch64__ || __arm64__ */
 
 #define USE_SETJMP
 

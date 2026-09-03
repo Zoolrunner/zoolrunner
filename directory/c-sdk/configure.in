@@ -916,6 +916,9 @@ case "$target" in
             AC_DEFINE(i386)
             CPU_ARCH=i386
             ;;
+        aarch64* | arm64*)
+            CPU_ARCH=aarch64
+            ;;
         *)
             AC_DEFINE(ppc)
             CPU_ARCH=ppc

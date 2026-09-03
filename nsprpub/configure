@@ -3356,6 +3356,9 @@ EOF
                 CPU_ARCH=i386
             fi
             ;;
+        aarch64* | arm64*)
+            CPU_ARCH=aarch64
+            ;;
         *)
             CPU_ARCH=ppc
             ;;
@@ -3371,7 +3374,8 @@ EOF
     PR_MD_ASFILES=os_Darwin.s
 
     # Add Mac OS X support for loading CFM & CFBundle plugins
-    if test -f /System/Library/Frameworks/Carbon.framework/Carbon; then
+    if test -d "${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework" -o \
+            -f /System/Library/Frameworks/Carbon.framework/Carbon; then
         cat >> confdefs.h <<\EOF
 #define XP_MACOSX 1
 EOF
@@ -3387,6 +3391,9 @@ EOF
                     ;;
                 i*86*)
                                         export MACOSX_DEPLOYMENT_TARGET=10.4
+                    ;;
+                aarch64* | arm64*)
+                                        export MACOSX_DEPLOYMENT_TARGET=11.0
                     ;;
             esac
         fi
@@ -6342,4 +6349,3 @@ EOF
 chmod +x $CONFIG_STATUS
 rm -fr confdefs* $ac_clean_files
 test "$no_create" = yes || ${CONFIG_SHELL-/bin/sh} $CONFIG_STATUS || exit 1
-

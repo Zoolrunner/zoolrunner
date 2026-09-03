@@ -5,6 +5,9 @@ the layout used by related UXP-based trees:
 
 ```text
 mozconfigs/
+  macos/
+    arm64/
+      cocoa_suite_clang.mozconfig
   linux/
     loongarch64/
       gtk2_browser_gcc.mozconfig
@@ -14,7 +17,10 @@ mozconfigs/
       xlib_suite_gcc.mozconfig
 ```
 
-Only currently exercised Linux frontends are represented here. Do not add Qt 3
+The macOS arm64 Cocoa Suite configuration is an active platform bring-up target.
+It uses the macOS 11.3 SDK at `~/dev/macos-sdk/MacOSX11.3.sdk` and is not yet a
+verified release configuration. Only currently exercised Linux frontends are
+otherwise represented here. Do not add Qt 3
 or other historical frontend mozconfigs until those frontends are known to build
 and run in this tree.
 
@@ -23,6 +29,13 @@ Use a config by copying it to the source root as `mozconfig`, then run
 
 ```sh
 cp mozconfigs/linux/loongarch64/gtk2_browser_gcc.mozconfig mozconfig
+make -f client.mk build
+```
+
+For the native Apple Silicon Cocoa Suite bring-up:
+
+```sh
+cp mozconfigs/macos/arm64/cocoa_suite_clang.mozconfig mozconfig
 make -f client.mk build
 ```
 

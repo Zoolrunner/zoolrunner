@@ -231,6 +231,7 @@ case $basic_machine in
 #### End MozillaHack 
 	1750a | 580 \
 	| a29k \
+	| aarch64 \
 	| alpha | alphaev[4-8] | alphaev56 | alphaev6[78] | alphapca5[67] \
 	| alpha64 | alpha64ev[4-8] | alpha64ev56 | alpha64ev6[78] | alpha64pca5[67] \
 	| am33_2.0 \
@@ -310,6 +311,7 @@ case $basic_machine in
 	| a29k-* \
 	| alpha-* | alphaev[4-8]-* | alphaev56-* | alphaev6[78]-* \
 	| alpha64-* | alpha64ev[4-8]-* | alpha64ev56-* | alpha64ev6[78]-* \
+	| aarch64-* \
 	| alphapca5[67]-* | alpha64pca5[67]-* | arc-* \
 	| arm-*  | armbe-* | armle-* | armeb-* | armv*-* \
 	| avr-* \
@@ -371,6 +373,9 @@ case $basic_machine in
 		;;
 	# Recognize the various machine names and aliases which stand
 	# for a CPU type and a company and sometimes even an OS.
+	arm64 | arm64-*)
+		basic_machine=`echo $basic_machine | sed 's/^arm64/aarch64/'`
+		;;
 	386bsd)
 		basic_machine=i386-unknown
 		os=-bsd

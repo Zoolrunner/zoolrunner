@@ -1006,6 +1006,9 @@ case "$target" in
                 CPU_ARCH=i386
             fi
             ;;
+        aarch64* | arm64*)
+            CPU_ARCH=aarch64
+            ;;
         *)
             CPU_ARCH=ppc
             ;;
@@ -1021,7 +1024,8 @@ case "$target" in
     PR_MD_ASFILES=os_Darwin.s
 
     # Add Mac OS X support for loading CFM & CFBundle plugins
-    if test -f /System/Library/Frameworks/Carbon.framework/Carbon; then
+    if test -d "${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework" -o \
+            -f /System/Library/Frameworks/Carbon.framework/Carbon; then
         AC_DEFINE(XP_MACOSX)
         OS_TARGET=MacOSX
 
@@ -1040,6 +1044,10 @@ case "$target" in
                 i*86*)
                     dnl Architecture minimum 10.4
                     export MACOSX_DEPLOYMENT_TARGET=10.4
+                    ;;
+                aarch64* | arm64*)
+                    dnl Apple Silicon was introduced with Mac OS X 11.0.
+                    export MACOSX_DEPLOYMENT_TARGET=11.0
                     ;;
             esac
         fi

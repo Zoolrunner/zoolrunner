@@ -1275,7 +1275,12 @@ EOF
     *:Darwin:*:*)
 	UNAME_PROCESSOR=`uname -p` || UNAME_PROCESSOR=unknown
 	case $UNAME_PROCESSOR in
-	    unknown) UNAME_PROCESSOR=powerpc ;;
+	    arm|arm64) UNAME_PROCESSOR=aarch64 ;;
+	    unknown|'')
+		case ${UNAME_MACHINE} in
+		    arm64) UNAME_PROCESSOR=aarch64 ;;
+		    *) UNAME_PROCESSOR=${UNAME_MACHINE} ;;
+		esac ;;
 	esac
 	echo ${UNAME_PROCESSOR}-apple-darwin${UNAME_RELEASE}
 	exit ;;
