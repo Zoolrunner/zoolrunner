@@ -65,9 +65,9 @@
 #include <sys/stat.h>
 
 #if !defined(MAC_OS_X_VERSION_10_4) || MAC_OS_X_VERSION_MIN_REQUIRED < MAC_OS_X_VERSION_10_4
-#define GetAliasSizeFromRecord(aliasRecord) aliasRecord.aliasSize
+#define GetAliasSizeFromRecord(aliasRecord) ((aliasRecord)->aliasSize)
 #else
-#define GetAliasSizeFromRecord(aliasRecord) GetAliasSizeFromPtr(&aliasRecord)
+#define GetAliasSizeFromRecord(aliasRecord) GetAliasSizeFromPtr(aliasRecord)
 #endif
 
 //*****************************************************************************
@@ -1465,8 +1465,8 @@ NS_IMETHODIMP nsLocalFile::SetPersistentDescriptor(const nsACString& aPersistent
   }
   
   // Cast to an alias record and resolve.
-  AliasRecord aliasHeader = *(AliasPtr)decodedData;
-  PRInt32 aliasSize = GetAliasSizeFromRecord(aliasHeader);
+  AliasPtr aliasRecord = (AliasPtr)decodedData;
+  PRInt32 aliasSize = GetAliasSizeFromRecord(aliasRecord);
   if (aliasSize > (dataSize * 3) / 4) { // be paranoid about having too few data
     PR_Free(decodedData);
     return NS_ERROR_FAILURE;
