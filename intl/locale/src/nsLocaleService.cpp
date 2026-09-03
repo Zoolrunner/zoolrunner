@@ -56,6 +56,9 @@
 #elif defined(XP_MAC) || defined(XP_MACOSX)
 #  include <Script.h>
 #  include "nsIMacLocale.h"
+#  ifdef XP_MACOSX
+#    include <CoreFoundation/CoreFoundation.h>
+#  endif
 #elif defined(XP_UNIX) || defined(XP_BEOS)
 #  include <locale.h>
 #  include <stdlib.h>
@@ -307,6 +310,10 @@ nsLocaleService::nsLocaleService(void)
 
     if (!checked)
     {
+#if __LP64__
+        fpCFLocaleCopyCurrent = CFLocaleCopyCurrent;
+        fpCFLocaleGetIdentifier = CFLocaleGetIdentifier;
+#else
         CFBundleRef bundle =
             ::CFBundleGetBundleWithIdentifier(CFSTR("com.apple.Carbon"));
         if (bundle)
@@ -320,6 +327,7 @@ nsLocaleService::nsLocaleService(void)
                 ::CFBundleGetFunctionPointerForName(bundle,
                                                     CFSTR("CFLocaleGetIdentifier"));
         }
+#endif
         checked = PR_TRUE;
     }
 
@@ -332,7 +340,7 @@ nsLocaleService::nsLocaleService(void)
 
         nsAutoBuffer<UniChar, 32> buffer;
         int size = ::CFStringGetLength(userLocaleStr);
-        if (buffer.EnsureElemCapacity(size))
+        if (buffer.EnsureElemCapacity(size + 1))
         {
             CFRange range = ::CFRangeMake(0, size);
             ::CFStringGetCharacters(userLocaleStr, range, buffer.get());
@@ -355,6 +363,7 @@ nsLocaleService::nsLocaleService(void)
     }
     else
     {
+#if !__LP64__
         // Legacy MacOSX locale code
         long script = GetScriptManagerVariable(smSysScript);
         long lang = GetScriptVariable(smSystemScript,smScriptLang);
@@ -371,6 +380,7 @@ nsLocaleService::nsLocaleService(void)
                 }
             }
         }
+#endif
     }
 #endif
 }

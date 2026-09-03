@@ -378,7 +378,7 @@ static nsModuleComponentInfo components[] =
   { "Collation",
     NS_COLLATION_CID,
     NS_COLLATION_CONTRACTID,
-#ifdef USE_UCCOLLATIONKEY
+#if defined(USE_UCCOLLATIONKEY) || (defined(XP_MACOSX) && defined(__LP64__))
     nsCollationMacUCConstructor },
 #else
     nsCollationMacConstructor },

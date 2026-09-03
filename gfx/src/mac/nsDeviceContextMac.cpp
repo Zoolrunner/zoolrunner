@@ -37,6 +37,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsDeviceContextMac.h"
+#include "ATSUICompat.h"
 #include "nsRenderingContextMac.h"
 #include "nsDeviceContextSpecX.h"
 #include "nsIPrintingContext.h"
@@ -156,7 +157,7 @@ NS_IMETHODIMP nsDeviceContextMac :: SupportsNativeWidgets(PRBool &aSupportsWidge
 {
   //XXX it is very critical that this not lie!! MMP
   
-  // ⅴ� VERY IMPORTANT (pinkerton)
+  // 짜짜짜 VERY IMPORTANT (pinkerton)
   // This routine should return true if the widgets behave like Win32
   // "windows", that is they paint themselves and the app never knows about
   // them or has to send them update events. We were returning false which
@@ -871,7 +872,7 @@ void nsDeviceContextMac :: InitFontInfoList()
  */
 bool nsDeviceContextMac :: GetMacFontNumber(const nsString& aFontName, short &aFontNum)
 {
-	//쩣ODO?: Maybe we shouldn't call that function so often. If nsFont could store the
+	//짜TODO?: Maybe we shouldn't call that function so often. If nsFont could store the
 	//				fontNum, nsFontMetricsMac::SetFont() wouldn't need to call this at all.
 	InitFontInfoList();
     FontNameKey key(aFontName);

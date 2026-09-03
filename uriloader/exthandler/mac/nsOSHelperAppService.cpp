@@ -54,7 +54,7 @@
 
 #include "nsIInternetConfigService.h"
 #include "nsEmbedCID.h"
-#include <LaunchServices.h>
+#include <CoreServices/CoreServices.h>
 
 // chrome URL's
 #define HELPERAPPLAUNCHER_BUNDLE_URL "chrome://global/locale/helperAppLauncher.properties"

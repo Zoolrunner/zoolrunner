@@ -70,7 +70,7 @@
 #endif
 
 #ifdef USE_MAC_LOCALE
-#ifdef USE_UCCOLLATIONKEY
+#if defined(USE_UCCOLLATIONKEY) || (defined(XP_MACOSX) && defined(__LP64__))
 #include "nsCollationMacUC.h"
 #else
 #include "nsCollationMac.h"
@@ -123,7 +123,7 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsDateTimeFormatUnix)
 
 #ifdef USE_MAC_LOCALE
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsMacLocale)
-#ifdef USE_UCCOLLATIONKEY 
+#if defined(USE_UCCOLLATIONKEY) || (defined(XP_MACOSX) && defined(__LP64__))
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsCollationMacUC)
 #else
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsCollationMac)

@@ -39,6 +39,7 @@
  
 #include "nscore.h"
 #include "nsMessengerOSXIntegration.h"
+#include "ATSUICompat.h"
 #include "nsIMsgAccountManager.h"
 #include "nsIMsgMailSession.h"
 #include "nsIMsgIncomingServer.h"

@@ -56,7 +56,8 @@
 #include <Gestalt.h>
 #include <CFURL.h>
 #include <Finder.h>
-#include <LaunchServices.h>
+#include <CoreServices/CoreServices.h>
+#include <ApplicationServices/ApplicationServices.h>
 
 
 // helper converter function.....
@@ -412,6 +413,11 @@ NS_IMETHODIMP nsInternetConfigService::GetMIMEInfoFromTypeCreator(PRUint32 aType
 
 NS_IMETHODIMP nsInternetConfigService::GetFileMappingFlags(FSSpec* fsspec, PRBool lookupByExtensionFirst, PRInt32 *_retval)
 {
+#if __LP64__
+  NS_ENSURE_ARG(_retval);
+  *_retval = -1;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   nsresult  rv = NS_ERROR_FAILURE;
   OSStatus  err = noErr;
 
@@ -440,12 +446,16 @@ NS_IMETHODIMP nsInternetConfigService::GetFileMappingFlags(FSSpec* fsspec, PRBoo
      rv = NS_OK;
   }
   return rv;
+#endif
 }
 
 
 /* void GetDownloadFolder (out FSSpec fsspec); */
 NS_IMETHODIMP nsInternetConfigService::GetDownloadFolder(FSSpec *fsspec)
 {
+#if __LP64__
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   ICInstance  inst = nsInternetConfig::GetInstance();
   OSStatus    err;
   Handle      prefH;
@@ -494,6 +504,7 @@ NS_IMETHODIMP nsInternetConfigService::GetDownloadFolder(FSSpec *fsspec)
     }
   }
   return rv;
+#endif
 }
 
 nsresult nsInternetConfigService::GetICKeyPascalString(PRUint32 inIndex, const unsigned char*& outICKey)

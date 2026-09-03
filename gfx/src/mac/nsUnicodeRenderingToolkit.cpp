@@ -47,6 +47,7 @@
 #include "nsISaveAsCharset.h"
 #include "nsIComponentManager.h"
 #include "nsUnicharUtils.h"
+#include "ATSUICompat.h"
 
 
 #include "nsMacUnicodeFontInfo.h"

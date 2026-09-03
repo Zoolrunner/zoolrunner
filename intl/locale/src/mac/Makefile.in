@@ -53,14 +53,21 @@ REQUIRES	= xpcom \
 		  uconv \
 		  $(NULL)
 
+ifeq ($(HAVE_64BIT_OS),1)
+CPPSRCS		= \
+		nsCollationMacUC.cpp \
+		nsDateTimeFormatMacCF.cpp \
+		nsMacLocale.cpp \
+		$(NULL)
+else
 CPPSRCS		= \
 		nsCollationMac.cpp \
 		nsCollationMacUC.cpp \
 		nsDateTimeFormatMac.cpp \
 		nsMacLocale.cpp \
 		$(NULL)
+endif
 
 include $(topsrcdir)/config/rules.mk
 
 INCLUDES	+= -I$(srcdir)/..
-

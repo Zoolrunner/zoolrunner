@@ -55,7 +55,12 @@ static OSType GetAppCreatorCode()
   
   procInfo.processInfoLength = sizeof(ProcessInfoRec);
   procInfo.processName = nsnull;
+#if __LP64__
+  FSRef appRef;
+  procInfo.processAppRef = &appRef;
+#else
   procInfo.processAppSpec = nsnull;
+#endif
   
   GetProcessInformation(&psn, &procInfo);
   return procInfo.processSignature;  
@@ -68,8 +73,10 @@ ICInstance nsInternetConfig::GetInstance()
 	if ( !sInstance )
 	{
 		OSStatus err;
+#if !__LP64__
 		if ((long)ICStart == kUnresolvedCFragSymbolAddress )
 			return sInstance;                          
+#endif
                                                                                  
                                                                                   
 		OSType creator = GetAppCreatorCode();
@@ -119,4 +126,3 @@ nsInternetConfig::~nsInternetConfig()
 		sInstance = NULL;
 	}
 }
-

@@ -42,6 +42,7 @@
 #include "nsTransform2D.h"
 #include "plhash.h"
 #include "nsFontUtils.h"
+#include "ATSUICompat.h"
 
 #include <Gestalt.h>
 #include <FixMath.h>

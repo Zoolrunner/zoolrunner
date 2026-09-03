@@ -38,7 +38,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include <LaunchServices.h>
+#include <CoreServices/CoreServices.h>
 
 #include "nsMIMEInfoMac.h"
 #include "nsILocalFileMac.h"

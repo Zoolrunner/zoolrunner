@@ -49,7 +49,10 @@
 #include "prtypes.h"
 #endif
 
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX)
+#   include <ApplicationServices/ApplicationServices.h>
+#   include <Carbon/Carbon.h>
+#elif defined(XP_MAC)
 #   include <Quickdraw.h>
 #   include <Events.h>
 #   include <MacWindows.h>

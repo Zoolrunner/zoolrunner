@@ -185,7 +185,7 @@ NS_IMETHODIMP nsCollationMacUC::AllocateRawSortKey(
   OSStatus err = ::UCGetCollationKey(mCollator, (const UniChar*) PromiseFlatString(stringIn).get(),
                                      (UniCharCount) stringInLen,
                                      (ItemCount) (mBufferLen / sizeof(UCCollationValue)),
-                                     &actual, (UCCollationValue *)key);
+                                     &actual, (UCCollationValue *)mBuffer);
   NS_ENSURE_TRUE((err == noErr), NS_ERROR_FAILURE);
 
   PRUint32 keyLength = actual * sizeof(UCCollationValue);
