@@ -43,7 +43,11 @@
 #include "nsIPrintingContext.h"
 #include "nsDeviceContextMac.h"
 
+#ifdef __LP64__
+#include <ApplicationServices/ApplicationServices.h>
+#else
 #include <PMApplication.h>
+#endif
 
 class nsDeviceContextSpecX : public nsIDeviceContextSpec, public nsIPrintingContext
 {

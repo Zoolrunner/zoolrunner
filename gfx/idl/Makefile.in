@@ -68,7 +68,7 @@ XPIDLSRCS	+= \
 		$(NULL)
 endif
 
-ifneq (,$(filter mac cocoa,$(MOZ_GFX_TOOLKIT)))
+ifneq (,$(filter mac,$(MOZ_GFX_TOOLKIT))$(filter cocoa,$(MOZ_WIDGET_TOOLKIT)))
 XPIDLSRCS += nsIPrintSettingsX.idl \
 		nsIPrintSessionX.idl \
 		$(NULL)
@@ -83,4 +83,3 @@ XPIDLSRCS += nsIPrintSettingsWin.idl
 endif
 
 include $(topsrcdir)/config/rules.mk
-

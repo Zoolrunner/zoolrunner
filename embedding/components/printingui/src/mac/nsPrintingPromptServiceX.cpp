@@ -63,13 +63,19 @@
 #include "nsIWebProgressListener.h"
 
 // OS includes
+#ifdef __LP64__
+#include <ApplicationServices/ApplicationServices.h>
+#import <Cocoa/Cocoa.h>
+#else
 #include <PMApplication.h>
+#endif
 #include <CFPlugIn.h>
 
 //-----------------------------------------------------------------------------
 // Static Helpers
 //-----------------------------------------------------------------------------
 
+#ifndef __LP64__
 static nsresult LoadPDEPlugIn()
 {
     static CFPlugInRef gPDEPlugIn = nsnull;
@@ -169,6 +175,40 @@ SetDictionaryBooleanvalue(CFMutableDictionaryRef aDictionary, CFStringRef aKey, 
 {
     CFDictionaryAddValue(aDictionary, aKey, aValue ? kCFBooleanTrue : kCFBooleanFalse);
 }
+#else
+static NSPrintInfo*
+CreatePrintInfo(PMPageFormat aPageFormat, PMPrintSettings aPrintSettings)
+{
+    NSPrintInfo* printInfo =
+        [[NSPrintInfo alloc] initWithDictionary:[NSDictionary dictionary]];
+    if (!printInfo)
+        return nil;
+
+    PMPageFormat infoPageFormat = (PMPageFormat)[printInfo PMPageFormat];
+    PMPrintSettings infoPrintSettings =
+        (PMPrintSettings)[printInfo PMPrintSettings];
+    if (::PMCopyPageFormat(aPageFormat, infoPageFormat) != noErr ||
+        ::PMCopyPrintSettings(aPrintSettings, infoPrintSettings) != noErr) {
+        [printInfo release];
+        return nil;
+    }
+    [printInfo updateFromPMPageFormat];
+    [printInfo updateFromPMPrintSettings];
+    return printInfo;
+}
+
+static OSStatus
+CopyPrintInfo(NSPrintInfo* aPrintInfo, PMPageFormat aPageFormat,
+              PMPrintSettings aPrintSettings)
+{
+    OSStatus status = ::PMCopyPageFormat((PMPageFormat)[aPrintInfo PMPageFormat],
+                                         aPageFormat);
+    if (status == noErr)
+        status = ::PMCopyPrintSettings(
+            (PMPrintSettings)[aPrintInfo PMPrintSettings], aPrintSettings);
+    return status;
+}
+#endif
 
 //*****************************************************************************
 // nsPrintingPromptService
@@ -218,6 +258,68 @@ nsPrintingPromptService::ShowPrintDialog(nsIDOMWindow *parent, nsIWebBrowserPrin
     rv = printSettingsX->GetPMPrintSettings(&nativePrintSettings);
     if (NS_FAILED(rv))
         return rv;
+
+#ifdef __LP64__
+    NSPrintInfo* printInfo = CreatePrintInfo(pageFormat, nativePrintSettings);
+    if (!printInfo)
+        return NS_ERROR_FAILURE;
+
+    PRUnichar** docTitles = nsnull;
+    PRUint32 titleCount = 0;
+    webBrowserPrint->EnumerateDocumentNames(&titleCount, &docTitles);
+    if (titleCount > 0) {
+        CFStringRef title = ::CFStringCreateWithCharacters(
+            NULL, docTitles[0], nsCRT::strlen(docTitles[0]));
+        if (title) {
+            ::PMPrintSettingsSetJobName(
+                (PMPrintSettings)[printInfo PMPrintSettings], title);
+            [printInfo updateFromPMPrintSettings];
+            ::CFRelease(title);
+        }
+    }
+    while (titleCount > 0)
+        nsMemory::Free(docTitles[--titleCount]);
+    nsMemory::Free(docTitles);
+
+    NSView* printView = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 1, 1)];
+    NSPrintOperation* operation =
+        [NSPrintOperation printOperationWithView:printView printInfo:printInfo];
+    [NSPrintOperation setCurrentOperation:operation];
+    NSPrintPanel* panel = [NSPrintPanel printPanel];
+    [panel setOptions:NSPrintPanelShowsCopies |
+                      NSPrintPanelShowsPageRange |
+                      NSPrintPanelShowsPaperSize |
+                      NSPrintPanelShowsOrientation |
+                      NSPrintPanelShowsScaling];
+    NSInteger button = [panel runModal];
+    NSPrintInfo* resultInfo = [[NSPrintOperation currentOperation] printInfo];
+    if (button == NSModalResponseOK && resultInfo)
+        status = CopyPrintInfo(resultInfo, pageFormat, nativePrintSettings);
+    else
+        status = (button == NSModalResponseOK) ? paramErr : userCanceledErr;
+    [NSPrintOperation setCurrentOperation:nil];
+    [printView release];
+    [printInfo release];
+
+    if (status == userCanceledErr)
+        return NS_ERROR_ABORT;
+    if (status != noErr)
+        return NS_ERROR_FAILURE;
+
+    UInt32 firstPage = 1;
+    UInt32 lastPage = kPMPrintAllPages;
+    if (::PMGetFirstPage(nativePrintSettings, &firstPage) == noErr &&
+        ::PMGetLastPage(nativePrintSettings, &lastPage) == noErr &&
+        lastPage != kPMPrintAllPages) {
+        printSettings->SetPrintRange(
+            nsIPrintSettings::kRangeSpecifiedPageRange);
+        printSettings->SetStartPageRange((PRInt32)firstPage);
+        printSettings->SetEndPageRange((PRInt32)lastPage);
+    } else {
+        printSettings->SetPrintRange(nsIPrintSettings::kRangeAllPages);
+    }
+    return NS_OK;
+#else
     
     status = ::PMSessionValidatePageFormat(printSession, pageFormat, kPMDontWantBoolean);
     if (status != noErr)
@@ -412,6 +514,7 @@ nsPrintingPromptService::ShowPrintDialog(nsIDOMWindow *parent, nsIWebBrowserPrin
         return NS_ERROR_FAILURE;
 
     return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP 
@@ -433,6 +536,29 @@ nsPrintingPromptService::ShowPageSetup(nsIDOMWindow *parent, nsIPrintSettings *p
   nsCOMPtr<nsIPrintSettingsX> printSettingsX(do_QueryInterface(printSettings));
   if (!printSettingsX)
     return NS_ERROR_NO_INTERFACE;
+
+#ifdef __LP64__
+  PMPageFormat pageFormat = kPMNoPageFormat;
+  PMPrintSettings nativePrintSettings = kPMNoPrintSettings;
+  nsresult rv = printSettingsX->GetPMPageFormat(&pageFormat);
+  if (NS_FAILED(rv))
+    return rv;
+  rv = printSettingsX->GetPMPrintSettings(&nativePrintSettings);
+  if (NS_FAILED(rv))
+    return rv;
+
+  NSPrintInfo* printInfo = CreatePrintInfo(pageFormat, nativePrintSettings);
+  if (!printInfo)
+    return NS_ERROR_FAILURE;
+  NSInteger button = [[NSPageLayout pageLayout] runModalWithPrintInfo:printInfo];
+  OSStatus status = noErr;
+  if (button == NSModalResponseOK)
+    status = CopyPrintInfo(printInfo, pageFormat, nativePrintSettings);
+  [printInfo release];
+  if (button != NSModalResponseOK)
+    return NS_ERROR_ABORT;
+  return status == noErr ? NS_OK : NS_ERROR_FAILURE;
+#else
   
   OSStatus status;
     
@@ -465,6 +591,7 @@ nsPrintingPromptService::ShowPageSetup(nsIDOMWindow *parent, nsIPrintSettings *p
     return NS_ERROR_ABORT;
 
   return NS_OK;
+#endif
 }
 
 NS_IMETHODIMP 

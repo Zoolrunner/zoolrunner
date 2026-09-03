@@ -57,13 +57,25 @@ REQUIRES	= xpcom \
 		  webbrwsr \
 		  $(NULL)
 
+# Print dialog extensions use the retired Carbon PDE ABI. Keep building the
+# historical plug-in everywhere it was supported, but use Cocoa's native
+# print panel without that extension on arm64.
+ifneq (aarch64,$(CPU_ARCH))
 DIRS      = printpde
+endif
 
 CPPSRCS		= \
       nsPrintingPromptServiceX.cpp \
       nsPrintProgressParams.cpp \
       nsPrintProgress.cpp \
       $(NULL)
+
+# The 64-bit Printing Manager no longer provides the Carbon dialog entry
+# points.  Compile the prompt service as Objective-C++ on native arm64 so it
+# can use the Cocoa print panels while leaving historical Mac targets alone.
+ifeq (aarch64,$(CPU_ARCH))
+nsPrintingPromptServiceX.o: CXXFLAGS += -x objective-c++
+endif
 
 LOCAL_INCLUDES	= \
 		-I$(srcdir)/printpde/public \
@@ -74,4 +86,3 @@ LOCAL_INCLUDES	= \
 FORCE_STATIC_LIB = 1
 
 include $(topsrcdir)/config/rules.mk
-

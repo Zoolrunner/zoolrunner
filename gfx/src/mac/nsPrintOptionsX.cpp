@@ -36,7 +36,11 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#ifdef __LP64__
+#include <ApplicationServices/ApplicationServices.h>
+#else
 #include <PMApplication.h>
+#endif
 
 #include "nsCOMPtr.h"
 #include "nsIServiceManager.h"

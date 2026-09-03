@@ -19,3 +19,9 @@ Carbon `EventRecord` structures. The Cairo Cocoa backend does not expose a
 QuickDraw plug-in port, so that bridge is retained for the older graphics
 backend but is not enabled in the arm64 configuration. A usable arm64 plug-in
 would require a compatible non-QuickDraw drawing and event model.
+
+The historical `PrintPDE.plugin` is also retained in source but is not built
+for arm64. It implements Apple's retired Carbon Print Dialog Extension ABI,
+which is not available to 64-bit applications. The arm64 build uses the Cocoa
+print and page-setup panels and preserves the native PrintCore settings used by
+the existing Mozilla printing interfaces.
