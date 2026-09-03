@@ -84,7 +84,11 @@
 
 #ifdef XP_MACOSX
 #include "nsAutoPtr.h"
+#ifdef __LP64__
+#include <ApplicationServices/ApplicationServices.h>
+#else
 #include <Scrap.h>
+#endif
 #endif
 
 
@@ -275,6 +279,31 @@ NS_IMETHODIMP nsWebBrowserFind::GetSearchString(PRUnichar * *aSearchString)
 {
     NS_ENSURE_ARG_POINTER(aSearchString);
 #ifdef XP_MACOSX
+#ifdef __LP64__
+    PasteboardRef pasteboard = nsnull;
+    if (PasteboardCreate(kPasteboardFind, &pasteboard) == noErr) {
+        PasteboardSynchronize(pasteboard);
+        ItemCount itemCount = 0;
+        PasteboardItemID item = nsnull;
+        CFDataRef data = nsnull;
+        if (PasteboardGetItemCount(pasteboard, &itemCount) == noErr &&
+            itemCount &&
+            PasteboardGetItemIdentifier(pasteboard, 1, &item) == noErr &&
+            PasteboardCopyItemFlavorData(pasteboard, item,
+                                         CFSTR("public.utf8-plain-text"),
+                                         &data) == noErr) {
+            CFIndex length = CFDataGetLength(data);
+            if (length >= 0 && (PRUint64)length <= PR_UINT32_MAX) {
+                NS_ConvertUTF8toUTF16 value(
+                    NS_REINTERPRET_CAST(const char*, CFDataGetBytePtr(data)),
+                    NS_STATIC_CAST(PRUint32, length));
+                mSearchString.Assign(value);
+            }
+            CFRelease(data);
+        }
+        CFRelease(pasteboard);
+    }
+#else
     OSStatus err;
     ScrapRef scrap;
     err = ::GetScrapByName(kScrapFindScrap, kScrapGetNamedScrap, &scrap);
@@ -293,6 +322,7 @@ NS_IMETHODIMP nsWebBrowserFind::GetSearchString(PRUnichar * *aSearchString)
         }
     }    
 #endif
+#endif
     *aSearchString = ToNewUnicode(mSearchString);
     return NS_OK;
 }
@@ -301,6 +331,27 @@ NS_IMETHODIMP nsWebBrowserFind::SetSearchString(const PRUnichar * aSearchString)
 {
     mSearchString.Assign(aSearchString);
 #ifdef XP_MACOSX
+#ifdef __LP64__
+    PasteboardRef pasteboard = nsnull;
+    if (PasteboardCreate(kPasteboardFind, &pasteboard) == noErr) {
+        static char sFindPasteboardItem = 0;
+        NS_ConvertUTF16toUTF8 value(mSearchString);
+        CFDataRef data = CFDataCreate(
+            kCFAllocatorDefault,
+            NS_REINTERPRET_CAST(const UInt8*, value.get()), value.Length());
+        if (data) {
+            if (PasteboardClear(pasteboard) == noErr) {
+                PasteboardPutItemFlavor(
+                    pasteboard,
+                    &sFindPasteboardItem,
+                    CFSTR("public.utf8-plain-text"), data,
+                    kPasteboardFlavorNoFlags);
+            }
+            CFRelease(data);
+        }
+        CFRelease(pasteboard);
+    }
+#else
     OSStatus err;
     ScrapRef scrap;
     err = ::GetScrapByName(kScrapFindScrap, kScrapClearNamedScrap, &scrap);
@@ -308,6 +359,7 @@ NS_IMETHODIMP nsWebBrowserFind::SetSearchString(const PRUnichar * aSearchString)
         ::PutScrapFlavor(scrap, kScrapFlavorTypeUnicode, kScrapFlavorMaskNone,
         (mSearchString.Length()*2), aSearchString);
     }
+#endif
 #endif
     return NS_OK;
 }
@@ -941,4 +993,3 @@ nsWebBrowserFind::GetDocShellFromWindow(nsIDOMWindow *inWindow)
 
   return scriptGO->GetDocShell();
 }
-
