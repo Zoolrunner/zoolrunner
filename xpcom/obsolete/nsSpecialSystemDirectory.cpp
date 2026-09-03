@@ -44,7 +44,7 @@
 #ifdef XP_MAC
 #include <Folders.h>
 #include <Files.h>
-#include <Memory.h>
+#include <MacMemory.h>
 #include <Processes.h>
 #include <Gestalt.h>
 #include "nsIInternetConfigService.h"

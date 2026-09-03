@@ -711,7 +711,12 @@ NS_IMETHODIMP nsLocalFile::GetPermissions(PRUint32 *aPermissions)
                   nsnull, nsnull, nsnull);
   if (err != noErr)
     return MacErrorMapper(err);
-  FSPermissionInfo *permPtr = (FSPermissionInfo*)catalogInfo.permissions;
+  FSPermissionInfo *permPtr =
+#if __LP64__
+    &catalogInfo.permissions;
+#else
+    (FSPermissionInfo*)catalogInfo.permissions;
+#endif
   *aPermissions = permPtr->mode;
   return NS_OK;
 }
@@ -728,7 +733,12 @@ NS_IMETHODIMP nsLocalFile::SetPermissions(PRUint32 aPermissions)
                   nsnull, nsnull, nsnull);
   if (err != noErr)
     return MacErrorMapper(err);
-  FSPermissionInfo *permPtr = (FSPermissionInfo*)catalogInfo.permissions;
+  FSPermissionInfo *permPtr =
+#if __LP64__
+    &catalogInfo.permissions;
+#else
+    (FSPermissionInfo*)catalogInfo.permissions;
+#endif
   permPtr->mode = (UInt16)aPermissions;
   err = ::FSSetCatalogInfo(&fsRef, kFSCatInfoPermissions, &catalogInfo);
   return MacErrorMapper(err);
@@ -845,7 +855,7 @@ NS_IMETHODIMP nsLocalFile::SetFileSize(PRInt64 aFileSize)
   if (NS_FAILED(rv))
     return rv;
   
-  SInt16 refNum;    
+  FSIORefNum refNum;
   OSErr err = ::FSOpenFork(&fsRef, 0, nsnull, fsWrPerm, &refNum);
   if (err != noErr)
     return MacErrorMapper(err);
@@ -1508,17 +1518,15 @@ NS_IMETHODIMP nsLocalFile::Reveal()
         // Create the file list
         err = ::AECreateList(nil, 0, false, &fileList);
         if (err == noErr) {
-          FSSpec fsSpecToReveal;
-          err = ::FSRefMakeFSSpec(&fsRefToReveal, &fsSpecToReveal);
+          err = ::AEPutPtr(&fileList, 0, typeFSRef, &fsRefToReveal,
+                           sizeof(FSRef));
           if (err == noErr) {
-            err = ::AEPutPtr(&fileList, 0, typeFSS, &fsSpecToReveal, sizeof(FSSpec));
+            err = ::AEPutParamDesc(&aeEvent, keyDirectObject, &fileList);
             if (err == noErr) {
-              err = ::AEPutParamDesc(&aeEvent, keyDirectObject, &fileList);
-              if (err == noErr) {
-                err = ::AESend(&aeEvent, &aeReply, kAENoReply, kAENormalPriority, kAEDefaultTimeout, nil, nil);
-                if (err == noErr)
-                  ::SetFrontProcess(&process);
-              }
+              err = ::AESend(&aeEvent, &aeReply, kAENoReply,
+                             kAENormalPriority, kAEDefaultTimeout, nil, nil);
+              if (err == noErr)
+                ::SetFrontProcess(&process);
             }
           }
         }
@@ -1576,7 +1584,10 @@ NS_IMETHODIMP nsLocalFile::InitWithFSRef(const FSRef *aFSRef)
 NS_IMETHODIMP nsLocalFile::InitWithFSSpec(const FSSpec *aFileSpec)
 {
   NS_ENSURE_ARG(aFileSpec);
-  
+
+#if __LP64__
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   FSRef fsRef;
   OSErr err = ::FSpMakeFSRef(aFileSpec, &fsRef);
   if (err == noErr)
@@ -1610,6 +1621,7 @@ NS_IMETHODIMP nsLocalFile::InitWithFSSpec(const FSSpec *aFileSpec)
     return Append(nsDependentString(unicodeName.unicode, unicodeName.length));  
   }
   return MacErrorMapper(err);
+#endif
 }
 
 /* void initToAppWithCreatorCode (in OSType aAppCreator); */
@@ -1646,7 +1658,10 @@ NS_IMETHODIMP nsLocalFile::GetFSSpec(FSSpec *_retval)
   NS_ENSURE_ARG_POINTER(_retval);
   if (!mBaseRef)
     return NS_ERROR_NOT_INITIALIZED;
-  
+
+#if __LP64__
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   OSErr err;
   FSRef fsRef;
   nsresult rv = GetFSRefInternal(fsRef);
@@ -1684,6 +1699,7 @@ NS_IMETHODIMP nsLocalFile::GetFSSpec(FSSpec *_retval)
     rv = MacErrorMapper(err);
   }
   return rv;
+#endif
 }
 
 /* readonly attribute PRInt64 fileSizeWithResFork; */
@@ -2180,6 +2196,25 @@ nsresult NS_NewLocalFileWithFSSpec(const FSSpec* inSpec, PRBool followLinks, nsI
     return NS_OK;
 }
 
+nsresult NS_NewLocalFileWithFSRef(const FSRef* inRef, PRBool followLinks,
+                                  nsILocalFileMac **result)
+{
+    nsLocalFile* file = new nsLocalFile();
+    if (file == nsnull)
+        return NS_ERROR_OUT_OF_MEMORY;
+    NS_ADDREF(file);
+
+    file->SetFollowLinks(followLinks);
+
+    nsresult rv = file->InitWithFSRef(inRef);
+    if (NS_FAILED(rv)) {
+        NS_RELEASE(file);
+        return rv;
+    }
+    *result = file;
+    return NS_OK;
+}
+
 //*****************************************************************************
 //  Static Functions
 //*****************************************************************************
@@ -2239,7 +2274,11 @@ static OSErr FindRunningAppBySignature(OSType aAppSig, ProcessSerialNumber& outP
       return err;
     info.processInfoLength = sizeof(ProcessInfoRec);
     info.processName = nil;
+#if __LP64__
+    info.processAppRef = nil;
+#else
     info.processAppSpec = nil;
+#endif
     err = ::GetProcessInformation(&outPsn, &info);
     if (err != noErr)
       return err;

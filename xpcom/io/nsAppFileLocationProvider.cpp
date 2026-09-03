@@ -147,9 +147,12 @@ nsAppFileLocationProvider::GetFile(const char *prop, PRBool *persistant, nsIFile
     *_retval = nsnull;
     *persistant = PR_TRUE;
 
-#if defined (XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX)
+    FSRef fileRef;
+    nsCOMPtr<nsILocalFileMac> macFile;
+#elif defined(XP_MAC)
     short foundVRefNum;
-    long foundDirID;
+    SInt32 foundDirID;
     FSSpec fileSpec;
     nsCOMPtr<nsILocalFileMac> macFile;
 #endif
@@ -215,7 +218,28 @@ nsAppFileLocationProvider::GetFile(const char *prop, PRBool *persistant, nsIFile
         if (NS_SUCCEEDED(rv))
             rv = localFile->AppendRelativeNativePath(PLUGINS_DIR_NAME);
     }
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX)
+    else if (nsCRT::strcmp(prop, NS_MACOSX_USER_PLUGIN_DIR) == 0)
+    {
+        if (::FSFindFolder(kUserDomain, kInternetPlugInFolderType, false,
+                           &fileRef) == noErr) {
+            rv = NS_NewLocalFileWithFSRef(&fileRef, PR_TRUE,
+                                           getter_AddRefs(macFile));
+            if (NS_SUCCEEDED(rv))
+                localFile = macFile;
+        }
+    }
+    else if (nsCRT::strcmp(prop, NS_MACOSX_LOCAL_PLUGIN_DIR) == 0)
+    {
+        if (::FSFindFolder(kLocalDomain, kInternetPlugInFolderType, false,
+                           &fileRef) == noErr) {
+            rv = NS_NewLocalFileWithFSRef(&fileRef, PR_TRUE,
+                                           getter_AddRefs(macFile));
+            if (NS_SUCCEEDED(rv))
+                localFile = macFile;
+        }
+    }
+#elif defined(XP_MAC)
     else if (nsCRT::strcmp(prop, NS_MACOSX_USER_PLUGIN_DIR) == 0)
     {
         if (!(::FindFolder(kUserDomain,
@@ -603,7 +627,12 @@ nsAppFileLocationProvider::GetFiles(const char *prop, nsISimpleEnumerator **_ret
     
     if (!nsCRT::strcmp(prop, NS_APP_PLUGINS_DIR_LIST))
     {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX)
+        static const char* keys[] = { NS_APP_PLUGINS_DIR,
+                                      NS_MACOSX_USER_PLUGIN_DIR,
+                                      NS_MACOSX_LOCAL_PLUGIN_DIR, nsnull };
+        *_retval = new nsAppDirectoryEnumerator(this, keys);
+#elif defined(XP_MAC)
         static const char* osXKeys[] = { NS_APP_PLUGINS_DIR, NS_MACOSX_USER_PLUGIN_DIR, NS_MACOSX_LOCAL_PLUGIN_DIR, nsnull };
         static const char* os9Keys[] = { NS_APP_PLUGINS_DIR, NS_MAC_CLASSIC_PLUGIN_DIR, nsnull };
         static const char** keys;

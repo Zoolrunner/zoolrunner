@@ -44,7 +44,9 @@
 #include "xpcomobsolete.h"
 #include "nsFileSpec.h"
 
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX)
+#include <MacTypes.h>
+#elif defined(XP_MAC)
 #include <Types.h>
 #endif
 
@@ -138,7 +140,7 @@ class NS_COM_OBSOLETE nsSpecialSystemDirectory : public nsFileSpec
     void            operator = (OSType folderType);
                     nsSpecialSystemDirectory(OSType folderType);
     enum {
-      kDefaultDownloadFolderType = FOUR_CHAR_CODE('DfDÄ')    /* Default Download Folder */
+      kDefaultDownloadFolderType = FOUR_CHAR_CODE('DfD\304') /* Default Download Folder */
     };              
 #endif
 

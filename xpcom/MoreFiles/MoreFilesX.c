@@ -6,7 +6,7 @@
 
 	Version:	MoreFilesX 1.0.1
 
-	Copyright:	© 1992-2002 by Apple Computer, Inc., all rights reserved.
+	Copyright:	Â© 1992-2002 by Apple Computer, Inc., all rights reserved.
 
 	Disclaimer:	IMPORTANT:  This Apple software is supplied to you by Apple Computer, Inc.
 				("Apple") in consideration of your agreement to the following terms, and your
@@ -15,7 +15,7 @@
 				please do not use, install, modify or redistribute this Apple software.
 
 				In consideration of your agreement to abide by the following terms, and subject
-				to these terms, Apple grants you a personal, non-exclusive license, under AppleÕs
+				to these terms, Apple grants you a personal, non-exclusive license, under AppleÃ•s
 				copyrights in this original Apple software (the "Apple Software"), to use,
 				reproduce, modify and redistribute the Apple Software, with or without
 				modifications, in source and/or binary forms; provided that if you redistribute
@@ -70,7 +70,9 @@
 */
 
 #if defined(__MACH__)
+	#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 1
 	#include <Carbon/Carbon.h>
+	#include <AssertMacros.h>
 	#include <string.h>
 #else
 	#include <Carbon.h>
@@ -225,6 +227,13 @@ FSGetVolParms(
 	GetVolParmsInfoBuffer *volParmsInfo,
 	UInt32 *actualInfoSize)
 {
+#if __LP64__
+	(void)volRefNum;
+	(void)bufferSize;
+	(void)volParmsInfo;
+	(void)actualInfoSize;
+	return unimpErr;
+#else
 	OSErr			result;
 	HParamBlockRec	pb;
 	
@@ -246,6 +255,7 @@ PBHGetVolParmsSync:
 BadParameter:
 
 	return ( result );
+#endif
 }
 
 /*****************************************************************************/
@@ -409,6 +419,11 @@ FSRefMakeFSSpec(
 	const FSRef *ref,
 	FSSpec *spec)
 {
+#if __LP64__
+	(void)ref;
+	(void)spec;
+	return unimpErr;
+#else
 	OSErr	result;
 	
 	/* check parameters */
@@ -421,6 +436,7 @@ FSGetCatalogInfo:
 BadParameter:
 
 	return ( result );
+#endif
 }
 
 /*****************************************************************************/
@@ -432,6 +448,13 @@ FSMakeFSRef(
 	ConstStr255Param name,
 	FSRef *ref)
 {
+#if __LP64__
+	(void)volRefNum;
+	(void)dirID;
+	(void)name;
+	(void)ref;
+	return unimpErr;
+#else
 	OSErr		result;
 	FSRefParam	pb;
 	
@@ -449,6 +472,7 @@ PBMakeFSRefSync:
 BadParameter:
 
 	return ( result );
+#endif
 }
 
 /*****************************************************************************/
@@ -490,6 +514,12 @@ FSPathMakeFSSpec(
 	FSSpec *spec,
 	Boolean *isDirectory)	/* can be NULL */
 {
+#if __LP64__
+	(void)path;
+	(void)spec;
+	(void)isDirectory;
+	return unimpErr;
+#else
 	OSStatus	result;
 	FSRef		ref;
 	
@@ -509,6 +539,7 @@ FSPathMakeRef:
 BadParameter:
 
 	return ( result );
+#endif
 }
 
 /*****************************************************************************/
@@ -1020,7 +1051,12 @@ FSBumpDate(
 	oldDateTime = catalogInfo.contentModDate;
 
 	/* Get the current date and time */
+	#if __LP64__
+	result = UCConvertCFAbsoluteTimeToUTCDateTime(CFAbsoluteTimeGetCurrent(),
+		&catalogInfo.contentModDate);
+	#else
 	result = GetUTCDateTime(&catalogInfo.contentModDate, kUTCDefaultOptions);
+	#endif
 	require_noerr(result, GetUTCDateTime);
 	
 	/* if the old date and time is the the same as the current, bump the seconds by one */
@@ -2124,6 +2160,8 @@ BadParameter:
 
 /*****************************************************************************/
 
+#if !__LP64__
+
 /* Renamed from FSLockRange to MFX_FSLockRange to avoid a conflict with
  * the FSLockRange function present in the system library since Mac OS X
  * 10.4. */
@@ -2615,6 +2653,8 @@ BadParameter:
 	return ( result );
 }
 
+#endif /* !__LP64__ */
+
 /*****************************************************************************/
 
 #pragma mark ----- Utility Routines -----
@@ -2651,6 +2691,11 @@ GetTempBuffer(
 	/* If request failed, go to backup plan */
 	if ( (tempPtr == NULL) && (buffReqSize > 0x00001000) )
 	{
+#if __LP64__
+		/* The classic memory-manager sizing calls are unavailable in LP64. */
+		buffReqSize = 0x00001000;
+		tempPtr = NewPtr(buffReqSize);
+#else
 		/*
 		**	Try to get largest 4K byte block available
 		**	leaving some slop for the toolbox if possible
@@ -2670,6 +2715,7 @@ GetTempBuffer(
 		}
 		
 		tempPtr = NewPtr(buffReqSize);
+#endif
 	}
 	
 	/* Return bytes allocated */
@@ -2704,6 +2750,11 @@ FSSetDefault(
 	const FSRef *newDefault,
 	FSRef *oldDefault)
 {
+#if __LP64__
+	(void)newDefault;
+	(void)oldDefault;
+	return unimpErr;
+#else
 	OSErr			result;
 	FSVolumeRefNum	vRefNum;
 	long			dirID;
@@ -2742,6 +2793,7 @@ FSGetCatalogInfo:
 BadParameter:
 
 	return ( result );
+#endif
 }
 
 /*****************************************************************************/
@@ -2750,6 +2802,10 @@ OSErr
 FSRestoreDefault(
 	const FSRef *oldDefault)
 {
+#if __LP64__
+	(void)oldDefault;
+	return unimpErr;
+#else
 	OSErr			result;
 	FSCatalogInfo	catalogInfo;
 	
@@ -2776,6 +2832,7 @@ FSGetCatalogInfo:
 BadParameter:
 
 	return ( result );
+#endif
 }
 
 /*****************************************************************************/

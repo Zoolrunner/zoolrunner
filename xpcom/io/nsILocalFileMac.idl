@@ -251,5 +251,8 @@ NS_EXPORT const char* NS_TruncNodeName(const char *aNode, char *outBuf);
 #endif
 
 NS_EXPORT nsresult NS_NewLocalFileWithFSSpec(const FSSpec* inSpec, PRBool followSymlinks, nsILocalFileMac* *result);
+#ifdef XP_MACOSX
+NS_EXPORT nsresult NS_NewLocalFileWithFSRef(const FSRef* inRef, PRBool followSymlinks, nsILocalFileMac* *result);
+#endif
 }
 %}

@@ -13,7 +13,7 @@
 				please do not use, install, modify or redistribute this Apple software.
 
 				In consideration of your agreement to abide by the following terms, and subject
-				to these terms, Apple grants you a personal, non-exclusive license, under AppleÕs
+				to these terms, Apple grants you a personal, non-exclusive license, under AppleÃ•s
 				copyrights in this original Apple software (the "Apple Software"), to use,
 				reproduce, modify and redistribute the Apple Software, with or without
 				modifications, in source and/or binary forms; provided that if you redistribute
@@ -41,13 +41,16 @@
 				(INCLUDING NEGLIGENCE), STRICT LIABILITY OR OTHERWISE, EVEN IF APPLE HAS BEEN
 				ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-	Copyright © 2002 Apple Computer, Inc., All Rights Reserved
+	Copyright Â© 2002 Apple Computer, Inc., All Rights Reserved
 */
 
 #include "FSCopyObject.h"
-#include <UnicodeConverter.h>
 #include <stddef.h>
 #include <string.h>
+
+#if !__LP64__
+
+#include <UnicodeConverter.h>
 
 /*
 	
@@ -1703,3 +1706,54 @@ OSErr FSMakeFSRef(	FSVolumeRefNum volRefNum,
 		
 	return ( osErr );
 }
+
+#else /* __LP64__ */
+
+OSErr
+FSCopyObject(const FSRef *source,
+	const FSRef *destDir,
+	UniCharCount nameLength,
+	const UniChar *copyName,
+	ItemCount maxLevels,
+	FSCatalogInfoBitmap whichInfo,
+	Boolean wantFSSpec,
+	Boolean wantName,
+	CopyObjectFilterProcPtr filterProcPtr,
+	void *yourDataPtr,
+	FSRef *newObject)
+{
+	CFStringRef destinationName;
+	OSStatus result;
+
+	(void)whichInfo;
+	(void)wantName;
+	(void)yourDataPtr;
+	if (source == NULL || destDir == NULL ||
+		(maxLevels != 0 && maxLevels != 1) || wantFSSpec ||
+		filterProcPtr != NULL)
+		return paramErr;
+
+	destinationName = NULL;
+	if (copyName != NULL) {
+		destinationName = CFStringCreateWithCharacters(kCFAllocatorDefault,
+			copyName, nameLength);
+		if (destinationName == NULL)
+			return memFullErr;
+	}
+
+	result = FSCopyObjectSync(source, destDir, destinationName, newObject,
+		kFSFileOperationDefaultOptions);
+	if (destinationName != NULL)
+		CFRelease(destinationName);
+	return result;
+}
+
+OSErr
+FSDeleteObjects(const FSRef *source)
+{
+	if (source == NULL)
+		return paramErr;
+	return FSDeleteObject(source);
+}
+
+#endif /* __LP64__ */

@@ -44,7 +44,12 @@
 #include "nscore.h"
 #include "nsILocalFile.h"
 
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX)
+#include <MacTypes.h>
+#include <Folders.h>
+#include "nsILocalFileMac.h"
+#include "prenv.h"
+#elif defined(XP_MAC)
 #include <Types.h>
 #include "nsILocalFileMac.h"
 #include "prenv.h"

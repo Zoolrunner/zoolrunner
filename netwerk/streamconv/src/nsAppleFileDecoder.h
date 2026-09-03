@@ -120,8 +120,13 @@ private:
                     parseDataFork, parseResourceFork, parseWriteThrough};
   
   nsCOMPtr<nsIOutputStream> m_output;
+#if defined(XP_MACOSX) && defined(__LP64__)
+  FSRef             m_fsRef;
+  FSIORefNum        m_rfRefNum;
+#else
   FSSpec            m_fsFileSpec;
   SInt16            m_rfRefNum;
+#endif
   
   unsigned char *   m_dataBuffer;
   PRInt32           m_dataBufferLength;

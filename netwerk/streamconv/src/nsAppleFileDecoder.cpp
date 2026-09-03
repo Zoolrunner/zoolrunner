@@ -56,8 +56,8 @@ nsAppleFileDecoder::nsAppleFileDecoder()
   
   m_comment[0] = 0;
   memset(&m_dates, 0, sizeof(m_dates));
-  memset(&m_finderInfo, 0, sizeof(m_dates));
-  memset(&m_finderExtraInfo, 0, sizeof(m_dates));
+  memset(&m_finderInfo, 0, sizeof(m_finderInfo));
+  memset(&m_finderExtraInfo, 0, sizeof(m_finderExtraInfo));
 }
 
 nsAppleFileDecoder::~nsAppleFileDecoder()
@@ -75,11 +75,22 @@ NS_IMETHODIMP nsAppleFileDecoder::Initialize(nsIOutputStream *outputStream, nsIF
   m_output = outputStream;
   
   nsCOMPtr<nsILocalFileMac> macFile = do_QueryInterface(outputFile);
+  if (!macFile)
+    return NS_ERROR_NO_INTERFACE;
   PRBool saveFollowLinks;
   macFile->GetFollowLinks(&saveFollowLinks);
   macFile->SetFollowLinks(PR_TRUE);
+#if defined(XP_MACOSX) && defined(__LP64__)
+  nsresult rv = macFile->GetFSRef(&m_fsRef);
+#else
   macFile->GetFSSpec(&m_fsFileSpec);
+#endif
   macFile->SetFollowLinks(saveFollowLinks);
+
+#if defined(XP_MACOSX) && defined(__LP64__)
+  if (NS_FAILED(rv))
+    return rv;
+#endif
 
   m_offset = 0;
   m_dataForkOffset = 0;
@@ -94,8 +105,13 @@ NS_IMETHODIMP nsAppleFileDecoder::Close(void)
 
   PRInt32 i;
 
-  if (m_rfRefNum != -1)
+  if (m_rfRefNum != -1) {
+#if defined(XP_MACOSX) && defined(__LP64__)
+    FSCloseFork(m_rfRefNum);
+#else
     FSClose(m_rfRefNum);
+#endif
+  }
     
   /* Check if the file is complete and if it's the case, write file attributes */
   if (m_headerOk)
@@ -121,6 +137,37 @@ NS_IMETHODIMP nsAppleFileDecoder::Close(void)
       
     if (dataOk && resourceOk)
     {
+#if defined(XP_MACOSX) && defined(__LP64__)
+      FSCatalogInfo catalogInfo;
+      FSCatalogInfoBitmap whichInfo = kFSCatInfoFinderInfo |
+                                      kFSCatInfoFinderXInfo |
+                                      kFSCatInfoCreateDate |
+                                      kFSCatInfoContentMod |
+                                      kFSCatInfoBackupDate;
+      if (FSGetCatalogInfo(&m_fsRef, whichInfo, &catalogInfo,
+                           nsnull, nsnull, nsnull) == noErr) {
+        FInfo finderInfo = m_finderInfo;
+        finderInfo.fdFlags &= 0xfc00;
+        memcpy(catalogInfo.finderInfo, &finderInfo, sizeof(finderInfo));
+        memcpy(catalogInfo.extFinderInfo, &m_finderExtraInfo,
+               sizeof(m_finderExtraInfo));
+
+        catalogInfo.createDate.highSeconds = 0;
+        catalogInfo.createDate.lowSeconds =
+          (UInt32)(m_dates.create - CONVERT_TIME);
+        catalogInfo.createDate.fraction = 0;
+        catalogInfo.contentModDate.highSeconds = 0;
+        catalogInfo.contentModDate.lowSeconds =
+          (UInt32)(m_dates.modify - CONVERT_TIME);
+        catalogInfo.contentModDate.fraction = 0;
+        catalogInfo.backupDate.highSeconds = 0;
+        catalogInfo.backupDate.lowSeconds =
+          (UInt32)(m_dates.backup - CONVERT_TIME);
+        catalogInfo.backupDate.fraction = 0;
+        FSSetCatalogInfo(&m_fsRef, whichInfo, &catalogInfo);
+      }
+      /* The legacy Desktop Manager comment API has no 64-bit equivalent. */
+#else
       HFileInfo *fpb;
       CInfoPBRec cipbr;
       
@@ -168,6 +215,7 @@ NS_IMETHODIMP nsAppleFileDecoder::Close(void)
             PBDTFlushSync(&dtp);
         }
       }
+#endif
     }
   }
   
@@ -391,13 +439,29 @@ NS_IMETHODIMP nsAppleFileDecoder::Write(const char *buffer, PRUint32 bufferSize,
         
         if (m_rfRefNum == -1)
         {
+#if defined(XP_MACOSX) && defined(__LP64__)
+          HFSUniStr255 resourceForkName;
+          if (FSGetResourceForkName(&resourceForkName) != noErr ||
+              FSOpenFork(&m_fsRef, resourceForkName.length,
+                         resourceForkName.unicode, fsWrPerm,
+                         &m_rfRefNum) != noErr)
+            return NS_ERROR_FAILURE;
+#else
           if (noErr != FSpOpenRF(&m_fsFileSpec, fsWrPerm, &m_rfRefNum))
             return NS_ERROR_FAILURE;
+#endif
         }
-        
+
+#if defined(XP_MACOSX) && defined(__LP64__)
+        ByteCount count = dataCount;
+        if (FSWriteFork(m_rfRefNum, fsAtMark, 0, dataCount, buffPtr,
+                        &count) != noErr || count != dataCount)
+            return NS_ERROR_FAILURE;
+#else
         long count = dataCount;
         if (noErr != FSWrite(m_rfRefNum, &count, buffPtr) || count != dataCount)
             return NS_ERROR_FAILURE;
+#endif
         m_totalResourceForkWritten += dataCount;
         }
         break;

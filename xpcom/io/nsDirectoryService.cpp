@@ -53,7 +53,7 @@
 #if defined(XP_MAC)
 #include <Folders.h>
 #include <Files.h>
-#include <Memory.h>
+#include <MacMemory.h>
 #include <Processes.h>
 #include <Gestalt.h>
 #elif defined(XP_WIN)

@@ -303,7 +303,7 @@ nsProcess::Run(PRBool blocking, const char **args, PRUint32 count,
 
 #else // Note, this must not be an #elif ...!
 
-#if defined(XP_MACOSX)
+#if defined(XP_MACOSX) && !defined(__LP64__)
     if (count == 0) {
         FSSpec resolvedSpec;
         OSErr err = noErr;

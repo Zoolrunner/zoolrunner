@@ -325,6 +325,11 @@ endif
 # Darwin/PPC
 #
 ifeq ($(OS_ARCH),Darwin)
+ifeq ($(TARGET_CPU),aarch64)
+ASFLAGS         += -x assembler-with-cpp
+CPPSRCS         := xptcinvoke_darwin_aarch64.cpp xptcstubs_darwin_aarch64.cpp
+ASFILES         := xptcinvoke_asm_darwin_aarch64.s xptcstubs_asm_darwin_aarch64.s
+endif
 ifeq ($(TARGET_CPU), powerpc)
 ASFLAGS		+= -x assembler-with-cpp   # assumes $(AS) == $(CC)
 ifdef HAVE_GCC3_ABI
