@@ -102,9 +102,12 @@ private:
 private:
 	PRUint32		m_depth;
 	nsIFileSpec *	m_mailImportLocation;
+#ifdef __LP64__
+        PRBool HasResourceFork(nsIFileSpec *fileSpec);
+#else
         PRBool HasResourceFork(FSSpec *fsSpec);
+#endif
 };
 
 
 #endif /* nsEudoraMac_h__ */
-

@@ -66,6 +66,52 @@
 #ifdef XP_MACOSX
 #include "nsILocalFileMac.h"
 #include "MoreFilesX.h"
+#ifdef __LP64__
+#include <Carbon/Carbon.h>
+
+static ResFileRefNum
+OpenResourceFork(nsIFileSpec *aFile)
+{
+  char *nativePath = nsnull;
+  FSRef fileRef;
+  if (NS_FAILED(aFile->GetNativePath(&nativePath)) || !nativePath)
+    return -1;
+  OSStatus err = FSPathMakeRef((const UInt8 *)nativePath, &fileRef, nsnull);
+  nsCRT::free(nativePath);
+  return err == noErr ? FSOpenResFile(&fileRef, fsRdPerm) : -1;
+}
+
+static void
+GetIndexedString(StringPtr aResult, ResID aResourceID, short aIndex)
+{
+  aResult[0] = 0;
+  Handle strings = Get1Resource('STR#', aResourceID);
+  if (!strings || aIndex < 1)
+    return;
+
+  HLock(strings);
+  const unsigned char *data = (const unsigned char *)*strings;
+  Size size = GetHandleSize(strings);
+  if (size >= 2) {
+    short count = (short)(((unsigned short)data[0] << 8) | data[1]);
+    Size offset = 2;
+    short index;
+    for (index = 1; index <= count && offset < size; ++index) {
+      unsigned char length = data[offset++];
+      if (offset + length > size)
+        break;
+      if (index == aIndex) {
+        aResult[0] = length;
+        memcpy(aResult + 1, data + offset, length);
+        break;
+      }
+      offset += length;
+    }
+  }
+  HUnlock(strings);
+  ReleaseResource(strings);
+}
+#endif
 
 static nsresult NS_FileSpecToILocalFileMac(nsFileSpec *aSpec, nsILocalFileMac **aLocalFileMac)
 {
@@ -451,6 +497,9 @@ PRBool nsEudoraMac::CreateTocFromResource( nsIFileSpec *pMail, nsIFileSpec *pToc
 		return( PR_FALSE);
         short resFile = -1;
 #ifdef XP_MACOSX
+#ifdef __LP64__
+        resFile = OpenResourceFork(pMail);
+#else
         {
           nsCOMPtr<nsILocalFileMac> macFile;
           rv = NS_FileSpecToILocalFileMac(&spec, getter_AddRefs(macFile));
@@ -464,6 +513,7 @@ PRBool nsEudoraMac::CreateTocFromResource( nsIFileSpec *pMail, nsIFileSpec *pToc
 
           resFile = FSpOpenResFile( &fsSpec, fsRdPerm);
         }
+#endif
 #else
         resFile = FSpOpenResFile( spec.GetFSSpecPtr(), fsRdPerm);
 #endif
@@ -602,6 +652,9 @@ PRBool nsEudoraMac::GetSettingsFromResource( nsIFileSpec *pSettings, short resId
 
         short resFile = -1;
 #ifdef XP_MACOSX
+#ifdef __LP64__
+        resFile = OpenResourceFork(pSettings);
+#else
         {
           nsCOMPtr<nsILocalFileMac> macFile;
           rv = NS_FileSpecToILocalFileMac(&spec, getter_AddRefs(macFile));
@@ -615,6 +668,7 @@ PRBool nsEudoraMac::GetSettingsFromResource( nsIFileSpec *pSettings, short resId
 
           resFile = FSpOpenResFile( &fsSpec, fsRdPerm);
         }
+#endif
 #else
 	resFile = FSpOpenResFile( spec.GetFSSpecPtr(), fsRdPerm);
 #endif
@@ -633,11 +687,19 @@ PRBool nsEudoraMac::GetSettingsFromResource( nsIFileSpec *pSettings, short resId
 			pStr[i] = (StringPtr) new PRUint8[256];
 			(pStr[i])[0] = 0;
 		}
+#ifdef __LP64__
+		GetIndexedString(pStr[0], resId /* 1000 */, kSmtpServerID);
+		GetIndexedString(pStr[1], resId, kEmailAddressID);
+		GetIndexedString(pStr[2], resId, kReturnAddressID);
+		GetIndexedString(pStr[3], resId, kFullNameID);
+		GetIndexedString(pStr[4], resId, kLeaveMailOnServerID);
+#else
 		GetIndString( pStr[0], resId /* 1000 */, kSmtpServerID);
 		GetIndString( pStr[1], resId, kEmailAddressID); // user name@pop server
 		GetIndString( pStr[2], resId, kReturnAddressID); 
 		GetIndString( pStr[3], resId, kFullNameID);
 		GetIndString( pStr[4], resId, kLeaveMailOnServerID);
+#endif
 		CloseResFile( resFile); 
 		
 		theStr = pStr[0];
@@ -686,7 +748,7 @@ PRBool nsEudoraMac::GetSettingsFromResource( nsIFileSpec *pSettings, short resId
 			}
 		}
 		for (i = 0; i < 5; i++) {
-			delete pStr[i];
+			delete [] pStr[i];
 		}
 		
 		return( PR_TRUE);
@@ -781,7 +843,7 @@ PRBool nsEudoraMac::ImportSettings( nsIFileSpec *pIniFile, nsIMsgAccount **local
 	for (i = 0; i < kNumSettingStrs; i++) {
 		delete pStrs[i];
 	}
-	delete pStrs;
+	delete [] pStrs;
 
 	return( accounts != 0);
 }
@@ -1022,8 +1084,10 @@ nsresult nsEudoraMac::GetAttachmentInfo( const char *pFileName, nsIFileSpec *pSp
 	IMPORT_LOG3( "\tAttachment type: %s, creator: %s, fileNum: %ld\n", typeStr.get(), creatStr.get(), fNum);
 	IMPORT_LOG1( "\tAttachment file name: %s\n", str.get());
 #endif
+#ifndef __LP64__
 	FSSpec	spec;
 	memset( &spec, 0, sizeof( spec));
+#endif
 #ifdef XP_MACOSX
         {
           nsresult rv = pSpec->SetNativePath(str.get());
@@ -1043,6 +1107,7 @@ nsresult nsEudoraMac::GetAttachmentInfo( const char *pFileName, nsIFileSpec *pSp
 		      pSpec->GetLeafName( &pLeaf);
           aAttachment.Adopt(pLeaf);
 
+#ifndef __LP64__
           nsCOMPtr<nsILocalFileMac> macFile;
           rv = NS_FileSpecToILocalFileMac(&tempFileSpec, getter_AddRefs(macFile));
           if (NS_FAILED(rv)) {
@@ -1055,6 +1120,7 @@ nsresult nsEudoraMac::GetAttachmentInfo( const char *pFileName, nsIFileSpec *pSp
             IMPORT_LOG0("\tfailed to get FSSpec\n");
             return rv;
           }
+#endif
         }
 #else
 	// Now we have all of the pertinent info, find out if the file exists?
@@ -1111,7 +1177,11 @@ nsresult nsEudoraMac::GetAttachmentInfo( const char *pFileName, nsIFileSpec *pSp
 #endif
 	
 #ifdef XP_MACOSX
+#ifdef __LP64__
+	if (HasResourceFork(pSpec))
+#else
 	if (HasResourceFork(&spec)) 
+#endif
 #else
         // Need to find the mime type for the attachment?
         long    dataSize = 0;
@@ -1134,11 +1204,26 @@ nsresult nsEudoraMac::GetAttachmentInfo( const char *pFileName, nsIFileSpec *pSp
 	return( NS_OK);
 }
 		
-PRBool nsEudoraMac::HasResourceFork(FSSpec *fsSpec)
+PRBool nsEudoraMac::HasResourceFork(
+#ifdef __LP64__
+  nsIFileSpec *fileSpec)
+#else
+  FSSpec *fsSpec)
+#endif
 {
   FSRef fsRef;
+#ifdef __LP64__
+  char *nativePath = nsnull;
+  if (NS_SUCCEEDED(fileSpec->GetNativePath(&nativePath)) && nativePath)
+  {
+    OSErr pathErr = FSPathMakeRef((const UInt8 *)nativePath, &fsRef, nsnull);
+    nsCRT::free(nativePath);
+    if (pathErr != noErr)
+      return PR_FALSE;
+#else
   if (::FSpMakeFSRef(fsSpec, &fsRef) == noErr)
   {
+#endif
     FSCatalogInfo catalogInfo;
     OSErr err = ::FSGetCatalogInfo(&fsRef, kFSCatInfoRsrcSizes, &catalogInfo, nsnull, nsnull, nsnull);
     return (err == noErr && catalogInfo.rsrcLogicalSize != 0);
@@ -1374,4 +1459,3 @@ nsresult nsEudoraMac::FindAddressBooks( nsIFileSpec *pRoot, nsISupportsArray **p
 	
 	return( rv);
 }
-
