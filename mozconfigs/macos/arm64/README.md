@@ -13,3 +13,9 @@ configurations continue to select the original sample build.
 Third-party NPAPI plug-in bundles must contain a compatible arm64 Mach-O
 executable. On LP64, ZoolRunner reads their established `WebPluginMIMETypes`
 Info.plist metadata rather than requiring a classic resource fork.
+
+The historical Mac NPAPI paint and event bridge passes QuickDraw ports and
+Carbon `EventRecord` structures. The Cairo Cocoa backend does not expose a
+QuickDraw plug-in port, so that bridge is retained for the older graphics
+backend but is not enabled in the arm64 configuration. A usable arm64 plug-in
+would require a compatible non-QuickDraw drawing and event model.
