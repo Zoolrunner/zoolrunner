@@ -85,6 +85,10 @@ public:
 
     virtual PRInt8 GetAlphaDepth();
     virtual void* GetBitInfo();
+    virtual nsresult GetSurface(gfxASurface** aSurface) {
+        *aSurface = ThebesSurface();
+        return *aSurface ? NS_OK : NS_ERROR_FAILURE;
+    }
     NS_IMETHOD LockImagePixels(PRBool aMaskPixels);
     NS_IMETHOD UnlockImagePixels(PRBool aMaskPixels);
 

@@ -105,7 +105,6 @@
 #include "gfxContext.h"
 #include "gfxASurface.h"
 #include "gfxPlatform.h"
-#include "nsThebesImage.h"
 
 #include "nsIViewManager.h"
 #include "nsIScrollableView.h"
@@ -2237,10 +2236,9 @@ nsCanvasRenderingContext2D::CairoSurfaceFromElement(nsIDOMElement *imgElt,
         *heightOut = imgHeight;
 
 #ifdef MOZ_ENABLE_CAIRO_GFX
-    nsThebesImage* thebesImage =
-        NS_STATIC_CAST(nsThebesImage*, NS_STATIC_CAST(nsIImage*, img.get()));
-    gfxASurface* gfxsurf = thebesImage->ThebesSurface();
-    NS_ENSURE_TRUE(gfxsurf, NS_ERROR_FAILURE);
+    gfxASurface* gfxsurf = nsnull;
+    rv = img->GetSurface(&gfxsurf);
+    NS_ENSURE_SUCCESS(rv, rv);
 
     *aCairoSurface = gfxsurf->CairoSurface();
     cairo_surface_reference (*aCairoSurface);

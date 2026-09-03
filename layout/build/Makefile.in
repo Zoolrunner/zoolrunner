@@ -66,6 +66,9 @@ PACKAGE_VARS += MOZ_XUL
 
 ifndef MOZ_ENABLE_LIBXUL
 EXTRA_DSO_LIBS	= gkgfx
+ifdef MOZ_ENABLE_CAIRO_GFX
+EXTRA_DSO_LIBS	+= thebes
+endif
 endif
 ifdef MOZ_PERF_METRICS
 EXTRA_DSO_LIBS	+= mozutil_s
@@ -283,8 +286,10 @@ endif
 endif
 
 # XXXdholbert bug 344818
+ifdef MOZ_X11
 ifdef MOZ_ENABLE_CANVAS
 EXTRA_DSO_LDOPTS += $(XLDFLAGS) -lX11 -lXrender
+endif
 endif
 
 export:: $(BUILD_DATE)

@@ -43,6 +43,9 @@
 #include "nsRect.h"
 
 class nsIDeviceContext;
+#ifdef MOZ_ENABLE_CAIRO_GFX
+class gfxASurface;
+#endif
 
 struct nsColorMap
 {
@@ -249,6 +252,11 @@ public:
    * @return a bitmap info structure for the Device Dependent Bits
    */
   virtual void* GetBitInfo() = 0;
+
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  /** Return the native Thebes surface used by the Cairo graphics backend. */
+  virtual nsresult GetSurface(gfxASurface** aSurface) = 0;
+#endif
 
 
   /**
