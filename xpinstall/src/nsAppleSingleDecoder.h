@@ -43,14 +43,18 @@
  *   http://andrew2.andrew.cmu.edu/rfc/rfc1740.html
  *----------------------------------------------------------------------*/
 
-#pragma options align=mac68k
-
 #ifndef _NS_APPLESINGLEDECODER_H_
 #define _NS_APPLESINGLEDECODER_H_
 
 #include <stdlib.h>
 #include <string.h>
 #include <Carbon/Carbon.h>
+
+#ifdef __LP64__
+#pragma pack(push, 2)
+#else
+#pragma options align=mac68k
+#endif
 
 
 /*----------------------------------------------------------------------*
@@ -205,7 +209,7 @@ private:
   const FSRef *mInRef;
   FSRef       *mOutRef;
   // cache since it's used through the life of one Decode cycle:
-  SInt16      mInRefNum;  
+  FSIORefNum  mInRefNum;
   Boolean     mRenameReqd;
   
   OSErr  ProcessASEntry(ASEntry inEntry);  
@@ -214,7 +218,7 @@ private:
   OSErr  ProcessRealName(ASEntry inEntry);
   OSErr  ProcessFileDates(ASEntry inEntry);
   OSErr  ProcessFinderInfo(ASEntry inEntry);
-  OSErr  EntryToMacFile(ASEntry inEntry, UInt16 inTargetSpecRefNum);
+  OSErr  EntryToMacFile(ASEntry inEntry, FSIORefNum inTargetSpecRefNum);
 
   OSErr  FSMakeUnique(const FSRef *inParentRef, FSRef *outRef);
 };
@@ -232,6 +236,10 @@ DecodeDirIterateFilter(Boolean containerChanged, ItemCount currentLevel,
 }
 #endif
 
+#ifdef __LP64__
+#pragma pack(pop)
+#else
 #pragma options align=reset
+#endif
 
 #endif /* _NS_APPLESINGLEDECODER_H_ */

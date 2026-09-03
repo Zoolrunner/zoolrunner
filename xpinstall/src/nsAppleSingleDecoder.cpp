@@ -39,7 +39,45 @@
 
 
 #ifndef _NS_APPLESINGLEDECODER_H_
-  #include "nsAppleSingleDecoder.h"
+#include "nsAppleSingleDecoder.h"
+
+static OSErr
+ReadForkBytes(FSIORefNum aFork, UInt32* aCount, void* aBuffer)
+{
+  ByteCount actualCount = 0;
+  OSErr err = FSReadFork(aFork, fsAtMark, 0, (ByteCount)*aCount,
+                         aBuffer, &actualCount);
+  *aCount = (UInt32)actualCount;
+  return err;
+}
+
+static OSErr
+WriteForkBytes(FSIORefNum aFork, UInt32* aCount, const void* aBuffer)
+{
+  ByteCount actualCount = 0;
+  OSErr err = FSWriteFork(aFork, fsAtMark, 0, (ByteCount)*aCount,
+                          aBuffer, &actualCount);
+  *aCount = (UInt32)actualCount;
+  return err;
+}
+
+#ifdef __LP64__
+static void
+AppleSingleLocalDateToUTC(SInt32 aSeconds, UTCDateTime* aResult)
+{
+  /* AppleSingle dates use 2000-01-01 as their epoch. CFAbsoluteTime uses
+   * 2001-01-01; retain the decoder's historical interpretation as local
+   * time before converting it to UTC. */
+  const CFAbsoluteTime secondsInLeapYear = 31622400.0;
+  CFAbsoluteTime localTime = (CFAbsoluteTime)aSeconds - secondsInLeapYear;
+  CFTimeZoneRef timeZone = CFTimeZoneCopySystem();
+  CFTimeInterval offset = timeZone ?
+    CFTimeZoneGetSecondsFromGMT(timeZone, localTime) : 0;
+  if (timeZone)
+    CFRelease(timeZone);
+  UCConvertCFAbsoluteTimeToUTCDateTime(localTime - offset, aResult);
+}
+#endif
 #endif
 
 #include "MoreFilesX.h"
@@ -125,7 +163,7 @@ nsAppleSingleDecoder::Decode()
   MAC_ERR_CHECK(FSGetDataForkName( &dataForkName ));
   MAC_ERR_CHECK(FSOpenFork( mInRef, dataForkName.length, dataForkName.unicode, 
     fsRdPerm, &mInRefNum ));
-  MAC_ERR_CHECK(FSRead( mInRefNum, (long *)&bytesRead, &header ));
+  MAC_ERR_CHECK(ReadForkBytes( mInRefNum, &bytesRead, &header ));
   
   if ( (bytesRead != sizeof(header)) ||
      (header.magicNum != APPLESINGLE_MAGIC) ||
@@ -153,10 +191,10 @@ nsAppleSingleDecoder::Decode()
     for ( int i=0; i < header.numEntries; i++ )
     {  
       offset = sizeof( ASHeader ) + sizeof( ASEntry ) * i;
-      MAC_ERR_CHECK(SetFPos( mInRefNum, fsFromStart, offset ));
+      MAC_ERR_CHECK(FSSetForkPosition( mInRefNum, fsFromStart, offset ));
       
       bytesRead = sizeof(entry);
-      MAC_ERR_CHECK(FSRead( mInRefNum, (long *) &bytesRead, &entry ));
+      MAC_ERR_CHECK(ReadForkBytes( mInRefNum, &bytesRead, &entry ));
       if (bytesRead != sizeof(entry))
         return -1;
         
@@ -173,7 +211,7 @@ nsAppleSingleDecoder::Decode()
   }
   
   // close the inSpec
-  FSClose( mInRefNum );
+  FSCloseFork( mInRefNum );
   
   // rename if need be
   if (mRenameReqd)
@@ -273,7 +311,7 @@ Boolean
 nsAppleSingleDecoder::IsAppleSingleFile(const FSRef *inRef)
 {
   OSErr   err;
-  SInt16  inRefNum;
+  FSIORefNum inRefNum;
   UInt32  magic;
   long    bytesRead = sizeof(magic);
   
@@ -297,11 +335,15 @@ nsAppleSingleDecoder::IsAppleSingleFile(const FSRef *inRef)
   if (err!=noErr)
     return false;
 
-  err = FSRead( inRefNum, &bytesRead, &magic );
+  {
+    UInt32 count = (UInt32)bytesRead;
+    err = ReadForkBytes( inRefNum, &count, &magic );
+    bytesRead = count;
+  }
   if (err!=noErr)
     return false;
     
-  FSClose(inRefNum);
+  FSCloseFork(inRefNum);
   if (bytesRead != sizeof(magic))
     return false;
 
@@ -353,7 +395,7 @@ OSErr
 nsAppleSingleDecoder::ProcessDataFork(ASEntry inEntry)
 {
   OSErr  err = noErr;
-  SInt16  refNum;
+  FSIORefNum refNum;
   
   /* Setup the files */
   HFSUniStr255 dataForkName;
@@ -367,7 +409,7 @@ nsAppleSingleDecoder::ProcessDataFork(ASEntry inEntry)
   if ( err == noErr )
     err = EntryToMacFile( inEntry, refNum );
   
-  FSClose( refNum );
+  FSCloseFork( refNum );
   return err;
 }
 
@@ -375,7 +417,7 @@ OSErr
 nsAppleSingleDecoder::ProcessResourceFork(ASEntry inEntry)
 {
   OSErr  err = noErr;
-  SInt16  refNum;
+  FSIORefNum refNum;
     
   HFSUniStr255 rsrcForkName;
   err = FSGetResourceForkName( &rsrcForkName );
@@ -388,7 +430,7 @@ nsAppleSingleDecoder::ProcessResourceFork(ASEntry inEntry)
   if ( err == noErr )
     err = EntryToMacFile( inEntry, refNum );
   
-  FSClose( refNum );
+  FSCloseFork( refNum );
   return err;
 }
 
@@ -401,10 +443,10 @@ nsAppleSingleDecoder::ProcessRealName(ASEntry inEntry)
   UInt32        bytesRead;
   FSRef         parentOfOutRef;
   
-  MAC_ERR_CHECK(SetFPos(mInRefNum, fsFromStart, inEntry.entryOffset));
+  MAC_ERR_CHECK(FSSetForkPosition(mInRefNum, fsFromStart, inEntry.entryOffset));
   
   bytesRead = inEntry.entryLength;
-  MAC_ERR_CHECK(FSRead(mInRefNum, (long *) &bytesRead, &newName[1]));
+  MAC_ERR_CHECK(ReadForkBytes(mInRefNum, &bytesRead, &newName[1]));
   if (bytesRead != inEntry.entryLength)
     return -1;
     
@@ -454,13 +496,14 @@ nsAppleSingleDecoder::ProcessFileDates(ASEntry inEntry)
   if ( inEntry.entryLength != sizeof(dates) )  
     return -1;
   
-  MAC_ERR_CHECK(SetFPos(mInRefNum, fsFromStart, inEntry.entryOffset));
+  MAC_ERR_CHECK(FSSetForkPosition(mInRefNum, fsFromStart, inEntry.entryOffset));
   
   bytesRead = inEntry.entryLength;
-  MAC_ERR_CHECK(FSRead(mInRefNum, (long *) &bytesRead, &dates));
+  MAC_ERR_CHECK(ReadForkBytes(mInRefNum, &bytesRead, &dates));
   if (bytesRead != inEntry.entryLength)
     return -1;
     
+#ifndef __LP64__
 #define YR_2000_SECONDS 3029529600
   LocalDateTime local = (LocalDateTime) {0, 0, 0};
 
@@ -482,6 +525,14 @@ nsAppleSingleDecoder::ProcessFileDates(ASEntry inEntry)
 
   // set attribute modification date
   GetUTCDateTime(&catInfo.attributeModDate, kUTCDefaultOptions);  
+#else
+  AppleSingleLocalDateToUTC(dates.create, &catInfo.createDate);
+  AppleSingleLocalDateToUTC(dates.modify, &catInfo.contentModDate);
+  AppleSingleLocalDateToUTC(dates.access, &catInfo.accessDate);
+  AppleSingleLocalDateToUTC(dates.backup, &catInfo.backupDate);
+  UCConvertCFAbsoluteTimeToUTCDateTime(CFAbsoluteTimeGetCurrent(),
+                                       &catInfo.attributeModDate);
+#endif
 
   MAC_ERR_CHECK(FSSetCatalogInfo(mOutRef, 
     kFSCatInfoCreateDate |
@@ -505,10 +556,10 @@ nsAppleSingleDecoder::ProcessFinderInfo(ASEntry inEntry)
   if (inEntry.entryLength != sizeof( ASFinderInfo ))
     return -1;
 
-  MAC_ERR_CHECK(SetFPos(mInRefNum, fsFromStart, inEntry.entryOffset));
+  MAC_ERR_CHECK(FSSetForkPosition(mInRefNum, fsFromStart, inEntry.entryOffset));
 
   bytesRead = sizeof(info);
-  MAC_ERR_CHECK(FSRead(mInRefNum, (long *) &bytesRead, &info));
+  MAC_ERR_CHECK(ReadForkBytes(mInRefNum, &bytesRead, &info));
   if (bytesRead != inEntry.entryLength)
     return -1;
     
@@ -529,7 +580,7 @@ nsAppleSingleDecoder::ProcessFinderInfo(ASEntry inEntry)
 }
 
 OSErr
-nsAppleSingleDecoder::EntryToMacFile(ASEntry inEntry, UInt16 inTargetSpecRefNum)
+nsAppleSingleDecoder::EntryToMacFile(ASEntry inEntry, FSIORefNum inTargetSpecRefNum)
 {
 #define BUFFER_SIZE 8192
 
@@ -537,13 +588,13 @@ nsAppleSingleDecoder::EntryToMacFile(ASEntry inEntry, UInt16 inTargetSpecRefNum)
   char   buffer[BUFFER_SIZE];
   UInt32 totalRead = 0, bytesRead, bytesToWrite;
 
-  MAC_ERR_CHECK(SetFPos( mInRefNum, fsFromStart, inEntry.entryOffset ));
+  MAC_ERR_CHECK(FSSetForkPosition( mInRefNum, fsFromStart, inEntry.entryOffset ));
 
   while ( totalRead < inEntry.entryLength )
   {
 // Should we yield in here?
     bytesRead = BUFFER_SIZE;
-    err = FSRead( mInRefNum, (long *) &bytesRead, buffer );
+    err = ReadForkBytes( mInRefNum, &bytesRead, buffer );
     if (err!=noErr && err!=eofErr)
       return err;
       
@@ -554,8 +605,7 @@ nsAppleSingleDecoder::EntryToMacFile(ASEntry inEntry, UInt16 inTargetSpecRefNum)
                   bytesRead;
 
     totalRead += bytesRead;
-    MAC_ERR_CHECK(FSWrite(inTargetSpecRefNum, (long *) &bytesToWrite, 
-      buffer));
+    MAC_ERR_CHECK(WriteForkBytes(inTargetSpecRefNum, &bytesToWrite, buffer));
   }  
   
   return err;

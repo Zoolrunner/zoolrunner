@@ -980,7 +980,7 @@ nsInstall::Gestalt(const nsString& aSelector, PRInt32* aReturn)
     }
 #if defined(XP_MAC) || defined(XP_MACOSX)
 
-    long    response = 0;
+    SInt32  response = 0;
     char    selectorChars[4];
     int     i;
     OSErr   err = noErr;
