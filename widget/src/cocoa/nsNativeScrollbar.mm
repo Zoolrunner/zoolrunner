@@ -93,6 +93,9 @@ nsNativeScrollbar::CreateCocoaView(NSRect inFrame)
 GrafPtr
 nsNativeScrollbar::GetQuickDrawPort ( )
 {
+#if defined(MOZ_ENABLE_CAIRO_GFX)
+  return nsnull;
+#else
   // pray we're always a child of a NSQuickDrawView
   if ( [mParentView isKindOfClass: [ChildView class]] ) {
     NSQuickDrawView* parent = NS_STATIC_CAST(NSQuickDrawView*, mParentView);
@@ -100,6 +103,7 @@ nsNativeScrollbar::GetQuickDrawPort ( )
   }
   
   return nsnull;
+#endif
 }
 
 
@@ -766,4 +770,3 @@ nsNativeScrollbar::UpdateScroller()
 }
 
 @end
-

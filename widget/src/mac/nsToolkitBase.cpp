@@ -129,6 +129,10 @@ int nsToolkitBase::QuartzChangedCallback(const char* pref, void* data)
 //
 void nsToolkitBase::SetupQuartzRendering()
 {
+#if defined(__APPLE__) && defined(__LP64__)
+  // QuickDraw text flags do not exist in the 64-bit Cocoa environment.
+  return;
+#else
   // from Apple's technote at http://developer.apple.com/qa/qa2001/qa1193.html
   enum {
     kQDDontChangeFlags = 0xFFFFFFFF,         // don't change anything
@@ -164,6 +168,7 @@ void nsToolkitBase::SetupQuartzRendering()
   }
   else 
     QDSwapTextFlags(oldFlags & !kFlagsWeUse);
+#endif
 }
 
 
@@ -183,7 +188,7 @@ static void ToolkitSleepWakeCallback(void *refCon, io_service_t service, natural
     case kIOMessageCanSystemSleep:
       // In this case, the computer has been idle for several minutes
       // and will sleep soon so you must either allow or cancel
-      // this notification. Important: if you don’t respond, there will
+      // this notification. Important: if you don't respond, there will
       // be a 30-second timeout before the computer sleeps.
       // In Mozilla's case, we always allow sleep.
       ::IOAllowPowerChange(gRootPort,(long)messageArgument);

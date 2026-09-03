@@ -56,10 +56,12 @@
 #include "nsIInterfaceRequestor.h"
 #include "nsIServiceManager.h"
 
+#ifndef MOZ_ENABLE_CAIRO_GFX
 #include "nsCarbonHelpers.h"
 #include "nsGfxUtils.h"
 #include "nsMacResources.h"
 #include "nsIQDFlushManager.h"
+#endif
 
 #import "nsCursorManager.h"
 #import "nsWindowMap.h"
@@ -175,6 +177,21 @@ ConvertCocoaToGeckoRect ( const NSRect & inCocoaRect, nsRect & outGeckoRect )
   outGeckoRect.y = NS_STATIC_CAST(nscoord, inCocoaRect.origin.y);
   outGeckoRect.width = NS_STATIC_CAST(nscoord, inCocoaRect.size.width);
   outGeckoRect.height = NS_STATIC_CAST(nscoord, inCocoaRect.size.height);
+}
+
+static void
+GetGlobalMouseCompat(Point *aPoint)
+{
+#if defined(__LP64__)
+  NSPoint location = [NSEvent mouseLocation];
+  NSArray *screens = [NSScreen screens];
+  if ([screens count])
+    location.y = NSMaxY([[screens objectAtIndex:0] frame]) - location.y;
+  aPoint->h = (short)location.x;
+  aPoint->v = (short)location.y;
+#else
+  ::GetGlobalMouse(aPoint);
+#endif
 }
 
 
@@ -343,7 +360,9 @@ nsChildView::~nsChildView()
 
   if (mVisRgn)
   {
+#ifndef MOZ_ENABLE_CAIRO_GFX
     ::DisposeRgn(mVisRgn);
+#endif
     mVisRgn = nsnull;
   }
 }
@@ -475,6 +494,7 @@ void nsChildView::TearDownView()
         [(NSView*)responder isDescendantOf:mView])
       [win makeFirstResponder: [mView superview]];
 
+#ifndef MOZ_ENABLE_CAIRO_GFX
     GrafPtr curPort = GetChildViewQuickDrawPort();
     if (curPort)
     {
@@ -483,6 +503,7 @@ void nsChildView::TearDownView()
       if (qdFlushManager)
         qdFlushManager->RemovePort(curPort);
     }
+#endif
 
     [mView removeFromSuperviewWithoutNeedingDisplay];
     [mView release];
@@ -598,6 +619,7 @@ void* nsChildView::GetNativeData(PRUint32 aDataType)
       
     case NS_NATIVE_REGION:
     {
+#ifndef MOZ_ENABLE_CAIRO_GFX
       if (!mVisRgn)
         mVisRgn = ::NewRgn();
 
@@ -606,6 +628,7 @@ void* nsChildView::GetNativeData(PRUint32 aDataType)
       if (grafPort && mVisRgn)
         ::GetPortVisibleRegion(grafPort, mVisRgn);
       retVal = (void*)mVisRgn;
+#endif
       break;
     }
       
@@ -624,6 +647,10 @@ void* nsChildView::GetNativeData(PRUint32 aDataType)
 #endif
 
     case NS_NATIVE_PLUGIN_PORT:
+#ifdef MOZ_ENABLE_CAIRO_GFX
+      // The classic QuickDraw NPAPI drawing model is unavailable in LP64.
+      retVal = nsnull;
+#else
       // this needs to be a combination of the port and the offsets.
       if (mPluginPort == nsnull)
       {
@@ -659,6 +686,7 @@ void* nsChildView::GetNativeData(PRUint32 aDataType)
       }
 
       retVal = (void*)mPluginPort;
+#endif
       break;
   }
 
@@ -1032,6 +1060,10 @@ NS_IMETHODIMP nsChildView::GetPluginClipRect(nsRect& outClipRect, nsPoint& outOr
 //-------------------------------------------------------------------------
 NS_IMETHODIMP nsChildView::StartDrawPlugin()
 {
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  // The classic NPAPI QuickDraw drawing model is unavailable to LP64 Cocoa.
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   NS_ASSERTION(mPluginPort, "StartDrawPlugin must only be called on a plugin widget");
   if (!mPluginPort)
     return NS_ERROR_FAILURE;
@@ -1083,6 +1115,7 @@ NS_IMETHODIMP nsChildView::StartDrawPlugin()
   
   NS_ASSERTION(0, "lockFocusIfCanDraw returned false\n");
   return NS_ERROR_FAILURE;
+#endif
 }
 
 //-------------------------------------------------------------------------
@@ -1300,6 +1333,7 @@ void nsChildView::StartDraw(nsIRenderingContext* aRenderingContext)
 
   // set the widget background and foreground colors
   nscolor color = GetBackgroundColor();
+#ifndef MOZ_ENABLE_CAIRO_GFX
   RGBColor macColor;
   macColor.red   = COLOR8TOCOLOR16(NS_GET_R(color));
   macColor.green = COLOR8TOCOLOR16(NS_GET_G(color));
@@ -1311,6 +1345,7 @@ void nsChildView::StartDraw(nsIRenderingContext* aRenderingContext)
   macColor.green = COLOR8TOCOLOR16(NS_GET_G(color));
   macColor.blue  = COLOR8TOCOLOR16(NS_GET_B(color));
   ::RGBForeColor(&macColor);
+#endif
 
   mTempRenderingContext->SetColor(color);       // just in case, set the rendering context color too
 }
@@ -2113,9 +2148,13 @@ nsChildView::GetThebesSurface()
 
     // See if hack code for enabling and disabling mouse move
     // events is necessary. Fixed by at least 10.2.8
-    long version = 0;
+    SInt32 version = 0;
+#if defined(__LP64__)
+    mToggleMouseMoveEventWatching = NO;
+#else
     ::Gestalt(gestaltSystemVersion, &version);
     mToggleMouseMoveEventWatching = (version < 0x00001028);
+#endif
     
     // initialization for NSTextInput
     mMarkedRange.location = NSNotFound;
@@ -2132,7 +2171,9 @@ nsChildView::GetThebesSurface()
 {
   [super dealloc];    // This sets the current port to _savePort (which should be
                       // a valid port, checked with the assertion above.
+#ifndef MOZ_ENABLE_CAIRO_GFX
   SetPort(NULL);      // Bullet-proof against future changes in NSQDView
+#endif
 }
 
 - (void)widgetDestroyed
@@ -2515,7 +2556,7 @@ nsChildView::GetThebesSurface()
   nsRefPtr<gfxContext> targetContext = new gfxContext(targetSurface);
 
   const NSRect *rects;
-  int count, i;
+  NSInteger count, i;
   [self getRectsBeingDrawn:&rects count:&count];
   for (i = 0; i < count; ++i) {
     targetContext->Rectangle(gfxRect(rects[i].origin.x, rects[i].origin.y,
@@ -2574,6 +2615,9 @@ nsChildView::GetThebesSurface()
 
 - (void)flushRect:(NSRect)inRect
 {
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  [self setNeedsDisplayInRect:inRect];
+#else
   Rect updateRect;
   updateRect.left   = (short)inRect.origin.x;
   updateRect.top    = (short)inRect.origin.y;
@@ -2584,6 +2628,7 @@ nsChildView::GetThebesSurface()
   RectRgn(updateRgn, &updateRect);
   ::QDFlushPortBuffer((CGrafPtr)[self qdPort], updateRgn);
   ::DisposeRgn(updateRgn);
+#endif
 }
 
 //
@@ -2656,7 +2701,7 @@ nsChildView::GetThebesSurface()
   macEvent.what = mouseDown;
   macEvent.message = 0;
   macEvent.when = ::TickCount();
-  GetGlobalMouse(&macEvent.where);
+  GetGlobalMouseCompat(&macEvent.where);
   macEvent.modifiers = GetCurrentKeyModifiers();
   geckoEvent.nativeMsg = &macEvent;
 
@@ -2687,7 +2732,7 @@ nsChildView::GetThebesSurface()
   macEvent.what = mouseUp;
   macEvent.message = 0;
   macEvent.when = ::TickCount();
-  GetGlobalMouse(&macEvent.where);
+  GetGlobalMouseCompat(&macEvent.where);
   macEvent.modifiers = GetCurrentKeyModifiers();
   geckoEvent.nativeMsg = &macEvent;
 
@@ -2723,7 +2768,7 @@ nsChildView::GetThebesSurface()
   macEvent.what = nullEvent;
   macEvent.message = 0;
   macEvent.when = ::TickCount();
-  GetGlobalMouse(&macEvent.where);
+  GetGlobalMouseCompat(&macEvent.where);
   
   macEvent.modifiers = GetCurrentKeyModifiers();
   geckoEvent.nativeMsg = &macEvent;
@@ -2750,7 +2795,7 @@ nsChildView::GetThebesSurface()
   macEvent.what = nullEvent;
   macEvent.message = 0;
   macEvent.when = ::TickCount();
-  GetGlobalMouse(&macEvent.where);
+  GetGlobalMouseCompat(&macEvent.where);
   macEvent.modifiers = btnState | GetCurrentKeyModifiers();
   geckoEvent.nativeMsg = &macEvent;
   
@@ -2800,7 +2845,7 @@ nsChildView::GetThebesSurface()
   macEvent.what = mouseDown;
   macEvent.message = 0;
   macEvent.when = ::TickCount();
-  GetGlobalMouse(&macEvent.where);
+  GetGlobalMouseCompat(&macEvent.where);
   macEvent.modifiers = controlKey;  // fake a context menu click
   geckoEvent.nativeMsg = &macEvent;
 
@@ -2823,7 +2868,7 @@ nsChildView::GetThebesSurface()
   macEvent.what = mouseUp;
   macEvent.message = 0;
   macEvent.when = ::TickCount();
-  GetGlobalMouse(&macEvent.where);
+  GetGlobalMouseCompat(&macEvent.where);
   macEvent.modifiers = controlKey;  // fake a context menu click
   geckoEvent.nativeMsg = &macEvent;
 
@@ -2902,7 +2947,8 @@ nsChildView::GetThebesSurface()
 
   mGeckoChild->DispatchWindowEvent(geckoEvent);
 
-  // dispatch scroll wheel carbon event for plugins
+  // Dispatch a Carbon scroll-wheel event for classic QuickDraw plugins.
+#if !defined(__LP64__)
   {
     EventRef theEvent;
     OSStatus err = ::MacCreateEvent(NULL,
@@ -2933,7 +2979,7 @@ nsChildView::GetThebesSurface()
                             &delta);
 
       Point mouseLoc;
-      GetGlobalMouse(&mouseLoc);
+      GetGlobalMouseCompat(&mouseLoc);
       SetEventParameter(theEvent,
                             kEventParamMouseLocation,
                             typeQDPoint,
@@ -2944,6 +2990,7 @@ nsChildView::GetThebesSurface()
       ReleaseEvent(theEvent);
     }
   }
+#endif
 }
 
 -(void)scrollWheel:(NSEvent*)theEvent
@@ -3096,7 +3143,7 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
     }
     macEvent.message = (charCode & 0x00FF) | ([cocoaEvent keyCode] << 8);
     macEvent.when = ::TickCount();
-    GetGlobalMouse(&macEvent.where);
+    GetGlobalMouseCompat(&macEvent.where);
     macEvent.modifiers = ::GetCurrentKeyModifiers();
 }
 
@@ -3379,7 +3426,11 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
 }
 
 
+#if defined(__LP64__)
+- (NSUInteger)characterIndexForPoint:(NSPoint)thePoint
+#else
 - (unsigned int)characterIndexForPoint:(NSPoint)thePoint
+#endif
 {
 #if DEBUG_IME
   NSLog(@"****in characterIndexForPoint");
@@ -3905,7 +3956,11 @@ static PRBool IsSpecialRaptorKey(UInt32 macKeyCode)
   } 
   
   if (aMessage == NS_KEY_PRESS && !outGeckoEvent->isMeta)
+#if defined(__LP64__)
+    [NSCursor setHiddenUntilMouseMoves:YES];
+#else
     ::ObscureCursor();
+#endif
 }
 
 //

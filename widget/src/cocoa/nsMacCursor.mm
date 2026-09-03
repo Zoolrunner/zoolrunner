@@ -300,6 +300,9 @@
 
 - (void) setFrame: (int) aFrameIndex
 {
+#if defined(__LP64__)
+  [[NSCursor arrowCursor] set];
+#else
   if ( [self isAnimated] )
   {
     //if the cursor is animated try to draw the appropriate frame
@@ -314,6 +317,7 @@
   {
     ::SetThemeCursor(mCursor);
   }
+#endif
 }
 
 - (int) numFrames
@@ -392,6 +396,9 @@
 
 - (void) setFrame: (int) aFrameIndex
 {
+#if defined(__LP64__)
+  [[NSCursor arrowCursor] set];
+#else
   nsMacResources::OpenLocalResourceFile();
   CursHandle cursHandle = ::GetCursor(mFirstFrame + aFrameIndex);
   NS_ASSERTION(cursHandle, "Can't load cursor, is the resource file installed correctly?");
@@ -400,6 +407,7 @@
     ::SetCursor(*cursHandle);
   }
   nsMacResources::CloseLocalResourceFile();
+#endif
 }
 
 - (int) numFrames

@@ -36,10 +36,19 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsLookAndFeel.h"
-#include "nsCarbonHelpers.h"
 #include "nsIInternetConfigService.h"
 #include "nsIServiceManager.h"
 #include "nsSize.h"
+
+#include <Carbon/Carbon.h>
+
+#if defined(__LP64__)
+extern "C" {
+extern OSStatus GetThemeBrushAsColor(ThemeBrush, SInt16, Boolean, RGBColor *);
+extern OSStatus GetThemeTextColor(ThemeTextColor, SInt16, Boolean, RGBColor *);
+extern UInt32 GetCaretTime(void);
+}
+#endif
 
 #if MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_3
 // This theme brush is available in 10.2 and later, but was not
@@ -396,6 +405,10 @@ NS_IMETHODIMP nsLookAndFeel::GetMacAccentColor(	const nsMacAccentColorOffset aAc
 												nscolor & aColor,
 												const nscolor & aDefaultColor)
 {
+#if defined(__LP64__)
+	aColor = aDefaultColor;
+	return NS_OK;
+#else
 	nsresult res = NS_OK;
 	OSStatus err = noErr;
 	ColorTable colourTable;
@@ -436,6 +449,7 @@ NS_IMETHODIMP nsLookAndFeel::GetMacAccentColor(	const nsMacAccentColorOffset aAc
 		}
 	}
 	return res;
+#endif
 }
 
 NS_IMETHODIMP nsLookAndFeel::GetMetric(const nsMetricID aID, PRInt32 & aMetric)
@@ -532,14 +546,22 @@ NS_IMETHODIMP nsLookAndFeel::GetMetric(const nsMetricID aID, PRInt32 & aMetric)
         aMetric = 4;
         break;
     case eMetric_ScrollArrowStyle:
+#if defined(__LP64__)
+        aMetric = kThemeScrollBarArrowsSingle;
+#else
         ThemeScrollBarArrowStyle arrowStyle;
         ::GetThemeScrollBarArrowStyle ( &arrowStyle );
         aMetric = arrowStyle;
+#endif
         break;
     case eMetric_ScrollSliderStyle:
+#if defined(__LP64__)
+        aMetric = kThemeScrollBarThumbProportional;
+#else
         ThemeScrollBarThumbStyle thumbStyle;
         ::GetThemeScrollBarThumbStyle ( &thumbStyle );
         aMetric = thumbStyle;
+#endif
         break;
     case eMetric_TreeOpenDelay:
         aMetric = 1000;

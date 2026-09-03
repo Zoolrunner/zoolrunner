@@ -96,7 +96,7 @@ static BOOL isPantherOrLater()
   static PRBool gOnPantherOrLater = PR_FALSE;
   if(!gInitVer)
   {
-    long version;
+    SInt32 version;
     OSErr err = ::Gestalt(gestaltSystemVersion, &version);
     gOnPantherOrLater = (err == noErr && version >= 0x00001030);
     gInitVer = PR_TRUE;
@@ -128,7 +128,11 @@ static BOOL isPantherOrLater()
     case eCursor_standard:
       return [nsMacCursor cursorWithCursor: [NSCursor arrowCursor]];
     case eCursor_wait:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor arrowCursor]];
+#else
       return [nsMacCursor cursorWithThemeCursor: kThemeWatchCursor];
+#endif
     case eCursor_select:              
       return [nsMacCursor cursorWithCursor: [NSCursor IBeamCursor]];
     case eCursor_hyperlink:
@@ -140,20 +144,40 @@ static BOOL isPantherOrLater()
     case eCursor_help:
       return [nsMacCursor cursorWithImageNamed: @"help" hotSpot: NSMakePoint(1,1)];        
     case eCursor_copy:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor dragCopyCursor]];
+#else
       return [nsMacCursor cursorWithThemeCursor: kThemeCopyArrowCursor];
+#endif
     case eCursor_alias:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor dragLinkCursor]];
+#else
       return [nsMacCursor cursorWithThemeCursor: kThemeAliasArrowCursor];
+#endif
     case eCursor_context_menu:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor arrowCursor]];
+#else
       return [nsMacCursor cursorWithThemeCursor: kThemeContextualMenuArrowCursor];
+#endif
 
     case eCursor_cell:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor crosshairCursor]];
+#else
       return [nsMacCursor cursorWithThemeCursor: kThemePlusCursor];
+#endif
     case eCursor_grab:
       return [nsCursorManager createNSCursor: @selector(openHandCursor) orThemeCursor: kThemeOpenHandCursor];
     case eCursor_grabbing:
       return [nsCursorManager createNSCursor: @selector(closedHandCursor) orThemeCursor: kThemeClosedHandCursor];
     case eCursor_spinning:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor arrowCursor]];
+#else
       return [nsMacCursor cursorWithResources: 200 lastFrame: 203]; // better than kThemeSpinningCursor        
+#endif
     case eCursor_zoom_in:
       return [nsMacCursor cursorWithImageNamed: @"zoomIn" hotSpot: NSMakePoint(6,6)];
     case eCursor_zoom_out:
@@ -164,7 +188,11 @@ static BOOL isPantherOrLater()
       return [nsCursorManager createNSCursor: @selector(openHandCursor) orThemeCursor: kThemeOpenHandCursor];                   
     case eCursor_not_allowed:
     case eCursor_no_drop:
+#if defined(__LP64__)
+      return [nsMacCursor cursorWithCursor: [NSCursor operationNotAllowedCursor]];
+#else
       return [nsMacCursor cursorWithThemeCursor: kThemeNotAllowedCursor];
+#endif
 
     // Resize Cursors:
     //North
