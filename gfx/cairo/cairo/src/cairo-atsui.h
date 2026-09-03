@@ -44,10 +44,19 @@
 
 #include <Carbon/Carbon.h>
 
+#if defined(__arm64__) || defined(__aarch64__)
+#include <CoreGraphics/CoreGraphics.h>
+#endif
+
 CAIRO_BEGIN_DECLS
 
 cairo_public cairo_font_face_t *
 cairo_atsui_font_face_create_for_atsu_font_id (ATSUFontID font_id);
+
+#if defined(__arm64__) || defined(__aarch64__)
+cairo_public cairo_font_face_t *
+cairo_atsui_font_face_create_for_cgfont (CGFontRef font);
+#endif
 
 CAIRO_END_DECLS
 

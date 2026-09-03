@@ -67,4 +67,9 @@ _cairo_atsui_scaled_font_get_atsu_style (cairo_scaled_font_t *sfont);
 ATSUFontID
 _cairo_atsui_scaled_font_get_atsu_font_id (cairo_scaled_font_t *sfont);
 
+#if defined(__arm64__) || defined(__aarch64__)
+CGFontRef
+_cairo_atsui_scaled_font_get_cgfont (cairo_scaled_font_t *sfont);
+#endif
+
 #endif /* CAIRO_QUARTZ_PRIVATE_H */

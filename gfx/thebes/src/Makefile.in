@@ -60,6 +60,10 @@ ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
 CPPSRCS	+= 	gfxQuartzSurface.cpp gfxPlatformMac.cpp gfxAtsuiFonts.cpp
 #CPPSRCS +=	gfxPDFSurface.cpp
 
+ifeq ($(CPU_ARCH),aarch64)
+EXTRA_DSO_LDOPTS += -framework CoreText
+endif
+
 ifneq ($(CPU_ARCH),aarch64)
 EXTRA_DSO_LDOPTS += -framework OpenGL -framework AGL
 endif

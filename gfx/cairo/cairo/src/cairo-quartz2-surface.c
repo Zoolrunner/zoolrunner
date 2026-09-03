@@ -523,6 +523,7 @@ _cairo_quartzgl_cairo_repeating_surface_pattern_to_quartz (cairo_quartzgl_surfac
 			      SurfacePatternDrawFunc,
 			      (CGFunctionReleaseInfoCallback) cairo_pattern_destroy };
     CGPatternRef cgpat;
+    cairo_pattern_t *pattern_copy;
     float rw, rh;
 
     /* SURFACE is the only type we'll handle here */
@@ -581,14 +582,24 @@ _cairo_quartzgl_cairo_repeating_surface_pattern_to_quartz (cairo_quartzgl_surfac
     rh = extents.height;
 #endif
 
-    cairo_pattern_reference (abspat);
-    cgpat = CGPatternCreate (abspat,
+    /*
+     * The source passed here may be a temporary pattern on Cairo's stack.
+     * CoreGraphics is free to invoke the draw callback after this function
+     * returns, so a reference to that storage is not sufficient.
+     */
+    pattern_copy = malloc (sizeof (cairo_surface_pattern_t));
+    if (!pattern_copy)
+	return NULL;
+    _cairo_pattern_init_copy (pattern_copy, abspat);
+    cgpat = CGPatternCreate (pattern_copy,
 			     pbounds,
 			     ptransform,
 			     rw, rh,
 			     kCGPatternTilingConstantSpacing, /* kCGPatternTilingNoDistortion, */
 			     TRUE,
 			     &cb);
+    if (!cgpat)
+	cairo_pattern_destroy (pattern_copy);
     return cgpat;
 }
 
@@ -1279,12 +1290,16 @@ _cairo_quartzgl_surface_show_glyphs (void *abstract_surface,
 
     CGContextSetCompositeOperation (surface->cgContext, _cairo_quartzgl_cairo_operator_to_quartz (op));
 
+#if defined(__arm64__) || defined(__aarch64__)
+    CGFontRef cgfref = _cairo_atsui_scaled_font_get_cgfont (scaled_font);
+    CGContextSetFont (surface->cgContext, cgfref);
+#else
     ATSUFontID fid = _cairo_atsui_scaled_font_get_atsu_font_id (scaled_font);
     ATSFontRef atsfref = FMGetATSFontRefFromFont (fid);
     CGFontRef cgfref = CGFontCreateWithPlatformFont (&atsfref);
-
     CGContextSetFont (surface->cgContext, cgfref);
     CGFontRelease (cgfref);
+#endif
 
     /* So this should include the size; I don't know if I need to extract the
      * size from this and call CGContextSetFontSize.. will I get crappy hinting
