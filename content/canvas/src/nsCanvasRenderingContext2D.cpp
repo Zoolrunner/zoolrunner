@@ -56,8 +56,6 @@
 
 #ifdef MOZILLA_1_8_BRANCH
 #include "nsIScriptGlobalObject.h"
-#include "nsIViewManager.h"
-#include "nsIScrollableView.h"
 #endif
 
 #include "imgIRequest.h"
@@ -103,16 +101,14 @@
 #define imgIEncoder imgIEncoder_MOZILLA_1_8_BRANCH
 #endif
 
-#ifdef MOZ_CAIRO_GFX
+#ifdef MOZ_ENABLE_CAIRO_GFX
 #include "gfxContext.h"
 #include "gfxASurface.h"
 #include "gfxPlatform.h"
+#include "nsThebesImage.h"
 
-#include "nsDisplayList.h"
 #include "nsIViewManager.h"
 #include "nsIScrollableView.h"
-#include "nsFrameManager.h"
-#include "nsRegion.h"
 #endif
 
 #ifdef XP_WIN
@@ -148,7 +144,7 @@ _cairo_win32_surface_create_dib (cairo_format_t format,
 #include <gdk/gdkx.h>
 #endif
 
-#ifdef XP_MACOSX
+#if defined(XP_MACOSX) && !defined(MOZ_ENABLE_CAIRO_GFX)
 #include <Quickdraw.h>
 #include <CGContext.h>
 
@@ -416,7 +412,7 @@ protected:
     nsCOMPtr<nsICSSParser> mCSSParser;
 
     // yay cairo
-#ifdef MOZ_CAIRO_GFX
+#ifdef MOZ_ENABLE_CAIRO_GFX
     nsRefPtr<gfxContext> mThebesContext;
     nsRefPtr<gfxASurface> mThebesSurface;
 #endif
@@ -795,7 +791,7 @@ nsCanvasRenderingContext2D::SetDimensions(PRInt32 width, PRInt32 height)
     mWidth = width;
     mHeight = height;
 
-#ifdef MOZ_CAIRO_GFX
+#ifdef MOZ_ENABLE_CAIRO_GFX
     mThebesSurface = gfxPlatform::GetPlatform()->CreateOffscreenSurface(width, height, gfxASurface::ImageFormatARGB32);
     mThebesContext = new gfxContext(mThebesSurface);
 
@@ -897,7 +893,7 @@ nsCanvasRenderingContext2D::Render(nsIRenderingContext *rc)
         cairo_status(mCairo))
         return NS_ERROR_FAILURE;
 
-#ifdef MOZ_CAIRO_GFX
+#ifdef MOZ_ENABLE_CAIRO_GFX
 
     if (!mThebesSurface)
         return NS_ERROR_FAILURE;
@@ -2240,10 +2236,11 @@ nsCanvasRenderingContext2D::CairoSurfaceFromElement(nsIDOMElement *imgElt,
     if (heightOut)
         *heightOut = imgHeight;
 
-#ifdef MOZ_CAIRO_GFX
-    gfxASurface* gfxsurf = nsnull;
-    rv = img->GetSurface(&gfxsurf);
-    NS_ENSURE_SUCCESS(rv, rv);
+#ifdef MOZ_ENABLE_CAIRO_GFX
+    nsThebesImage* thebesImage =
+        NS_STATIC_CAST(nsThebesImage*, NS_STATIC_CAST(nsIImage*, img.get()));
+    gfxASurface* gfxsurf = thebesImage->ThebesSurface();
+    NS_ENSURE_TRUE(gfxsurf, NS_ERROR_FAILURE);
 
     *aCairoSurface = gfxsurf->CairoSurface();
     cairo_surface_reference (*aCairoSurface);
@@ -2652,76 +2649,6 @@ nsCanvasRenderingContext2D::DrawWindow(nsIDOMWindow* aWindow, PRInt32 aX, PRInt3
     nsIPresShell* presShell = presContext->PresShell();
 #endif
 
-#ifdef MOZ_CAIRO_GFX
-    mThebesContext->Save();
-    //mThebesContext->NewPath();
-    //mThebesContext->Rectangle(gfxRect(0, 0, aW, aH));
-    //mThebesContext->Clip();
-
-    mThebesContext->PushGroup(NS_GET_A(bgColor) == 0xff ? gfxContext::CONTENT_COLOR_ALPHA : gfxContext::CONTENT_COLOR_ALPHA);
-
-    // draw background color
-    if (NS_GET_A(bgColor) > 0) {
-      mThebesContext->SetColor(gfxRGBA(bgColor));
-      mThebesContext->SetOperator(gfxContext::OPERATOR_SOURCE);
-      mThebesContext->Paint();
-    }
-
-    // we want the window to be composited as a single image using
-    // whatever operator was set, so set this to the default OVER;
-    // the original operator will be present when we PopGroup
-    mThebesContext->SetOperator(gfxContext::OPERATOR_OVER);
-
-    nsIFrame* rootFrame = presShell->FrameManager()->GetRootFrame();
-    if (0 && rootFrame) {
-        nsRect r(aX, aY, aW, aH);
-        r.ScaleRoundOut(presContext->PixelsToTwips());
-
-        nsDisplayListBuilder builder(rootFrame, PR_FALSE, PR_FALSE);
-        nsDisplayList list;
-        nsIScrollableView* scrollingView = nsnull;       
-        presContext->GetViewManager()->GetRootScrollableView(&scrollingView);
-
-        if (scrollingView) {
-            nscoord x, y;
-            scrollingView->GetScrollPosition(x, y);
-            r.MoveBy(-x, -y);
-            builder.SetIgnoreScrollFrame(presShell->GetRootScrollFrame());
-        }
-
-        rv = rootFrame->BuildDisplayListForStackingContext(&builder, r, &list);      
-        if (NS_SUCCEEDED(rv)) {
-            float t2p = presContext->TwipsToPixels();
-            // Ensure that r.x,r.y gets drawn at (0,0)
-            mThebesContext->Save();
-            mThebesContext->Translate(gfxPoint(-r.x*t2p, -r.y*t2p));
-          
-            nsIDeviceContext* devCtx = presContext->DeviceContext();
-            nsCOMPtr<nsIRenderingContext> rc;
-            devCtx->CreateRenderingContextInstance(*getter_AddRefs(rc));
-            rc->Init(devCtx, mThebesContext);
-            
-            nsRegion region(r);
-            list.OptimizeVisibility(&builder, &region);
-            list.Paint(&builder, rc, r);
-            // Flush the list so we don't trigger the IsEmpty-on-destruction assertion
-            list.DeleteAll();
-
-            mThebesContext->Restore();
-        }
-    }
-
-    mThebesContext->PopGroupToSource();
-    mThebesContext->Paint();
-    mThebesContext->Restore();
-
-    // get rid of the pattern surface ref, just in case
-    cairo_set_source_rgba (mCairo, 1, 1, 1, 1);
-    DirtyAllStyles();
-
-    Redraw();
-#else
-
     nsCOMPtr<nsIRenderingContext> blackCtx;
 #ifdef MOZILLA_1_8_BRANCH
     rv = vm->RenderOffscreen(view, r, PR_FALSE, PR_TRUE,
@@ -2773,7 +2700,6 @@ nsCanvasRenderingContext2D::DrawWindow(nsIDOMWindow* aWindow, PRInt32 aX, PRInt3
     }
     
     blackCtx->DestroyDrawingSurface(blackSurface);
-#endif
 
     return rv;
 }
@@ -2838,7 +2764,7 @@ nsCanvasRenderingContext2D::DrawNativeSurfaces(nsIDrawingSurface* aBlackSurface,
     PRUint32 bytesPerPix = rowLen/aSurfaceSize.width;
     nsPixelFormat format;
     
-#ifndef XP_MACOSX
+#if !defined(XP_MACOSX) || defined(MOZ_ENABLE_CAIRO_GFX)
     rv = aBlackSurface->GetPixelFormat(&format);
     if (NS_FAILED(rv)) {
         aBlackSurface->Unlock();
@@ -2927,7 +2853,8 @@ nsCanvasRenderingContext2D::DrawNativeSurfaces(nsIDrawingSurface* aBlackSurface,
 #endif
 
 // Mac surfaces are big endian.
-#if defined(IS_BIG_ENDIAN) || defined(XP_MACOSX)
+#if defined(IS_BIG_ENDIAN) || \
+    (defined(XP_MACOSX) && !defined(MOZ_ENABLE_CAIRO_GFX))
 #define NATIVE_SURFACE_IS_BIG_ENDIAN
 #endif
 
