@@ -1600,7 +1600,7 @@ cairo_quartzgl_surface_create (cairo_format_t format,
 	if (width % 4 == 0)
 	    stride = width;
 	else
-	    stride = (width & 3) + 1;
+	    stride = (width + 3) & ~3;
 	bitinfo = kCGImageAlphaNone;
 	bitsPerComponent = 8;
     } else if (format == CAIRO_FORMAT_A1) {
