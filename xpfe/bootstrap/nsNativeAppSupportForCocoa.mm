@@ -177,6 +177,7 @@ nsresult NS_CreateSplashScreen(nsISplashScreen**aResult)
 
 // Snagged from mozilla/xpinstall/wizrd/mac/src/SetupTypeWin.c
 // VersGreaterThan4 - utility function to test if it's >4.x running
+#ifndef __LP64__
 static Boolean VersGreaterThan4(FSSpec *fSpec)
 {
   Boolean result = false;
@@ -196,6 +197,7 @@ static Boolean VersGreaterThan4(FSSpec *fSpec)
     
   return result;
 }
+#endif
 
 PRBool NS_CanRun() 
 {
