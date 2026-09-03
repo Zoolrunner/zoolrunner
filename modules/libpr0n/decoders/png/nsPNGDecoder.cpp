@@ -440,7 +440,7 @@ row_callback(png_structp png_ptr, png_bytep new_row,
     switch (format) {
     case gfxIFormats::RGB:
     case gfxIFormats::BGR:
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
         cptr = decoder->colorLine;
         for (PRUint32 x=0; x<iwidth; x++) {
           *cptr++ = 0;
@@ -460,7 +460,7 @@ row_callback(png_structp png_ptr, png_bytep new_row,
         aptr = decoder->alphaLine;
         memset(aptr, 0, abpr);
         for (PRUint32 x=0; x<iwidth; x++) {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
           *cptr++ = 0;
 #endif
           if (line[3]) {
@@ -486,7 +486,7 @@ row_callback(png_structp png_ptr, png_bytep new_row,
         cptr = decoder->colorLine;
         aptr = decoder->alphaLine;
         for (PRUint32 x=0; x<iwidth; x++) {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
           *cptr++ = 0;
 #endif
           *cptr++ = *line++;
@@ -500,7 +500,7 @@ row_callback(png_structp png_ptr, png_bytep new_row,
       break;
     case gfxIFormats::RGBA:
     case gfxIFormats::BGRA:
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
       {
         cptr = decoder->colorLine;
         aptr = decoder->alphaLine;

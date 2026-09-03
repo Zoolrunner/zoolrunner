@@ -514,7 +514,7 @@ int nsGIFDecoder2::HaveDecodedRow(
         case gfxIFormats::BGR:
         {
           while (rowBufIndex != decoder->mGIFStruct->rowend) {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
             *rgbRowIndex++ = 0; // Mac is always 32bits per pixel, this is pad
 #endif
             if (*rowBufIndex < cmapsize) {
@@ -548,7 +548,7 @@ int nsGIFDecoder2::HaveDecodedRow(
           memset(decoder->mAlphaLine, 0, abpr);
           for (PRUint32 x = 0; x < (PRUint32)width; ++x) {
             if (*rowBufIndex != decoder->mGIFStruct->tpixel) {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
               *rgbRowIndex++ = 0; // Mac is always 32bits per pixel, this is pad
 #endif
               if (*rowBufIndex < cmapsize) {
@@ -569,7 +569,7 @@ int nsGIFDecoder2::HaveDecodedRow(
               }
               decoder->mAlphaLine[x>>3] |= 1<<(7-x&0x7);
             } else {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
               rgbRowIndex+=4;
 #else
               rgbRowIndex+=3;

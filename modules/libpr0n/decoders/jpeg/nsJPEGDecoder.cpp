@@ -353,7 +353,7 @@ NS_IMETHODIMP nsJPEGDecoder::WriteFrom(nsIInputStream *inStr, PRUint32 count, PR
 
     // Note! row_stride here must match the row_stride in
     // nsJPEGDecoder::OutputScanlines
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
     row_stride = mInfo.output_width * 4;
 #else
     row_stride = mInfo.output_width * 3;
@@ -363,7 +363,7 @@ NS_IMETHODIMP nsJPEGDecoder::WriteFrom(nsIInputStream *inStr, PRUint32 count, PR
                                            JPOOL_IMAGE,
                                            row_stride, 1);
 
-#if defined(XP_WIN) || defined(XP_OS2) || defined(XP_BEOS) || defined(XP_MAC) || defined(XP_MACOSX) || defined(MOZ_WIDGET_PHOTON)
+#if defined(XP_WIN) || defined(XP_OS2) || defined(XP_BEOS) || defined(MOZ_WIDGET_PHOTON) || ((defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX))
     // allocate buffer to do byte flipping / padding
     mRGBRow = (PRUint8*) PR_MALLOC(row_stride);
 #endif
@@ -529,7 +529,7 @@ nsJPEGDecoder::OutputScanlines()
       }
 
       samples = mRGBRow;
-#elif defined(XP_MAC) || defined(XP_MACOSX)
+#elif (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
       PRUint8 *ptrOutputBuf = mRGBRow;
 
       JSAMPLE *j1 = mSamples[0];
@@ -548,7 +548,7 @@ nsJPEGDecoder::OutputScanlines()
 
       // Note! row_stride here must match the row_stride in
       // nsJPEGDecoder::WriteFrom
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
       int row_stride = mInfo.output_width * 4;
 #else
       int row_stride = mInfo.output_width * 3;

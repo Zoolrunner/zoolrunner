@@ -125,7 +125,7 @@ struct bitFields {
 #define RLE_GFXFORMAT_ALPHA gfxIFormats::RGB_A1
 #endif
 
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
 #define GFXBYTESPERPIXEL 4
 #else
 #define GFXBYTESPERPIXEL 3
@@ -232,7 +232,7 @@ private:
  * The variable passed in as aDecoded will be moved on 3 bytes! */
 inline void SetPixel(PRUint8*& aDecoded, PRUint8 aRed, PRUint8 aGreen, PRUint8 aBlue)
 {
-#if defined(XP_MAC) || defined(XP_MACOSX)
+#if (defined(XP_MAC) || defined(XP_MACOSX)) && !defined(MOZ_ENABLE_CAIRO_GFX)
     *aDecoded++ = 0; // Mac needs this padding byte
 #endif
 #ifdef USE_RGB
