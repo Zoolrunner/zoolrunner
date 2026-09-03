@@ -20,6 +20,7 @@
  *
  * Contributor(s):
  *   Stuart Parmenter <pavlov@pavlov.net>
+ *   Vladimir Vukicevic <vladimir@pobox.com>
  *
  * Alternatively, the contents of this file may be used under the terms of
  * either the GNU General Public License Version 2 or later (the "GPL"), or
@@ -47,6 +48,9 @@
 #include "gfxASurface.h"
 #include "gfxPattern.h"
 
+// this doesn't really belong here, but it doesn't need
+// its own file
+THEBES_IMPL_REFCOUNTING(gfxUnknownSurface)
 
 THEBES_IMPL_REFCOUNTING(gfxContext)
 
@@ -63,6 +67,15 @@ gfxContext::~gfxContext()
 gfxASurface *gfxContext::CurrentSurface()
 {
     return mSurface;
+}
+
+gfxASurface *gfxContext::CurrentGroupSurface()
+{
+    cairo_surface_t *s = cairo_get_group_target(mCairo);
+    if (!s)
+        return NULL;
+
+    return new gfxUnknownSurface(s);
 }
 
 void gfxContext::Save()
@@ -120,40 +133,26 @@ void gfxContext::Line(gfxPoint start, gfxPoint end)
     LineTo(end);
 }
 
+// XXX snapToPixels is only valid when snapping for filled
+// rectangles and for even-width stroked rectangles.
+// For odd-width stroked rectangles, we need to offset x/y by
+// 0.5...
 void gfxContext::Rectangle(gfxRect rect, PRBool snapToPixels)
 {
     if (snapToPixels) {
-        gfxPoint p1 = UserToDevice(rect.pos);
-        gfxPoint p2 = UserToDevice(rect.pos + rect.size);
+        gfxRect snappedRect(rect);
 
-        gfxPoint p3 = UserToDevice(rect.pos + gfxSize(rect.size.width, 0.0));
-        gfxPoint p4 = UserToDevice(rect.pos + gfxSize(0.0, rect.size.height));
+        if (UserToDevicePixelSnapped(snappedRect)) {
+            cairo_matrix_t mat;
+            cairo_get_matrix(mCairo, &mat);
+            cairo_identity_matrix(mCairo);
+            Rectangle(snappedRect);
+            cairo_set_matrix(mCairo, &mat);
 
-        if (p1.x != p4.x ||
-            p2.x != p3.x ||
-            p1.y != p3.y ||
-            p2.y != p4.y)
-            // rectangle is no longer axis-aligned after transforming, so don't snap
-            goto dontsnap;
-
-        cairo_matrix_t mat;
-        cairo_get_matrix(mCairo, &mat);
-
-        if (mat.xx != 1.0 ||
-            mat.yy != 1.0)
-            // if we're not at 1.0 scale, don't snap
-            goto dontsnap;
-
-        p1.round();
-        p2.round();
-
-        cairo_identity_matrix(mCairo);
-        cairo_rectangle(mCairo, p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-        cairo_set_matrix(mCairo, &mat);
-        return;
+            return;
+        }
     }
 
-dontsnap:
     cairo_rectangle(mCairo, rect.pos.x, rect.pos.y, rect.size.width, rect.size.height);
 }
 
@@ -297,6 +296,69 @@ gfxRect gfxContext::UserToDevice(gfxRect rect) const
     return ret;
 }
 
+PRBool gfxContext::UserToDevicePixelSnapped(gfxRect& rect) const
+{
+    // if we're not at 1.0 scale, don't snap
+    cairo_matrix_t mat;
+    cairo_get_matrix(mCairo, &mat);
+    if (mat.xx != 1.0 || mat.yy != 1.0)
+        return PR_FALSE;
+
+    gfxPoint p1 = UserToDevice(rect.pos);
+    gfxPoint p2 = UserToDevice(rect.pos + rect.size);
+
+    gfxPoint p3 = UserToDevice(rect.pos + gfxSize(rect.size.width, 0.0));
+    gfxPoint p4 = UserToDevice(rect.pos + gfxSize(0.0, rect.size.height));
+
+    // rectangle is no longer axis-aligned after transforming, so we can't snap
+    if (p1.x != p4.x ||
+        p2.x != p3.x ||
+        p1.y != p3.y ||
+        p2.y != p4.y)
+        return PR_FALSE;
+
+    p1.round();
+    p2.round();
+
+    gfxPoint pd = p2 - p1;
+
+    rect.pos = p1;
+    rect.size = gfxSize(pd.x, pd.y);
+
+    return PR_TRUE;
+}
+
+void gfxContext::PixelSnappedRectangleAndSetPattern(const gfxRect& rect,
+                                                    gfxPattern *pattern)
+{
+    gfxRect r(rect);
+
+    // Bob attempts to pixel-snap the rectangle, and returns true if
+    // the snapping succeeds.  If it does, we need to set up an
+    // identity matrix, because the rectangle given back is in device
+    // coordinates.
+    //
+    // We then have to call a translate to dr.pos afterwards, to make
+    // sure the image lines up in the right place with our pixel
+    // snapped rectangle.
+    //
+    // If snapping wasn't successful, we just translate to where the
+    // pattern would normally start (in app coordinates) and do the
+    // same thing.
+
+    gfxMatrix mat = CurrentMatrix();
+    if (UserToDevicePixelSnapped(r)) {
+        IdentityMatrix();
+    }
+
+    Translate(r.pos);
+    r.pos.x = r.pos.y = 0;
+    Rectangle(r);
+    SetPattern(pattern);
+
+    SetMatrix(mat);
+}
+
 void gfxContext::SetAntialiasMode(AntialiasMode mode)
 {
     // XXX implement me
@@ -418,8 +480,20 @@ void gfxContext::SetSource(gfxASurface *surface, gfxPoint offset)
     cairo_set_source_surface(mCairo, surface->CairoSurface(), offset.x, offset.y);
 }
 
+// masking
+
+void gfxContext::Mask(gfxPattern *pattern)
+{
+    cairo_mask(mCairo, pattern->CairoPattern());
+}
+
+void gfxContext::Mask(gfxASurface *surface, gfxPoint offset)
+{
+    cairo_mask_surface(mCairo, surface->CairoSurface(), offset.x, offset.y);
+}
+
 // fonts?
-void gfxContext::DrawString(gfxTextRun& text, int pos, int len)
+void gfxContext::DrawText(gfxTextRun& text)
 {
 
 }
@@ -427,6 +501,24 @@ void gfxContext::DrawString(gfxTextRun& text, int pos, int len)
 void gfxContext::Paint(gfxFloat alpha)
 {
     cairo_paint_with_alpha(mCairo, alpha);
+}
+
+// groups
+
+void gfxContext::PushGroup(SurfaceContent content)
+{
+    cairo_push_group_with_content(mCairo, (cairo_content_t) content);
+}
+
+gfxPattern *gfxContext::PopGroup()
+{
+    cairo_pattern_t *pat = cairo_pop_group(mCairo);
+    return new gfxPattern(pat);
+}
+
+void gfxContext::PopGroupToSource()
+{
+    cairo_pop_group_to_source(mCairo);
 }
 
 // filters
@@ -438,4 +530,28 @@ void gfxContext::PushFilter(gfxFilter& filter, FilterHints hints, gfxRect& maxAr
 void gfxContext::PopFilter()
 {
 
+}
+
+void gfxContext::BeginPrinting(const nsAString& aTitle, const nsAString& aPrintToFileName)
+{
+    mSurface->BeginPrinting(aTitle, aPrintToFileName);
+}
+
+void gfxContext::EndPrinting()
+{
+    mSurface->EndPrinting();
+}
+void gfxContext::AbortPrinting()
+{
+    mSurface->AbortPrinting();
+}
+void gfxContext::BeginPage()
+{
+    mSurface->BeginPage();
+}
+
+void gfxContext::EndPage()
+{
+    if (NS_FAILED(mSurface->EndPage()))
+        cairo_show_page(mCairo);
 }

@@ -34,6 +34,10 @@ extern OSStatus ATSUSetLayoutControls(
     ATSUTextLayout iTextLayout, ItemCount iAttributeCount,
     const ATSUAttributeTag iTag[], const ByteCount iValueSize[],
     const ATSUAttributeValuePtr iValue[]);
+extern OSStatus ATSUSetLineControls(
+    ATSUTextLayout iTextLayout, UniCharArrayOffset iLineStart,
+    ItemCount iAttributeCount, const ATSUAttributeTag iTag[],
+    const ByteCount iValueSize[], const ATSUAttributeValuePtr iValue[]);
 extern OSStatus ATSUSetRunStyle(ATSUTextLayout iTextLayout, ATSUStyle iStyle,
                                 UniCharArrayOffset iRunStart,
                                 UniCharCount iRunLength);
@@ -43,6 +47,11 @@ extern OSStatus ATSUFindFontFromName(
     const void *iName, ByteCount iNameLength, FontNameCode iFontNameCode,
     FontPlatformCode iFontNamePlatform, FontScriptCode iFontNameScript,
     FontLanguageCode iFontNameLanguage, ATSUFontID *oFontID);
+extern OSStatus ATSUCreateFontFallbacks(ATSUFontFallbacks *oFontFallback);
+extern OSStatus ATSUDisposeFontFallbacks(ATSUFontFallbacks iFontFallbacks);
+extern OSStatus ATSUSetObjFontFallbacks(
+    ATSUFontFallbacks iFontFallbacks, ItemCount iFontFallbacksCount,
+    const ATSUFontID iFonts[], ATSUFontFallbackMethod iFontFallbackMethod);
 extern OSStatus ATSUDirectGetLayoutDataArrayPtrFromTextLayout(
     ATSUTextLayout iTextLayout, UniCharArrayOffset iLineOffset,
     ATSUDirectDataSelector iDataSelector, void *oLayoutDataArrayPtr[],
@@ -71,6 +80,12 @@ extern OSStatus ATSUGetUnjustifiedBounds(
     UniCharCount iLineLength, ATSUTextMeasurement *oTextBefore,
     ATSUTextMeasurement *oTextAfter, ATSUTextMeasurement *oAscent,
     ATSUTextMeasurement *oDescent);
+extern OSStatus ATSUGetGlyphBounds(
+    ATSUTextLayout iTextLayout, ATSUTextMeasurement iTextBasePointX,
+    ATSUTextMeasurement iTextBasePointY,
+    UniCharArrayOffset iBoundsCharStart, UniCharCount iBoundsCharLength,
+    UInt16 iTypeOfBounds, ItemCount iMaxNumberOfBounds,
+    ATSTrapezoid oGlyphBounds[], ItemCount *oActualNumberOfBounds);
 extern OSStatus ATSUMeasureTextImage(
     ATSUTextLayout iTextLayout, UniCharArrayOffset iLineOffset,
     UniCharCount iLineLength, ATSUTextMeasurement iLocationX,

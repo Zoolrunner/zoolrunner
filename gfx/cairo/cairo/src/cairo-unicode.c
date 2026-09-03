@@ -4,8 +4,8 @@
  *   ultimately from libunicode. It is relicensed under the
  *   dual LGPL/MPL with permission of the original authors.
  *
- * Copyright © 1999 Tom Tromey
- * Copyright © 2005 Red Hat, Inc
+ * Copyright Â© 1999 Tom Tromey
+ * Copyright Â© 2005 Red Hat, Inc
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public

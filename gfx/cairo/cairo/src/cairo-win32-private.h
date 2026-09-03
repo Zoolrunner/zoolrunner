@@ -1,6 +1,6 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2005 Red Hat, Inc
+ * Copyright Â© 2005 Red Hat, Inc
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -57,30 +57,18 @@ typedef struct _cairo_win32_surface {
      * on some versions of Windows.
      */
     HBITMAP saved_dc_bitmap;
-
-    /* We need two images that point to the same bits, because of
-     * broken pixman clipping semantics -- pixman (brokenly) does
-     * source clipping because Render does -- the xlib backend
-     * avoids this by creating two Pictures for each Drawable,
-     * one that's used as a src and one that's used as a dst.
-     */
-    cairo_surface_t *src_image;
-    cairo_surface_t *dst_image;
+    
+    cairo_surface_t *image;
     
     cairo_rectangle_t clip_rect;
 
-    int set_clip;
     HRGN saved_clip;
 
+    cairo_rectangle_t extents;
 } cairo_win32_surface_t;
 
 cairo_status_t
 _cairo_win32_print_gdi_error (const char *context);
-
-cairo_surface_t *
-_cairo_win32_surface_create_dib (cairo_format_t format,
-				 int            width,
-				 int            height);
 
 cairo_bool_t
 _cairo_surface_is_win32 (cairo_surface_t *surface);

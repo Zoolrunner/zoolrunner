@@ -1,6 +1,6 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2005 Red Hat, Inc.
+ * Copyright Â© 2005 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -30,19 +30,13 @@
  * The Initial Developer of the Original Code is Red Hat, Inc.
  *
  * Contributor(s):
- *	Kristian Høgsberg <krh@redhat.com>
+ *	Kristian HÃ¸gsberg <krh@redhat.com>
  */
 
 #ifndef CAIRO_CLIP_PRIVATE_H
 #define CAIRO_CLIP_PRIVATE_H
 
 #include "cairo-path-fixed-private.h"
-
-enum _cairo_clip_mode {
-    CAIRO_CLIP_MODE_PATH,
-    CAIRO_CLIP_MODE_REGION,
-    CAIRO_CLIP_MODE_MASK
-};
 
 struct _cairo_clip_path {
     unsigned int	ref_count;
@@ -114,7 +108,7 @@ _cairo_clip_intersect_to_region (cairo_clip_t      *clip,
 
 cairo_private cairo_status_t
 _cairo_clip_combine_to_surface (cairo_clip_t            *clip,
-				cairo_operator_t         operator,
+				cairo_operator_t         op,
 				cairo_surface_t         *dst,
 				int                      dst_x,
 				int                      dst_y,

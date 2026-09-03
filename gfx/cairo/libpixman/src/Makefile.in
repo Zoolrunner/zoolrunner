@@ -76,7 +76,7 @@ CSRCS	= \
 	renderedge.c \
 	$(NULL)
 
-EXPORTS		= pixman.h
+EXPORTS		= pixman.h pixman-remap.h
 
 LOCAL_INCLUDES	= -I$(srcdir)
 
@@ -91,4 +91,3 @@ libs:: $(srcdir)/pixman-vc71.lib
 	cp $(srcdir)/pixman-vc71.lib $(LIBRARY)
 	$(INSTALL) $(IFLAGS1) $(LIBRARY) $(DIST)/lib
 endif
-

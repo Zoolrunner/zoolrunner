@@ -1,7 +1,7 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2002 University of Southern California
- * Copyright © 2005 Red Hat, Inc.
+ * Copyright Â© 2002 University of Southern California
+ * Copyright Â© 2005 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -324,33 +324,156 @@ cairo_restore (cairo_t *cr)
 }
 slim_hidden_def(cairo_restore);
 
-/* XXX: I want to rethink this API
+/**
+ * moz_cairo_set_target:
+ * @cr: a #cairo_t
+ * @target: a #cairo_surface_t
+ *
+ * Change the destination surface of rendering to @cr to @target.
+ * @target must not be %NULL, or an error will be set on @cr.
+ */
+void
+moz_cairo_set_target (cairo_t *cr, cairo_surface_t *target)
+{
+    if (cr->status)
+        return;
+
+    if (target == NULL) {
+        _cairo_set_error (cr, CAIRO_STATUS_NULL_POINTER);
+        return;
+    }
+
+    _moz_cairo_gstate_set_target (cr->gstate, target);
+}
+slim_hidden_def(moz_cairo_set_target);
+
+/**
+ * cairo_push_group:
+ * @cr: a cairo context
+ *
+ * Pushes a CAIRO_CONTENT_COLOR_ALPHA temporary surface onto
+ * the rendering stack, redirecting all rendering into it.
+ * See cairo_push_group_with_content().
+ */
+
 void
 cairo_push_group (cairo_t *cr)
 {
-    if (cr->status)
-	return;
-
-    cr->status = cairoPush (cr);
-    if (cr->status)
-	return;
-
-    cr->status = _cairo_gstate_begin_group (cr->gstate);
+    cairo_push_group_with_content (cr, CAIRO_CONTENT_COLOR_ALPHA);
 }
+slim_hidden_def(cairo_push_group);
+
+/**
+ * cairo_push_group_with_content:
+ * @cr: a cairo context
+ * @content: a %cairo_content_t indicating the type of group that
+ *           will be created
+ *
+ * Pushes a temporary surface onto the rendering stack, redirecting
+ * all rendering into it.  The surface dimensions are the size of
+ * the current clipping bounding box.  Initially, this surface
+ * is painted with CAIRO_OPERATOR_CLEAR.
+ *
+ * cairo_push_group() calls cairo_save() so that any changes to the
+ * graphics state will not be visible after cairo_pop_group() or
+ * cairo_pop_group_with_alpha().  See cairo_pop_group() and
+ * cairo_pop_group_with_alpha().
+ */
 
 void
+cairo_push_group_with_content (cairo_t *cr, cairo_content_t content)
+{
+    cairo_status_t status;
+    cairo_rectangle_t extents;
+    cairo_surface_t *group_surface = NULL;
+
+    /* Get the extents that we'll use in creating our new group surface */
+    _cairo_surface_get_extents (_cairo_gstate_get_target (cr->gstate), &extents);
+    status = _cairo_clip_intersect_to_rectangle (_cairo_gstate_get_clip (cr->gstate), &extents);
+    if (status != CAIRO_STATUS_SUCCESS)
+	goto bail;
+
+    group_surface = cairo_surface_create_similar (_cairo_gstate_get_target (cr->gstate),
+						  content,
+						  extents.width,
+						  extents.height);
+    status = cairo_surface_status (group_surface);
+    if (status)
+	goto bail;
+
+    /* Set device offsets on the new surface so that logically it appears at
+     * the same location on the parent surface. */
+    cairo_surface_set_device_offset (group_surface, -extents.x, -extents.y);
+
+    /* create a new gstate for the redirect */
+    cairo_save (cr);
+    if (cr->status)
+	goto bail;
+
+    _cairo_gstate_redirect_target (cr->gstate, group_surface);
+
+bail:
+    cairo_surface_destroy (group_surface);
+    if (status)
+	_cairo_set_error (cr, status);
+}
+slim_hidden_def(cairo_push_group_with_content);
+
+cairo_pattern_t *
 cairo_pop_group (cairo_t *cr)
 {
-    if (cr->status)
-	return;
+    cairo_surface_t *group_surface, *parent_target;
+    cairo_pattern_t *group_pattern = NULL;
+    cairo_matrix_t group_matrix;
 
-    cr->status = _cairo_gstate_end_group (cr->gstate);
-    if (cr->status)
-	return;
+    /* Grab the active surfaces */
+    group_surface = _cairo_gstate_get_target (cr->gstate);
+    parent_target = _cairo_gstate_get_parent_target (cr->gstate);
 
-    cr->status = cairoPop (cr);
+    /* Verify that we are at the right nesting level */
+    if (parent_target == NULL) {
+	_cairo_set_error (cr, CAIRO_STATUS_INVALID_POP_GROUP);
+	return NULL;
+    }
+
+    /* We need to save group_surface before we restore; we don't need
+     * to reference parent_target and original_target, since the
+     * gstate will still hold refs to them once we restore. */
+    cairo_surface_reference (group_surface);
+
+    cairo_restore (cr);
+
+    if (cr->status)
+	goto done;
+
+    group_pattern = cairo_pattern_create_for_surface (group_surface);
+    if (!group_pattern) {
+        cr->status = CAIRO_STATUS_NO_MEMORY;
+        goto done;
+    }
+
+    _cairo_gstate_get_matrix (cr->gstate, &group_matrix);
+    cairo_pattern_set_matrix (group_pattern, &group_matrix);
+done:
+    cairo_surface_destroy (group_surface);
+
+    return group_pattern;
 }
-*/
+slim_hidden_def(cairo_pop_group);
+
+void
+cairo_pop_group_to_source (cairo_t *cr)
+{
+    cairo_pattern_t *group_pattern;
+
+    group_pattern = cairo_pop_group (cr);
+    if (!group_pattern)
+        return;
+
+    cairo_set_source (cr, group_pattern);
+    cairo_pattern_destroy (group_pattern);
+}
+slim_hidden_def(cairo_pop_group_to_source);
 
 /**
  * cairo_set_operator:
@@ -1034,7 +1157,7 @@ cairo_line_to (cairo_t *cr, double x, double y)
  * @x3: the X coordinate of the end of the curve
  * @y3: the Y coordinate of the end of the curve
  *
- * Adds a cubic Bézier spline to the path from the current point to
+ * Adds a cubic BÃ©zier spline to the path from the current point to
  * position (@x3, @y3) in user-space coordinates, using (@x1, @y1) and
  * (@x2, @y2) as the control points. After this call the current point
  * will be (@x3, @y3).
@@ -1092,8 +1215,8 @@ cairo_curve_to (cairo_t *cr,
  * to the path to connect the current point to the beginning of the
  * arc.
  *
- * Angles are measured in radians. An angle of 0 is in the direction
- * of the positive X axis (in user-space). An angle of %M_PI radians
+ * Angles are measured in radians. An angle of 0.0 is in the direction
+ * of the positive X axis (in user-space). An angle of %M_PI/2.0 radians
  * (90 degrees) is in the direction of the positive Y axis (in
  * user-space). Angles increase in the direction from the positive X
  * axis toward the positive Y axis. So with the default transformation
@@ -1274,7 +1397,7 @@ slim_hidden_def(cairo_rel_line_to);
  * @dy3: the Y offset to the end of the curve
  *
  * Relative-coordinate version of cairo_curve_to(). All offsets are
- * relative to the current point. Adds a cubic Bézier spline to the
+ * relative to the current point. Adds a cubic BÃ©zier spline to the
  * path from the current point to a point offset from the current
  * point by (@dx3, @dy3), using points offset by (@dx1, @dy1) and
  * (@dx2, @dy2) as the control points. After this call the current
@@ -2398,6 +2521,30 @@ cairo_get_target (cairo_t *cr)
     if (cr->status)
 	return (cairo_surface_t*) &_cairo_surface_nil;
 
+    return _cairo_gstate_get_original_target (cr->gstate);
+}
+
+/**
+ * cairo_get_group_target:
+ * @cr: a cairo context
+ * 
+ * Gets the target surface for the current transparency group
+ * started by the last cairo_push_group() call on the cairo
+ * context.
+ *
+ * This function may return NULL if there is no transparency
+ * group on the target.
+ * 
+ * Return value: the target group surface, or NULL if none.  This
+ * object is owned by cairo. To keep a reference to it, you must call
+ * cairo_surface_reference().
+ **/
+cairo_surface_t *
+cairo_get_group_target (cairo_t *cr)
+{
+    if (cr->status)
+	return (cairo_surface_t*) &_cairo_surface_nil;
+
     return _cairo_gstate_get_target (cr->gstate);
 }
 
@@ -2409,10 +2556,6 @@ cairo_get_target (cairo_t *cr)
  * #cairo_path_t. See #cairo_path_data_t for hints on how to iterate
  * over the returned data structure.
  * 
- * Return value: the copy of the current path. The caller owns the
- * returned object and should call cairo_path_destroy() when finished
- * with it.
- *
  * This function will always return a valid pointer, but the result
  * will have no data (<literal>data==NULL</literal> and
  * <literal>num_data==0</literal>), if either of the following

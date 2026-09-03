@@ -1,6 +1,6 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2005 Red Hat, Inc.
+ * Copyright Â© 2005 Red Hat, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -37,11 +37,33 @@
 #define CAIRO_DEBUG_H
 
 #include <cairo-features.h>
+#include <stdio.h>
 
 CAIRO_BEGIN_DECLS
 
+struct _cairo_path_fixed;
+struct _cairo_traps;
+struct _cairo_trapezoid;
+struct _cairo_clip;
+
 void
 cairo_debug_reset_static_data (void);
+
+void
+cairo_debug_dump_clip (struct _cairo_clip *clip,
+                       FILE *fp);
+void
+cairo_debug_dump_path (struct _cairo_path_fixed *path,
+                       FILE *fp);
+
+void
+cairo_debug_dump_traps (struct _cairo_traps *traps,
+                        FILE *fp);
+
+void
+cairo_debug_dump_trapezoid_array (struct _cairo_trapezoid *traps,
+                                  int num_traps,
+                                  FILE *fp);
 
 CAIRO_END_DECLS
 

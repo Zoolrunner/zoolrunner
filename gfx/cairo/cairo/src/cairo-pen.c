@@ -1,6 +1,6 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2002 University of Southern California
+ * Copyright Â© 2002 University of Southern California
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -36,10 +36,6 @@
 
 #include "cairoint.h"
 
-#include "cairo-gstate-private.h"
-
-#define PEN_MAX_VERTICES 0xffff
-
 static int
 _cairo_pen_vertices_needed (double tolerance, double radius, cairo_matrix_t *matrix);
 
@@ -61,44 +57,31 @@ _cairo_pen_init_empty (cairo_pen_t *pen)
 }
 
 cairo_status_t
-_cairo_pen_init (cairo_pen_t *pen, double radius, cairo_gstate_t *gstate)
+_cairo_pen_init (cairo_pen_t	*pen,
+		 double		 radius,
+		 double		 tolerance,
+		 cairo_matrix_t	*ctm)
 {
     int i;
     int reflect;
     double  det;
 
-    if (pen->num_vertices) {
-	/* XXX: It would be nice to notice that the pen is already properly constructed.
-	   However, this test would also have to account for possible changes in the transformation
-	   matrix.
-	   if (pen->radius == radius && pen->tolerance == tolerance)
-	   return CAIRO_STATUS_SUCCESS;
-	*/
-	_cairo_pen_fini (pen);
-    }
-
     pen->radius = radius;
-    pen->tolerance = gstate->tolerance;
+    pen->tolerance = tolerance;
 
-    _cairo_matrix_compute_determinant (&gstate->ctm, &det);
+    _cairo_matrix_compute_determinant (ctm, &det);
     if (det >= 0) {
 	reflect = 0;
     } else {
 	reflect = 1;
     }
 
-    pen->num_vertices = _cairo_pen_vertices_needed (gstate->tolerance,
+    pen->num_vertices = _cairo_pen_vertices_needed (tolerance,
 						    radius,
-						    &gstate->ctm);
-
-    if ((pen->num_vertices <= 0) || (pen->num_vertices > PEN_MAX_VERTICES)) {
-	pen->num_vertices = 0;
-	return CAIRO_STATUS_NO_MEMORY;
-    }
-
+						    ctm);
+    
     pen->vertices = malloc (pen->num_vertices * sizeof (cairo_pen_vertex_t));
     if (pen->vertices == NULL) {
-	pen->num_vertices = 0;
 	return CAIRO_STATUS_NO_MEMORY;
     }
 
@@ -113,7 +96,7 @@ _cairo_pen_init (cairo_pen_t *pen, double radius, cairo_gstate_t *gstate)
 	double dx = radius * cos (reflect ? -theta : theta);
 	double dy = radius * sin (reflect ? -theta : theta);
 	cairo_pen_vertex_t *v = &pen->vertices[i];
-	cairo_matrix_transform_distance (&gstate->ctm, &dx, &dy);
+	cairo_matrix_transform_distance (ctm, &dx, &dy);
 	v->point.x = _cairo_fixed_from_double (dx);
 	v->point.y = _cairo_fixed_from_double (dy);
     }
@@ -140,7 +123,6 @@ _cairo_pen_init_copy (cairo_pen_t *pen, cairo_pen_t *other)
     if (pen->num_vertices) {
 	pen->vertices = malloc (pen->num_vertices * sizeof (cairo_pen_vertex_t));
 	if (pen->vertices == NULL) {
-	    pen->num_vertices = 0;
 	    return CAIRO_STATUS_NO_MEMORY;
 	}
 	memcpy (pen->vertices, other->vertices, pen->num_vertices * sizeof (cairo_pen_vertex_t));
@@ -156,17 +138,7 @@ _cairo_pen_add_points (cairo_pen_t *pen, cairo_point_t *point, int num_points)
     int num_vertices;
     int i;
 
-    if (num_points <= 0 || num_points > PEN_MAX_VERTICES)
-	return CAIRO_STATUS_NO_MEMORY;
-
-    if (pen->num_vertices < 0 || pen->num_vertices > PEN_MAX_VERTICES)
-	return CAIRO_STATUS_NO_MEMORY;
-
     num_vertices = pen->num_vertices + num_points;
-
-    if (num_vertices > PEN_MAX_VERTICES)
-	return CAIRO_STATUS_NO_MEMORY;
-
     vertices = realloc (pen->vertices, num_vertices * sizeof (cairo_pen_vertex_t));
     if (vertices == NULL)
 	return CAIRO_STATUS_NO_MEMORY;
@@ -205,66 +177,66 @@ an ellipse parameterized by angle 't':
 
 	    x = M cos t			y = m sin t
 
-Perturb t by ± d and compute two new points (x+,y+), (x-,y-).
+Perturb t by Â± d and compute two new points (x+,y+), (x-,y-).
 The distance from the average of these two points to (x,y) represents
 the maximum error in approximating the ellipse with a polygon formed
-from vertices 2∆ radians apart.
+from vertices 2â radians apart.
 
-	    x+ = M cos (t+∆)		y+ = m sin (t+∆)
-	    x- = M cos (t-∆)		y- = m sin (t-∆)
+	    x+ = M cos (t+â)		y+ = m sin (t+â)
+	    x- = M cos (t-â)		y- = m sin (t-â)
 
 Now compute the approximation error, E:
 
 	Ex = (x - (x+ + x-) / 2)
-	Ex = (M cos(t) - (Mcos(t+∆) + Mcos(t-∆))/2)
-	   = M (cos(t) - (cos(t)cos(∆) + sin(t)sin(∆) +
-			  cos(t)cos(∆) - sin(t)sin(∆))/2)
-	   = M(cos(t) - cos(t)cos(∆))
-	   = M cos(t) (1 - cos(∆))
+	Ex = (M cos(t) - (Mcos(t+â) + Mcos(t-â))/2)
+	   = M (cos(t) - (cos(t)cos(â) + sin(t)sin(â) +
+			  cos(t)cos(â) - sin(t)sin(â))/2)
+	   = M(cos(t) - cos(t)cos(â))
+	   = M cos(t) (1 - cos(â))
 
 	Ey = y - (y+ - y-) / 2
-	   = m sin (t) - (m sin(t+∆) + m sin(t-∆)) / 2
-	   = m (sin(t) - (sin(t)cos(∆) + cos(t)sin(∆) +
-			  sin(t)cos(∆) - cos(t)sin(∆))/2)
-	   = m (sin(t) - sin(t)cos(∆))
-	   = m sin(t) (1 - cos(∆))
+	   = m sin (t) - (m sin(t+â) + m sin(t-â)) / 2
+	   = m (sin(t) - (sin(t)cos(â) + cos(t)sin(â) +
+			  sin(t)cos(â) - cos(t)sin(â))/2)
+	   = m (sin(t) - sin(t)cos(â))
+	   = m sin(t) (1 - cos(â))
 
-	E² = Ex² + Ey²
-	   = (M cos(t) (1 - cos (∆)))² + (m sin(t) (1-cos(∆)))²
-	   = (1 - cos(∆))² (M² cos²(t) + m² sin²(t))
-	   = (1 - cos(∆))² ((m² + M² - m²) cos² (t) + m² sin²(t))
-	   = (1 - cos(∆))² (M² - m²) cos² (t) + (1 - cos(∆))² m²
+	EÂ² = ExÂ² + EyÂ²
+	   = (M cos(t) (1 - cos (â)))Â² + (m sin(t) (1-cos(â)))Â²
+	   = (1 - cos(â))Â² (MÂ² cosÂ²(t) + mÂ² sinÂ²(t))
+	   = (1 - cos(â))Â² ((mÂ² + MÂ² - mÂ²) cosÂ² (t) + mÂ² sinÂ²(t))
+	   = (1 - cos(â))Â² (MÂ² - mÂ²) cosÂ² (t) + (1 - cos(â))Â² mÂ²
 
 Find the extremum by differentiation wrt t and setting that to zero
 
-∂(E²)/∂(t) = (1-cos(∆))² (M² - m²) (-2 cos(t) sin(t))
+â(EÂ²)/â(t) = (1-cos(â))Â² (MÂ² - mÂ²) (-2 cos(t) sin(t))
 
          0 = 2 cos (t) sin (t)
 	 0 = sin (2t)
-	 t = nπ
+	 t = nÏ
 
 Which is to say that the maximum and minimum errors occur on the
-axes of the ellipse at 0 and π radians:
+axes of the ellipse at 0 and Ï radians:
 
-	E²(0) = (1-cos(∆))² (M² - m²) + (1-cos(∆))² m²
-	      = (1-cos(∆))² M²
-	E²(π) = (1-cos(∆))² m²
+	EÂ²(0) = (1-cos(â))Â² (MÂ² - mÂ²) + (1-cos(â))Â² mÂ²
+	      = (1-cos(â))Â² MÂ²
+	EÂ²(Ï) = (1-cos(â))Â² mÂ²
 
-maximum error = M (1-cos(∆))
-minimum error = m (1-cos(∆))
+maximum error = M (1-cos(â))
+minimum error = m (1-cos(â))
 
-We must make maximum error ≤ tolerance, so compute the ∆ needed:
+We must make maximum error â¤ tolerance, so compute the â needed:
 
-	    tolerance = M (1-cos(∆))
-	tolerance / M = 1 - cos (∆)
-	       cos(∆) = 1 - tolerance/M
-                    ∆ = acos (1 - tolerance / M);
+	    tolerance = M (1-cos(â))
+	tolerance / M = 1 - cos (â)
+	       cos(â) = 1 - tolerance/M
+                    â = acos (1 - tolerance / M);
 
-Remembering that ∆ is half of our angle between vertices,
+Remembering that â is half of our angle between vertices,
 the number of vertices is then
 
-             vertices = ceil(2π/2∆).
-                      = ceil(π/∆).
+             vertices = ceil(2Ï/2â).
+                      = ceil(Ï/â).
 
 Note that this also equation works for M == m (a circle) as it
 doesn't matter where on the circle the error is computed.

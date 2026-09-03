@@ -40,7 +40,12 @@
 
 #include "gfxTypes.h"
 
-class gfxFilter {
+/**
+ * A filter.
+ *
+ * @see gfxContext::PushFilter, gfxContext::PopFilter
+ */
+class NS_EXPORT gfxFilter {
     static gfxFilter* CreateOpacityFilter(gfxFloat alpha);
     // CreateGaussianFilter, etc
 };

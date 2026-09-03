@@ -67,6 +67,11 @@ struct nsBoundingMetrics;
 /* gfx2 */
 class imgIContainer;
 
+#ifdef MOZ_ENABLE_CAIRO_GFX
+class gfxASurface;
+class gfxContext;
+#endif
+
 //cliprect/region combination methods
 
 typedef enum
@@ -123,6 +128,13 @@ public:
    * @result The result of the initialization, NS_Ok if no errors
    */
   NS_IMETHOD Init(nsIDeviceContext* aContext, nsIDrawingSurface* aSurface) = 0;
+
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  virtual nsresult Init(nsIDeviceContext* aContext, gfxASurface* aSurface)
+  { return NS_ERROR_NOT_IMPLEMENTED; }
+  virtual nsresult Init(nsIDeviceContext* aContext, gfxContext* aContext2)
+  { return NS_ERROR_NOT_IMPLEMENTED; }
+#endif
 
   /**
    * Reset the rendering context
@@ -703,6 +715,21 @@ public:
                                const nsRect &aDestBounds, PRUint32 aCopyFlags) = 0;
   //~~~
   NS_IMETHOD RetrieveCurrentNativeGraphicData(void** ngd) = 0;
+
+  enum GraphicDataType {
+    NATIVE_CAIRO_CONTEXT = 1,
+    NATIVE_GDK_DRAWABLE = 2,
+    NATIVE_WINDOWS_DC = 3,
+    NATIVE_MAC_THING = 4,
+    NATIVE_THEBES_CONTEXT = 5
+  };
+
+  virtual void* GetNativeGraphicData(GraphicDataType aType)
+  {
+    void* data = nsnull;
+    RetrieveCurrentNativeGraphicData(&data);
+    return data;
+  }
 
 
   /**

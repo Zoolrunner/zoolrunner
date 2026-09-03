@@ -36,14 +36,126 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "gfxWindowsSurface.h"
+#include "nsString.h"
 
 THEBES_IMPL_REFCOUNTING(gfxWindowsSurface)
 
-gfxWindowsSurface::gfxWindowsSurface(HDC dc)
+gfxWindowsSurface::gfxWindowsSurface(HWND wnd) :
+    mOwnsDC(PR_TRUE), mWnd(wnd), mOrigBitmap(nsnull)
 {
-    Init(cairo_win32_surface_create(dc));
+    mDC = ::GetDC(mWnd);
+    Init(cairo_win32_surface_create(mDC));
+}
+
+gfxWindowsSurface::gfxWindowsSurface(HDC dc, PRBool deleteDC) :
+    mOwnsDC(deleteDC), mDC(dc),mWnd(nsnull), mOrigBitmap(nsnull)
+{
+    Init(cairo_win32_surface_create(mDC));
+}
+
+gfxWindowsSurface::gfxWindowsSurface(HDC dc, unsigned long width, unsigned long height, gfxImageFormat imageFormat) :
+    mOwnsDC(PR_FALSE), mWnd(nsnull)
+{
+    HBITMAP bmp = nsnull;
+
+    // At some point we might want to revisit creating a DDB
+    // with CreateCompatibleDC, but from stuff that I've read
+    // that's only useful for terminal services clients.
+
+    Init(cairo_win32_surface_create_dib((cairo_format_t)imageFormat,
+                                        width, height));
+
+    mDC = cairo_win32_surface_get_dc(CairoSurface());
 }
 
 gfxWindowsSurface::~gfxWindowsSurface()
 {
+    Destroy();
+
+    if (mDC && mOrigBitmap) {
+        HBITMAP tbits = (HBITMAP)::SelectObject(mDC, mOrigBitmap);
+        if (tbits)
+            DeleteObject(tbits);
+    }
+
+    if (mOwnsDC) {
+        if (mWnd)
+            ::ReleaseDC(mWnd, mDC);
+        else
+            ::DeleteDC(mDC);
+    }
+}
+
+
+static char*
+GetACPString(const nsAString& aStr)
+{
+    int acplen = aStr.Length() * 2 + 1;
+    char * acp = new char[acplen];
+    if(acp) {
+        int outlen = ::WideCharToMultiByte(CP_ACP, 0, 
+                                           PromiseFlatString(aStr).get(),
+                                           aStr.Length(),
+                                           acp, acplen, NULL, NULL);
+        if (outlen > 0)
+            acp[outlen] = '\0';  // null terminate
+    }
+    return acp;
+}
+
+nsresult gfxWindowsSurface::BeginPrinting(const nsAString& aTitle,
+                                          const nsAString& aPrintToFileName)
+{
+#define DOC_TITLE_LENGTH 30
+    DOCINFO docinfo;
+
+    nsString titleStr;
+    titleStr = aTitle;
+    if (titleStr.Length() > DOC_TITLE_LENGTH) {
+        titleStr.SetLength(DOC_TITLE_LENGTH-3);
+        titleStr.AppendLiteral("...");
+    }
+    char *title = GetACPString(titleStr);
+
+    char *docName = nsnull;
+    if (!aPrintToFileName.IsEmpty()) {
+        docName = ToNewCString(aPrintToFileName);
+    }
+
+    docinfo.cbSize = sizeof(docinfo);
+    docinfo.lpszDocName = title ? title : "Mozilla Document";
+    docinfo.lpszOutput = docName;
+    docinfo.lpszDatatype = NULL;
+    docinfo.fwType = 0;
+
+    ::StartDoc(mDC, &docinfo);
+        
+    delete [] title;
+    if (docName != nsnull) nsMemory::Free(docName);
+
+    return NS_OK;
+}
+
+nsresult gfxWindowsSurface::EndPrinting()
+{
+    ::EndDoc(mDC);
+    return NS_OK;
+}
+
+nsresult gfxWindowsSurface::AbortPrinting()
+{
+    ::AbortDoc(mDC);
+    return NS_OK;
+}
+
+nsresult gfxWindowsSurface::BeginPage()
+{
+    ::StartPage(mDC);
+    return NS_OK;
+}
+
+nsresult gfxWindowsSurface::EndPage()
+{
+    ::EndPage(mDC);
+    return NS_OK;
 }

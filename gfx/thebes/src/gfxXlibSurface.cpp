@@ -36,12 +36,22 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include <stdio.h>
 #include "gfxXlibSurface.h"
+
+static cairo_user_data_key_t pixmap_free_key;
+
+typedef struct {
+    Display* dpy;
+    Pixmap pixmap;
+} pixmap_free_struct;
+
+static void pixmap_free_func (void *);
 
 THEBES_IMPL_REFCOUNTING(gfxXlibSurface)
 
-gfxXlibSurface::gfxXlibSurface(Display* dpy, Drawable drawable, Visual* visual) :
-    mOwnsPixmap(PR_FALSE), mDisplay(dpy), mDrawable(drawable)
+gfxXlibSurface::gfxXlibSurface(Display* dpy, Drawable drawable, Visual* visual)
+    : mPixmapTaken(PR_FALSE), mDisplay(dpy), mDrawable(drawable)
 {
     // figure out width/height/depth
     Window root_ignore;
@@ -62,15 +72,15 @@ gfxXlibSurface::gfxXlibSurface(Display* dpy, Drawable drawable, Visual* visual) 
 }
 
 gfxXlibSurface::gfxXlibSurface(Display* dpy, Drawable drawable, Visual* visual,
-                               unsigned long width, unsigned long height) :
-    mOwnsPixmap(PR_FALSE), mDisplay(dpy), mDrawable(drawable), mWidth(width), mHeight(height)
+                               unsigned long width, unsigned long height)
+    : mPixmapTaken(PR_FALSE), mDisplay(dpy), mDrawable(drawable), mWidth(width), mHeight(height)
 {
     cairo_surface_t *surf = cairo_xlib_surface_create(dpy, drawable, visual, width, height);
     Init(surf);
 }
 
-gfxXlibSurface::gfxXlibSurface(Display* dpy, Visual* visual, unsigned long width, unsigned long height) :
-    mOwnsPixmap(PR_TRUE), mDisplay(dpy), mWidth(width), mHeight(height)
+gfxXlibSurface::gfxXlibSurface(Display* dpy, Visual* visual, unsigned long width, unsigned long height)
+    : mPixmapTaken(PR_FALSE), mDisplay(dpy), mWidth(width), mHeight(height)
 
 {
     mDrawable = (Drawable)XCreatePixmap(dpy,
@@ -79,13 +89,89 @@ gfxXlibSurface::gfxXlibSurface(Display* dpy, Visual* visual, unsigned long width
                                         DefaultDepth(dpy, DefaultScreen(dpy)));
 
     cairo_surface_t *surf = cairo_xlib_surface_create(dpy, mDrawable, visual, width, height);
+
     Init(surf);
+    TakePixmap();
+}
+
+gfxXlibSurface::gfxXlibSurface(Display* dpy, Drawable drawable, XRenderPictFormat *format,
+                               unsigned long width, unsigned long height)
+    : mPixmapTaken(PR_FALSE), mDisplay(dpy), mDrawable(drawable),
+      mWidth(width), mHeight(height)
+{
+    cairo_surface_t *surf = cairo_xlib_surface_create_with_xrender_format (dpy, drawable,
+                                                                           ScreenOfDisplay(dpy,DefaultScreen(dpy)),
+                                                                           format, width, height);
+    Init(surf);
+}
+
+gfxXlibSurface::gfxXlibSurface(Display* dpy, XRenderPictFormat *format,
+                               unsigned long width, unsigned long height)
+    : mPixmapTaken(PR_FALSE), mDisplay(dpy), mWidth(width), mHeight(height)
+{
+    mDrawable = (Drawable)XCreatePixmap(dpy,
+                                        RootWindow(dpy, DefaultScreen(dpy)),
+                                        width, height,
+                                        format->depth);
+
+    cairo_surface_t *surf = cairo_xlib_surface_create_with_xrender_format (dpy, mDrawable,
+                                                                           ScreenOfDisplay(dpy,DefaultScreen(dpy)),
+                                                                           format, width, height);
+    Init(surf);
+    TakePixmap();
 }
 
 gfxXlibSurface::~gfxXlibSurface()
 {
     Destroy();
+}
 
-    if (mOwnsPixmap)
-        XFreePixmap(mDisplay, mDrawable);
+XRenderPictFormat*
+gfxXlibSurface::FindRenderFormat(Display *dpy, gfxImageFormat format)
+{
+    switch (format) {
+        case ImageFormatARGB32:
+            return XRenderFindStandardFormat (dpy, PictStandardARGB32);
+            break;
+        case ImageFormatRGB24:
+            return XRenderFindStandardFormat (dpy, PictStandardRGB24);
+            break;
+        case ImageFormatA8:
+            return XRenderFindStandardFormat (dpy, PictStandardA8);
+            break;
+        case ImageFormatA1:
+            return XRenderFindStandardFormat (dpy, PictStandardA1);
+            break;
+    }
+
+    return (XRenderPictFormat*)NULL;
+}
+
+void
+gfxXlibSurface::TakePixmap()
+{
+    if (mPixmapTaken)
+        return;
+
+    pixmap_free_struct *pfs = new pixmap_free_struct;
+    pfs->dpy = mDisplay;
+    pfs->pixmap = mDrawable;
+
+    cairo_surface_set_user_data (CairoSurface(),
+                                 &pixmap_free_key,
+                                 pfs,
+                                 pixmap_free_func);
+
+    mPixmapTaken = PR_TRUE;
+}
+
+void
+pixmap_free_func (void *data)
+{
+    pixmap_free_struct *pfs = (pixmap_free_struct*) data;
+
+    //fprintf (stderr, "freeing pixmap %d\n", pfs->pixmap);
+    XFreePixmap (pfs->dpy, pfs->pixmap);
+
+    delete pfs;
 }

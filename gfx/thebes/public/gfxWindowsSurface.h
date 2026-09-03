@@ -42,12 +42,30 @@
 
 #include <cairo-win32.h>
 
-class gfxWindowsSurface : public gfxASurface {
+class NS_EXPORT gfxWindowsSurface : public gfxASurface {
     THEBES_DECL_ISUPPORTS_INHERITED
 
 public:
-    gfxWindowsSurface(HDC dc);
+    gfxWindowsSurface(HWND wnd);
+    gfxWindowsSurface(HDC dc, PRBool deleteDC = PR_FALSE);
+    gfxWindowsSurface(HDC dc,
+                      unsigned long width, unsigned long height,
+                      gfxImageFormat imageFormat = ImageFormatRGB24);
     virtual ~gfxWindowsSurface();
+
+    HDC GetDC() { return mDC; }
+
+    nsresult BeginPrinting(const nsAString& aTitle, const nsAString& aPrintToFileName);
+    nsresult EndPrinting();
+    nsresult AbortPrinting();
+    nsresult BeginPage();
+    nsresult EndPage();
+
+private:
+    PRBool mOwnsDC;
+    HDC mDC;
+    HWND mWnd;
+    HBITMAP mOrigBitmap;
 };
 
 #endif /* GFX_WINDOWSSURFACE_H */

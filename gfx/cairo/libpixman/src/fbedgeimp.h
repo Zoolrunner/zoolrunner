@@ -1,7 +1,7 @@
 /*
- * $Id: fbedgeimp.h,v 1.3.4.1 2005/09/27 23:09:03 vladimir%pobox.com Exp $
+ * $Id: fbedgeimp.h,v 1.8 2006/02/03 04:49:30 vladimir%pobox.com Exp $
  *
- * Copyright © 2004 Keith Packard
+ * Copyright Â© 2004 Keith Packard
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that

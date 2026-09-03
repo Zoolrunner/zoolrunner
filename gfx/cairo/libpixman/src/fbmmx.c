@@ -1,7 +1,7 @@
 /*
- * Copyright © 2004 Red Hat, Inc.
- * Copyright © 2004 Nicholas Miell
- * Copyright © 2005 Trolltech AS
+ * Copyright Â© 2004 Red Hat, Inc.
+ * Copyright Â© 2004 Nicholas Miell
+ * Copyright Â© 2005 Trolltech AS
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -22,7 +22,7 @@
  * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
  * SOFTWARE.
  *
- * Author:  Søren Sandmann (sandmann@redhat.com)
+ * Author:  SÃ¸ren Sandmann (sandmann@redhat.com)
  * Minor Improvements: Nicholas Miell (nmiell@gmail.com)
  * MMX code paths for fbcompose.c by Lars Knoll (lars@trolltech.com) 
  *

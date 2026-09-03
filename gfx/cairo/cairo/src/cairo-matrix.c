@@ -1,6 +1,6 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2002 University of Southern California
+ * Copyright Â© 2002 University of Southern California
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -589,33 +589,33 @@ _cairo_matrix_is_integer_translation(const cairo_matrix_t *m,
   (A) through (C) below are standard double-angle formulae.  (D) is a lesser
   known result and is derived below:
   
-  (A)  sin²(θ) = (1 - cos(2*θ))/2
-  (B)  cos²(θ) = (1 + cos(2*θ))/2
-  (C)  sin(θ)*cos(θ) = sin(2*θ)/2
-  (D)  MAX[a*cos(θ) + b*sin(θ)] = sqrt(a² + b²)
+  (A)  sinÂ²(Î¸) = (1 - cos(2*Î¸))/2
+  (B)  cosÂ²(Î¸) = (1 + cos(2*Î¸))/2
+  (C)  sin(Î¸)*cos(Î¸) = sin(2*Î¸)/2
+  (D)  MAX[a*cos(Î¸) + b*sin(Î¸)] = sqrt(aÂ² + bÂ²)
   
   Proof of (D):
   
   find the maximum of the function by setting the derivative to zero:
   
-       -a*sin(θ)+b*cos(θ) = 0
+       -a*sin(Î¸)+b*cos(Î¸) = 0
   
   From this it follows that 
   
-       tan(θ) = b/a 
+       tan(Î¸) = b/a 
   
   and hence 
   
-       sin(θ) = b/sqrt(a² + b²)
+       sin(Î¸) = b/sqrt(aÂ² + bÂ²)
   
   and 
   
-       cos(θ) = a/sqrt(a² + b²)
+       cos(Î¸) = a/sqrt(aÂ² + bÂ²)
   
   Thus the maximum value is
   
-       MAX[a*cos(θ) + b*sin(θ)] = (a² + b²)/sqrt(a² + b²)
-                                   = sqrt(a² + b²)
+       MAX[a*cos(Î¸) + b*sin(Î¸)] = (aÂ² + bÂ²)/sqrt(aÂ² + bÂ²)
+                                   = sqrt(aÂ² + bÂ²)
   
   
   4.  Derivation of maximum expansion
@@ -623,46 +623,46 @@ _cairo_matrix_is_integer_translation(const cairo_matrix_t *m,
   To find MAX[ |X'| ] we search brute force method using calculus.  The unit
   circle on which X is constrained is to be parameterized by t:
   
-       X(θ) = (cos(θ), sin(θ))
+       X(Î¸) = (cos(Î¸), sin(Î¸))
   
   Thus 
   
-       X'(θ) = X(θ) * _R_ = (cos(θ), sin(θ)) * [a b]
+       X'(Î¸) = X(Î¸) * _R_ = (cos(Î¸), sin(Î¸)) * [a b]
                                                [c d]
-             = (a*cos(θ) + c*sin(θ), b*cos(θ) + d*sin(θ)).
+             = (a*cos(Î¸) + c*sin(Î¸), b*cos(Î¸) + d*sin(Î¸)).
   
   Define 
   
-       r(θ) = |X'(θ)|
+       r(Î¸) = |X'(Î¸)|
   
   Thus
   
-       r²(θ) = (a*cos(θ) + c*sin(θ))² + (b*cos(θ) + d*sin(θ))²
-             = (a² + b²)*cos²(θ) + (c² + d²)*sin²(θ) 
-                 + 2*(a*c + b*d)*cos(θ)*sin(θ) 
+       rÂ²(Î¸) = (a*cos(Î¸) + c*sin(Î¸))Â² + (b*cos(Î¸) + d*sin(Î¸))Â²
+             = (aÂ² + bÂ²)*cosÂ²(Î¸) + (cÂ² + dÂ²)*sinÂ²(Î¸) 
+                 + 2*(a*c + b*d)*cos(Î¸)*sin(Î¸) 
   
   Now apply the double angle formulae (A) to (C) from above:
   
-       r²(θ) = (a² + b² + c² + d²)/2 
-	     + (a² + b² - c² - d²)*cos(2*θ)/2
-  	     + (a*c + b*d)*sin(2*θ)
-             = f + g*cos(φ) + h*sin(φ)
+       rÂ²(Î¸) = (aÂ² + bÂ² + cÂ² + dÂ²)/2 
+	     + (aÂ² + bÂ² - cÂ² - dÂ²)*cos(2*Î¸)/2
+  	     + (a*c + b*d)*sin(2*Î¸)
+             = f + g*cos(Ï) + h*sin(Ï)
   
   Where
   
-       f = (a² + b² + c² + d²)/2
-       g = (a² + b² - c² - d²)/2
+       f = (aÂ² + bÂ² + cÂ² + dÂ²)/2
+       g = (aÂ² + bÂ² - cÂ² - dÂ²)/2
        h = (a*c + d*d)
-       φ = 2*θ
+       Ï = 2*Î¸
   
-  It is clear that MAX[ |X'| ] = sqrt(MAX[ r² ]).  Here we determine MAX[ r² ]
+  It is clear that MAX[ |X'| ] = sqrt(MAX[ rÂ² ]).  Here we determine MAX[ rÂ² ]
   using (D) from above:
   
-       MAX[ r² ] = f + sqrt(g² + h²)
+       MAX[ rÂ² ] = f + sqrt(gÂ² + hÂ²)
   
   And finally
 
-       MAX[ |X'| ] = sqrt( f + sqrt(g² + h²) )
+       MAX[ |X'| ] = sqrt( f + sqrt(gÂ² + hÂ²) )
 
   Which is the solution to this problem.
 
@@ -671,7 +671,7 @@ _cairo_matrix_is_integer_translation(const cairo_matrix_t *m,
   2004/10/08
 
   (Note that the minor axis length is at the minimum of the above solution,
-  which is just sqrt ( f - sqrt(g² + h²) ) given the symmetry of (D)).
+  which is just sqrt ( f - sqrt(gÂ² + hÂ²) ) given the symmetry of (D)).
 */
 
 /* determine the length of the major axis of a circle of the given radius
@@ -699,4 +699,21 @@ _cairo_matrix_transformed_circle_major_axis (cairo_matrix_t *matrix, double radi
      * we don't need the minor axis length, which is
      * double min = radius * sqrt (f - sqrt (g*g+h*h));
      */
+}
+
+void
+_cairo_matrix_to_pixman_matrix (const cairo_matrix_t	*matrix,
+				pixman_transform_t	*pixman_transform)
+{
+    pixman_transform->matrix[0][0] = _cairo_fixed_from_double (matrix->xx);
+    pixman_transform->matrix[0][1] = _cairo_fixed_from_double (matrix->xy);
+    pixman_transform->matrix[0][2] = _cairo_fixed_from_double (matrix->x0);
+
+    pixman_transform->matrix[1][0] = _cairo_fixed_from_double (matrix->yx);
+    pixman_transform->matrix[1][1] = _cairo_fixed_from_double (matrix->yy);
+    pixman_transform->matrix[1][2] = _cairo_fixed_from_double (matrix->y0);
+
+    pixman_transform->matrix[2][0] = 0;
+    pixman_transform->matrix[2][1] = 0;
+    pixman_transform->matrix[2][2] = _cairo_fixed_from_double (1);
 }

@@ -1,6 +1,6 @@
 /* cairo - a vector graphics library with display and print output
  *
- * Copyright © 2005 Red Hat Inc.
+ * Copyright Â© 2005 Red Hat Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public
@@ -61,6 +61,16 @@ _cairo_font_options_init_default (cairo_font_options_t *options)
     options->hint_metrics = CAIRO_HINT_METRICS_DEFAULT;
 }
 
+void
+_cairo_font_options_init_copy (cairo_font_options_t		*options,
+			       const cairo_font_options_t	*other)
+{
+    options->antialias = other->antialias;
+    options->subpixel_order = other->subpixel_order;
+    options->hint_style = other->hint_style;
+    options->hint_metrics = other->hint_metrics;
+}
+
 /**
  * cairo_font_options_create:
  *
@@ -107,7 +117,7 @@ cairo_font_options_copy (const cairo_font_options_t *original)
     if (!options)
 	return (cairo_font_options_t *)&cairo_font_options_nil;
 
-    *options = *original;
+    _cairo_font_options_init_copy (options, original);
 
     return options;
 }

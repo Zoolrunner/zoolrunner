@@ -1,5 +1,5 @@
 /*
- * Copyright © 2003 Carl Worth
+ * Copyright Â© 2003 Carl Worth
  *
  * Permission to use, copy, modify, distribute, and sell this software and its
  * documentation for any purpose is hereby granted without fee, provided that
@@ -34,9 +34,6 @@
 #include <limits.h>
 
 #include "slim_internal.h"
-
-/* Include NSPR's prcpucfg.h for endianness information */
-#include "prcpucfg.h"
 
 #ifndef __GNUC__
 #define __inline
@@ -111,7 +108,7 @@ typedef pixman_triangle_t	xTriangle;
 #define LSBFirst 0
 #define MSBFirst 1
 
-#if defined(WORDS_BIGENDIAN) || defined(IS_BIG_ENDIAN)
+#ifdef WORDS_BIGENDIAN
 #  define IMAGE_BYTE_ORDER MSBFirst
 #  define BITMAP_BIT_ORDER MSBFirst
 #else
@@ -837,6 +834,13 @@ pixman_format_init (pixman_format_t *format, int format_code);
 pixman_private pixman_image_t *
 pixman_image_createForPixels (FbPixels	*pixels,
 			pixman_format_t	*format);
+
+pixman_private uint32_t
+pixman_gradient_color (pixman_gradient_stop_t *stop1,
+		       pixman_gradient_stop_t *stop2,
+		       uint32_t		      x);
+
+#define PictureGradientColor pixman_gradient_color
 
 /* icpixels.c */
 

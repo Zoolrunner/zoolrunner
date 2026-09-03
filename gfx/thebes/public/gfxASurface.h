@@ -41,13 +41,66 @@
 #include <cairo.h>
 
 #include "gfxTypes.h"
+#include "gfxRect.h"
+#include "nsStringFwd.h"
 
-class gfxASurface {
+/**
+ * A surface is something you can draw on. Instantiate a subclass of this
+ * abstract class, and use gfxContext to draw on this surface.
+ */
+class NS_EXPORT gfxASurface {
     THEBES_DECL_REFCOUNTING_ABSTRACT
 
 public:
+    /**
+     * The format for an image surface. For all formats with alpha data, 0
+     * means transparent, 1 or 255 means fully opaque.
+     */
+    typedef enum {
+        ImageFormatARGB32, ///< ARGB data in native endianness, using premultiplied alpha
+        ImageFormatRGB24,  ///< xRGB data in native endianness
+        ImageFormatA8,     ///< Only an alpha channel
+        ImageFormatA1      ///< Packed transparency information (one byte refers to 8 pixels)
+    } gfxImageFormat;
+
     /*** this DOES NOT addref the surface */
     cairo_surface_t* CairoSurface() { return mSurface; }
+
+    void SetDeviceOffset (gfxFloat xOff, gfxFloat yOff) {
+        cairo_surface_set_device_offset(mSurface,
+                                        xOff, yOff);
+    }
+
+    void GetDeviceOffset (gfxFloat *xOff, gfxFloat *yOff) {
+        cairo_surface_get_device_offset(mSurface, xOff, yOff);
+    }
+
+    void Flush() { cairo_surface_flush(mSurface); }
+    void MarkDirty() { cairo_surface_mark_dirty(mSurface); }
+    void MarkDirty(const gfxRect& r) {
+        cairo_surface_mark_dirty_rectangle(mSurface,
+                                           (int) r.pos.x, (int) r.pos.y,
+                                           (int) r.size.width, (int) r.size.height);
+    }
+
+    /* Printing backend functions */
+    virtual nsresult BeginPrinting(const nsAString& aTitle, const nsAString& aPrintToFileName) { return NS_ERROR_NOT_IMPLEMENTED; }
+    virtual nsresult EndPrinting() { return NS_ERROR_NOT_IMPLEMENTED; }
+    virtual nsresult AbortPrinting() { return NS_ERROR_NOT_IMPLEMENTED; }
+    virtual nsresult BeginPage() { return NS_ERROR_NOT_IMPLEMENTED; }
+    virtual nsresult EndPage() { return NS_ERROR_NOT_IMPLEMENTED; }
+
+    void SetData(const cairo_user_data_key_t *key,
+                 void *user_data,
+                 cairo_destroy_func_t destroy)
+    {
+        cairo_surface_set_user_data (mSurface, key, user_data, destroy);
+    }
+
+    void *GetData(const cairo_user_data_key_t *key)
+    {
+        return cairo_surface_get_user_data (mSurface, key);
+    }
 
 protected:
     void Init(cairo_surface_t* surface) {
@@ -77,6 +130,23 @@ protected:
 private:
     cairo_surface_t* mSurface;
     PRBool mDestroyed;
+};
+
+/**
+ * An Unknown surface; used to wrap unknown cairo_surface_t returns from cairo
+ */
+class NS_EXPORT gfxUnknownSurface : public gfxASurface {
+    THEBES_DECL_ISUPPORTS_INHERITED
+
+public:
+    gfxUnknownSurface(cairo_surface_t *surf) {
+        cairo_surface_reference(surf);
+        Init(surf);
+    }
+
+    virtual ~gfxUnknownSurface() {
+        Destroy();
+    }
 };
 
 #endif /* GFX_ASURFACE_H */

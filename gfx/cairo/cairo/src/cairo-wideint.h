@@ -1,7 +1,7 @@
 /*
- * $Id: cairo-wideint.h,v 1.6.4.1 2005/09/27 23:09:01 vladimir%pobox.com Exp $
+ * $Id: cairo-wideint.h,v 1.11 2006/02/03 04:49:23 vladimir%pobox.com Exp $
  *
- * Copyright © 2004 Keith Packard
+ * Copyright Â© 2004 Keith Packard
  *
  * This library is free software; you can redistribute it and/or
  * modify it either under the terms of the GNU Lesser General Public

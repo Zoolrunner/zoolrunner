@@ -50,8 +50,6 @@ SOFTWARE.
 #include <limits.h>
 #include <string.h>
 
-#undef DEBUG
-
 #include "pixregionint.h"
 #include "slim_internal.h"
 
@@ -62,7 +60,7 @@ SOFTWARE.
 #endif
 
 #undef assert
-#ifdef DEBUG
+#ifdef DEBUG_PIXREGION
 #define assert(expr) {if (!(expr)) \
 		FatalError("Assertion failed file %s, line %d: expr\n", \
 			__FILE__, __LINE__); }
@@ -210,7 +208,7 @@ if (((numRects) < ((reg)->data->size >> 1)) && ((reg)->data->size > 50)) \
 }
 
 
-#ifdef DEBUG
+#ifdef DEBUG_PIXREGION
 int
 pixman_region16_print(rgn)
     pixman_region16_t * rgn;
@@ -304,7 +302,7 @@ pixman_region16_valid(reg)
     }
 }
 
-#endif /* DEBUG */
+#endif /* DEBUG_PIXREGION */
 
 
 /*	Create a new empty region	*/
