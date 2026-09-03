@@ -64,6 +64,7 @@ extern "C" {
 #include "nsIInterfaceRequestor.h"
 #include "nsIInterfaceRequestorUtils.h"
 
+#ifndef MOZ_ENABLE_CAIRO_GFX
 #ifdef XP_MACOSX
 #include "nsIDrawingSurfaceMac.h"
 extern "C" {
@@ -90,6 +91,7 @@ extern "C" {
 #else
 #include "nsRenderingContextGTK.h"
 #include <gdk/gdkx.h>
+#endif
 #endif
 
 /**
@@ -126,7 +128,7 @@ private:
   cairo_matrix_t mInitialTransform;
   nsVoidArray mContextStack;
 
-#ifdef XP_MACOSX
+#if defined(XP_MACOSX) && !defined(MOZ_ENABLE_CAIRO_GFX)
   nsCOMPtr<nsIDrawingSurfaceMac> mSurface;
   CGContextRef mQuartzRef;
 #endif
@@ -192,7 +194,7 @@ nsSVGCairoCanvas::Init(nsIRenderingContext *ctx,
   void* data;
   ctx->RetrieveCurrentNativeGraphicData(&data);
   mCR = (cairo_t*)data;
-  cairo_get_matrix(mCR, &mInitialTranslation);
+  cairo_get_matrix(mCR, &mInitialTransform);
   return NS_OK;
 
 #else // !MOZ_ENABLE_CAIRO_GFX
@@ -564,7 +566,7 @@ static nsresult CopyCairoImageToIImage(PRUint8* aData, PRInt32 aWidth, PRInt32 a
 NS_IMETHODIMP
 nsSVGCairoCanvas::Flush()
 {
-#ifdef XP_MACOSX
+#if defined(XP_MACOSX) && !defined(MOZ_ENABLE_CAIRO_GFX)
   if (mSurface)
     mSurface->EndQuartzDrawing(mQuartzRef);
 #endif
@@ -773,4 +775,3 @@ nsSVGCairoCanvas::CompositeSurfaceMatrix(nsISVGRendererSurface *aSurface,
 
   return NS_OK;
 }
-
