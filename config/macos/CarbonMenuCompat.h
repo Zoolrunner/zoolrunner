@@ -36,12 +36,23 @@ extern OSErr GetMenuItemCommandID(MenuRef, MenuItemIndex, MenuCommand *);
 extern OSErr SetMenuItemModifiers(MenuRef, MenuItemIndex, UInt8);
 extern OSStatus SetMenuItemCommandKey(MenuRef, MenuItemIndex, Boolean, UInt16);
 extern OSStatus SetMenuItemHierarchicalMenu(MenuRef, MenuItemIndex, MenuRef);
-extern void EnableMenuCommand(MenuRef, MenuCommand);
 extern void DisableMenuCommand(MenuRef, MenuCommand);
+extern OSStatus GetIndMenuItemWithCommandID(MenuRef, MenuCommand, UInt32,
+                                           MenuRef *, MenuItemIndex *);
 extern MenuRef AcquireRootMenu(void);
 extern OSStatus SetRootMenu(MenuRef);
 extern void DrawMenuBar(void);
 extern EventTargetRef GetMenuEventTarget(MenuRef);
+}
+
+static inline void
+ZREnableMenuCommand(MenuRef aMenu, MenuCommand aCommand)
+{
+  MenuRef foundMenu = NULL;
+  MenuItemIndex foundItem = 0;
+  if (GetIndMenuItemWithCommandID(aMenu, aCommand, 1, &foundMenu,
+                                 &foundItem) == noErr && foundMenu)
+    EnableMenuItem(foundMenu, foundItem);
 }
 
 static inline OSStatus

@@ -189,6 +189,10 @@ LDFLAGS	+= \
 
 ifneq ($(CPU_ARCH),aarch64)
 LDFLAGS += -framework QuickTime
+else
+# The LP64 headers hide several retained HIToolbox menu and text-input APIs,
+# but the macOS 11 Carbon umbrella explicitly exports them for arm64.
+LDFLAGS += -framework Carbon
 endif
 
 CXXFLAGS += \

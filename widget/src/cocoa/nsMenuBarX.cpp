@@ -380,9 +380,13 @@ nsMenuBarX :: CommandEventHandler ( EventHandlerCallRef inHandlerChain, EventRef
       // only enable the preferences item in the app menu if we found a pref
       // item DOM node in this menubar.
       if ( command.commandID == kHICommandPreferences ) {
-        if ( self->mPrefItemContent )
-          ::EnableMenuCommand ( nsnull, kHICommandPreferences );
-        else
+        if ( self->mPrefItemContent ) {
+#if defined(__LP64__)
+          ZREnableMenuCommand(nsnull, kHICommandPreferences);
+#else
+          ::EnableMenuCommand(nsnull, kHICommandPreferences);
+#endif
+        } else
           ::DisableMenuCommand ( nsnull, kHICommandPreferences );
         handled = noErr;
       }
@@ -957,4 +961,3 @@ MenuHelpersX::DocShellToPresContext (nsIDocShell* inDocShell, nsPresContext** ou
   return retval;
   
 } // DocShellToPresContext
-
