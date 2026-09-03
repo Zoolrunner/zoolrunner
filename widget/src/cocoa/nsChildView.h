@@ -72,6 +72,7 @@ struct nsPluginPort;
 #import <Cocoa/Cocoa.h>
 
 class nsChildView;
+class nsIDragService;
 
 
 #ifdef MOZ_ENABLE_CAIRO_GFX
@@ -116,6 +117,9 @@ class nsChildView;
   BOOL mPendingFullDisplay;
   
   PRUint32 mLastModifierState;
+#if defined(__APPLE__) && defined(__LP64__)
+  nsIDragService* mDragService;
+#endif
 }
 
 // these are sent to the first responder when the window key status

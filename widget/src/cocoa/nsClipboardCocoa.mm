@@ -114,7 +114,9 @@ nsClipboard::SetNativeClipboardData(PRInt32 aWhichClipboard)
   mIgnoreEmptyNotification = PR_TRUE;
   NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
   [pasteboard declareTypes:types owner:nil];
-  for (NSString *type in types) {
+  NSUInteger typeCount = [types count];
+  for (NSUInteger i = 0; i < typeCount; ++i) {
+    NSString *type = [types objectAtIndex:i];
     id value = [values objectForKey:type];
     if ([value isKindOfClass:[NSString class]])
       [pasteboard setString:value forType:type];

@@ -79,6 +79,12 @@ public:
 
 private:
 
+#if defined(__APPLE__) && defined(__LP64__)
+  nsISupportsArray* mDataItems;
+  void* mNativeDragView;
+  void* mNativeDragEvent;
+#else
+
   char* LookupMimeMappingsForItem ( DragReference inDragRef, ItemReference itemRef ) ;
 
   void RegisterDragItemsAndFlavors ( nsISupportsArray * inArray, RgnHandle inDragRgn ) ;
@@ -107,9 +113,9 @@ private:
                                  // DragSendDataProc has access to them. 
                                  // ONLY VALID DURING A DRAG STARTED WITHIN THIS APP.
   PRBool mImageDraggingSupported;
+#endif
 
 }; // class nsDragService
 
 
 #endif // nsDragService_h__
-

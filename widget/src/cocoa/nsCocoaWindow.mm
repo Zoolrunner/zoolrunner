@@ -45,9 +45,11 @@
 #include "nsIScreen.h"
 #include "nsIScreenManager.h"
 #include "nsGUIEvent.h"
+#ifndef MOZ_ENABLE_CAIRO_GFX
 #include "nsCarbonHelpers.h"
 #include "nsGfxUtils.h"
 #include "nsMacResources.h"
+#endif
 #include "nsIRollupListener.h"
 #import "nsChildView.h"
 
@@ -111,7 +113,7 @@ SetDragActionBasedOnModifiers ( nsIDragService* inDragService, short inModifiers
 #pragma mark -
 
 
-//¥¥¥ this should probably go into the drag session as a static
+//â€¢â€¢â€¢ this should probably go into the drag session as a static
 pascal OSErr
 nsCocoaWindow::DragTrackingHandler ( DragTrackingMessage theMessage, WindowPtr theWindow, 
                     void *handlerRefCon, DragReference theDrag)
@@ -216,7 +218,7 @@ nsCocoaWindow::DragTrackingHandler ( DragTrackingMessage theMessage, WindowPtr t
 } // DragTrackingHandler
 
 
-//¥¥¥ this should probably go into the drag session as a static
+//â€¢â€¢â€¢ this should probably go into the drag session as a static
 pascal OSErr
 nsCocoaWindow::DragReceiveHandler (WindowPtr theWindow, void *handlerRefCon,
                   DragReference theDragRef)
@@ -393,8 +395,13 @@ nsresult nsCocoaWindow::StandardCreate(nsIWidget *aParent,
     if (features == 0)
       [mWindow setReleasedWhenClosed: NO];
 
-    // create a quickdraw view as the toplevel content view of the window
+    // Create the top-level content view. The historical 32-bit backend uses
+    // NSQuickDrawView; QuickDraw is unavailable in the LP64 Cocoa ABI.
+#ifdef MOZ_ENABLE_CAIRO_GFX
+    NSView* content = [[[NSView alloc] init] autorelease];
+#else
     NSQuickDrawView* content = [[[NSQuickDrawView alloc] init] autorelease];
+#endif
     [content setFrame:[[mWindow contentView] frame]];
     [mWindow setContentView:content];
     
@@ -804,7 +811,11 @@ nsCocoaWindow::GetNativeData(PRUint32 aDataType)
       break;
       
     case NS_NATIVE_GRAPHIC:          // quickdraw port of top view (for now)
+#ifdef MOZ_ENABLE_CAIRO_GFX
+      retVal = nsnull;
+#else
       retVal = [[mWindow contentView] qdPort];
+#endif
       break;
       
 #if 0
@@ -813,7 +824,7 @@ nsCocoaWindow::GetNativeData(PRUint32 aDataType)
       break;
 
     case NS_NATIVE_COLORMAP:
-      //¥TODO
+      //â€¢TODO
       break;
 
     case NS_NATIVE_OFFSETX:

@@ -55,6 +55,11 @@
 #include "nsIScrollableView.h"
 #include "nsIInterfaceRequestor.h"
 #include "nsIServiceManager.h"
+#if defined(__APPLE__) && defined(__LP64__)
+#include "nsIDragService.h"
+#include "nsIDragSession.h"
+#include "nsIDOMNode.h"
+#endif
 
 #ifndef MOZ_ENABLE_CAIRO_GFX
 #include "nsCarbonHelpers.h"
@@ -129,6 +134,10 @@ enum {
 - (BOOL)isRectObscuredBySubview:(NSRect)inRect;
 
 - (void)processPendingRedraws;
+
+#if defined(__APPLE__) && defined(__LP64__)
+- (BOOL)doDragAction:(PRUint32)aMessage sender:(id <NSDraggingInfo>)aSender;
+#endif
 
 #if USE_CLICK_HOLD_CONTEXTMENU
  // called on a timer two seconds after a mouse down to see if we should display
@@ -2132,6 +2141,12 @@ nsChildView::GetThebesSurface()
 
 @implementation ChildView
 
+#if defined(__APPLE__) && defined(__LP64__)
+NSPasteboard *gCocoaDragPasteboard = nil;
+NSView *gCocoaLastDragView = nil;
+NSEvent *gCocoaLastDragEvent = nil;
+#endif
+
 //
 // initWithFrame:geckoChild:eventSink:
 //
@@ -2145,6 +2160,9 @@ nsChildView::GetThebesSurface()
     mEventSink = inSink;
     mIsPluginView = NO;
     mCurKeyEvent = nil;
+#if defined(__APPLE__) && defined(__LP64__)
+    mDragService = nsnull;
+#endif
 
     // See if hack code for enabling and disabling mouse move
     // events is necessary. Fixed by at least 10.2.8
@@ -2163,12 +2181,23 @@ nsChildView::GetThebesSurface()
     mSelectedRange.length = 0;
     mInComposition = NO;
   }
+
+#if defined(__APPLE__) && defined(__LP64__)
+  [self registerForDraggedTypes:[NSArray arrayWithObjects:
+    NSFilenamesPboardType, NSStringPboardType, NSHTMLPboardType,
+    NSURLPboardType, @"ZoolRunnerWildcard",
+    @"CorePasteboardFlavorType 0x75726C20",
+    @"CorePasteboardFlavorType 0x75726C64", nil]];
+#endif
   
   return self;
 }
 
 - (void)dealloc
 {
+#if defined(__APPLE__) && defined(__LP64__)
+  NS_IF_RELEASE(mDragService);
+#endif
   [super dealloc];    // This sets the current port to _savePort (which should be
                       // a valid port, checked with the assertion above.
 #ifndef MOZ_ENABLE_CAIRO_GFX
@@ -2178,6 +2207,9 @@ nsChildView::GetThebesSurface()
 
 - (void)widgetDestroyed
 {
+#if defined(__APPLE__) && defined(__LP64__)
+  NS_IF_RELEASE(mDragService);
+#endif
   mGeckoChild = nsnull;
   mEventSink = nsnull;
 }
@@ -2788,6 +2820,11 @@ nsChildView::GetThebesSurface()
     return;
   }
 
+#if defined(__APPLE__) && defined(__LP64__)
+  gCocoaLastDragView = self;
+  gCocoaLastDragEvent = theEvent;
+#endif
+
   nsMouseEvent geckoEvent(PR_TRUE, 0, nsnull, nsMouseEvent::eReal);
   [self convertEvent:theEvent message:NS_MOUSE_MOVE toGeckoEvent:&geckoEvent];
 
@@ -2802,6 +2839,11 @@ nsChildView::GetThebesSurface()
   // send event into Gecko by going directly to the
   // the widget.
   mGeckoChild->DispatchMouseEvent(geckoEvent);    
+
+#if defined(__APPLE__) && defined(__LP64__)
+  gCocoaLastDragView = nil;
+  gCocoaLastDragEvent = nil;
+#endif
 
   // XXX maybe call markedTextSelectionChanged:client: here?
 }
@@ -3975,5 +4017,118 @@ static PRBool IsSpecialRaptorKey(UInt32 macKeyCode)
 {
   return [scroller floatValue];
 }
+
+#if defined(__APPLE__) && defined(__LP64__)
+
+#define COCOA_DRAG_SERVICE_CONTRACTID "@mozilla.org/widget/dragservice;1"
+
+- (BOOL)doDragAction:(PRUint32)aMessage sender:(id <NSDraggingInfo>)aSender
+{
+  if (!mGeckoChild)
+    return NO;
+
+  if (!mDragService) {
+    CallGetService(COCOA_DRAG_SERVICE_CONTRACTID, &mDragService);
+    if (!mDragService)
+      return NO;
+  }
+
+  nsCOMPtr<nsIDragSession> session;
+  mDragService->GetCurrentSession(getter_AddRefs(session));
+  if (aMessage == NS_DRAGDROP_ENTER && !session) {
+    mDragService->StartDragSession();
+    mDragService->GetCurrentSession(getter_AddRefs(session));
+  }
+  if (!session)
+    return NO;
+
+  if (aMessage == NS_DRAGDROP_OVER)
+    session->SetCanDrop(PR_FALSE);
+
+  NSUInteger modifiers = [[NSApp currentEvent] modifierFlags];
+  PRUint32 action = nsIDragService::DRAGDROP_ACTION_MOVE;
+  if (modifiers & NSAlternateKeyMask) {
+    action = (modifiers & NSCommandKeyMask) ?
+      nsIDragService::DRAGDROP_ACTION_LINK :
+      nsIDragService::DRAGDROP_ACTION_COPY;
+  }
+  session->SetDragAction(action);
+
+  if (aMessage == NS_DRAGDROP_DROP) {
+    PRBool canDrop = PR_FALSE;
+    if (NS_FAILED(session->GetCanDrop(&canDrop)) || !canDrop)
+      return NO;
+  }
+
+  nsMouseEvent geckoEvent(PR_TRUE, aMessage, nsnull, nsMouseEvent::eReal);
+  NSPoint location = [aSender draggingLocation];
+  [self convertLocation:location message:aMessage modifiers:(unsigned int)modifiers
+            toGeckoEvent:&geckoEvent];
+  mGeckoChild->DispatchWindowEvent(geckoEvent);
+
+  if (aMessage == NS_DRAGDROP_OVER) {
+    PRBool canDrop = PR_FALSE;
+    session->GetCanDrop(&canDrop);
+    return canDrop ? YES : NO;
+  }
+
+  if (aMessage == NS_DRAGDROP_EXIT || aMessage == NS_DRAGDROP_DROP) {
+    nsCOMPtr<nsIDOMNode> sourceNode;
+    session->GetSourceNode(getter_AddRefs(sourceNode));
+    if (!sourceNode)
+      mDragService->EndDragSession();
+  }
+  return YES;
+}
+
+- (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
+{
+  [gCocoaDragPasteboard release];
+  gCocoaDragPasteboard = [[sender draggingPasteboard] retain];
+  return [self doDragAction:NS_DRAGDROP_ENTER sender:sender] ?
+    NSDragOperationGeneric : NSDragOperationNone;
+}
+
+- (NSDragOperation)draggingUpdated:(id <NSDraggingInfo>)sender
+{
+  return [self doDragAction:NS_DRAGDROP_OVER sender:sender] ?
+    NSDragOperationGeneric : NSDragOperationNone;
+}
+
+- (void)draggingExited:(id <NSDraggingInfo>)sender
+{
+  [self doDragAction:NS_DRAGDROP_EXIT sender:sender];
+  [gCocoaDragPasteboard release];
+  gCocoaDragPasteboard = nil;
+  NS_IF_RELEASE(mDragService);
+}
+
+- (BOOL)performDragOperation:(id <NSDraggingInfo>)sender
+{
+  BOOL accepted = [self doDragAction:NS_DRAGDROP_DROP sender:sender];
+  [gCocoaDragPasteboard release];
+  gCocoaDragPasteboard = nil;
+  NS_IF_RELEASE(mDragService);
+  return accepted;
+}
+
+- (void)draggedImage:(NSImage *)image endedAt:(NSPoint)point
+            operation:(NSDragOperation)operation
+{
+  if (!mDragService)
+    CallGetService(COCOA_DRAG_SERVICE_CONTRACTID, &mDragService);
+  if (mDragService)
+    mDragService->EndDragSession();
+  NS_IF_RELEASE(mDragService);
+  [gCocoaDragPasteboard release];
+  gCocoaDragPasteboard = nil;
+}
+
+- (NSDragOperation)draggingSourceOperationMaskForLocal:(BOOL)isLocal
+{
+  return NSDragOperationEvery;
+}
+
+#endif
 
 @end

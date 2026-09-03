@@ -83,14 +83,7 @@ EXPORTS = \
 
 MAC_LCPPSRCS = \
 		nsBidiKeyboard.cpp \
-		nsDragService.cpp \
-		nsDragHelperService.cpp \
 		nsLookAndFeel.cpp \
-		nsMacNativeUnicodeConverter.cpp \
-		nsMacResources.cpp \
-		nsMimeMapper.cpp \
-		nsSound.cpp \
-		nsStylClipboardUtils.cpp \
 		nsToolkitBase.cpp \
 		$(NULL)
 
@@ -116,9 +109,23 @@ CMMSRCS = \
 		$(NULL)
 
 ifeq ($(CPU_ARCH),aarch64)
-CMMSRCS += nsClipboardCocoa.mm
+CMMSRCS += \
+		nsClipboardCocoa.mm \
+		nsDragServiceCocoa.mm \
+		nsSoundCocoa.mm \
+		$(NULL)
+CPPSRCS += nsDragHelperServiceCocoa.cpp
 else
-MAC_LCPPSRCS += nsClipboard.cpp
+MAC_LCPPSRCS += \
+		nsClipboard.cpp \
+		nsDragService.cpp \
+		nsDragHelperService.cpp \
+		nsMacNativeUnicodeConverter.cpp \
+		nsMacResources.cpp \
+		nsMimeMapper.cpp \
+		nsSound.cpp \
+		nsStylClipboardUtils.cpp \
+		$(NULL)
 endif
 	
 XPIDLSRCS	+= \
