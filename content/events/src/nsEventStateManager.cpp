@@ -129,6 +129,9 @@
 
 #if defined (XP_MAC) || defined(XP_MACOSX)
 #include <Events.h>
+#if defined(XP_MACOSX) && defined(__LP64__)
+#include <Carbon/Carbon.h>
+#endif
 #endif
 
 #if defined(DEBUG_rods) || defined(DEBUG_bryner)
@@ -1340,7 +1343,12 @@ nsEventStateManager::FireContextClick()
   if ( !mGestureDownContent )
     return;
 
-#if defined (XP_MAC) || defined(XP_MACOSX)
+#if defined(XP_MACOSX) && defined(__LP64__)
+  // StillDown is unavailable to 64-bit applications.  Bit zero is the
+  // primary mouse button, matching the historical StillDown check.
+  if (!(::GetCurrentButtonState() & 1))
+    return;
+#elif defined(XP_MAC) || defined(XP_MACOSX)
   // hacky OS call to ensure that we don't show a context menu when the user
   // let go of the mouse already, after a long, cpu-hogging operation prevented
   // us from handling any OS events. See bug 117589.
