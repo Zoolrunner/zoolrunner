@@ -130,7 +130,7 @@
 #if defined (XP_MAC) || defined(XP_MACOSX)
 #include <Events.h>
 #if defined(XP_MACOSX) && defined(__LP64__)
-#include <Carbon/Carbon.h>
+#include <ApplicationServices/ApplicationServices.h>
 #endif
 #endif
 
@@ -1344,9 +1344,10 @@ nsEventStateManager::FireContextClick()
     return;
 
 #if defined(XP_MACOSX) && defined(__LP64__)
-  // StillDown is unavailable to 64-bit applications.  Bit zero is the
-  // primary mouse button, matching the historical StillDown check.
-  if (!(::GetCurrentButtonState() & 1))
+  // StillDown is unavailable to 64-bit applications. Query the primary
+  // button directly while retaining StillDown for historical Mac targets.
+  if (!CGEventSourceButtonState(kCGEventSourceStateCombinedSessionState,
+                                kCGMouseButtonLeft))
     return;
 #elif defined(XP_MAC) || defined(XP_MACOSX)
   // hacky OS call to ensure that we don't show a context menu when the user
