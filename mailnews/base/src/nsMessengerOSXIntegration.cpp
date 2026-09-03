@@ -69,6 +69,9 @@
 #include "nsIWeakReference.h"
 
 #include <Carbon/Carbon.h>
+#ifdef __LP64__
+#import <Cocoa/Cocoa.h>
+#endif
 
 #define kBiffBadgeIcon "mail-biff-badge.png"
 
@@ -86,7 +89,11 @@ nsMessengerOSXIntegration::~nsMessengerOSXIntegration()
 {
   if (mBiffIconVisible) 
   {
+#ifdef __LP64__
+    [[[NSApplication sharedApplication] dockTile] setBadgeLabel:nil];
+#else
     RestoreApplicationDockTileImage();
+#endif
     mBiffIconVisible = PR_FALSE;
   }
 }
@@ -194,7 +201,7 @@ nsresult nsMessengerOSXIntegration::OnAlertFinished(const PRUnichar * aAlertCook
 	  }
     }
 
-    // This will change the dock icon.     
+    // This will change the dock icon.
     // If we want to overlay the number of new messages on top of
     // the icon ...
     
@@ -202,6 +209,12 @@ nsresult nsMessengerOSXIntegration::OnAlertFinished(const PRUnichar * aAlertCook
     // -- you'll have to pass it a CGImage, and somehow we have to
     // create the CGImage with the numbers. tricky    
     PRInt32 totalNewMessages = CountNewMessages();
+#ifdef __LP64__
+    NSString* badgeLabel = [NSString stringWithFormat:@"%ld",
+                            (long)totalNewMessages];
+    [[[NSApplication sharedApplication] dockTile] setBadgeLabel:badgeLabel];
+    mBiffIconVisible = PR_TRUE;
+#else
     CGContextRef context = ::BeginCGContextForApplicationDockTile();
     
     // Draw a circle.
@@ -319,6 +332,7 @@ nsresult nsMessengerOSXIntegration::OnAlertFinished(const PRUnichar * aAlertCook
 
     ::EndCGContextForApplicationDockTile(context);
     mBiffIconVisible = PR_TRUE;
+#endif
   }
 
   mSuppressBiffIcon = PR_FALSE;
@@ -408,7 +422,11 @@ nsMessengerOSXIntegration::OnItemIntPropertyChanged(nsIRDFResource *aItem, nsIAt
       mFoldersWithNewMail->Clear(); 
       if (mBiffIconVisible) 
       {
+#ifdef __LP64__
+        [[[NSApplication sharedApplication] dockTile] setBadgeLabel:nil];
+#else
         RestoreApplicationDockTileImage();
+#endif
         mBiffIconVisible = PR_FALSE;
       }
     }
