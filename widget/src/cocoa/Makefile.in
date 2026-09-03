@@ -183,10 +183,13 @@ LOCAL_INCLUDES	= \
 	$(NULL)
 
 LDFLAGS	+= \
-	-framework QuickTime \
 	-framework IOKit \
 	-framework Cocoa \
 	$(NULL)
+
+ifneq ($(CPU_ARCH),aarch64)
+LDFLAGS += -framework QuickTime
+endif
 
 CXXFLAGS += \
   -DUSE_COCOA \

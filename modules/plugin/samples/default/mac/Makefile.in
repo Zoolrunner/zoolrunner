@@ -89,6 +89,8 @@ export::
 	ln -fs $(srcdir)/NullPlugin.rsrc
 endif
 
+ifneq ($(CPU_ARCH),aarch64)
+
 libs install:: install-plugin
 
 install-plugin: build-plugin
@@ -100,3 +102,5 @@ build-plugin:
 
 clean clobber distclean::
 	rm -rf build
+
+endif
