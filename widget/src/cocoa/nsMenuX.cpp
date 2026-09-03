@@ -365,7 +365,9 @@ nsMenuX :: InsertMenuItemWithTruncation ( nsAutoString & inItemLabel, PRUint32 i
 
   CFMutableStringRef labelRef = ::CFStringCreateMutable ( kCFAllocatorDefault, inItemLabel.Length() );
   ::CFStringAppendCharacters ( labelRef, (UniChar*)inItemLabel.get(), inItemLabel.Length() );
+#if !defined(__LP64__)
   ::TruncateThemeText(labelRef, kThemeMenuItemFont, kThemeStateActive, kMaxItemPixelWidth, truncMiddle, NULL);
+#endif
   ::InsertMenuItemTextWithCFString(mMacMenuHandle, labelRef, inItemIndex, 0, 0);
   ::CFRelease(labelRef);
 
@@ -420,8 +422,8 @@ NS_METHOD nsMenuX::RemoveAll()
     nsCOMPtr<nsIMenuCommandDispatcher> dispatcher ( do_QueryInterface(mManager) );
     if ( dispatcher ) {
       for ( int i = 1; i <= mNumMenuItems; ++i ) {
-        PRUint32 commandID = 0L;
-        OSErr err = ::GetMenuItemCommandID(mMacMenuHandle, i, (unsigned long*)&commandID);
+        MenuCommand commandID = 0L;
+        OSErr err = ::GetMenuItemCommandID(mMacMenuHandle, i, &commandID);
         if ( !err )
           dispatcher->Unregister(commandID);
       }
@@ -481,9 +483,9 @@ nsEventStatus nsMenuX::MenuSelected(const nsMenuEvent & aMenuEvent)
   nsEventStatus eventStatus = nsEventStatus_eIgnore;
 
   // Determine if this is the correct menu to handle the event
-  MenuHandle selectedMenuHandle = (MenuHandle) aMenuEvent.mCommand;
+  MenuID selectedMenuID = (MenuID)aMenuEvent.mCommand;
 
-  if (mMacMenuHandle == selectedMenuHandle) {
+  if (mMacMenuHandle && ::GetMenuID(mMacMenuHandle) == selectedMenuID) {
     // Open the node.
     mMenuContent->SetAttr(kNameSpaceID_None, nsWidgetAtoms::open, NS_LITERAL_STRING("true"), PR_TRUE);
   
@@ -693,7 +695,7 @@ static pascal OSStatus MyMenuEventHandler(EventHandlerCallRef myHandler, EventRe
       ::GetEventParameter(event, kEventParamDirectObject, typeMenuRef, NULL, sizeof(menuRef), NULL, &menuRef);
       nsMenuEvent menuEvent(PR_TRUE, NS_MENU_SELECTED, nsnull);
       menuEvent.time = PR_IntervalNow();
-      menuEvent.mCommand = (PRUint32) menuRef;
+      menuEvent.mCommand = (PRUint32)::GetMenuID(menuRef);
       if (kind == kEventMenuOpening) {
         gCurrentlyTrackedMenuID = ::GetMenuID(menuRef);    // remember which menu ID we're over for later
         listener->MenuSelected(menuEvent);

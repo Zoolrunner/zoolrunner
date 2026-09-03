@@ -67,7 +67,11 @@
 
 #include <utility>
 #include <vector>
+#if defined(__APPLE__) && defined(__LP64__)
+#include <MacTypes.h>
+#else
 #include <Types.h>
+#endif
 #include "nsString.h"
 
 using std::pair;

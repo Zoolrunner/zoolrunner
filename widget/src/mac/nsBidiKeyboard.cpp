@@ -40,6 +40,10 @@
 
 #include "nsBidiKeyboard.h"
 
+#if defined(__LP64__)
+#include <string.h>
+#endif
+
 NS_IMPL_ISUPPORTS1(nsBidiKeyboard, nsIBidiKeyboard)
 
 nsBidiKeyboard::nsBidiKeyboard() : nsIBidiKeyboard()
@@ -55,6 +59,35 @@ NS_IMETHODIMP nsBidiKeyboard::IsLangRTL(PRBool *aIsRTL)
   *aIsRTL = PR_FALSE;
   nsresult rv = NS_ERROR_FAILURE;
 
+#if defined(__LP64__)
+  TISInputSourceRef inputSource = ::TISCopyCurrentKeyboardInputSource();
+  if (inputSource) {
+    CFArrayRef languages = (CFArrayRef)::TISGetInputSourceProperty(
+      inputSource, kTISPropertyInputSourceLanguages);
+    if (languages && ::CFArrayGetCount(languages) > 0) {
+      CFStringRef language = (CFStringRef)::CFArrayGetValueAtIndex(languages, 0);
+      char languageCode[32];
+      if (language && ::CFStringGetCString(language, languageCode,
+                                            sizeof(languageCode),
+                                            kCFStringEncodingUTF8)) {
+        static const char * const rtlLanguages[] = {
+          "ar", "dv", "fa", "he", "ku", "ps", "syr", "ur", "yi"
+        };
+        PRUint32 i;
+        for (i = 0; i < sizeof(rtlLanguages) / sizeof(rtlLanguages[0]); ++i) {
+          size_t length = strlen(rtlLanguages[i]);
+          if (!strncmp(languageCode, rtlLanguages[i], length) &&
+              (languageCode[length] == '\0' || languageCode[length] == '-')) {
+            *aIsRTL = PR_TRUE;
+            break;
+          }
+        }
+        rv = NS_OK;
+      }
+    }
+    ::CFRelease(inputSource);
+  }
+#else
   OSStatus err;
   KeyboardLayoutRef currentKeyboard;
 
@@ -70,6 +103,7 @@ NS_IMETHODIMP nsBidiKeyboard::IsLangRTL(PRBool *aIsRTL)
       *aIsRTL = IsRTLLanguage((SInt32)currentKeyboardResID);
     }
   }
+#endif
 
   return rv;
 }

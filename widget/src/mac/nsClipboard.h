@@ -48,7 +48,11 @@
 
 #include "nsBaseClipboard.h"
 
+#if defined(__APPLE__) && defined(__LP64__)
+#include <MacTypes.h>
+#else
 #include "Types.h"
+#endif
 
 class nsITransferable;
 
@@ -78,6 +82,10 @@ protected:
 
   // actually places data on the clipboard
   nsresult PutOnClipboard ( ResType inFlavor, const void* inData, PRInt32 inLen ) ;
+
+#if defined(__APPLE__) && defined(__LP64__)
+  long mChangeCount;
+#endif
 
 }; // nsClipboard
 

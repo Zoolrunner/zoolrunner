@@ -64,6 +64,11 @@
 #import "nsCursorManager.h"
 #import "nsWindowMap.h"
 
+#ifdef MOZ_ENABLE_CAIRO_GFX
+#include "gfxContext.h"
+#include "gfxQuartzSurface.h"
+#endif
+
 #define NSAppKitVersionNumber10_2 663
 
 // category of NSView methods to quiet warnings
@@ -614,7 +619,7 @@ void* nsChildView::GetNativeData(PRUint32 aDataType)
     
 #if 0
     case NS_NATIVE_COLORMAP:
-      //¥TODO
+      //Â¥TODO
       break;
 #endif
 
@@ -1391,7 +1396,8 @@ nsChildView::UpdateWidget(nsRect& aRect, nsIRenderingContext* aContext)
 {
   if (! mVisible)
     return;
-  
+
+#ifndef MOZ_ENABLE_CAIRO_GFX
   // For updating widgets, we _always_ want to use the NSQuickDrawView's port,
   // since that's the correct port for gecko to use to make rendering contexts.
   // The plugin is the only thing that uses the plugin port.
@@ -1420,6 +1426,7 @@ nsChildView::UpdateWidget(nsRect& aRect, nsIRenderingContext* aContext)
       Flash(paintEvent);
   }
   EndDraw();
+#endif
 }
 
 
@@ -1983,8 +1990,10 @@ nsChildView::GetQuickDrawPort()
 GrafPtr
 nsChildView::GetChildViewQuickDrawPort()
 {
+#ifndef MOZ_ENABLE_CAIRO_GFX
   if ([mView isKindOfClass:[ChildView class]])
     return (GrafPtr)[(ChildView*)mView qdPort];
+#endif
 
   return nsnull;
 }
@@ -2073,6 +2082,14 @@ nsChildView::Idle()
   // do some idle stuff?
   return NS_ERROR_NOT_IMPLEMENTED;
 }
+
+#ifdef MOZ_ENABLE_CAIRO_GFX
+gfxASurface*
+nsChildView::GetThebesSurface()
+{
+  return new gfxQuartzSurface(gfxASurface::ImageFormatARGB32, 1, 1);
+}
+#endif
 
 
 #pragma mark -
@@ -2365,7 +2382,11 @@ nsChildView::Idle()
 // 
 - (BOOL)isOpaque
 {
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  return YES;
+#else
   return mIsPluginView;
+#endif
 }
 
 -(void)setIsPluginView:(BOOL)aIsPlugin
@@ -2456,6 +2477,7 @@ nsChildView::Idle()
   return NO;
 }
 
+#ifndef MOZ_ENABLE_CAIRO_GFX
 - (void)lockFocus
 {
   // Set the current GrafPort to a "safe" port before calling [NSQuickDrawView lockFocus],
@@ -2464,6 +2486,7 @@ nsChildView::Idle()
   SetPort(NULL);
   [super lockFocus];
 }
+#endif
 
 //
 // -drawRect:
@@ -2481,7 +2504,37 @@ nsChildView::Idle()
   // being drawn is covered by a subview, and, if so, just bail.
   if ([self isRectObscuredBySubview:aRect])
     return;
-  
+
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  CGContextRef cgContext = (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];
+  nsRect geckoBounds;
+  mGeckoChild->GetBounds(geckoBounds);
+  nsRefPtr<gfxQuartzSurface> targetSurface =
+    new gfxQuartzSurface(cgContext, geckoBounds.width, geckoBounds.height,
+                         PR_FALSE);
+  nsRefPtr<gfxContext> targetContext = new gfxContext(targetSurface);
+
+  const NSRect *rects;
+  int count, i;
+  [self getRectsBeingDrawn:&rects count:&count];
+  for (i = 0; i < count; ++i) {
+    targetContext->Rectangle(gfxRect(rects[i].origin.x, rects[i].origin.y,
+                                     rects[i].size.width, rects[i].size.height));
+  }
+  targetContext->Clip();
+
+  nsCOMPtr<nsIRenderingContext> rc;
+  mGeckoChild->GetDeviceContext()->CreateRenderingContextInstance(*getter_AddRefs(rc));
+  rc->Init(mGeckoChild->GetDeviceContext(), targetContext);
+
+  nsRect r;
+  ConvertCocoaToGeckoRect(aRect, r);
+  nsPaintEvent paintEvent(PR_TRUE, NS_PAINT, mGeckoChild);
+  paintEvent.renderingContext = rc;
+  paintEvent.rect = &r;
+  mGeckoChild->DispatchWindowEvent(paintEvent);
+  paintEvent.renderingContext = nsnull;
+#else
   // tell gecko to paint.
   // If < 10.3, just paint the rect
   if (floor(NSAppKitVersionNumber) <= NSAppKitVersionNumber10_2) {
@@ -2503,6 +2556,7 @@ nsChildView::Idle()
       mGeckoChild->UpdateWidget(r, rendContext);
     }
   }
+#endif
 }
 
 - (BOOL)isRectObscuredBySubview:(NSRect)inRect

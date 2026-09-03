@@ -60,7 +60,9 @@
 
 #include <Menus.h>
 #include <TextUtils.h>
+#if !defined(__LP64__)
 #include <Balloons.h>
+#endif
 #include <Resources.h>
 #include <Appearance.h>
 #include <Gestalt.h>
@@ -279,6 +281,14 @@ nsMenuBarX :: InstallCommandEventHandler ( )
   OSStatus err = noErr;
   
   WindowRef myWindow = NS_REINTERPRET_CAST(WindowRef, mParent->GetNativeData(NS_NATIVE_DISPLAY));
+#if defined(__LP64__)
+  if (sCommandEventHandler) {
+    const EventTypeSpec commandEventList[] = { {kEventClassCommand, kEventCommandProcess},
+                                               {kEventClassCommand, kEventCommandUpdateStatus} };
+    err = ::InstallApplicationEventHandler(sCommandEventHandler, 2,
+                                            commandEventList, this, NULL);
+  }
+#else
   NS_ASSERTION ( myWindow, "Can't get WindowRef to install command handler!" );
   if ( myWindow && sCommandEventHandler ) {
     const EventTypeSpec commandEventList[] = { {kEventClassCommand, kEventCommandProcess},
@@ -286,6 +296,7 @@ nsMenuBarX :: InstallCommandEventHandler ( )
     err = ::InstallWindowEventHandler ( myWindow, sCommandEventHandler, 2, commandEventList, this, NULL );
     NS_ASSERTION ( err == noErr, "Uh oh, command handler not installed" );
   }
+#endif
 
   return err;
   
@@ -490,8 +501,7 @@ nsMenuBarX::MenuConstruct( const nsMenuEvent & aMenuEvent, nsIWidget* aParentWin
           menu->GetAttr(kNameSpaceID_None, nsWidgetAtoms::id, menuIDstring);
           if ( menuIDstring.EqualsLiteral("menu_Help") ) {
             nsMenuEvent event(PR_TRUE, 0, nsnull);
-            MenuHandle handle = nsnull;
-            event.mCommand = (unsigned int) handle;
+            event.mCommand = 0;
             nsCOMPtr<nsIMenuListener> listener(do_QueryInterface(pnsMenu));
             listener->MenuSelected(event);
           }          
@@ -947,6 +957,4 @@ MenuHelpersX::DocShellToPresContext (nsIDocShell* inDocShell, nsPresContext** ou
   return retval;
   
 } // DocShellToPresContext
-
-
 

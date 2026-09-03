@@ -54,6 +54,8 @@
 #include <Menus.h>
 #include <CarbonEvents.h>
 
+#include "CarbonMenuCompat.h"
+
 extern nsWeakPtr gMacMenubarX;
 
 class nsIWidget;

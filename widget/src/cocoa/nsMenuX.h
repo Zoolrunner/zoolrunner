@@ -49,6 +49,8 @@
 #include <UnicodeConverter.h>
 #include <CarbonEvents.h>
 
+#include "CarbonMenuCompat.h"
+
 
 class nsIMenuBar;
 class nsIMenuListener;

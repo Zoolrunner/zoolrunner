@@ -65,6 +65,9 @@ class   nsIRollupListener;
 class   nsGUIEvent;
 struct  nsColorMap;
 class   imgIContainer;
+#ifdef MOZ_ENABLE_CAIRO_GFX
+class   gfxASurface;
+#endif
 
 /**
  * Callback function that processes events.
@@ -850,6 +853,10 @@ class nsIWidget : public nsISupports {
     virtual void* GetNativeData(PRUint32 aDataType) = 0;
     virtual void FreeNativeData(void * data, PRUint32 aDataType) = 0;//~~~
     virtual nsIRenderingContext* GetRenderingContext() = 0;
+
+#ifdef MOZ_ENABLE_CAIRO_GFX
+    virtual gfxASurface* GetThebesSurface() { return nsnull; }
+#endif
     virtual nsIDeviceContext* GetDeviceContext() = 0;
     virtual nsIAppShell *GetAppShell() = 0;
     //@}
