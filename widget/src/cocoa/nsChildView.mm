@@ -3500,6 +3500,23 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
 // Handle matching cocoa IME with gecko key events. Sends a key down and key press
 // event to gecko.
 //
+#if defined(__LP64__)
+- (BOOL)performKeyEquivalent:(NSEvent*)theEvent
+{
+  // Current AppKit routes Command-key equivalents here instead of through
+  // keyDown:.  The historical Carbon menu path handled these before AppKit
+  // reached the view, but that path is not available to a 64-bit process.
+  // Feed them through the normal Gecko key-event path so XUL key bindings such
+  // as Command-A continue to work.
+  if ([theEvent modifierFlags] & NSCommandKeyMask) {
+    [self keyDown:theEvent];
+    return YES;
+  }
+
+  return [super performKeyEquivalent:theEvent];
+}
+#endif
+
 - (void)keyDown:(NSEvent*)theEvent
 {
   PRBool isKeyDownEventHandled = PR_TRUE;
