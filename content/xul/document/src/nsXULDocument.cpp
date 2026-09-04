@@ -2598,6 +2598,21 @@ nsXULDocument::ApplyPersistentAttributesToElements(nsIRDFResource* aResource,
             nsCOMPtr<nsIContent> element = do_QueryInterface(isupports2);
             NS_RELEASE(isupports2);
 
+            // Do not let a transient zero-sized top-level window stored by a
+            // previous run replace the useful dimensions in its XUL
+            // prototype.  Width and height of zero remain valid for ordinary
+            // XUL elements.
+            nsIAtom* tag = element->Tag();
+            if ((tag == nsXULAtoms::window ||
+                 tag == nsXULAtoms::dialog ||
+                 tag == nsXULAtoms::wizard) &&
+                (attr == nsXULAtoms::width || attr == nsXULAtoms::height)) {
+                PRInt32 errorCode;
+                PRInt32 dimension = wrapper.ToInteger(&errorCode);
+                if (NS_SUCCEEDED(errorCode) && dimension <= 0)
+                    continue;
+            }
+
             rv = element->SetAttr(/* XXX */ kNameSpaceID_None,
                                   attr,
                                   wrapper,

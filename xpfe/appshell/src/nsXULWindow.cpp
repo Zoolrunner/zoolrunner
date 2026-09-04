@@ -1494,14 +1494,17 @@ NS_IMETHODIMP nsXULWindow::SavePersistentAttributes()
 
   if ((mPersistentAttributesDirty & PAD_SIZE) &&
       sizeMode == nsSizeMode_Normal) {
-    if(persistString.Find("width") >= 0) {
+    // A window can transiently report an empty size during creation or
+    // teardown.  Persisting that size replaces the useful value in the XUL
+    // prototype and makes the next launch collapse to its intrinsic minimum.
+    if(cx > 0 && persistString.Find("width") >= 0) {
       PR_snprintf(sizeBuf, sizeof(sizeBuf), "%ld", (long)cx);
       sizeString.AssignWithConversion(sizeBuf);
       docShellElement->SetAttribute(WIDTH_ATTRIBUTE, sizeString);
       if (ownerXULDoc)
         ownerXULDoc->Persist(windowElementId, WIDTH_ATTRIBUTE);
     }
-    if(persistString.Find("height") >= 0) {
+    if(cy > 0 && persistString.Find("height") >= 0) {
       PR_snprintf(sizeBuf, sizeof(sizeBuf), "%ld", (long)cy);
       sizeString.AssignWithConversion(sizeBuf);
       docShellElement->SetAttribute(HEIGHT_ATTRIBUTE, sizeString);
@@ -2161,6 +2164,5 @@ nsresult nsEventQueueStack::Success()
 {
    return mQueue ? NS_OK : NS_ERROR_FAILURE; 
 }
-
 
 
