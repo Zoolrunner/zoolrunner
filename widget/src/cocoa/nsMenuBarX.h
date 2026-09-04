@@ -118,6 +118,10 @@ public:
     NS_IMETHOD GetNativeData(void*& aData);
     NS_IMETHOD Paint();
     NS_IMETHOD SetNativeData(void* aData);
+
+    nsEventStatus ExecuteAboutCommand();
+    nsEventStatus ExecutePreferencesCommand();
+    nsEventStatus ExecuteQuitCommand();
     
 protected:
 

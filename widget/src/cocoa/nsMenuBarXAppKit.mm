@@ -11,6 +11,7 @@
 #include "nsIMenuBar.h"
 #include "nsIMenuItem.h"
 #include "nsIMenuListener.h"
+#include "nsMenuBarX.h"
 #include "nsGUIEvent.h"
 #include "CarbonMenuCompat.h"
 
@@ -20,6 +21,19 @@
 }
 - (id)initWithGeckoMenuItem:(nsIMenuItem*)aMenuItem;
 - (void)activateGeckoMenuItem:(id)aSender;
+@end
+
+@interface ZoolAppKitApplicationMenuItem : NSMenuItem
+{
+  nsMenuBarX* mGeckoMenuBar;
+}
+- (id)initWithTitle:(NSString*)aTitle
+              action:(SEL)aAction
+             menuBar:(nsMenuBarX*)aMenuBar
+       keyEquivalent:(NSString*)aKeyEquivalent;
+- (void)showAbout:(id)aSender;
+- (void)showPreferences:(id)aSender;
+- (void)quitApplication:(id)aSender;
 @end
 
 @interface ZoolAppKitMenu : NSMenu <NSMenuDelegate>
@@ -68,6 +82,48 @@
 {
   if (mGeckoMenuItem)
     mGeckoMenuItem->DoCommand();
+}
+
+@end
+
+@implementation ZoolAppKitApplicationMenuItem
+
+- (id)initWithTitle:(NSString*)aTitle
+              action:(SEL)aAction
+             menuBar:(nsMenuBarX*)aMenuBar
+       keyEquivalent:(NSString*)aKeyEquivalent
+{
+  self = [super initWithTitle:aTitle action:aAction keyEquivalent:aKeyEquivalent];
+  if (self) {
+    mGeckoMenuBar = aMenuBar;
+    NS_ADDREF(mGeckoMenuBar);
+    [self setTarget:self];
+  }
+  return self;
+}
+
+- (void)dealloc
+{
+  NS_IF_RELEASE(mGeckoMenuBar);
+  [super dealloc];
+}
+
+- (void)showAbout:(id)aSender
+{
+  if (mGeckoMenuBar)
+    mGeckoMenuBar->ExecuteAboutCommand();
+}
+
+- (void)showPreferences:(id)aSender
+{
+  if (mGeckoMenuBar)
+    mGeckoMenuBar->ExecutePreferencesCommand();
+}
+
+- (void)quitApplication:(id)aSender
+{
+  if (mGeckoMenuBar)
+    mGeckoMenuBar->ExecuteQuitCommand();
 }
 
 @end
@@ -180,7 +236,7 @@ PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu)
 }
 
 static void
-AddApplicationMenu(NSMenu* aMainMenu)
+AddApplicationMenu(NSMenu* aMainMenu, nsMenuBarX* aGeckoMenuBar)
 {
   NSString* appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"];
   if (!appName || ![appName length])
@@ -190,10 +246,28 @@ AddApplicationMenu(NSMenu* aMainMenu)
     [[NSMenuItem alloc] initWithTitle:appName action:nil keyEquivalent:@""];
   NSString* hideTitle = [NSString stringWithFormat:@"Hide %@", appName];
   NSString* quitTitle = [NSString stringWithFormat:@"Quit %@", appName];
+  NSString* aboutTitle = [NSString stringWithFormat:@"About %@", appName];
+  ZoolAppKitApplicationMenuItem* commandItem;
 
+  commandItem = [[ZoolAppKitApplicationMenuItem alloc]
+    initWithTitle:aboutTitle action:@selector(showAbout:)
+    menuBar:aGeckoMenuBar keyEquivalent:@""];
+  [appMenu addItem:commandItem];
+  [commandItem release];
+  [appMenu addItem:[NSMenuItem separatorItem]];
+  commandItem = [[ZoolAppKitApplicationMenuItem alloc]
+    initWithTitle:@"Preferences..." action:@selector(showPreferences:)
+    menuBar:aGeckoMenuBar keyEquivalent:@","];
+  [appMenu addItem:commandItem];
+  [commandItem release];
+  [appMenu addItem:[NSMenuItem separatorItem]];
   [appMenu addItemWithTitle:hideTitle action:@selector(hide:) keyEquivalent:@"h"];
   [appMenu addItem:[NSMenuItem separatorItem]];
-  [appMenu addItemWithTitle:quitTitle action:@selector(terminate:) keyEquivalent:@"q"];
+  commandItem = [[ZoolAppKitApplicationMenuItem alloc]
+    initWithTitle:quitTitle action:@selector(quitApplication:)
+    menuBar:aGeckoMenuBar keyEquivalent:@"q"];
+  [appMenu addItem:commandItem];
+  [commandItem release];
   [appItem setSubmenu:appMenu];
   [aMainMenu addItem:appItem];
   [appItem release];
@@ -201,12 +275,12 @@ AddApplicationMenu(NSMenu* aMainMenu)
 }
 
 void
-InstallAppKitMenuBar(nsIMenuBar* aMenuBar)
+InstallAppKitMenuBar(nsMenuBarX* aMenuBar)
 {
   NSMenu* mainMenu = [[NSMenu alloc] initWithTitle:@""];
   PRUint32 count = 0;
 
-  AddApplicationMenu(mainMenu);
+  AddApplicationMenu(mainMenu, aMenuBar);
   aMenuBar->GetMenuCount(count);
   for (PRUint32 i = 0; i < count; ++i) {
     nsCOMPtr<nsIMenu> geckoMenu;
