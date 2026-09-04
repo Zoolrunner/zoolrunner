@@ -494,6 +494,7 @@ endif
 libs:: $(PROGRAM)
 	mkdir -p $(DIST)/$(APP_NAME).app/Contents/MacOS
 	rsync -a --exclude CVS --exclude "*.in" $(srcdir)/macbuild/Contents $(DIST)/$(APP_NAME).app
+	rm -f $(DIST)/$(APP_NAME).app/Contents/Resources/English.lproj/InfoPlist.strings
 	sed -e "s/MOZ_APP_NAME/$(MOZ_APP_NAME)/" -e "s/MOZ_APP_DISPLAYNAME/$(MOZ_APP_DISPLAYNAME)/" -e "s/MOZ_APP_VERSION/$(MOZ_APP_VERSION)/" $(srcdir)/macbuild/Contents/Info.plist.in > $(DIST)/$(APP_NAME).app/Contents/Info.plist
 	rsync -a $(DIST)/bin/ $(DIST)/$(APP_NAME).app/Contents/MacOS
 	rm -f $(DIST)/$(APP_NAME).app/Contents/MacOS/$(PROGRAM)

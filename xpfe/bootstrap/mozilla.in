@@ -276,14 +276,26 @@ done
 
 export MRE_HOME
 
+run_binary="$dist_bin/$MOZILLA_BIN"
+run_script="$dist_bin/run-mozilla.sh"
+if [ "`uname -s 2>/dev/null`" = "Darwin" ]; then
+  bundle_runtime="$dist_bin/../%MOZ_APP_DISPLAYNAME%.app/Contents/MacOS"
+  bundle_binary="$bundle_runtime/$MOZILLA_BIN"
+  if [ -x "$bundle_binary" ]; then
+    bundle_runtime=`cd "$bundle_runtime" && pwd`
+    run_binary="$bundle_runtime/$MOZILLA_BIN"
+    run_script="$bundle_runtime/run-mozilla.sh"
+  fi
+fi
+
 ## Start addon scripts
 moz_pis_startstop_scripts "start"
 
 if [ $debugging = 1 ]
 then
-  echo $dist_bin/run-mozilla.sh $script_args $dist_bin/$MOZILLA_BIN "$@"
+  echo "$run_script" $script_args "$run_binary" "$@"
 fi
-"$dist_bin/run-mozilla.sh" $script_args "$dist_bin/$MOZILLA_BIN" "$@"
+"$run_script" $script_args "$run_binary" "$@"
 exitcode=$?
 
 ## Stop addon scripts
