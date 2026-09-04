@@ -201,11 +201,33 @@ static Boolean VersGreaterThan4(FSSpec *fSpec)
 
 PRBool NS_CanRun() 
 {
+#if defined(MAC_OS_X_VERSION_10_3) && \
+    MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_3
+  // An executable started from a terminal is initially a background process.
+  // Promote it before creating NSApplication so it owns the menu bar and can
+  // receive normal application commands.  Keep pre-10.3 builds on their
+  // historical path because TransformProcessType was introduced in 10.3.
+  ProcessSerialNumber psn;
+  if (::GetCurrentProcess(&psn) == noErr)
+    ::TransformProcessType(&psn, kProcessTransformToForegroundApplication);
+#endif
+
   // init Cocoa before anything else happens, like showing the 
   // splash screen.
   // XXX We leak the pool, but that's ok, it'll go away when the app quits
   [NSApplication sharedApplication];
   NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
+
+#if defined(MAC_OS_X_VERSION_10_6) && \
+    MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+  [[NSRunningApplication currentApplication]
+    activateWithOptions:NSApplicationActivateAllWindows |
+                        NSApplicationActivateIgnoringOtherApps];
+#elif defined(MAC_OS_X_VERSION_10_3) && \
+      MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_3
+  if (::GetCurrentProcess(&psn) == noErr)
+    ::SetFrontProcess(&psn);
+#endif
   
   return PR_TRUE;
 #if 0

@@ -875,8 +875,25 @@ nsCocoaWindow::IsVisible(PRBool & aState)
 //-------------------------------------------------------------------------
 NS_IMETHODIMP nsCocoaWindow::Show(PRBool bState)
 {
-  if ( bState )
+  if ( bState ) {
     [mWindow orderFront:NULL];
+
+    // Terminal-launched applications have no Launch Services activation
+    // event.  Activate when the first ordinary window is shown, after AppKit
+    // has had enough startup work to accept the request.  Popups must not
+    // steal focus from their parent window.
+    if (mWindowType != eWindowType_popup &&
+        mWindowType != eWindowType_invisible) {
+#if defined(MAC_OS_X_VERSION_10_6) && \
+    MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
+      [[NSRunningApplication currentApplication]
+        activateWithOptions:NSApplicationActivateAllWindows |
+                            NSApplicationActivateIgnoringOtherApps];
+#else
+      [NSApp activateIgnoringOtherApps:YES];
+#endif
+    }
+  }
   else
     [mWindow orderOut:NULL];
 
