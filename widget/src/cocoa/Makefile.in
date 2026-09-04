@@ -114,6 +114,7 @@ endif
 
 ifeq ($(CPU_ARCH),aarch64)
 CMMSRCS += \
+		nsMenuBarXAppKit.mm \
 		nsClipboardCocoa.mm \
 		nsDragServiceCocoa.mm \
 		nsSoundCocoa.mm \

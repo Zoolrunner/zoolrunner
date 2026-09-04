@@ -119,7 +119,7 @@ public:
     NS_IMETHOD              SetModal(PRBool aState) { return NS_OK; }
     NS_IMETHOD              IsVisible(PRBool & aState);
     NS_IMETHOD              SetFocus(PRBool aState=PR_FALSE) { return NS_OK; }
-    NS_IMETHOD SetMenuBar(nsIMenuBar * aMenuBar) { return NS_OK; }
+    NS_IMETHOD SetMenuBar(nsIMenuBar * aMenuBar);
     NS_IMETHOD ShowMenuBar(PRBool aShow) { return NS_OK; }
     NS_IMETHOD WidgetToScreen(const nsRect& aOldRect, nsRect& aNewRect) { return NS_OK; }
     NS_IMETHOD ScreenToWidget(const nsRect& aOldRect, nsRect& aNewRect) { return NS_OK; }
@@ -139,6 +139,7 @@ public:
     NS_IMETHOD            	GetScreenBounds(nsRect &aRect);
     virtual PRBool          OnPaint(nsPaintEvent &event);
     void                    ReportSizeEvent();
+    void                    PaintMenuBar();
 
 		NS_IMETHOD              SetTitle(const nsAString& aTitle);
 
@@ -204,6 +205,7 @@ protected:
 	PRBool            mWindowMadeHere; // true if we created the window, false for embedding
   NSWindow*         mWindow;         // our cocoa window [STRONG]
   WindowDelegate*   mDelegate;       // our delegate for processing window msgs [STRONG]
+  nsIMenuBar*        mMenuBar;        // the XUL menubar for this window [STRONG]
 
   PRBool            mVisible;        // Whether or not we're visible.
 };

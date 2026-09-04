@@ -51,6 +51,7 @@
 #include "nsMacResources.h"
 #endif
 #include "nsIRollupListener.h"
+#include "nsIMenuBar.h"
 #import "nsChildView.h"
 
 #include "nsIEventQueueService.h"
@@ -289,6 +290,7 @@ nsCocoaWindow::nsCocoaWindow()
 , mIsResizing(PR_FALSE)
 , mWindowMadeHere(PR_FALSE)
 , mWindow(nil)
+, mMenuBar(nsnull)
 {
 #if 0
   mMacEventHandler.reset(new nsMacEventHandler(this));
@@ -307,6 +309,10 @@ nsCocoaWindow::nsCocoaWindow()
 //-------------------------------------------------------------------------
 nsCocoaWindow::~nsCocoaWindow()
 {
+  if (mMenuBar)
+    mMenuBar->SetParent(nsnull);
+  NS_IF_RELEASE(mMenuBar);
+
   if ( mWindow && mWindowMadeHere ) {
     [mWindow autorelease];
     [mDelegate autorelease];
@@ -333,6 +339,28 @@ nsCocoaWindow::~nsCocoaWindow()
   }
 #endif
   
+}
+
+NS_IMETHODIMP
+nsCocoaWindow::SetMenuBar(nsIMenuBar* aMenuBar)
+{
+  if (mMenuBar)
+    mMenuBar->SetParent(nsnull);
+  NS_IF_RELEASE(mMenuBar);
+  NS_IF_ADDREF(aMenuBar);
+  mMenuBar = aMenuBar;
+
+  if (mMenuBar)
+    mMenuBar->Paint();
+
+  return NS_OK;
+}
+
+void
+nsCocoaWindow::PaintMenuBar()
+{
+  if (mMenuBar)
+    mMenuBar->Paint();
 }
 
 
@@ -876,8 +904,6 @@ nsCocoaWindow::IsVisible(PRBool & aState)
 NS_IMETHODIMP nsCocoaWindow::Show(PRBool bState)
 {
   if ( bState ) {
-    [mWindow orderFront:NULL];
-
     // Terminal-launched applications have no Launch Services activation
     // event.  Activate when the first ordinary window is shown, after AppKit
     // has had enough startup work to accept the request.  Popups must not
@@ -892,6 +918,9 @@ NS_IMETHODIMP nsCocoaWindow::Show(PRBool bState)
 #else
       [NSApp activateIgnoringOtherApps:YES];
 #endif
+      [mWindow makeKeyAndOrderFront:nil];
+    } else {
+      [mWindow orderFront:nil];
     }
   }
   else
@@ -1741,7 +1770,8 @@ void StopResizing ( )
 
 - (void)windowDidBecomeMain:(NSNotification *)aNotification
 {
-  //printf("got activation\n");
+  if (mGeckoWindow)
+    mGeckoWindow->PaintMenuBar();
 }
 
 

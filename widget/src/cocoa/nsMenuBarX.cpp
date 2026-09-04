@@ -70,6 +70,10 @@
 
 #include "nsGUIEvent.h"
 
+#if defined(__LP64__)
+extern void InstallAppKitMenuBar(nsIMenuBar* aMenuBar);
+#endif
+
 // CIDs
 #include "nsWidgetsCID.h"
 static NS_DEFINE_CID(kMenuCID, NS_MENU_CID);
@@ -709,10 +713,14 @@ NS_METHOD nsMenuBarX::SetNativeData(void* aData)
 //-------------------------------------------------------------------------
 NS_METHOD nsMenuBarX::Paint()
 {
+#if defined(__LP64__)
+    InstallAppKitMenuBar(this);
+#else
     // hack to correctly swap menu bars.
     // hopefully this is fast enough.
     ::SetRootMenu(mRootMenu);
     ::DrawMenuBar();
+#endif
     return NS_OK;
 }
 
