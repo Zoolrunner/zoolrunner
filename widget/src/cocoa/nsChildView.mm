@@ -2580,10 +2580,9 @@ NSEvent *gCocoaLastDragEvent = nil;
 
 #ifdef MOZ_ENABLE_CAIRO_GFX
   CGContextRef cgContext = (CGContextRef)[[NSGraphicsContext currentContext] graphicsPort];
-  nsRect geckoBounds;
-  mGeckoChild->GetBounds(geckoBounds);
+  NSRect bounds = [self bounds];
   nsRefPtr<gfxQuartzSurface> targetSurface =
-    new gfxQuartzSurface(cgContext, geckoBounds.width, geckoBounds.height,
+    new gfxQuartzSurface(cgContext, bounds.size.width, bounds.size.height,
                          PR_FALSE);
   nsRefPtr<gfxContext> targetContext = new gfxContext(targetSurface);
 

@@ -1358,21 +1358,32 @@ NS_IMETHODIMP nsCocoaWindow::Resize(PRInt32 aWidth, PRInt32 aHeight, PRBool aRep
 {
   if ( mWindow ) {
     NSRect newBounds = [mWindow frame];
+#ifdef MOZ_ENABLE_CAIRO_GFX
+    NSRect contentBounds = [mWindow contentRectForFrameRect:newBounds];
+    contentBounds.size.width = aWidth;
+    contentBounds.size.height = aHeight;
+    newBounds = [mWindow frameRectForContentRect:contentBounds];
+#else
     newBounds.size.width = aWidth;
     if ( mWindowType == eWindowType_popup )
       newBounds.size.height = aHeight;
     else
       newBounds.size.height = aHeight + kTitleBarHeight;     // add height of title bar
+#endif
     StartResizing();
     [mWindow setFrame:newBounds display:NO];
     StopResizing();
   }
 
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  ReportSizeEvent();
+#else
   mBounds.width  = aWidth;
   mBounds.height = aHeight;
   
   // tell gecko to update all the child widgets
   ReportSizeEvent();
+#endif
   
 #if 0
   if (mWindowMadeHere) {
@@ -1654,6 +1665,14 @@ nsCocoaWindow::DispatchEvent(nsGUIEvent* event, nsEventStatus& aStatus)
 void
 nsCocoaWindow::ReportSizeEvent()
 {
+#ifdef MOZ_ENABLE_CAIRO_GFX
+  if (mWindow) {
+    NSRect contentBounds = [mWindow contentRectForFrameRect:[mWindow frame]];
+    mBounds.width = NS_STATIC_CAST(PRInt32, contentBounds.size.width);
+    mBounds.height = NS_STATIC_CAST(PRInt32, contentBounds.size.height);
+  }
+#endif
+
   // nsEvent
   nsSizeEvent sizeEvent(PR_TRUE, NS_SIZE, this);
   sizeEvent.time        = PR_IntervalNow();
@@ -1706,12 +1725,16 @@ void StopResizing ( )
 - (void)windowDidResize:(NSNotification *)aNotification
 {
   if ( !mGeckoWindow->IsResizing() ) {
+#ifdef MOZ_ENABLE_CAIRO_GFX
+    mGeckoWindow->ReportSizeEvent();
+#else
     // must remember to give Gecko top-left, not straight cocoa origin
     // and that Gecko already compensates for the title bar, so we have to
     // strip it out here.
     NSRect frameRect = [[aNotification object] frame];
     mGeckoWindow->Resize ( NS_STATIC_CAST(PRInt32,frameRect.size.width),
                             NS_STATIC_CAST(PRInt32,frameRect.size.height - nsCocoaWindow::kTitleBarHeight), PR_TRUE );
+#endif
   }
 }
 
