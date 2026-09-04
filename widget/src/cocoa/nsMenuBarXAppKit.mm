@@ -22,6 +22,13 @@
 - (void)activateGeckoMenuItem:(id)aSender;
 @end
 
+@interface ZoolAppKitMenu : NSMenu <NSMenuDelegate>
+{
+  nsIMenu* mGeckoMenu;
+}
+- (id)initWithGeckoMenu:(nsIMenu*)aMenu;
+@end
+
 @implementation ZoolAppKitMenuItem
 
 - (id)initWithGeckoMenuItem:(nsIMenuItem*)aMenuItem
@@ -82,21 +89,56 @@ ConstructGeckoMenu(nsIMenu* aMenu)
   }
 }
 
-static NSMenu*
-CreateAppKitMenu(nsIMenu* aGeckoMenu)
+static void PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu);
+
+@implementation ZoolAppKitMenu
+
+- (id)initWithGeckoMenu:(nsIMenu*)aMenu
 {
   nsString label;
   NSString* title;
-  NSMenu* menu;
-  PRUint32 count = 0;
 
-  aGeckoMenu->GetLabel(label);
+  aMenu->GetLabel(label);
   title = [[[NSString alloc] initWithCharacters:(const unichar*)label.get()
                                          length:label.Length()] autorelease];
-  menu = [[[NSMenu alloc] initWithTitle:title] autorelease];
-  [menu setAutoenablesItems:NO];
+  self = [super initWithTitle:title];
+  if (self) {
+    mGeckoMenu = aMenu;
+    NS_ADDREF(mGeckoMenu);
+    [self setAutoenablesItems:NO];
+    [self setDelegate:self];
+  }
+  return self;
+}
+
+- (void)dealloc
+{
+  [self setDelegate:nil];
+  NS_IF_RELEASE(mGeckoMenu);
+  [super dealloc];
+}
+
+- (void)menuWillOpen:(NSMenu*)aMenu
+{
+  PopulateAppKitMenu(aMenu, mGeckoMenu);
+}
+
+@end
+
+
+static NSMenu*
+CreateAppKitMenu(nsIMenu* aGeckoMenu)
+{
+  return [[ZoolAppKitMenu alloc] initWithGeckoMenu:aGeckoMenu];
+}
+
+static void
+PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu)
+{
+  PRUint32 count = 0;
 
   ConstructGeckoMenu(aGeckoMenu);
+  [aMenu removeAllItems];
   aGeckoMenu->GetItemCount(count);
   for (PRUint32 i = 0; i < count; ++i) {
     nsCOMPtr<nsISupports> itemSupports;
@@ -107,11 +149,12 @@ CreateAppKitMenu(nsIMenu* aGeckoMenu)
       PRBool separator = PR_FALSE;
       geckoItem->IsSeparator(separator);
       if (separator) {
-        [menu addItem:[NSMenuItem separatorItem]];
+        [aMenu addItem:[NSMenuItem separatorItem]];
       } else {
         ZoolAppKitMenuItem* item =
-          [[[ZoolAppKitMenuItem alloc] initWithGeckoMenuItem:geckoItem] autorelease];
-        [menu addItem:item];
+          [[ZoolAppKitMenuItem alloc] initWithGeckoMenuItem:geckoItem];
+        [aMenu addItem:item];
+        [item release];
       }
       continue;
     }
@@ -124,24 +167,27 @@ CreateAppKitMenu(nsIMenu* aGeckoMenu)
         [[[NSString alloc] initWithCharacters:(const unichar*)submenuLabel.get()
                                        length:submenuLabel.Length()] autorelease];
       NSMenuItem* submenuItem =
-        [[[NSMenuItem alloc] initWithTitle:submenuTitle
-                                   action:nil
-                            keyEquivalent:@""] autorelease];
-      [submenuItem setSubmenu:CreateAppKitMenu(geckoSubmenu)];
-      [menu addItem:submenuItem];
+        [[NSMenuItem alloc] initWithTitle:submenuTitle
+                                  action:nil
+                           keyEquivalent:@""];
+      NSMenu* submenu = CreateAppKitMenu(geckoSubmenu);
+      [submenuItem setSubmenu:submenu];
+      [submenu release];
+      [aMenu addItem:submenuItem];
+      [submenuItem release];
     }
   }
-
-  return menu;
 }
 
 static void
 AddApplicationMenu(NSMenu* aMainMenu)
 {
-  NSString* appName = [[NSProcessInfo processInfo] processName];
-  NSMenu* appMenu = [[[NSMenu alloc] initWithTitle:appName] autorelease];
+  NSString* appName = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleName"];
+  if (!appName || ![appName length])
+    appName = [[NSProcessInfo processInfo] processName];
+  NSMenu* appMenu = [[NSMenu alloc] initWithTitle:appName];
   NSMenuItem* appItem =
-    [[[NSMenuItem alloc] initWithTitle:appName action:nil keyEquivalent:@""] autorelease];
+    [[NSMenuItem alloc] initWithTitle:appName action:nil keyEquivalent:@""];
   NSString* hideTitle = [NSString stringWithFormat:@"Hide %@", appName];
   NSString* quitTitle = [NSString stringWithFormat:@"Quit %@", appName];
 
@@ -150,12 +196,14 @@ AddApplicationMenu(NSMenu* aMainMenu)
   [appMenu addItemWithTitle:quitTitle action:@selector(terminate:) keyEquivalent:@"q"];
   [appItem setSubmenu:appMenu];
   [aMainMenu addItem:appItem];
+  [appItem release];
+  [appMenu release];
 }
 
 void
 InstallAppKitMenuBar(nsIMenuBar* aMenuBar)
 {
-  NSMenu* mainMenu = [[[NSMenu alloc] initWithTitle:@""] autorelease];
+  NSMenu* mainMenu = [[NSMenu alloc] initWithTitle:@""];
   PRUint32 count = 0;
 
   AddApplicationMenu(mainMenu);
@@ -172,10 +220,14 @@ InstallAppKitMenuBar(nsIMenuBar* aMenuBar)
       [[[NSString alloc] initWithCharacters:(const unichar*)label.get()
                                      length:label.Length()] autorelease];
     NSMenuItem* item =
-      [[[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""] autorelease];
-    [item setSubmenu:CreateAppKitMenu(geckoMenu)];
+      [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
+    NSMenu* submenu = CreateAppKitMenu(geckoMenu);
+    [item setSubmenu:submenu];
+    [submenu release];
     [mainMenu addItem:item];
+    [item release];
   }
 
   [NSApp setMainMenu:mainMenu];
+  [mainMenu release];
 }
