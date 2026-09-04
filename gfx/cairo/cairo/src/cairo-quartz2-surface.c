@@ -442,11 +442,26 @@ _cairo_quartzgl_cairo_gradient_pattern_to_quartz (cairo_pattern_t *abspat)
 
 
 /* Generic cairo_pattern -> CGPattern function */
+typedef struct _cairo_quartzgl_surface_pattern_info {
+    cairo_surface_t *surface;
+} cairo_quartzgl_surface_pattern_info_t;
+
+static void
+SurfacePatternReleaseInfo (void *info)
+{
+    cairo_quartzgl_surface_pattern_info_t *pattern_info =
+	(cairo_quartzgl_surface_pattern_info_t *) info;
+
+    cairo_surface_destroy (pattern_info->surface);
+    free (pattern_info);
+}
+
 static void
 SurfacePatternDrawFunc (void *info, CGContextRef context)
 {
-    cairo_surface_pattern_t *spat = (cairo_surface_pattern_t *) info;
-    cairo_surface_t *pat_surf = spat->surface;
+    cairo_quartzgl_surface_pattern_info_t *pattern_info =
+	(cairo_quartzgl_surface_pattern_info_t *) info;
+    cairo_surface_t *pat_surf = pattern_info->surface;
     cairo_rectangle_t extents;
     cairo_status_t status;
 
@@ -521,9 +536,9 @@ _cairo_quartzgl_cairo_repeating_surface_pattern_to_quartz (cairo_quartzgl_surfac
     CGAffineTransform ptransform, stransform;
     CGPatternCallbacks cb = { 0,
 			      SurfacePatternDrawFunc,
-			      (CGFunctionReleaseInfoCallback) cairo_pattern_destroy };
+			      SurfacePatternReleaseInfo };
     CGPatternRef cgpat;
-    cairo_pattern_t *pattern_copy;
+    cairo_quartzgl_surface_pattern_info_t *pattern_info;
     float rw, rh;
 
     /* SURFACE is the only type we'll handle here */
@@ -582,16 +597,13 @@ _cairo_quartzgl_cairo_repeating_surface_pattern_to_quartz (cairo_quartzgl_surfac
     rh = extents.height;
 #endif
 
-    /*
-     * The source passed here may be a temporary pattern on Cairo's stack.
-     * CoreGraphics is free to invoke the draw callback after this function
-     * returns, so a reference to that storage is not sufficient.
-     */
-    pattern_copy = malloc (sizeof (cairo_surface_pattern_t));
-    if (!pattern_copy)
+
+    /* CoreGraphics may invoke the callback after the Cairo pattern dies. */
+    pattern_info = malloc (sizeof (cairo_quartzgl_surface_pattern_info_t));
+    if (!pattern_info)
 	return NULL;
-    _cairo_pattern_init_copy (pattern_copy, abspat);
-    cgpat = CGPatternCreate (pattern_copy,
+    pattern_info->surface = cairo_surface_reference (pat_surf);
+    cgpat = CGPatternCreate (pattern_info,
 			     pbounds,
 			     ptransform,
 			     rw, rh,
@@ -599,7 +611,7 @@ _cairo_quartzgl_cairo_repeating_surface_pattern_to_quartz (cairo_quartzgl_surfac
 			     TRUE,
 			     &cb);
     if (!cgpat)
-	cairo_pattern_destroy (pattern_copy);
+	SurfacePatternReleaseInfo (pattern_info);
     return cgpat;
 }
 
