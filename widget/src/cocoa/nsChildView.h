@@ -76,9 +76,17 @@ class nsIDragService;
 
 
 #ifdef MOZ_ENABLE_CAIRO_GFX
+#if defined(__LP64__)
+@interface ChildView : NSView<mozView, NSTextInput, NSTextInputClient>
+#else
 @interface ChildView : NSView<mozView, NSTextInput>
+#endif
+#else
+#if defined(__LP64__)
+@interface ChildView : NSQuickDrawView<mozView, NSTextInput, NSTextInputClient>
 #else
 @interface ChildView : NSQuickDrawView<mozView, NSTextInput>
+#endif
 #endif
 {
 @private

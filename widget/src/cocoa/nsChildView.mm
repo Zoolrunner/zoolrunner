@@ -3301,6 +3301,14 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
     delete[] bufPtr;
 }
 
+#if defined(__LP64__)
+- (void)insertText:(id)insertString replacementRange:(NSRange)replacementRange
+{
+  (void)replacementRange;
+  [self insertText:insertString];
+}
+#endif
+
 - (void)insertNewline:(id)sender
 {
   // dummy impl, does nothing (other than stop the beeping when hitting return)
@@ -3365,6 +3373,16 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
     delete[] bufPtr;
 }
 
+#if defined(__LP64__)
+- (void)setMarkedText:(id)aString
+        selectedRange:(NSRange)selRange
+      replacementRange:(NSRange)replacementRange
+{
+  (void)replacementRange;
+  [self setMarkedText:aString selectedRange:selRange];
+}
+#endif
+
 - (void) unmarkText
 {
 #if DEBUG_IME
@@ -3419,6 +3437,17 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
   return nil;
 }
 
+#if defined(__LP64__)
+- (NSAttributedString*)attributedSubstringForProposedRange:(NSRange)theRange
+                                               actualRange:(NSRangePointer)actualRange
+{
+  NSAttributedString* result = [self attributedSubstringFromRange:theRange];
+  if (result && actualRange)
+    *actualRange = theRange;
+  return result;
+}
+#endif
+
 - (NSRange) markedRange
 {
 #if DEBUG_IME
@@ -3466,6 +3495,16 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
   rangeRect.origin = [[self getNativeWindow] convertBaseToScreen:rangeRect.origin];
   return rangeRect;
 }
+
+#if defined(__LP64__)
+- (NSRect)firstRectForCharacterRange:(NSRange)theRange
+                          actualRange:(NSRangePointer)actualRange
+{
+  if (actualRange)
+    *actualRange = theRange;
+  return [self firstRectForCharacterRange:theRange];
+}
+#endif
 
 
 #if defined(__LP64__)
