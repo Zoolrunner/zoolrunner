@@ -3549,11 +3549,12 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
                   message:NS_KEY_PRESS
              toGeckoEvent:&geckoEvent];
     
-    // if this is a non-letter keypress, or the control key is down,
+    // if this is a non-letter keypress, or the control or command key is down,
     // dispatch the keydown to gecko, so that we trap delete,
-    // control-letter combinations etc before Cocoa tries to use
+    // control/command-letter combinations etc before Cocoa tries to use
     // them for keybindings.
-    if ((!geckoEvent.isChar || geckoEvent.isControl) && !mInComposition)
+    if ((!geckoEvent.isChar || geckoEvent.isControl || geckoEvent.isMeta) &&
+        !mInComposition)
     {
       // plugins need a native event, it will either be keyDown or autoKey
       EventRecord macEvent;
