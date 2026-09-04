@@ -66,6 +66,11 @@
 
 #include "nsBidiKeyboard.h"
 
+#ifdef MOZ_ENABLE_CAIRO_GFX
+#include "nsGfxCIID.h"
+#include "nsScreenManagerCocoa.h"
+#endif
+
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsCocoaWindow)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsChildView)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsFilePicker)
@@ -84,6 +89,9 @@ NS_GENERIC_FACTORY_CONSTRUCTOR(nsClipboardHelper)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsDragService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsDragHelperService)
 NS_GENERIC_FACTORY_CONSTRUCTOR(nsBidiKeyboard)
+#ifdef MOZ_ENABLE_CAIRO_GFX
+NS_GENERIC_FACTORY_CONSTRUCTOR(nsScreenManagerCocoa)
+#endif
 
 static const nsModuleComponentInfo gComponents[] =
 {
@@ -159,6 +167,12 @@ static const nsModuleComponentInfo gComponents[] =
 		NS_BIDIKEYBOARD_CID,
 		"@mozilla.org/widget/bidikeyboard;1",
 		nsBidiKeyboardConstructor },
+#ifdef MOZ_ENABLE_CAIRO_GFX
+	{   "Cocoa Screen Manager",
+		NS_SCREENMANAGER_CID,
+		"@mozilla.org/gfx/screenmanager;1",
+		nsScreenManagerCocoaConstructor },
+#endif
 	{	"Native Scrollbar",
 		NS_NATIVESCROLLBAR_CID,
 		"@mozilla.org/widget/nativescrollbar;1",

@@ -108,6 +108,10 @@ CMMSRCS = \
 		nsMacCursor.mm \
 		$(NULL)
 
+ifdef MOZ_ENABLE_CAIRO_GFX
+CMMSRCS += nsScreenManagerCocoa.mm
+endif
+
 ifeq ($(CPU_ARCH),aarch64)
 CMMSRCS += \
 		nsClipboardCocoa.mm \
