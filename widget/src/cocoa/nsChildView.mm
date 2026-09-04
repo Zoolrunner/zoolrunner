@@ -3548,8 +3548,11 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
   // Feed them through the normal Gecko key-event path so XUL key bindings such
   // as Command-A continue to work.
   if ([theEvent modifierFlags] & NSCommandKeyMask) {
-    [self keyDown:theEvent];
-    return YES;
+    NSResponder* firstResponder = [[self window] firstResponder];
+    if ([firstResponder isKindOfClass:[ChildView class]]) {
+      [(ChildView*)firstResponder keyDown:theEvent];
+      return YES;
+    }
   }
 
   return [super performKeyEquivalent:theEvent];
