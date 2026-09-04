@@ -1342,6 +1342,7 @@ void nsViewManager::RenderViews(nsView *aRootView, nsIRenderingContext& aRC,
     return;
 
   nsAutoVoidArray filterStack;
+  PRInt32 failedFilterCount = 0;
 
   // draw all views in the display list, from back to front.
   for (PRInt32 i = 0; i < aDisplayList.Count(); i++) {
@@ -1356,12 +1357,23 @@ void nsViewManager::RenderViews(nsView *aRootView, nsIRenderingContext& aRC,
       NS_ASSERTION(aRCSurface,
                    "Cannot support translucent elements with doublebuffering disabled");
       if (aRCSurface) {
-        // Save current buffer on the stack and start rendering into a new
-        // offscreen buffer
-        filterStack.AppendElement(buffers);
-        buffers = CreateBlendingBuffers(&aRC, PR_FALSE, nsnull,
-                                        (element->mFlags & VIEW_TRANSPARENT) != 0,
-                                        element->mBounds);
+        if (failedFilterCount) {
+          ++failedFilterCount;
+        } else {
+          // Save the current buffer and render into a new offscreen buffer.
+          // If allocation fails, keep painting into the parent buffer and
+          // consume the matching POP_FILTER without dereferencing null.
+          BlendingBuffers* newBuffers =
+            CreateBlendingBuffers(&aRC, PR_FALSE, nsnull,
+                                  (element->mFlags & VIEW_TRANSPARENT) != 0,
+                                  element->mBounds);
+          if (!newBuffers || !filterStack.AppendElement(buffers)) {
+            delete newBuffers;
+            ++failedFilterCount;
+          } else {
+            buffers = newBuffers;
+          }
+        }
       }
     }
 
@@ -1381,33 +1393,44 @@ void nsViewManager::RenderViews(nsView *aRootView, nsIRenderingContext& aRC,
 
     if (element->mFlags & POP_FILTER) {
       if (aRCSurface) {
-        // Pop the last buffer off the stack and composite the current buffer into
-        // the last buffer
-        BlendingBuffers* doneBuffers = buffers;
-        buffers = NS_STATIC_CAST(BlendingBuffers*,
-                                 filterStack.ElementAt(filterStack.Count() - 1));
-        filterStack.RemoveElementAt(filterStack.Count() - 1);
-        
-        // perform the blend itself.
-        nsRect damageRectInPixels = element->mBounds;
-        damageRectInPixels -= buffers->mOffset;
-        damageRectInPixels *= mTwipsToPixels;
-        if (damageRectInPixels.width > 0 && damageRectInPixels.height > 0) {
-          nsIRenderingContext* targets[2] = { buffers->mBlackCX, buffers->mWhiteCX };
-          for (int j = 0; j < 2; j++) {
-            if (targets[j]) {
-              mBlender->Blend(0, 0,
-                              damageRectInPixels.width, damageRectInPixels.height,
-                              doneBuffers->mBlackCX, targets[j],
-                              damageRectInPixels.x, damageRectInPixels.y,
-                              element->mView->GetOpacity(), doneBuffers->mWhiteCX,
-                              NS_RGB(0, 0, 0), NS_RGB(255, 255, 255));
+        if (failedFilterCount) {
+          --failedFilterCount;
+        } else {
+          // Pop the last buffer off the stack and composite the current buffer
+          // into the last buffer.
+          NS_ASSERTION(filterStack.Count() > 0,
+                       "Unbalanced filter display list");
+          if (filterStack.Count() > 0) {
+            BlendingBuffers* doneBuffers = buffers;
+            buffers = NS_STATIC_CAST(BlendingBuffers*,
+                                     filterStack.ElementAt(filterStack.Count() - 1));
+            filterStack.RemoveElementAt(filterStack.Count() - 1);
+
+            // perform the blend itself.
+            nsRect damageRectInPixels = element->mBounds;
+            damageRectInPixels -= buffers->mOffset;
+            damageRectInPixels *= mTwipsToPixels;
+            if (damageRectInPixels.width > 0 && damageRectInPixels.height > 0) {
+              nsIRenderingContext* targets[2] =
+                { buffers->mBlackCX, buffers->mWhiteCX };
+              for (int j = 0; j < 2; j++) {
+                if (targets[j]) {
+                  mBlender->Blend(0, 0,
+                                  damageRectInPixels.width,
+                                  damageRectInPixels.height,
+                                  doneBuffers->mBlackCX, targets[j],
+                                  damageRectInPixels.x, damageRectInPixels.y,
+                                  element->mView->GetOpacity(),
+                                  doneBuffers->mWhiteCX,
+                                  NS_RGB(0, 0, 0), NS_RGB(255, 255, 255));
+                }
+              }
             }
+            // probably should recycle these so we don't eat the cost of
+            // graphics memory allocation
+            delete doneBuffers;
           }
         }
-        // probably should recycle these so we don't eat the cost of graphics memory
-        // allocation
-        delete doneBuffers;
       }
     }
     if (element->mFlags & POP_CLIP) {

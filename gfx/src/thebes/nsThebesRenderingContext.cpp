@@ -162,8 +162,13 @@ nsThebesRenderingContext::Init(nsIDeviceContext* aContext, nsIWidget *aWidget)
 NS_IMETHODIMP
 nsThebesRenderingContext::Init(nsIDeviceContext* aContext, nsIDrawingSurface *aSurface)
 {
-    NS_ERROR("Should never be called.");
-    return NS_ERROR_NOT_IMPLEMENTED;
+    NS_ENSURE_ARG_POINTER(aSurface);
+
+    nsThebesDrawingSurface* thebesSurface =
+        NS_STATIC_CAST(nsThebesDrawingSurface*, aSurface);
+    NS_ENSURE_TRUE(thebesSurface->GetThebesSurface(), NS_ERROR_FAILURE);
+
+    return Init(aContext, thebesSurface->GetThebesSurface());
 }
 
 NS_IMETHODIMP
@@ -504,11 +509,19 @@ nsThebesRenderingContext::CreateDrawingSurface(const nsRect &aBounds,
 {
     PR_LOG(gThebesGFXLog, PR_LOG_DEBUG, ("## %p nsTRC::CreateDrawingSurface [%d,%d,%d,%d] 0x%08x\n", this, aBounds.x, aBounds.y, aBounds.width, aBounds.height, aSurfFlags));
 
+    aSurface = nsnull;
     nsThebesDrawingSurface *cds = new nsThebesDrawingSurface();
+    NS_ENSURE_TRUE(cds, NS_ERROR_OUT_OF_MEMORY);
+
     nsIDeviceContext *dc = mDeviceContext.get();
-    cds->Init (NS_STATIC_CAST(nsThebesDeviceContext *, dc),
-               aBounds.width, aBounds.height,
-               PR_FALSE);
+    nsresult rv = cds->Init(NS_STATIC_CAST(nsThebesDeviceContext *, dc),
+                            aBounds.width, aBounds.height,
+                            PR_FALSE);
+    if (NS_FAILED(rv) || !cds->GetThebesSurface()) {
+        delete cds;
+        return NS_FAILED(rv) ? rv : NS_ERROR_OUT_OF_MEMORY;
+    }
+
     aSurface = (nsIDrawingSurface*) cds;
     NS_ADDREF(aSurface);
 
