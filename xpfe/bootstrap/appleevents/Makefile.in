@@ -62,7 +62,7 @@ REQUIRES	= xpcom \
 #    PatriciaTree.cpp \
 #    nsAppleEventsService.cpp \
 
-ifeq (aarch64,$(CPU_ARCH))
+ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 CPPSRCS = nsAEEventHandlingLP64.cpp
 else
 CSRCS = \
@@ -122,7 +122,7 @@ RES_DEST = mozillaSuite.r
 RSRC_DEST = mozillaSuite.rsrc
 PACKAGE_DIR = $(DIST)/package
 
-ifneq (aarch64,$(CPU_ARCH))
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 $(RSRC_DEST): $(SDEF_SRC) $(PACKAGE_DIR)
 	NEXT_ROOT= $(SDP_TOOL) -fa -o $(RES_DEST) $(SDEF_SRC) 
 	$(REZ_TOOL) -useDF -o $(RSRC_DEST) $(RES_DEST) 

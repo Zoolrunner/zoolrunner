@@ -36,7 +36,7 @@
 
 #include <Carbon/Carbon.h>
 
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
 #define CAIRO_QUARTZGL_HAS_AGL 1
 #include <AGL/agl.h>
 #include <OpenGL/gl.h>
@@ -1387,7 +1387,7 @@ _cairo_quartzgl_surface_show_glyphs (void *abstract_surface,
 
     CGContextSetCompositeOperation (surface->cgContext, _cairo_quartzgl_cairo_operator_to_quartz (op));
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CGFontRef cgfref = _cairo_atsui_scaled_font_get_cgfont (scaled_font);
     CGContextSetFont (surface->cgContext, cgfref);
 #else

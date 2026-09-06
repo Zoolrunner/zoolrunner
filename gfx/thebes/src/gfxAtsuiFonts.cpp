@@ -47,7 +47,7 @@
 
 #include "cairo-atsui.h"
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
 gfxAtsuiFont::gfxAtsuiFont(CTFontRef font,
                            gfxAtsuiFontGroup *fontGroup)
     : mCTFont((CTFontRef) CFRetain(font)),
@@ -161,7 +161,7 @@ gfxAtsuiFont::~gfxAtsuiFont()
 {
     cairo_scaled_font_destroy(mScaledFont);
     cairo_font_face_destroy(mFontFace);
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     if (mCGFont)
         CGFontRelease(mCGFont);
     if (mCTFont)
@@ -181,7 +181,7 @@ gfxAtsuiFontGroup::gfxAtsuiFontGroup(const nsAString& families,
 {
     ForEachFont(FindATSUFont, this);
 
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
     // Create the fallback structure
     ATSUCreateFontFallbacks(&mFallbacks);
 
@@ -283,7 +283,7 @@ gfxAtsuiFontGroup::FindATSUFont(const nsAString& aName,
 #else
     ATSUFontID fontID = kATSUInvalidFontID;
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CFStringRef fontName = CFStringCreateWithCharacters
         (kCFAllocatorDefault,
          (const UniChar *) nsPromiseFlatString(aName).get(),
@@ -320,7 +320,7 @@ gfxAtsuiFontGroup::FindATSUFont(const nsAString& aName,
                                   &fontID);
 #endif
 
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
     //fprintf (stderr, "FindATSUFont: %s -> %d (status: %d)\n", NS_ConvertUTF16toUTF8(aName).get(), (int) fontID, (int) status);
     if (fontID != kATSUInvalidFontID)
         fontGroup->mFonts.push_back(new gfxAtsuiFont(fontID, fontGroup));
@@ -332,7 +332,7 @@ gfxAtsuiFontGroup::FindATSUFont(const nsAString& aName,
 
 gfxAtsuiFontGroup::~gfxAtsuiFontGroup()
 {
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
     ATSUDisposeFontFallbacks(mFallbacks);
 #endif
 }
@@ -352,7 +352,7 @@ THEBES_IMPL_REFCOUNTING(gfxAtsuiTextRun)
 gfxAtsuiTextRun::gfxAtsuiTextRun(const nsAString& aString, gfxAtsuiFontGroup *aGroup)
     : mString(aString), mGroup(aGroup)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     mCTLine = NULL;
     if (mGroup->GetFontList().empty())
         return;
@@ -469,7 +469,7 @@ gfxAtsuiTextRun::gfxAtsuiTextRun(const nsAString& aString, gfxAtsuiFontGroup *aG
 
 gfxAtsuiTextRun::~gfxAtsuiTextRun()
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     if (mCTLine)
         CFRelease(mCTLine);
 #else
@@ -482,7 +482,7 @@ void
 gfxAtsuiTextRun::DrawString(gfxContext *aContext, gfxPoint pt)
 {
     cairo_t *cr = aContext->GetCairo();
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     if (!mCTLine)
         return;
 
@@ -586,7 +586,7 @@ gfxAtsuiTextRun::DrawString(gfxContext *aContext, gfxPoint pt)
 gfxFloat
 gfxAtsuiTextRun::MeasureString(gfxContext *aContext)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     if (!mCTLine)
         return 0.0;
     return CTLineGetTypographicBounds(mCTLine, NULL, NULL, NULL);

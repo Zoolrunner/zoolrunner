@@ -122,7 +122,7 @@ endif
 
 ifneq (,$(filter cocoa mac, $(MOZ_WIDGET_TOOLKIT)))
 OS_LIBS += -framework Carbon
-ifeq (aarch64,$(CPU_ARCH))
+ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 OS_LIBS += -framework Cocoa
 endif
 endif

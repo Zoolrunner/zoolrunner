@@ -113,7 +113,7 @@ ifdef MOZ_ENABLE_CAIRO_GFX
 CMMSRCS += nsScreenManagerCocoa.mm
 endif
 
-ifeq ($(CPU_ARCH),aarch64)
+ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 CMMSRCS += \
 		nsMenuBarXAppKit.mm \
 		nsClipboardCocoa.mm \
@@ -172,7 +172,7 @@ export::
 	ln -fs $(srcdir)/cursors
 endif
 
-ifneq ($(CPU_ARCH),aarch64)
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 $(RES_DEST): $(RES_SRC)
 	/Developer/Tools/Rez -i /Developer/Headers/FlatCarbon -useDF $(RES_SRC) -o $(RES_DEST)
 
@@ -193,11 +193,11 @@ LDFLAGS	+= \
 	-framework Cocoa \
 	$(NULL)
 
-ifneq ($(CPU_ARCH),aarch64)
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 LDFLAGS += -framework QuickTime
 else
 # The LP64 headers hide several retained HIToolbox menu and text-input APIs,
-# but the macOS 11 Carbon umbrella explicitly exports them for arm64.
+# but the macOS 11 Carbon umbrella explicitly exports them.
 LDFLAGS += -framework Carbon
 endif
 

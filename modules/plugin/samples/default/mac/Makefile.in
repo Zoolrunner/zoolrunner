@@ -89,7 +89,7 @@ export::
 	ln -fs $(srcdir)/NullPlugin.rsrc
 endif
 
-ifneq ($(CPU_ARCH),aarch64)
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 
 libs install:: install-plugin
 

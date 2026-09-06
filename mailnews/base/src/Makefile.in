@@ -137,7 +137,7 @@ CPPSRCS		= \
 ifneq (,$(filter cocoa mac, $(MOZ_WIDGET_TOOLKIT)))
 REQUIRES	+= macmorefiles
 CPPSRCS		+= nsMessengerOSXIntegration.cpp
-ifeq (aarch64,$(CPU_ARCH))
+ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 # The LP64 dock badge uses NSDockTile; retain the Carbon implementation and
 # ordinary C++ compilation mode for historical Mac targets.
 nsMessengerOSXIntegration.o: CXXFLAGS += -x objective-c++

@@ -43,7 +43,7 @@
 
 #include <Carbon/Carbon.h>
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
 #include <CoreText/CoreText.h>
 #endif
 
@@ -51,7 +51,7 @@ class gfxAtsuiFontGroup;
 
 class gfxAtsuiFont : public gfxFont {
 public:
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     gfxAtsuiFont(CTFontRef font,
                  gfxAtsuiFontGroup *fontGroup);
 #else
@@ -62,7 +62,7 @@ public:
 
     virtual const gfxFont::Metrics& GetMetrics();
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CTFontRef GetCTFont() { return mCTFont; }
 #else
     ATSUFontID GetATSUFontID() { return mATSUFontID; }
@@ -72,7 +72,7 @@ public:
     cairo_scaled_font_t *CairoScaledFont() { return mScaledFont; }
 
 protected:
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CTFontRef mCTFont;
     CGFontRef mCGFont;
 #else
@@ -96,7 +96,7 @@ public:
 
     virtual gfxTextRun *MakeTextRun(const nsAString& aString);
 
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
     ATSUFontFallbacks *GetATSUFontFallbacks() { return &mFallbacks; }
 #endif
 
@@ -105,7 +105,7 @@ protected:
                                const nsAString& aGenericName,
                                void *closure);
 
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
     ATSUFontFallbacks mFallbacks;
 #endif
 };
@@ -123,7 +123,7 @@ private:
     nsString mString;
     gfxAtsuiFontGroup *mGroup;
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CTLineRef mCTLine;
 #else
     ATSUStyle mATSUStyle;

@@ -42,7 +42,7 @@
 
 #include <Carbon/Carbon.h>
 
-#if !defined(__arm64__) && !defined(__aarch64__)
+#if !defined(__LP64__)
 #define CAIRO_QUARTZGL_HAS_AGL 1
 #include <AGL/agl.h>
 #endif

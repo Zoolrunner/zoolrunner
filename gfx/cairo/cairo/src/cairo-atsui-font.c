@@ -62,7 +62,7 @@ static cairo_status_t _cairo_atsui_font_create_scaled (cairo_font_face_t *font_f
 						       const cairo_font_options_t *options,
 						       cairo_scaled_font_t **font_out);
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
 static cairo_status_t _cairo_atsui_font_create_scaled_cg
     (cairo_font_face_t *font_face, CGFontRef cg_font,
      const cairo_matrix_t *font_matrix, const cairo_matrix_t *ctm,
@@ -75,7 +75,7 @@ struct _cairo_atsui_font {
     ATSUStyle style;
     ATSUStyle unscaled_style;
     ATSUFontID fontID;
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CGFontRef cg_font;
 #endif
 };
@@ -84,7 +84,7 @@ struct _cairo_atsui_font {
 struct _cairo_atsui_font_face {
   cairo_font_face_t base;
   ATSUFontID font_id;
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
   CGFontRef cg_font;
 #endif
 };
@@ -92,7 +92,7 @@ struct _cairo_atsui_font_face {
 static void
 _cairo_atsui_font_face_destroy (void *abstract_face)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     cairo_atsui_font_face_t *font_face = abstract_face;
     if (font_face->cg_font)
         CGFontRelease (font_face->cg_font);
@@ -107,7 +107,7 @@ _cairo_atsui_font_face_scaled_font_create (void	*abstract_face,
 					   cairo_scaled_font_t **font)
 {
     cairo_atsui_font_face_t *font_face = abstract_face;
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     if (font_face->cg_font)
         return _cairo_atsui_font_create_scaled_cg
             (&font_face->base, font_face->cg_font, font_matrix, ctm, options,
@@ -145,7 +145,7 @@ cairo_atsui_font_face_create_for_atsu_font_id (ATSUFontID font_id)
   }
 
   font_face->font_id = font_id;
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
   font_face->cg_font = NULL;
 #endif
 
@@ -154,7 +154,7 @@ cairo_atsui_font_face_create_for_atsu_font_id (ATSUFontID font_id)
     return &font_face->base;
 }
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
 cairo_public cairo_font_face_t *
 cairo_atsui_font_face_create_for_cgfont (CGFontRef cg_font)
 {
@@ -246,7 +246,7 @@ _cairo_atsui_font_set_metrics (cairo_atsui_font_t *font)
     return CAIRO_STATUS_NULL_POINTER;
 }
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
 static cairo_status_t
 _cairo_atsui_font_create_scaled_cg (cairo_font_face_t *font_face,
                                     CGFontRef cg_font,
@@ -336,7 +336,7 @@ _cairo_atsui_font_create_toy(cairo_toy_font_face_t *toy_face,
 			     const cairo_font_options_t *options,
 			     cairo_scaled_font_t **font_out)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CFStringRef familyName;
     CGFontRef cg_font;
     cairo_status_t status;
@@ -441,7 +441,7 @@ _cairo_atsui_font_fini(void *abstract_font)
     if (font == NULL)
         return;
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     if (font->cg_font)
         CGFontRelease (font->cg_font);
 #endif
@@ -473,7 +473,7 @@ _cairo_atsui_scaled_font_get_atsu_font_id (cairo_scaled_font_t *sfont)
     return afont->fontID;
 }
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
 CGFontRef
 _cairo_atsui_scaled_font_get_cgfont (cairo_scaled_font_t *sfont)
 {
@@ -486,7 +486,7 @@ static cairo_status_t
 _cairo_atsui_font_init_glyph_metrics (cairo_atsui_font_t *font,
 				      cairo_scaled_glyph_t *scaled_glyph)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
    cairo_text_extents_t extents;
    CGGlyph glyph = (CGGlyph) _cairo_scaled_glyph_index (scaled_glyph);
    int advance = 0;
@@ -603,7 +603,7 @@ static cairo_status_t
 _cairo_atsui_scaled_font_init_glyph_path (cairo_atsui_font_t *scaled_font,
 					  cairo_scaled_glyph_t *scaled_glyph)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     /* Quartz surfaces consume CGGlyphs directly and do not require outlines. */
     return CAIRO_INT_STATUS_UNSUPPORTED;
 #else
@@ -669,7 +669,7 @@ _cairo_atsui_font_text_to_glyphs (void		*abstract_font,
 				  cairo_glyph_t **glyphs, 
 				  int		*num_glyphs)
 {
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     /* CoreText shaping is performed by gfxAtsuiTextRun on this target. */
     return CAIRO_INT_STATUS_UNSUPPORTED;
 #else
@@ -785,7 +785,7 @@ _cairo_atsui_font_old_show_glyphs (void		       *abstract_font,
     CGContextTranslateCTM(myBitmapContext, 0, destImageSurface->height);
     CGContextScaleCTM(myBitmapContext, 1.0f, -1.0f);
 
-#if defined(__arm64__) || defined(__aarch64__)
+#if defined(__LP64__)
     CGFontRef cgFont = font->cg_font;
 #else
     ATSFontRef atsFont = FMGetATSFontRefFromFont(font->fontID);
