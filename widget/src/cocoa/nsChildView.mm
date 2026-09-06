@@ -1874,9 +1874,24 @@ PRBool nsChildView::PointInWidget(Point aThePoint)
 NS_IMETHODIMP nsChildView::WidgetToScreen(const nsRect& aLocalRect, nsRect& aGlobalRect)
 {
   NSRect temp;
+  NSWindow* window;
+
+#if defined(__LP64__)
+  // A modal window can be removed from AppKit's hierarchy before Gecko has
+  // finished destroying its child widgets.  ChildView's cached mWindow is a
+  // weak pointer and may already refer to a deallocated object at that point.
+  // Coordinates for a detached view are not meaningful, so fail the query
+  // instead of messaging the stale cached window.
+  window = [mView window];
+  if (!window)
+    return NS_ERROR_FAILURE;
+#else
+  window = [mView getNativeWindow];
+#endif
+
   ConvertGeckoToCocoaRect(aLocalRect, temp);
   temp = [mView convertRect:temp toView:nil];                       // convert to window coords
-  temp.origin = [[mView getNativeWindow] convertBaseToScreen:temp.origin];   // convert to screen coords
+  temp.origin = [window convertBaseToScreen:temp.origin];          // convert to screen coords
   
   // need to flip the point relative to the main screen
   if ([[NSScreen screens] count] > 0)   // paranoia
@@ -1909,6 +1924,18 @@ NS_IMETHODIMP nsChildView::WidgetToScreen(const nsRect& aLocalRect, nsRect& aGlo
 NS_IMETHODIMP nsChildView::ScreenToWidget(const nsRect& aGlobalRect, nsRect& aLocalRect)
 {
   NSRect temp;
+  NSWindow* window;
+
+#if defined(__LP64__)
+  // See WidgetToScreen().  Do not dereference ChildView's weak cached window
+  // while a modal window is being torn down.
+  window = [mView window];
+  if (!window)
+    return NS_ERROR_FAILURE;
+#else
+  window = [mView getNativeWindow];
+#endif
+
   ConvertGeckoToCocoaRect(aGlobalRect, temp);
 
   // need to flip the point relative to the main screen
@@ -1920,7 +1947,7 @@ NS_IMETHODIMP nsChildView::ScreenToWidget(const nsRect& aGlobalRect, nsRect& aLo
     temp.origin.y = NSMaxY(mainScreenFrame) - temp.origin.y;
   }
 
-  temp.origin = [[mView getNativeWindow] convertScreenToBase:temp.origin];   // convert to screen coords
+  temp.origin = [window convertScreenToBase:temp.origin];           // convert to window coords
   temp = [mView convertRect:temp fromView:nil];                     // convert to window coords
 
   ConvertCocoaToGeckoRect(temp, aLocalRect);
