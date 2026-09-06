@@ -50,6 +50,7 @@
 #include "nsIDeviceContext.h"
 #include "nsIEnumerator.h"
 #include "nsIRegion.h"
+#include "nsGfxCIID.h"
 #include "nsIRollupListener.h"
 #include "nsIEventSink.h"
 #include "nsIScrollableView.h"
@@ -77,6 +78,12 @@
 #endif
 
 #define NSAppKitVersionNumber10_2 663
+
+// Avoid constructing excessively complex dirty regions.  This is the same
+// limit used by later versions of Mozilla's Cocoa widget implementation.
+#define MAX_RECTS_IN_REGION 100
+
+static NS_DEFINE_CID(kRegionCID, NS_REGION_CID);
 
 // category of NSView methods to quiet warnings
 @interface NSView(ChildViewExtensions)
@@ -422,6 +429,19 @@ nsresult nsChildView::StandardCreate(nsIWidget *aParent,
   ConvertGeckoToCocoaRect(mBounds, r);
   mView = [CreateCocoaView(r) retain];
   if (!mView) return NS_ERROR_FAILURE;
+
+#if defined(MOZ_ENABLE_CAIRO_GFX) && defined(__LP64__)
+  // The window content view uses Cocoa's bottom-left coordinate system, while
+  // Gecko lays out its root child from the top left.  Keep the root child the
+  // same size as the content view throughout a live resize; otherwise Cocoa
+  // temporarily pins the old-sized child to the bottom until Gecko processes
+  // the resize event, which makes all Gecko content jump vertically.
+  if (!aParent && mParentView &&
+      [mParentView window] &&
+      [[mParentView window] contentView] == mParentView) {
+    [mView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+  }
+#endif
   
 #if DEBUG
   // if our parent is a popup window, we're most certainly coming from a <select> list dropdown which
@@ -2586,26 +2606,70 @@ NSEvent *gCocoaLastDragEvent = nil;
                          PR_FALSE);
   nsRefPtr<gfxContext> targetContext = new gfxContext(targetSurface);
 
+  nsCOMPtr<nsIRegion> region(do_CreateInstance(kRegionCID));
+  if (!region)
+    return;
+  region->Init();
+
+  nsRect fullRect;
+  ConvertCocoaToGeckoRect(aRect, fullRect);
+
   const NSRect *rects;
   NSInteger count, i;
   [self getRectsBeingDrawn:&rects count:&count];
-  for (i = 0; i < count; ++i) {
-    targetContext->Rectangle(gfxRect(rects[i].origin.x, rects[i].origin.y,
-                                     rects[i].size.width, rects[i].size.height));
+  if (count < MAX_RECTS_IN_REGION) {
+    for (i = 0; i < count; ++i) {
+      region->Union((PRInt32)rects[i].origin.x,
+                    (PRInt32)rects[i].origin.y,
+                    (PRInt32)rects[i].size.width,
+                    (PRInt32)rects[i].size.height);
+    }
   }
+  else {
+    region->Union((PRInt32)aRect.origin.x, (PRInt32)aRect.origin.y,
+                  (PRInt32)aRect.size.width, (PRInt32)aRect.size.height);
+  }
+
+  // A Gecko child widget is also an AppKit subview and paints itself.  Do not
+  // let its parent paint through it when AppKit coalesces dirty rectangles
+  // during a live resize.  Painting both layouts into the overlapping area
+  // leaves duplicated images and chrome until the resize finishes.
+  NSArray* subviews = [self subviews];
+  unsigned int subviewCount = NS_STATIC_CAST(unsigned int, [subviews count]);
+  for (unsigned int subviewIndex = 0;
+       subviewIndex < subviewCount; ++subviewIndex) {
+    NSView* view = [subviews objectAtIndex:subviewIndex];
+    if (![view isKindOfClass:[ChildView class]] || [view isHidden])
+      continue;
+    NSRect frame = [view frame];
+    region->Subtract((PRInt32)frame.origin.x, (PRInt32)frame.origin.y,
+                     (PRInt32)frame.size.width, (PRInt32)frame.size.height);
+  }
+
+  nsRegionRectSet* regionRects = nsnull;
+  region->GetRects(&regionRects);
+  if (!regionRects)
+    return;
+  for (PRUint32 rectIndex = 0;
+       rectIndex < regionRects->mNumRects; ++rectIndex) {
+    const nsRegionRect& rect = regionRects->mRects[rectIndex];
+    targetContext->Rectangle(gfxRect(rect.x, rect.y,
+                                     rect.width, rect.height));
+  }
+  region->FreeRects(regionRects);
   targetContext->Clip();
 
   nsCOMPtr<nsIRenderingContext> rc;
   mGeckoChild->GetDeviceContext()->CreateRenderingContextInstance(*getter_AddRefs(rc));
   rc->Init(mGeckoChild->GetDeviceContext(), targetContext);
 
-  nsRect r;
-  ConvertCocoaToGeckoRect(aRect, r);
   nsPaintEvent paintEvent(PR_TRUE, NS_PAINT, mGeckoChild);
   paintEvent.renderingContext = rc;
-  paintEvent.rect = &r;
+  paintEvent.rect = &fullRect;
+  paintEvent.region = region;
   mGeckoChild->DispatchWindowEvent(paintEvent);
   paintEvent.renderingContext = nsnull;
+  paintEvent.region = nsnull;
 #else
   // tell gecko to paint.
   // If < 10.3, just paint the rect
