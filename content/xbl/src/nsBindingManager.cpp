@@ -361,7 +361,10 @@ nsBindingManager::SetBinding(nsIContent* aContent, nsXBLBinding* aBinding)
   // constructor twice (if aBinding inherits from it) or firing its constructor
   // after aContent has been deleted (if aBinding is null and the content node
   // dies before we process mAttachedStack).
-  nsXBLBinding* oldBinding = mBindingTable.GetWeak(aContent);
+  // Removing the table entry below can release its last reference.  Keep the
+  // old binding alive until its bound element and auxiliary tables have been
+  // cleared.
+  nsRefPtr<nsXBLBinding> oldBinding = mBindingTable.GetWeak(aContent);
   if (oldBinding) {
     nsXBLBinding* oldBindingWithCtor =
       oldBinding->GetFirstBindingWithConstructor();
