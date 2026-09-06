@@ -7,11 +7,14 @@
 #import <Cocoa/Cocoa.h>
 
 #include "nsCOMPtr.h"
+#include "nsIAppStartup.h"
 #include "nsIMenu.h"
 #include "nsIMenuBar.h"
 #include "nsIMenuItem.h"
 #include "nsIMenuListener.h"
+#include "nsIServiceManager.h"
 #include "nsMenuBarX.h"
+#include "nsXPFEComponentsCID.h"
 #include "nsGUIEvent.h"
 #include "CarbonMenuCompat.h"
 
@@ -123,7 +126,17 @@
 
 - (void)quitApplication:(id)aSender
 {
-  if (mGeckoMenuBar)
+  // A standalone XUL window is not required to use the Suite's historical
+  // menu_FileQuitItem ID, and applications such as ChatZilla use their own
+  // local "quit" command to close just that window.  The native application
+  // menu must always request application shutdown.  nsIAppStartup still
+  // closes each window normally, preserving its close handlers and any
+  // application cancellation UI.
+  nsCOMPtr<nsIAppStartup> appStartup =
+    do_GetService(NS_APPSTARTUP_CONTRACTID);
+  if (appStartup)
+    appStartup->Quit(nsIAppStartup::eAttemptQuit);
+  else if (mGeckoMenuBar)
     mGeckoMenuBar->ExecuteQuitCommand();
 }
 

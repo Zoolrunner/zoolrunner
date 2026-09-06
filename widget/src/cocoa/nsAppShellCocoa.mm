@@ -115,6 +115,24 @@ NS_IMETHODIMP
 nsAppShellCocoa::Exit(void)
 {
   [NSApp stop:nil];
+
+  // stop: only changes the state observed by NSApplication's outer run
+  // loop.  When called from the XPCOM CFRunLoop source, AppKit can still be
+  // blocked waiting for its next native event and never return to inspect
+  // that state.  Wake it with an otherwise unused application event.  This
+  // is part of the original Cocoa event API and remains suitable for the
+  // historical Cocoa targets as well as modern macOS.
+  NSEvent* wakeEvent =
+    [NSEvent otherEventWithType:NSApplicationDefined
+                       location:NSZeroPoint
+                  modifierFlags:0
+                      timestamp:0
+                   windowNumber:0
+                        context:nil
+                        subtype:0
+                          data1:0
+                          data2:0];
+  [NSApp postEvent:wakeEvent atStart:NO];
 	return NS_OK;
 }
 

@@ -85,6 +85,7 @@ private:
   PRPackedBool mRunning;        // Have we started the main event loop?
   PRPackedBool mShuttingDown;   // Quit method reentrancy check
   PRPackedBool mAttemptingQuit; // Quit(eAttemptQuit) still trying
+  PRPackedBool mQuitRetryPending; // a window died during the quit pass
   PRPackedBool mRestart;        // Quit(eRestart)
 };
 

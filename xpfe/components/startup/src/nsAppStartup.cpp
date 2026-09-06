@@ -81,7 +81,8 @@ NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
 nsAppStartup::nsAppStartup() :
   mConsiderQuitStopper(0),
   mShuttingDown(PR_FALSE),
-  mAttemptingQuit(PR_FALSE)
+  mAttemptingQuit(PR_FALSE),
+  mQuitRetryPending(PR_FALSE)
 { }
 
 
@@ -140,6 +141,7 @@ nsAppStartup::Initialize(nsISupports *aNativeAppSupportOrSplashScreen)
 
   return NS_OK;
 }
+
 
 
 NS_IMETHODIMP
@@ -313,9 +315,6 @@ nsAppStartup::Quit(PRUint32 aFerocity)
         if (windowEnumerator) {
           PRBool more;
           while (windowEnumerator->HasMoreElements(&more), more) {
-            /* we can't quit immediately. we'll try again as the last window
-               finally closes. */
-            aFerocity = eAttemptQuit;
             nsCOMPtr<nsISupports> window;
             windowEnumerator->GetNext(getter_AddRefs(window));
             nsCOMPtr<nsIDOMWindowInternal> domWindow(do_QueryInterface(window));
@@ -323,6 +322,11 @@ nsAppStartup::Quit(PRUint32 aFerocity)
               PRBool closed = PR_FALSE;
               domWindow->GetClosed(&closed);
               if (!closed) {
+                /* We can't quit immediately. We'll try again as the last
+                   window finally closes.  The mediator may temporarily keep
+                   already-closed windows in its enumeration; those must not
+                   prevent the force-quit phase. */
+                aFerocity = eAttemptQuit;
                 rv = NS_ERROR_FAILURE;
                 break;
               }
@@ -388,8 +392,13 @@ nsAppStartup::Quit(PRUint32 aFerocity)
 
   // turn off the reentrancy check flag, but not if we have
   // more asynchronous work to do still.
-  if (!postedExitEvent)
+  if (!postedExitEvent) {
+    PRBool retryQuit = mQuitRetryPending;
+    mQuitRetryPending = PR_FALSE;
     mShuttingDown = PR_FALSE;
+    if (retryQuit)
+      return Quit(eAttemptQuit);
+  }
   return rv;
 }
 
@@ -971,7 +980,15 @@ nsAppStartup::Observe(nsISupports *aSubject,
   } else if (!strcmp(aTopic, "xul-window-registered")) {
     AttemptingQuit(PR_FALSE);
   } else if (!strcmp(aTopic, "xul-window-destroyed")) {
-    Quit(eConsiderQuit);
+    // The mediator can still enumerate the window whose destruction produced
+    // this notification.  During an explicit quit, retry the attempt so that
+    // closed asynchronous windows are examined instead of waiting for a
+    // notification which may never follow.  Ordinary last-window behavior
+    // still uses eConsiderQuit.
+    if (mShuttingDown && mAttemptingQuit)
+      mQuitRetryPending = PR_TRUE;
+    else
+      Quit(mAttemptingQuit ? eAttemptQuit : eConsiderQuit);
   } else if (!strcmp(aTopic, "xul-window-visible")) {
     // Hide splash screen (if there is one).
     static PRBool splashScreenGone = PR_FALSE;
@@ -985,4 +1002,3 @@ nsAppStartup::Observe(nsISupports *aSubject,
 
   return NS_OK;
 }
-
