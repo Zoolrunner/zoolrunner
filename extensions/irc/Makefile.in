@@ -83,7 +83,16 @@ libs realchrome:: locales/Makefile
 	done
 	# ZoolRunner: copy chatzilla.jar into proper dir:
 	cp -f $(objDir)/xpi-stage/chatzilla/chrome/chatzilla.jar $(objDir)/bin/chrome/chatzilla.jar
+	cp -f $(objDir)/xpi-stage/chatzilla/chrome.manifest $(objDir)/bin/chrome/chatzilla.manifest
 	cp -f $(objDir)/xpi-stage/chatzilla/components/chatzilla-service.js $(objDir)/bin/components/chatzilla-service.js
+	@for entry in \
+	  'content,install,url,jar:resource:/chrome/chatzilla.jar!/content/chatzilla/' \
+	  'content,install,url,jar:resource:/chrome/chatzilla.jar!/content/chatzilla/sm/' \
+	  'locale,install,url,jar:resource:/chrome/chatzilla.jar!/locale/en-US/chatzilla/' \
+	  'skin,install,url,jar:resource:/chrome/chatzilla.jar!/skin/modern/chatzilla/'; do \
+	  grep -F "$$entry" $(objDir)/bin/chrome/installed-chrome.txt >/dev/null 2>&1 || \
+	    echo "$$entry" >> $(objDir)/bin/chrome/installed-chrome.txt; \
+	done
 
 export::
 	$(NSINSTALL) -D $(FINAL_TARGET)/chrome/icons/default
