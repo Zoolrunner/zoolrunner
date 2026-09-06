@@ -110,15 +110,19 @@ XPCCallContext::XPCCallContext(XPCContext::LangType callerLanguage,
         mContextPopRequired = JS_TRUE;
     }
 
-    // Look up the mapping while the runtime owns its context-map lock.  The
-    // old per-thread shortcut held only raw pointers, which could outlive an
-    // XPCContext swept after its JSContext died.  Allocator reuse could then
-    // make a new JSContext compare equal to the stale cached key and turn the
-    // shortcut into a use-after-free.
-    if(!(mXPCContext = nsXPConnect::GetContext(mJSContext, mXPC)))
-        return;
+    // Try to get the JSContext -> XPCContext mapping from the cache.
+    // FWIW... quicky tests show this hitting ~ 95% of the time.
+    // That is a *lot* of locking we can skip in nsXPConnect::GetContext.
+    mXPCContext = mThreadData->GetRecentXPCContext(mJSContext);
 
-    mThreadData->SetRecentContext(mJSContext, mXPCContext);
+    if(!mXPCContext)
+    {
+        if(!(mXPCContext = nsXPConnect::GetContext(mJSContext, mXPC)))
+            return;
+
+        // Fill the cache.
+        mThreadData->SetRecentContext(mJSContext, mXPCContext);
+    }
 
     mPrevCallerLanguage = mXPCContext->SetCallingLangType(mCallerLanguage);
 

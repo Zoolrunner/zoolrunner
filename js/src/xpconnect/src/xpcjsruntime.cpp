@@ -1126,4 +1126,3 @@ XPCJSRuntime::DebugDump(PRInt16 depth)
         XPC_LOG_OUTDENT();
 #endif
 }
-
