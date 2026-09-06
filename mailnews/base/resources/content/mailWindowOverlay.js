@@ -219,6 +219,9 @@ function setSortByMenuItemCheckState(id, value)
 
 function InitViewSortByMenu()
 {
+    if (!gDBView)
+      return;
+
     var sortType = gDBView.sortType;
 
     setSortByMenuItemCheckState("sortByDateMenuitem", (sortType == nsMsgViewSortType.byDate));
@@ -608,9 +611,9 @@ function InitMessageTags(menuPopup)
   SetMessageTagLabel(menuPopup.firstChild, 0, tagRemoveLabel);
 
   // now rebuild the list
-  var msgHdr = gDBView.hdrForFirstSelectedMessage;
-  var curKeys = msgHdr.getStringProperty("keywords");
-  if (msgHdr.label)
+  var msgHdr = gDBView ? gDBView.hdrForFirstSelectedMessage : null;
+  var curKeys = msgHdr ? msgHdr.getStringProperty("keywords") : "";
+  if (msgHdr && msgHdr.label)
     curKeys += " $label" + msgHdr.label;
   for (var i = 0; i < tagCount; ++i)
   {

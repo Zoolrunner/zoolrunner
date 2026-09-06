@@ -280,7 +280,7 @@ function MsgSortByTotal()
 function MsgSortByThread()
 {
   var dbview = GetDBView();
-  if(dbview && !dbview.supportsThreading)
+  if (!dbview || !dbview.supportsThreading)
     return;
   dbview.viewFlags |= nsMsgViewFlagsType.kThreadedDisplay;
   dbview.viewFlags &= ~nsMsgViewFlagsType.kGroupBySort;
@@ -290,6 +290,8 @@ function MsgSortByThread()
 function MsgSortThreadPane(sortType)
 {
   var dbview = GetDBView();
+  if (!dbview)
+    return;
 
   if (dbview.viewFlags & nsMsgViewFlagsType.kGroupBySort)
   {
@@ -307,6 +309,8 @@ function MsgSortThreadPane(sortType)
 function MsgReverseSortThreadPane()
 {
   var dbview = GetDBView();
+  if (!dbview)
+    return;
   if (dbview.sortOrder == nsMsgViewSortOrder.ascending) {
     MsgSortDescending();
   }
@@ -318,6 +322,8 @@ function MsgReverseSortThreadPane()
 function MsgToggleThreaded()
 {
     var dbview = GetDBView();
+    if (!dbview)
+      return;
 
     dbview.viewFlags ^= nsMsgViewFlagsType.kThreadedDisplay;
     if (dbview.viewFlags & nsMsgViewFlagsType.kGroupBySort)
@@ -335,6 +341,8 @@ function MsgToggleThreaded()
 function MsgSortThreaded()
 {
     var dbview = GetDBView();
+    if (!dbview)
+      return;
     var viewFlags = dbview.viewFlags;
 
     if (viewFlags & nsMsgViewFlagsType.kGroupBySort)
@@ -351,6 +359,8 @@ function MsgSortThreaded()
 function MsgGroupBySort()
 {
   var dbview = GetDBView();
+  if (!dbview)
+    return;
   var viewFlags = dbview.viewFlags;
   var sortOrder = dbview.sortOrder;
   var sortType = dbview.sortType;
@@ -388,14 +398,19 @@ function MsgGroupBySort()
 
 function MsgSortUnthreaded()
 {
+    var dbview = GetDBView();
+    if (!dbview)
+      return;
     // Toggle if not already unthreaded.
-    if ((GetDBView().viewFlags & nsMsgViewFlagsType.kThreadedDisplay) != 0)
+    if ((dbview.viewFlags & nsMsgViewFlagsType.kThreadedDisplay) != 0)
         MsgToggleThreaded();
 }
 
 function MsgSortAscending()
 {
   var dbview = GetDBView();
+  if (!dbview)
+    return;
   dbview.sort(dbview.sortType, nsMsgViewSortOrder.ascending);
   UpdateSortIndicators(dbview.sortType, nsMsgViewSortOrder.ascending);
 }
@@ -403,13 +418,16 @@ function MsgSortAscending()
 function MsgSortDescending()
 {
   var dbview = GetDBView();
+  if (!dbview)
+    return;
   dbview.sort(dbview.sortType, nsMsgViewSortOrder.descending);
   UpdateSortIndicators(dbview.sortType, nsMsgViewSortOrder.descending);
 }
 
 function groupedBySortUsingDummyRow()
 {
-  return (gDBView.viewFlags & nsMsgViewFlagsType.kGroupBySort) && 
+  return gDBView &&
+         (gDBView.viewFlags & nsMsgViewFlagsType.kGroupBySort) &&
          (gDBView.sortType != nsMsgViewSortType.bySubject);
 }
 
