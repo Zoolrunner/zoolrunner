@@ -29,6 +29,9 @@ endif
 ifeq ($(CPU_ARCH),aarch64)
 CC              += -arch arm64
 CCC             += -arch arm64
+else ifeq ($(CPU_ARCH),x86_64)
+CC              += -arch x86_64
+CCC             += -arch x86_64
 else ifeq (,$(filter-out i%86,$(CPU_ARCH)))
 ifdef USE_64
 CC              += -arch x86_64

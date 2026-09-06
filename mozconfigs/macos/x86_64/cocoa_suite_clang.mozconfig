@@ -33,7 +33,9 @@ HOST_RANLIB=/usr/bin/ranlib
 export CC CXX HOST_CC HOST_CXX AR RANLIB LD HOST_AR HOST_RANLIB
 
 CROSS_COMPILE=1
-export CROSS_COMPILE
+ac_cv_va_copy=yes
+ac_cv_va_val_copy=no
+export CROSS_COMPILE ac_cv_va_copy ac_cv_va_val_copy
 
 ac_add_options --target=x86_64-apple-darwin24.6.0
 ac_add_options --enable-application=suite

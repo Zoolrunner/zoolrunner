@@ -516,6 +516,11 @@ case "$build:$target" in
         dnl translated environment, making a cross compiler appear native.
         cross_compiling=yes
         ;;
+    aarch64-apple-darwin*:x86_64-apple-darwin*)
+        dnl Rosetta can likewise run an x86_64 compiler probe on an arm64
+        dnl build host.  Host tools must still use the native host compiler.
+        cross_compiling=yes
+        ;;
 esac
 
 if test "$cross_compiling"  = "yes"; then

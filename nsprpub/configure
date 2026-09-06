@@ -2588,6 +2588,9 @@ case "$build:$target" in
     i?86-apple-darwin*:powerpc-apple-darwin*)
                                 cross_compiling=yes
         ;;
+    aarch64-apple-darwin*:x86_64-apple-darwin*)
+                                cross_compiling=yes
+        ;;
 esac
 
 if test "$cross_compiling"  = "yes"; then

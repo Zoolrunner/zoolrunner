@@ -59,6 +59,10 @@ endif
 
 ifeq ($(CPU_ARCH),aarch64)
 OS_REL_CFLAGS	=
+else ifeq ($(CPU_ARCH),x86_64)
+OS_REL_CFLAGS	=
+CC              += -arch x86_64
+CCC             += -arch x86_64
 else ifeq (,$(filter-out i%86,$(CPU_ARCH)))
 ifdef USE_64
 CC              += -arch x86_64
@@ -70,10 +74,11 @@ OS_REL_CFLAGS	= -Dppc
 endif
 
 ifneq (,$(MACOS_SDK_DIR))
-  ifeq ($(OS_TEST),arm64)
+  ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
     # Current Apple Clang supplies compiler headers such as stdarg.h from its
     # resource directory.  Modern SDKs no longer contain the GCC header tree
-    # used by the historical -nostdinc configuration below.
+    # used by the historical -nostdinc configuration below.  Keep that old
+    # configuration for the historical 32-bit compiler targets.
     DARWIN_SDK_CFLAGS = -isysroot $(MACOS_SDK_DIR)
     DARWIN_SDK_SHLIBFLAGS = -isysroot $(MACOS_SDK_DIR)
   else

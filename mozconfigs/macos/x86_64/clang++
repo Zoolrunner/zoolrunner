@@ -1,3 +1,25 @@
 #!/bin/sh
 
-exec /usr/bin/clang++ -arch x86_64 "$@"
+zr_output=
+zr_previous=
+for zr_argument in "$@"; do
+  if test "$zr_previous" = -o; then
+    zr_output=$zr_argument
+    zr_previous=
+  elif test "$zr_argument" = -o; then
+    zr_previous=-o
+  fi
+done
+
+/usr/bin/clang++ -arch x86_64 "$@"
+zr_status=$?
+
+# Autoconf 2.13 executes target compiler probes even after a cross target was
+# specified.  Prevent Rosetta from making those probes look like host tools.
+if test $zr_status -eq 0; then
+  case "$zr_output" in
+    conftest|*/conftest) chmod a-x "$zr_output" ;;
+  esac
+fi
+
+exit $zr_status
