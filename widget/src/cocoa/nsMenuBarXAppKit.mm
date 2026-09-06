@@ -39,8 +39,9 @@
 @interface ZoolAppKitMenu : NSMenu <NSMenuDelegate>
 {
   nsIMenu* mGeckoMenu;
+  nsMenuBarX* mGeckoMenuBar;
 }
-- (id)initWithGeckoMenu:(nsIMenu*)aMenu;
+- (id)initWithGeckoMenu:(nsIMenu*)aMenu menuBar:(nsMenuBarX*)aMenuBar;
 @end
 
 @implementation ZoolAppKitMenuItem
@@ -145,11 +146,12 @@ ConstructGeckoMenu(nsIMenu* aMenu)
   }
 }
 
-static void PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu);
+static void PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu,
+                               nsMenuBarX* aGeckoMenuBar);
 
 @implementation ZoolAppKitMenu
 
-- (id)initWithGeckoMenu:(nsIMenu*)aMenu
+- (id)initWithGeckoMenu:(nsIMenu*)aMenu menuBar:(nsMenuBarX*)aMenuBar
 {
   nsString label;
   NSString* title;
@@ -161,6 +163,12 @@ static void PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu);
   if (self) {
     mGeckoMenu = aMenu;
     NS_ADDREF(mGeckoMenu);
+    // The Gecko menu keeps only a weak pointer to its change manager.  AppKit
+    // can release items in the old main menu in any order when a different
+    // window installs its menu bar, so keep the manager alive for as long as
+    // this native menu can retain the Gecko menu.
+    mGeckoMenuBar = aMenuBar;
+    NS_ADDREF(mGeckoMenuBar);
     [self setAutoenablesItems:NO];
     [self setDelegate:self];
   }
@@ -171,25 +179,28 @@ static void PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu);
 {
   [self setDelegate:nil];
   NS_IF_RELEASE(mGeckoMenu);
+  NS_IF_RELEASE(mGeckoMenuBar);
   [super dealloc];
 }
 
 - (void)menuWillOpen:(NSMenu*)aMenu
 {
-  PopulateAppKitMenu(aMenu, mGeckoMenu);
+  PopulateAppKitMenu(aMenu, mGeckoMenu, mGeckoMenuBar);
 }
 
 @end
 
 
 static NSMenu*
-CreateAppKitMenu(nsIMenu* aGeckoMenu)
+CreateAppKitMenu(nsIMenu* aGeckoMenu, nsMenuBarX* aGeckoMenuBar)
 {
-  return [[ZoolAppKitMenu alloc] initWithGeckoMenu:aGeckoMenu];
+  return [[ZoolAppKitMenu alloc] initWithGeckoMenu:aGeckoMenu
+                                           menuBar:aGeckoMenuBar];
 }
 
 static void
-PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu)
+PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu,
+                   nsMenuBarX* aGeckoMenuBar)
 {
   PRUint32 count = 0;
 
@@ -226,7 +237,7 @@ PopulateAppKitMenu(NSMenu* aMenu, nsIMenu* aGeckoMenu)
         [[NSMenuItem alloc] initWithTitle:submenuTitle
                                   action:nil
                            keyEquivalent:@""];
-      NSMenu* submenu = CreateAppKitMenu(geckoSubmenu);
+      NSMenu* submenu = CreateAppKitMenu(geckoSubmenu, aGeckoMenuBar);
       [submenuItem setSubmenu:submenu];
       [submenu release];
       [aMenu addItem:submenuItem];
@@ -295,7 +306,7 @@ InstallAppKitMenuBar(nsMenuBarX* aMenuBar)
                                      length:label.Length()] autorelease];
     NSMenuItem* item =
       [[NSMenuItem alloc] initWithTitle:title action:nil keyEquivalent:@""];
-    NSMenu* submenu = CreateAppKitMenu(geckoMenu);
+    NSMenu* submenu = CreateAppKitMenu(geckoMenu, aMenuBar);
     [item setSubmenu:submenu];
     [submenu release];
     [mainMenu addItem:item];
