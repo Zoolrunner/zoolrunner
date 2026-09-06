@@ -417,11 +417,13 @@ nsresult nsCocoaWindow::StandardCreate(nsIWidget *aParent,
     mWindow = [[NSWindow alloc] initWithContentRect:rect styleMask:features 
                         backing:NSBackingStoreBuffered defer:NO];
     
-    // Popups will receive a "close" message when an app terminates
-    // that causes an extra release to occur.  Make sure popups
-    // are set not to release when closed.
-    if (features == 0)
-      [mWindow setReleasedWhenClosed: NO];
+    // nsCocoaWindow owns the NSWindow until the widget is destroyed.  AppKit's
+    // default releasedWhenClosed behavior would otherwise consume the retain
+    // from alloc when a XUL window closes, leaving mWindow dangling while
+    // Gecko completes asynchronous window teardown.  Session restoration can
+    // then call Show(PR_FALSE) on that stale pointer.  This ownership rule is
+    // equally important for ordinary windows and for borderless popups.
+    [mWindow setReleasedWhenClosed:NO];
 
     // Create the top-level content view. The historical 32-bit backend uses
     // NSQuickDrawView; QuickDraw is unavailable in the LP64 Cocoa ABI.
