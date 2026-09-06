@@ -194,6 +194,13 @@ tier_9_dirs	+= \
 		xpfe/appshell \
 		$(NULL)
 
+# The AppKit application menu asks nsIAppStartup to perform a complete quit.
+# Export the existing interface before the Cocoa widget library is compiled;
+# XPFE will still export it normally with the rest of tier 50 as well.
+ifeq ($(MOZ_WIDGET_TOOLKIT),cocoa)
+tier_9_dirs += xpfe/components/startup/public
+endif
+
 ifdef MOZ_OJI
 tier_9_dirs	+= \
 		js/src/liveconnect \

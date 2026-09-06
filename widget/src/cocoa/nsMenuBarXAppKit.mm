@@ -14,7 +14,6 @@
 #include "nsIMenuListener.h"
 #include "nsIServiceManager.h"
 #include "nsMenuBarX.h"
-#include "nsXPFEComponentsCID.h"
 #include "nsGUIEvent.h"
 #include "CarbonMenuCompat.h"
 
@@ -133,7 +132,7 @@
   // closes each window normally, preserving its close handlers and any
   // application cancellation UI.
   nsCOMPtr<nsIAppStartup> appStartup =
-    do_GetService(NS_APPSTARTUP_CONTRACTID);
+    do_GetService("@mozilla.org/toolkit/app-startup;1");
   if (appStartup)
     appStartup->Quit(nsIAppStartup::eAttemptQuit);
   else if (mGeckoMenuBar)
