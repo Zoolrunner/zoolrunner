@@ -3348,6 +3348,9 @@ EOF
 
     CFLAGS="$CFLAGS -Wmost -fno-common"
     case "${target_cpu}" in
+        x86_64*)
+            CPU_ARCH=x86_64
+            ;;
         i*86*)
             if test -n "$USE_64"; then
                 CPU_ARCH=x86_64

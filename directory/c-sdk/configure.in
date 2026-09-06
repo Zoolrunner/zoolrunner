@@ -912,6 +912,9 @@ case "$target" in
     AC_DEFINE(HAVE_BSD_FLOCK)
     CFLAGS="$CFLAGS -Wmost -fno-common"
     case "${target_cpu}" in
+        x86_64*)
+            CPU_ARCH=x86_64
+            ;;
         i*86*)
             AC_DEFINE(i386)
             CPU_ARCH=i386

@@ -1,0 +1,60 @@
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-macos-x86_64-suite
+mk_add_options MOZ_MAKE_FLAGS="-j8"
+mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
+
+ZR_TOPSRCDIR=${MOZCONFIG%/*}
+if test "$ZR_TOPSRCDIR" = "$MOZCONFIG"; then
+  ZR_TOPSRCDIR=`pwd`
+else
+  ZR_TOPSRCDIR=`cd "$ZR_TOPSRCDIR" && pwd`
+fi
+while test ! -f "$ZR_TOPSRCDIR/client.mk" -a "$ZR_TOPSRCDIR" != /; do
+  ZR_TOPSRCDIR=${ZR_TOPSRCDIR%/*}
+done
+ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-macos-x86_64-suite/build/unix/libIDL-prefix"
+LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
+HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
+PATH="$ZR_LIBIDL_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$ZR_LIBIDL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+DYLD_LIBRARY_PATH="$ZR_LIBIDL_PREFIX/lib:$DYLD_LIBRARY_PATH"
+export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH DYLD_LIBRARY_PATH
+
+ZR_MACOS_SDK="$HOME/dev/macos-sdk/MacOSX11.3.sdk"
+
+CC="$ZR_TOPSRCDIR/mozconfigs/macos/x86_64/clang"
+CXX="$ZR_TOPSRCDIR/mozconfigs/macos/x86_64/clang++"
+HOST_CC=/usr/bin/clang
+HOST_CXX=/usr/bin/clang++
+AR=/usr/bin/ar
+RANLIB=/usr/bin/ranlib
+LD=/usr/bin/ld
+HOST_AR=/usr/bin/ar
+HOST_RANLIB=/usr/bin/ranlib
+export CC CXX HOST_CC HOST_CXX AR RANLIB LD HOST_AR HOST_RANLIB
+
+CROSS_COMPILE=1
+export CROSS_COMPILE
+
+ac_add_options --target=x86_64-apple-darwin24.6.0
+ac_add_options --enable-application=suite
+ac_add_options --enable-default-toolkit=cairo-cocoa
+ac_add_options --with-macos-sdk="$ZR_MACOS_SDK"
+ac_add_options --enable-macos-target=10.6
+ac_add_options --enable-optimize="-O2"
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+ac_add_options --disable-installer
+ac_add_options --disable-updater
+ac_add_options --without-system-jpg
+ac_add_options --without-system-zlib
+ac_add_options --enable-crypto
+ac_add_options --enable-svg
+ac_add_options --enable-canvas
+
+CFLAGS="-arch x86_64 -std=gnu89 -fcommon -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
+CXXFLAGS="-arch x86_64 -std=gnu++98 -fcommon"
+LDFLAGS="-arch x86_64 -isysroot $ZR_MACOS_SDK -mmacosx-version-min=10.6"
+HOST_CFLAGS="-arch arm64 -std=gnu89 -fcommon"
+HOST_CXXFLAGS="-arch arm64 -std=gnu++98 -fcommon"
+HOST_LDFLAGS="-arch arm64 -isysroot $ZR_MACOS_SDK -mmacosx-version-min=11.0"
+export CFLAGS CXXFLAGS LDFLAGS HOST_CFLAGS HOST_CXXFLAGS HOST_LDFLAGS
