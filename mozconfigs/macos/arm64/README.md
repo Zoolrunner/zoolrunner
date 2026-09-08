@@ -4,6 +4,9 @@ The native arm64 configuration uses the existing Cocoa widget backend with
 the Cairo/CoreGraphics graphics path. It targets macOS 11.0, the first macOS
 release capable of running native Apple Silicon applications.
 
+The package qualifier is `arm64`, producing a DMG named like
+`zoolrunner-2.3.en-US.mac-arm64.dmg`. This package is not a Universal Binary.
+
 The NPAPI host and its application-facing interfaces remain built. The
 bundled Default Plugin sample is not built for arm64: its implementation and
 Xcode project depend on the 32-bit QuickDraw plug-in drawing/event model,

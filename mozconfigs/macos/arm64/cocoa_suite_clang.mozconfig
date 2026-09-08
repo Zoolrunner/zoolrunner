@@ -28,7 +28,8 @@ HOST_CXX=/usr/bin/clang++
 AR=/usr/bin/ar
 RANLIB=/usr/bin/ranlib
 LD=/usr/bin/ld
-export CC CXX HOST_CC HOST_CXX AR RANLIB LD
+MOZ_PKG_SPECIAL=arm64
+export CC CXX HOST_CC HOST_CXX AR RANLIB LD MOZ_PKG_SPECIAL
 
 ac_add_options --enable-application=suite
 ac_add_options --enable-default-toolkit=cairo-cocoa

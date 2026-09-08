@@ -10,6 +10,10 @@ applications are Mach-O x86_64, while build-time tools are native arm64.
 Rosetta is useful for testing the finished Intel application, but is not used
 as the target architecture or to build host tools.
 
+The package qualifier is `x86_64`, producing a DMG named like
+`zoolrunner-2.3.en-US.mac-x86_64.dmg`. This package contains only the Intel
+slice and is not a Universal Binary.
+
 The bundled Default Plugin sample is not built for x86_64.  Its implementation
 and Xcode project depend on the 32-bit QuickDraw plug-in drawing/event model.
 The NPAPI host and its application-facing interfaces remain built; a usable
