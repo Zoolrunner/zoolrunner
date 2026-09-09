@@ -110,6 +110,10 @@
 #include "nsIScrollableView.h"
 #endif
 
+#ifdef MOZILLA_1_8_BRANCH
+#include "nsIViewManager.h"
+#endif
+
 #ifdef XP_WIN
 #include "cairo-win32.h"
 
@@ -139,8 +143,16 @@ _cairo_win32_surface_create_dib (cairo_format_t format,
 #ifdef MOZ_WIDGET_GTK2
 #include "cairo-xlib.h"
 #include "cairo-xlib-xrender.h"
-#include <gdk/gdk.h>
-#include <gdk/gdkx.h>
+#include <gdk/gdkdrawable.h>
+#include <gdk/gdkvisual.h>
+#include <X11/Xlib.h>
+
+extern "C" {
+Display *gdk_x11_get_default_xdisplay(void);
+Display *gdk_x11_drawable_get_xdisplay(GdkDrawable *drawable);
+XID gdk_x11_drawable_get_xid(GdkDrawable *drawable);
+Visual *gdk_x11_visual_get_xvisual(GdkVisual *visual);
+}
 #endif
 
 #if defined(XP_MACOSX) && !defined(MOZ_ENABLE_CAIRO_GFX)
@@ -560,7 +572,7 @@ nsCanvasRenderingContext2D::Destroy()
 
 #ifdef MOZ_WIDGET_GTK2
     if (mSurfacePixmap != None) {
-        XFreePixmap(GDK_DISPLAY(), mSurfacePixmap);
+        XFreePixmap(gdk_x11_get_default_xdisplay(), mSurfacePixmap);
         mSurfacePixmap = None;
     }
 #endif
@@ -814,11 +826,11 @@ nsCanvasRenderingContext2D::SetDimensions(PRInt32 width, PRInt32 height)
     // However, we provide MOZ_CANVAS_USE_RENDER for whomever wants to
     // go that route.
     if (getenv("MOZ_CANVAS_USE_RENDER")) {
-        XRenderPictFormat *fmt = XRenderFindStandardFormat (GDK_DISPLAY(),
+        XRenderPictFormat *fmt = XRenderFindStandardFormat (gdk_x11_get_default_xdisplay(),
                                                             PictStandardARGB32);
         if (fmt) {
             int npfmts = 0;
-            XPixmapFormatValues *pfmts = XListPixmapFormats(GDK_DISPLAY(), &npfmts);
+            XPixmapFormatValues *pfmts = XListPixmapFormats(gdk_x11_get_default_xdisplay(), &npfmts);
             for (int i = 0; i < npfmts; i++) {
                 if (pfmts[i].depth == 32) {
                     npfmts = -1;
@@ -828,11 +840,12 @@ nsCanvasRenderingContext2D::SetDimensions(PRInt32 width, PRInt32 height)
             XFree(pfmts);
 
             if (npfmts == -1) {
-                mSurfacePixmap = XCreatePixmap (GDK_DISPLAY(),
-                                                DefaultRootWindow(GDK_DISPLAY()),
+                mSurfacePixmap = XCreatePixmap (gdk_x11_get_default_xdisplay(),
+                                                DefaultRootWindow(gdk_x11_get_default_xdisplay()),
                                                 width, height, 32);
                 mSurface = cairo_xlib_surface_create_with_xrender_format
-                    (GDK_DISPLAY(), mSurfacePixmap, DefaultScreenOfDisplay(GDK_DISPLAY()),
+                    (gdk_x11_get_default_xdisplay(), mSurfacePixmap,
+                     DefaultScreenOfDisplay(gdk_x11_get_default_xdisplay()),
                      fmt, mWidth, mHeight);
             }
         }
@@ -963,9 +976,9 @@ nsCanvasRenderingContext2D::Render(nsIRenderingContext *rc)
 
     gint w, h;
     gdk_drawable_get_size (gdkdraw, &w, &h);
-    dest = cairo_xlib_surface_create (GDK_DRAWABLE_XDISPLAY(gdkdraw),
-                                      GDK_DRAWABLE_XID(gdkdraw),
-                                      GDK_VISUAL_XVISUAL(gdk_drawable_get_visual(gdkdraw)),
+    dest = cairo_xlib_surface_create (gdk_x11_drawable_get_xdisplay(gdkdraw),
+                                      gdk_x11_drawable_get_xid(gdkdraw),
+                                      gdk_x11_visual_get_xvisual(gdk_drawable_get_visual(gdkdraw)),
                                       w, h);
     dest_cr = cairo_create (dest);
 #endif
