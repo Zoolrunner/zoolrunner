@@ -41,6 +41,7 @@
 #    command-line. The .mozconfig file is searched for in the 
 #    order:
 #       if $MOZCONFIG is set, use that.
+#       Relative paths set in $MOZCONFIG are also checked from $TOPSRCDIR.
 #       Otherwise, use $TOPSRCDIR/.mozconfig
 #       Otherwise, use $HOME/.mozconfig
 #
@@ -60,4 +61,15 @@ do
     echo "$_config";
     exit 0
   fi
+
+  case "$_config" in
+    /* | '')
+      ;;
+    *)
+      if test -f "$topsrcdir/$_config"; then
+        echo "$topsrcdir/$_config";
+        exit 0
+      fi
+      ;;
+  esac
 done
