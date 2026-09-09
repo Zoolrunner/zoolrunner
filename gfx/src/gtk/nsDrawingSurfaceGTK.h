@@ -44,7 +44,8 @@
 #include "nsIRegion.h"
 #include "nsCOMPtr.h"
 
-#include <gtk/gtk.h>
+#include <gdk/gdkdrawable.h>
+#include <gdk/gdkgc.h>
 
 #ifdef MOZ_ENABLE_XFT
 typedef struct _XftDraw XftDraw;

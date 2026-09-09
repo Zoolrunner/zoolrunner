@@ -89,8 +89,16 @@ extern "C" {
 #include <cairo-os2.h>
 }
 #else
-#include "nsRenderingContextGTK.h"
-#include <gdk/gdkx.h>
+#include "nsDrawingSurfaceGTK.h"
+#include <gdk/gdkdrawable.h>
+#include <gdk/gdkvisual.h>
+#include <X11/Xlib.h>
+
+extern "C" {
+Display *gdk_x11_drawable_get_xdisplay(GdkDrawable *drawable);
+XID gdk_x11_drawable_get_xid(GdkDrawable *drawable);
+Visual *gdk_x11_visual_get_xvisual(GdkVisual *visual);
+}
 #endif
 #endif
 
@@ -281,10 +289,10 @@ nsSVGCairoCanvas::Init(nsIRenderingContext *ctx,
   if (surface) {
     surface->GetSize(&mWidth, &mHeight);
     GdkDrawable *drawable = surface->GetDrawable();
-    GdkVisual *visual = gdk_window_get_visual(drawable);
-    cairoSurf = cairo_xlib_surface_create(GDK_WINDOW_XDISPLAY(drawable),
-                                          GDK_WINDOW_XWINDOW(drawable),
-                                          GDK_VISUAL_XVISUAL(visual),
+    GdkVisual *visual = gdk_drawable_get_visual(drawable);
+    cairoSurf = cairo_xlib_surface_create(gdk_x11_drawable_get_xdisplay(drawable),
+                                          gdk_x11_drawable_get_xid(drawable),
+                                          gdk_x11_visual_get_xvisual(visual),
                                           mWidth, mHeight);
   }
 #endif
