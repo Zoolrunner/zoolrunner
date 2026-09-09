@@ -121,7 +121,7 @@ CPPSRCS += cairo-beos-surface.cpp
 EXPORTS += cairo-beos.h
 endif
 
-ifeq ($(MOZ_WIDGET_TOOLKIT),gtk2)
+ifdef BUILD_CAIRO_PDF
 CSRCS   += cairo-font-subset.c \
            cairo-pdf-surface.c \
            cairo-ps-surface.c
