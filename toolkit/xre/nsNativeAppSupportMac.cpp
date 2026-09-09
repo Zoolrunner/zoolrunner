@@ -108,6 +108,7 @@ nsNativeAppSupportMac::Enable()
 /* boolean start (); */
 NS_IMETHODIMP nsNativeAppSupportMac::Start(PRBool *_retval)
 {
+#if !defined(__LP64__)
   Str255 str1;
   Str255 str2;
   SInt16 outItemHit;
@@ -174,6 +175,7 @@ NS_IMETHODIMP nsNativeAppSupportMac::Start(PRBool *_retval)
     }
   }
 #endif
+#endif
 
   *_retval = PR_TRUE;
   return NS_OK;
@@ -223,12 +225,20 @@ nsNativeAppSupportMac::ReOpen()
         windowList->HasMoreElements(&more);
         continue;
       }
+#if defined(__LP64__)
+      // The Cocoa widget's Show implementation restores and activates its
+      // native window without relying on the 32-bit Carbon Window Manager.
+      baseWindow->SetVisibility(PR_TRUE);
+      haveUncollapsed = PR_TRUE;
+      break;
+#else
       WindowRef windowRef = (WindowRef)widget->GetNativeData(NS_NATIVE_DISPLAY);
       if (!::IsWindowCollapsed(windowRef))
       {
         haveUncollapsed = PR_TRUE;
         break;  //have un-minimized windows, nothing to do
       } 
+#endif
       windowList->HasMoreElements(&more);
     } // end while
         
@@ -238,8 +248,9 @@ nsNativeAppSupportMac::ReOpen()
       nsCOMPtr<nsIDOMWindowInternal> mru = nsnull;
       wm->GetMostRecentWindow(nsnull, getter_AddRefs(mru));
             
-      if (mru) 
+      if (mru)
       {        
+#if !defined(__LP64__)
         WindowRef mruRef = nil;
         GetNativeWindowPointerFromDOMWindow(mru, &mruRef);
         if (mruRef)
@@ -248,6 +259,7 @@ nsNativeAppSupportMac::ReOpen()
           ::SelectWindow(mruRef);
           done = PR_TRUE;
         }
+#endif
       }
       
     } // end if have uncollapsed 

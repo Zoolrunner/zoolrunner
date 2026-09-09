@@ -83,7 +83,7 @@
 #include "nsIGenericFactory.h"
 #include "nsIIOService.h"
 #include "nsIObserverService.h"
-#include "nsINativeAppSupport.h"
+#include "xulapp/nsINativeAppSupport.h"
 #include "nsIProcess.h"
 #include "nsIProfileUnlocker.h"
 #include "nsIPromptService.h"
@@ -2283,10 +2283,12 @@ XRE_main(int argc, char* argv[], const nsXREAppData* aAppData)
     // This can be confusing to the user, who is expecting the app to launch.
     // Calling ReceiveNextEvent without requesting any event is enough to
     // cause a dock tile for the child process to appear.
+#if !defined(__LP64__)
     const EventTypeSpec kFakeEventList[] = { { INT_MAX, INT_MAX } };
     EventRef event;
     ::ReceiveNextEvent(GetEventTypeCount(kFakeEventList), kFakeEventList,
                        kEventDurationNoWait, PR_FALSE, &event);
+#endif
   }
 
   if (CheckArg("foreground")) {

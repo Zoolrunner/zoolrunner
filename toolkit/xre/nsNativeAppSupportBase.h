@@ -40,7 +40,7 @@
 #define nsNativeAppSupportBase_h__
 
 #include "nsAppRunner.h"
-#include "nsINativeAppSupport.h"
+#include "xulapp/nsINativeAppSupport.h"
 
 // nsNativeAppSupportBase
 //

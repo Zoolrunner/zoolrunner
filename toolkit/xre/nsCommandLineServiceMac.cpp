@@ -108,6 +108,11 @@ static PRInt32 ReadLine(FILE* inStream, char* buf, PRInt32 bufSize)
 static PRUint32
 ProcessAppleEvents()
 {
+#if defined(__LP64__)
+  // The LP64 Apple Event bridge does not install the legacy handlers that
+  // consume EventRecords. Cocoa delivers normal application events instead.
+  return 0;
+#else
   // Dispatch all of the Apple Events waiting in the event queue.
 
   PRUint32 processed = 0;
@@ -130,6 +135,7 @@ ProcessAppleEvents()
   }
 
   return processed;
+#endif
 }
 
 //----------------------------------------------------------------------------------------
@@ -261,6 +267,13 @@ nsresult nsMacCommandLine::AddToCommandLine(const char* inArgText)
 nsresult nsMacCommandLine::AddToCommandLine(const char* inOptionString, const FSSpec& inFileSpec)
 //----------------------------------------------------------------------------------------
 {
+#if defined(__LP64__)
+  // FSSpec conversion is unavailable in the 64-bit macOS ABI. The LP64
+  // Apple Event bridge never calls this legacy entry point.
+  (void)inOptionString;
+  (void)inFileSpec;
+  return NS_ERROR_NOT_IMPLEMENTED;
+#else
   // Convert the filespec to a URL.  Avoid using xpcom because this may be
   // called before xpcom startup.
   FSRef fsRef;
@@ -297,7 +310,8 @@ nsresult nsMacCommandLine::AddToCommandLine(const char* inOptionString, const FS
   AddToCommandLine(inOptionString);
   AddToCommandLine((char*)buffer);
 
-   return NS_OK;
+  return NS_OK;
+#endif
 }
 
 //----------------------------------------------------------------------------------------

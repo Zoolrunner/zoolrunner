@@ -81,7 +81,9 @@
 #  define GFX_MODULES MODULE(nsGfxModule)
 #  define WIDGET_MODULES MODULE(nsWidgetModule)
 #elif defined(XP_MACOSX)
+#  ifndef MOZ_ENABLE_CAIRO_GFX
 #  define GFX_MODULES MODULE(nsGfxMacModule)
+#  endif
 #  define WIDGET_MODULES MODULE(nsWidgetMacModule)
 #elif defined(XP_BEOS)
 #  define GFX_MODULES MODULE(nsGfxBeOSModule)

@@ -104,9 +104,12 @@ STATIC_LIBS = \
 	unicharutil_s \
 	ucvutil_s \
 	gkgfx \
-	gfxshared_s \
 	xulapp_s \
 	$(NULL)
+
+ifndef MOZ_ENABLE_CAIRO_GFX
+STATIC_LIBS += gfxshared_s
+endif
 
 # component libraries
 COMPONENT_LIBS += \
@@ -141,6 +144,7 @@ COMPONENT_LIBS += \
 
 ifdef MOZ_STORAGE
 COMPONENT_LIBS += storagecomps
+EXTRA_DSO_LIBS += sqlite3
 endif
 
 ifdef MOZ_PLACES
@@ -217,7 +221,10 @@ ifeq (os2,$(MOZ_WIDGET_TOOLKIT))
 COMPONENT_LIBS += gfx_os2 wdgtos2
 endif
 ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
-COMPONENT_LIBS += gfx_mac widget_mac
+ifndef MOZ_ENABLE_CAIRO_GFX
+COMPONENT_LIBS += gfx_mac
+endif
+COMPONENT_LIBS += widget_mac
 endif
 ifeq (qt,$(MOZ_WIDGET_TOOLKIT))
 COMPONENT_LIBS += widget_qt
@@ -225,7 +232,8 @@ endif
 
 ifdef MOZ_ENABLE_CAIRO_GFX
 DEFINES += -DMOZ_ENABLE_CAIRO_GFX
-COMPONENT_LIBS += gkgfxcairo
+COMPONENT_LIBS += gkgfxthebes
+STATIC_LIBS += thebes
 else
   ifneq (,$(MOZ_ENABLE_GTK)$(MOZ_ENABLE_GTK2))
   COMPONENT_LIBS += gfx_gtk
@@ -339,10 +347,14 @@ ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
 CXXFLAGS	+= $(TK_CFLAGS)
 EXTRA_DSO_LDOPTS += \
 	-framework Cocoa \
-	-framework QuickTime \
 	-framework IOKit \
 	$(TK_LIBS) \
 	$(NULL)
+ifndef HAVE_64BIT_OS
+EXTRA_DSO_LDOPTS += -framework QuickTime
+else
+EXTRA_DSO_LDOPTS += -framework Carbon
+endif
 endif
 
 ifdef MOZ_ENABLE_XINERAMA

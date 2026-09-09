@@ -73,6 +73,7 @@
 #endif
 #endif
 #ifdef XP_MACOSX
+#include <Folders.h>
 #include "nsILocalFileMac.h"
 #endif
 #ifdef XP_BEOS
@@ -1016,4 +1017,3 @@ nsXREDirProvider::GetProfileDefaultsDir(nsIFile* *aResult)
   NS_ADDREF(*aResult = defaultsDir);
   return NS_OK;
 }
-
