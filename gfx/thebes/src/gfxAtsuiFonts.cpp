@@ -48,6 +48,19 @@
 #include "cairo-atsui.h"
 
 #if defined(__LP64__)
+static gfxFloat
+GetCharAdvance(CTFontRef aFont, UniChar aChar, gfxFloat aFallback)
+{
+    CGGlyph glyph;
+    if (!CTFontGetGlyphsForCharacters(aFont, &aChar, &glyph, 1))
+        return aFallback;
+
+    CGSize advance;
+    CTFontGetAdvancesForGlyphs(aFont, kCTFontOrientationHorizontal,
+                               &glyph, &advance, 1);
+    return advance.width > 0.0 ? advance.width : aFallback;
+}
+
 gfxAtsuiFont::gfxAtsuiFont(CTFontRef font,
                            gfxAtsuiFontGroup *fontGroup)
     : mCTFont((CTFontRef) CFRetain(font)),
@@ -69,14 +82,15 @@ gfxAtsuiFont::gfxAtsuiFont(CTFontRef font,
     mMetrics.emDescent = mMetrics.maxDescent;
     mMetrics.maxAdvance = CTFontGetBoundingBox(mCTFont).size.width;
     mMetrics.xHeight = CTFontGetXHeight(mCTFont);
-    mMetrics.aveCharWidth = mMetrics.maxAdvance;
+    mMetrics.aveCharWidth = GetCharAdvance(mCTFont, 'x', size);
     mMetrics.underlineOffset = CTFontGetUnderlinePosition(mCTFont);
     mMetrics.underlineSize = CTFontGetUnderlineThickness(mCTFont);
     mMetrics.subscriptOffset = mMetrics.xHeight;
     mMetrics.superscriptOffset = mMetrics.xHeight;
     mMetrics.strikeoutOffset = mMetrics.xHeight / 2.0;
     mMetrics.strikeoutSize = mMetrics.underlineSize;
-    mMetrics.spaceWidth = mMetrics.aveCharWidth;
+    mMetrics.spaceWidth = GetCharAdvance(mCTFont, ' ',
+                                         mMetrics.aveCharWidth);
 
     mFontFace = cairo_atsui_font_face_create_for_cgfont(mCGFont);
 
