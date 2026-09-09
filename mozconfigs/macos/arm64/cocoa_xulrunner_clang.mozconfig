@@ -1,0 +1,55 @@
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-macos-arm64-xulrunner
+mk_add_options MOZ_MAKE_FLAGS="-j8"
+mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
+
+ZR_TOPSRCDIR=${MOZCONFIG%/*}
+if test "$ZR_TOPSRCDIR" = "$MOZCONFIG"; then
+  ZR_TOPSRCDIR=`pwd`
+else
+  ZR_TOPSRCDIR=`cd "$ZR_TOPSRCDIR" && pwd`
+fi
+while test ! -f "$ZR_TOPSRCDIR/client.mk" -a "$ZR_TOPSRCDIR" != /; do
+  ZR_TOPSRCDIR=${ZR_TOPSRCDIR%/*}
+done
+ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-macos-arm64-xulrunner/build/unix/libIDL-prefix"
+LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
+HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
+PATH="$ZR_LIBIDL_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$ZR_LIBIDL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+DYLD_LIBRARY_PATH="$ZR_LIBIDL_PREFIX/lib:$DYLD_LIBRARY_PATH"
+export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH DYLD_LIBRARY_PATH
+
+ZR_MACOS_SDK="$HOME/dev/macos-sdk/MacOSX11.3.sdk"
+
+CC=/usr/bin/clang
+CXX=/usr/bin/clang++
+HOST_CC=/usr/bin/clang
+HOST_CXX=/usr/bin/clang++
+AR=/usr/bin/ar
+RANLIB=/usr/bin/ranlib
+LD=/usr/bin/ld
+MOZ_PKG_SPECIAL=arm64
+export CC CXX HOST_CC HOST_CXX AR RANLIB LD MOZ_PKG_SPECIAL
+
+ac_add_options --enable-application=xulrunner
+ac_add_options --enable-default-toolkit=cairo-cocoa
+ac_add_options --with-macos-sdk="$ZR_MACOS_SDK"
+ac_add_options --enable-macos-target=11.0
+ac_add_options --enable-optimize="-O2"
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+ac_add_options --disable-installer
+ac_add_options --disable-updater
+ac_add_options --without-system-jpg
+ac_add_options --without-system-zlib
+ac_add_options --enable-crypto
+ac_add_options --enable-svg
+ac_add_options --enable-canvas
+
+CFLAGS="-arch arm64 -std=gnu89 -fcommon -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
+CXXFLAGS="-arch arm64 -std=gnu++98 -fcommon"
+HOST_CFLAGS="-arch arm64 -std=gnu89 -fcommon"
+HOST_CXXFLAGS="-arch arm64 -std=gnu++98 -fcommon"
+LDFLAGS="-arch arm64 -isysroot $ZR_MACOS_SDK -mmacosx-version-min=11.0"
+HOST_LDFLAGS="$LDFLAGS"
+export CFLAGS CXXFLAGS HOST_CFLAGS HOST_CXXFLAGS LDFLAGS HOST_LDFLAGS
