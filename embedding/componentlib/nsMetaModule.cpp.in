@@ -54,41 +54,139 @@ static nsModuleInfo* gSubModules[] = {
 
 #define NUM_SUB_MODULES (sizeof(gSubModules) / sizeof(gSubModules[0]))
 
-static nsModuleComponentInfo* gComponentInfo;
-static PRBool gInitialized = PR_FALSE;
-
-PR_STATIC_CALLBACK(nsresult)
-Initialize(nsIModule *self)
+/*
+ * A flat nsGenericModule would have to run every sub-module constructor the
+ * first time any component in this DLL was requested.  That differs from a
+ * normal component build, where (for example) the editor, parser, layout and
+ * networking modules are initialized independently and on demand.  Apart
+ * from wasting work, eager construction creates initialization-order and
+ * re-entrancy hazards when one module constructor requests a service owned by
+ * another module in this aggregate.
+ *
+ * Keep the single DLL, but delegate each CID to its original generic module.
+ * This preserves the usual per-module lazy constructor/destructor lifetime.
+ */
+class nsMetaModule : public nsIModule
 {
-    if (! gInitialized) {
-        // Run the ctor for each sub-module
-        gInitialized = PR_TRUE;
+public:
+    nsMetaModule();
+    virtual ~nsMetaModule();
 
-        nsModuleInfo** module = gSubModules;
-        nsModuleInfo** limit = module + NUM_SUB_MODULES;
-        for ( ; module < limit; ++module) {
-            if ((*module)->mCtor)
-                ((*module)->mCtor)(self);
-        }
+    NS_DECL_ISUPPORTS
+    NS_DECL_NSIMODULE
+
+private:
+    nsresult GetSubModule(PRUint32 aIndex, nsIModule **aResult);
+
+    nsIModule *mModules[NUM_SUB_MODULES];
+};
+
+nsMetaModule::nsMetaModule()
+{
+    memset(mModules, 0, sizeof(mModules));
+}
+
+nsMetaModule::~nsMetaModule()
+{
+    PRUint32 index = NUM_SUB_MODULES;
+    while (index != 0) {
+        --index;
+        NS_IF_RELEASE(mModules[index]);
+    }
+}
+
+NS_IMPL_THREADSAFE_ISUPPORTS1(nsMetaModule, nsIModule)
+
+nsresult
+nsMetaModule::GetSubModule(PRUint32 aIndex, nsIModule **aResult)
+{
+    if (!mModules[aIndex]) {
+        nsresult rv = NS_NewGenericModule2(gSubModules[aIndex],
+                                           &mModules[aIndex]);
+        if (NS_FAILED(rv))
+            return rv;
     }
 
+    NS_ADDREF(*aResult = mModules[aIndex]);
     return NS_OK;
 }
 
-PR_STATIC_CALLBACK(void)
-Shutdown(nsIModule *self)
+NS_IMETHODIMP
+nsMetaModule::GetClassObject(nsIComponentManager *aCompMgr,
+                             const nsCID& aClass,
+                             const nsIID& aIID,
+                             void **aResult)
 {
-    if (gInitialized) {
-        // Run the dtor for each sub-module
-        gInitialized = PR_FALSE;
+    if (!aResult)
+        return NS_ERROR_INVALID_POINTER;
+    *aResult = nsnull;
 
-        nsModuleInfo** module = gSubModules;
-        nsModuleInfo** limit = module + NUM_SUB_MODULES;
-        for ( ; module < limit; ++module) {
-            if ((*module)->mDtor)
-                ((*module)->mDtor)(self);
+    for (PRUint32 moduleIndex = 0;
+         moduleIndex < NUM_SUB_MODULES;
+         ++moduleIndex) {
+        nsModuleInfo *info = gSubModules[moduleIndex];
+        for (PRUint32 componentIndex = 0;
+             componentIndex < info->mCount;
+             ++componentIndex) {
+            if (info->mComponents[componentIndex].mCID.Equals(aClass)) {
+                nsIModule *module = nsnull;
+                nsresult rv = GetSubModule(moduleIndex, &module);
+                if (NS_FAILED(rv))
+                    return rv;
+                rv = module->GetClassObject(aCompMgr, aClass, aIID, aResult);
+                NS_RELEASE(module);
+                return rv;
+            }
         }
     }
+
+    return NS_ERROR_FACTORY_NOT_REGISTERED;
+}
+
+NS_IMETHODIMP
+nsMetaModule::RegisterSelf(nsIComponentManager *aCompMgr,
+                           nsIFile *aPath,
+                           const char *aLoaderStr,
+                           const char *aType)
+{
+    for (PRUint32 index = 0; index < NUM_SUB_MODULES; ++index) {
+        nsIModule *module = nsnull;
+        nsresult rv = GetSubModule(index, &module);
+        if (NS_FAILED(rv))
+            return rv;
+        rv = module->RegisterSelf(aCompMgr, aPath, aLoaderStr, aType);
+        NS_RELEASE(module);
+        if (NS_FAILED(rv))
+            return rv;
+    }
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMetaModule::UnregisterSelf(nsIComponentManager *aCompMgr,
+                             nsIFile *aPath,
+                             const char *aLoaderStr)
+{
+    for (PRUint32 index = 0; index < NUM_SUB_MODULES; ++index) {
+        nsIModule *module = nsnull;
+        nsresult rv = GetSubModule(index, &module);
+        if (NS_FAILED(rv))
+            return rv;
+        rv = module->UnregisterSelf(aCompMgr, aPath, aLoaderStr);
+        NS_RELEASE(module);
+        if (NS_FAILED(rv))
+            return rv;
+    }
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsMetaModule::CanUnload(nsIComponentManager *aCompMgr, PRBool *aResult)
+{
+    if (!aResult)
+        return NS_ERROR_INVALID_POINTER;
+    *aResult = PR_FALSE;
+    return NS_OK;
 }
 
 extern "C" NS_EXPORT nsresult
@@ -96,39 +194,13 @@ nsMetaModule_nsGetModule(nsIComponentManager *servMgr,
                          nsIFile *location,                 
                          nsIModule **result)                
 {                                                                            
-    // Count the number of components contained in all of the
-    // sub-modules
-    nsModuleInfo** info = gSubModules;
-    nsModuleInfo** limit = info + NUM_SUB_MODULES;
-    PRUint32 count = 0;
-    for ( ; info < limit; ++info)
-        count += (*info)->mCount;
+    if (!result)
+        return NS_ERROR_INVALID_POINTER;
+    *result = nsnull;
 
-    // Allocate an nsModuleComponentInfo array large enough to contain
-    // all of them. This will be permanently leaked.
-    gComponentInfo = new nsModuleComponentInfo[count];
-    if (! gComponentInfo)
+    nsMetaModule *module = new nsMetaModule();
+    if (!module)
         return NS_ERROR_OUT_OF_MEMORY;
-
-    // Copy the module component info into the contiguous array
-    nsModuleComponentInfo *comps = gComponentInfo;
-    for (info = gSubModules; info < limit; ++info) {
-        PRUint32 n = (*info)->mCount;
-        ::memcpy(comps, (*info)->mComponents, sizeof(nsModuleComponentInfo) * n);
-        comps += n;
-    }
-
-    // Dummy up an nsModuleInfo struct to register us as a generic
-    // module that contains all our sub-module's components.
-    nsModuleInfo metainfo;
-    memset(&metainfo, 0, sizeof(metainfo));
-    metainfo.mVersion    = NS_MODULEINFO_VERSION;
-    metainfo.mModuleName = META_MODULE " meta module";
-    metainfo.mComponents = gComponentInfo;
-    metainfo.mCount      = count;
-    metainfo.mCtor       = Initialize;
-    metainfo.mDtor       = Shutdown;
-
-    return NS_NewGenericModule2(&metainfo, result);
+    NS_ADDREF(*result = module);
+    return NS_OK;
 }
-

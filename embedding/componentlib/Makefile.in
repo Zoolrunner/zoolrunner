@@ -47,6 +47,11 @@ REQUIRES	= xpcom \
 
 LOCAL_INCLUDES	= -I$(srcdir)
 
+# This build is otherwise static, but the component aggregate must remain a
+# DLL.  config.mk needs this before it decides whether shared linking is
+# available.
+FORCE_SHARED_LIB = 1
+
 include $(topsrcdir)/config/config.mk
 
 _FINAL_COMPONENT_NAMES := $(shell cat $(FINAL_LINK_COMP_NAMES))
@@ -67,8 +72,6 @@ EXTRA_DSO_LIBS	= $(STATIC_EXTRA_DSO_LIBS)
 ifeq ($(OS_ARCH),Darwin)
 EXTRA_DEPS = force_data_segment.o exported_symbols
 endif
-
-FORCE_SHARED_LIB = 1
 
 include $(topsrcdir)/config/rules.mk
 include $(topsrcdir)/config/static-rules.mk
@@ -171,4 +174,3 @@ nsMetaModule_%.cpp: nsMetaModule.cpp.in Makefile Makefile.in $(topsrcdir)/config
 	sed -e "s|%DECLARE_SUBMODULE_INFOS%|$(foreach m, $($(_META_COMPONENT_NAMES)), extern nsModuleInfo NSMODULEINFO($(m));)|" | \
 	sed -e "s|%SUBMODULE_INFOS%|$(foreach m, $($(_META_COMPONENT_NAMES)), \\& NSMODULEINFO($(m)),)|" \
 	> $(_TARGET)
-

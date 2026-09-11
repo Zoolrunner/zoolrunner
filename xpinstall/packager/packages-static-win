@@ -9,6 +9,13 @@
 ;
 
 bin/.autoreg
+bin/install.rdf
+bin/dependentlibs.list
+bin/chrome/installed-chrome.txt
+bin/chrome/*.manifest
+bin/chrome/icons/default/*
+bin/dictionaries/*
+bin/isp/*
 
 [langenus]
 ;
@@ -29,6 +36,7 @@ bin\chrome\en-mac\*
 bin\chrome\US.jar
 bin\chrome\US\*
 bin\defaults\profile\US\*
+bin\defaults\profile\US\chrome\*
 bin\defaults\messenger\US\*
 bin\searchplugins\*
 
@@ -51,6 +59,8 @@ bin\js3250.dll
 bin\plc4.dll
 bin\plds4.dll
 bin\xpcom.dll
+bin\xpcom_core.dll
+bin\mozcomps.dll
 bin\xpistub.dll
 bin\nsreg.dll
 bin\nspr4.dll
@@ -319,6 +329,8 @@ bin\components\smime-service.js
 bin\components\msgmdn.xpt
 bin\components\mdn-service.js
 bin\components\mapihook.xpt
+bin\MapiProxy.dll
+bin\mozMapi32.dll
 bin\components\mailview.xpt
 bin/components\offlineStartup.js 
 bin\chrome\messenger.jar
@@ -332,6 +344,10 @@ bin\chrome\chatzilla\*
 [venkman]
 bin\components\venkman-service.js
 bin\chrome\venkman.jar
+
+[spellcheck]
+bin\components\myspell.dll
+bin\components\spellchk.dll
 
 [psm]
 bin\nssckbi.dll

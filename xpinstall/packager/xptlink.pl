@@ -154,7 +154,11 @@ foreach my $component (@xptdirs) {
 	  $realmerged = $merged;
       }
 
-      my $cmdline = "$srcdir/bin/xpt_link $realmerged @realxptfiles";
+      my $xptlink = "$srcdir/host/bin/host_xpt_link";
+      if (! -x $xptlink) {
+        $xptlink = "$srcdir/bin/xpt_link";
+      }
+      my $cmdline = "$xptlink $realmerged @realxptfiles";
 			($debug >= 4) && print "$cmdline\n";
 			system($cmdline) == 0 || die ("'$cmdline' failed");
 

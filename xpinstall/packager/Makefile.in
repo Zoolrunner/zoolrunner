@@ -45,6 +45,15 @@ VPATH		= @srcdir@
 include $(DEPTH)/config/autoconf.mk
 
 OSPACKAGE	= unix
+PACKAGE_OS	= unix
+PACKAGE_FILE	= packages-$(OSPACKAGE)
+ifeq ($(OS_ARCH),WINNT)
+OSPACKAGE	= win
+PACKAGE_OS	= dos
+ifdef BUILD_STATIC_LIBS
+PACKAGE_FILE	= packages-static-win
+endif
+endif
 ifeq ($(OS_ARCH),IRIX)
 STRIP_FLAGS	= -f
 endif
@@ -56,6 +65,7 @@ ifeq ($(OS_ARCH),OS2)
 STRIP		= $(srcdir)/os2/strip.cmd
 STRIP_FLAGS	=
 OSPACKAGE	= os2
+PACKAGE_OS	= dos
 PLATFORM_EXCLUDE_LIST = ! -name "*.ico"
 endif
 
@@ -77,12 +87,16 @@ ifndef MOZ_PKG_DEST
 else
 	@if [ ! -d $(MOZ_PKG_DEST) ]; then mkdir $(MOZ_PKG_DEST); fi
 	@cd $(MOZ_PKG_DEST); rm -rf bin $(MOZ_PKG_APPNAME) $(PACKAGE)
+	@mkdir $(MOZ_PKG_DEST)/bin
 	@echo "Creating distribution tarball in $(MOZ_PKG_DEST)..."
-	$(PERL) $(srcdir)/pkgcp.pl --source $(DEPTH)/dist --destination $(MOZ_PKG_DEST) --file $(srcdir)/packages-$(OSPACKAGE) --os $(OSPACKAGE) --flat
+	$(PERL) $(srcdir)/pkgcp.pl --source $(DEPTH)/dist --destination $(MOZ_PKG_DEST)/bin --file $(srcdir)/$(PACKAGE_FILE) --os $(PACKAGE_OS) --flat
+	$(PERL) $(srcdir)/xptlink.pl -s $(DEPTH)/dist -d $(DEPTH)/dist/xpt -f $(MOZ_PKG_DEST)/bin/components -v
 	@cd $(MOZ_PKG_DEST); mv bin $(MOZ_PKG_APPNAME)
 ifneq ($(MOZ_PKG_APPNAME),mozilla)
+ifneq ($(OS_ARCH),WINNT)
 	@echo "Creating start script $(MOZ_PKG_APPNAME)..."
 	cd $(MOZ_PKG_DEST)/$(MOZ_PKG_APPNAME); cp mozilla $(MOZ_PKG_APPNAME)
+endif
 endif
 	@echo "Compressing..."
 	cd $(MOZ_PKG_DEST); $(MAKE_PACKAGE)

@@ -1396,7 +1396,7 @@ fi
 # embedding/componentlib
 
 if [ "$MOZ_COMPONENTLIB" ]; then
-    MAKEFILES_static_components="$MAKEFILE_static_components
+    MAKEFILES_static_components="$MAKEFILES_static_components
 	embedding/componentlib/Makefile
 "
 

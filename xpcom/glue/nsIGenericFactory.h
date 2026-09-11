@@ -319,8 +319,12 @@ NS_NewGenericModule(const char* moduleName,
 
 #if defined(XPCOM_TRANSLATE_NSGM_ENTRY_POINT)
 #  define NSGETMODULE_ENTRY_POINT(_name)  NS_VISIBILITY_HIDDEN nsresult _name##_NSGetModule
+#  define NSMODULEINFO(_name) _name##_NSModuleInfo
+#  define NSMODULEINFO_DECL(_name) nsModuleInfo NSMODULEINFO(_name)
 #else
 #  define NSGETMODULE_ENTRY_POINT(_name)  extern "C" NS_EXPORT nsresult NSGetModule
+#  define NSMODULEINFO(_name) kModuleInfo
+#  define NSMODULEINFO_DECL(_name) static nsModuleInfo const NSMODULEINFO(_name)
 #endif
 
 /** 
@@ -339,7 +343,7 @@ NS_NewGenericModule(const char* moduleName,
     NS_IMPL_NSGETMODULE_WITH_CTOR_DTOR(_name, _components, nsnull, _dtor)
 
 #define NS_IMPL_NSGETMODULE_WITH_CTOR_DTOR(_name, _components, _ctor, _dtor)  \
-static nsModuleInfo const kModuleInfo = {                                     \
+NSMODULEINFO_DECL(_name) = {                                                  \
     NS_MODULEINFO_VERSION,                                                    \
     (#_name),                                                                 \
     (_components),                                                            \
@@ -352,7 +356,7 @@ NSGETMODULE_ENTRY_POINT(_name)                                                \
             nsIFile* location,                                                \
             nsIModule** result)                                               \
 {                                                                             \
-    return NS_NewGenericModule2(&kModuleInfo, result);                        \
+    return NS_NewGenericModule2(&NSMODULEINFO(_name), result);                \
 }
 
 ////////////////////////////////////////////////////////////////////////////////

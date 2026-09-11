@@ -225,7 +225,16 @@ extern "C" {
 }
 #endif
 
-#ifndef _BUILD_STATIC_BIN
+#ifdef _MOZCOMPS_SHARED_LIBRARY
+extern "C" nsresult
+nsMetaModule_nsGetModule(nsIComponentManager*, nsIFile*, nsIModule**);
+
+static nsStaticModuleInfo const gMozCompsModule = {
+  "mozcomps", nsMetaModule_nsGetModule
+};
+nsStaticModuleInfo const *const kPStaticModules = &gMozCompsModule;
+PRUint32 const kStaticModuleCount = 1;
+#elif !defined(_BUILD_STATIC_BIN)
 nsStaticModuleInfo const *const kPStaticModules = nsnull;
 PRUint32 const kStaticModuleCount = 0;
 #endif

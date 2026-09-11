@@ -1,0 +1,97 @@
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-win32-msvc8-suite-legacy
+mk_add_options MOZ_MAKE_FLAGS="-j8"
+mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
+mk_add_options 'export PATH := @TOPSRCDIR@/build/win32/msvc8-cross:@TOPSRCDIR@/obj-zoolrunner-win32-msvc8-suite-legacy/build/unix/libIDL-prefix/bin:$(PATH)'
+mk_add_options 'export DYLD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-suite-legacy/build/unix/libIDL-prefix/lib:$(DYLD_LIBRARY_PATH)'
+mk_add_options 'export LD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-suite-legacy/build/unix/libIDL-prefix/lib:$(LD_LIBRARY_PATH)'
+mk_add_options 'export MSVC8_REQUIRE_STATIC_RTL=1'
+mk_add_options 'export MOZ_META_COMPONENTS=mozcomps'
+mk_add_options 'export MOZ_COMPONENTLIB=1'
+
+if test -z "${MSVC8_ROOT-}"; then
+  echo "MSVC8_ROOT must name the extracted Visual C++ 8.0 toolchain" >&2
+  exit 1
+fi
+
+ZR_TOPSRCDIR=${MOZCONFIG%/*}
+if test "$ZR_TOPSRCDIR" = "$MOZCONFIG"; then
+  ZR_TOPSRCDIR=`pwd`
+else
+  ZR_TOPSRCDIR=`cd "$ZR_TOPSRCDIR" && pwd`
+fi
+while test ! -f "$ZR_TOPSRCDIR/client.mk" -a "$ZR_TOPSRCDIR" != /; do
+  ZR_TOPSRCDIR=${ZR_TOPSRCDIR%/*}
+done
+
+ZR_CROSS_TOOLS="$ZR_TOPSRCDIR/build/win32/msvc8-cross"
+ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-win32-msvc8-suite-legacy/build/unix/libIDL-prefix"
+LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
+HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
+PATH="$ZR_CROSS_TOOLS:$ZR_LIBIDL_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$ZR_LIBIDL_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH-}"
+case `uname -s` in
+Darwin)
+  DYLD_LIBRARY_PATH="$ZR_LIBIDL_PREFIX/lib:${DYLD_LIBRARY_PATH-}"
+  export DYLD_LIBRARY_PATH
+  ;;
+*)
+  LD_LIBRARY_PATH="$ZR_LIBIDL_PREFIX/lib:${LD_LIBRARY_PATH-}"
+  export LD_LIBRARY_PATH
+  ;;
+esac
+export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH MSVC8_ROOT
+MSVC8_REQUIRE_STATIC_RTL=1
+MOZ_META_COMPONENTS=mozcomps
+MOZ_COMPONENTLIB=1
+export MSVC8_REQUIRE_STATIC_RTL MOZ_META_COMPONENTS MOZ_COMPONENTLIB
+
+CC=cl
+CXX=cl
+CPP=cl
+LD=link
+AR=lib
+AS=ml
+RC=rc
+MIDL=midl
+RANLIB=:
+STRIP=:
+CROSS_COMPILE=1
+export CC CXX CPP LD AR AS RC MIDL RANLIB STRIP CROSS_COMPILE
+
+HOST_CC=${HOST_CC-cc}
+HOST_CXX=${HOST_CXX-c++}
+HOST_LD=${HOST_LD-$HOST_CC}
+HOST_AR=${HOST_AR-ar}
+HOST_RANLIB=${HOST_RANLIB-ranlib}
+HOST_CFLAGS=${HOST_CFLAGS-"-std=gnu89"}
+HOST_CXXFLAGS=${HOST_CXXFLAGS-"-std=gnu++98"}
+HOST_LDFLAGS=${HOST_LDFLAGS-}
+export HOST_CC HOST_CXX HOST_LD HOST_AR HOST_RANLIB
+export HOST_CFLAGS HOST_CXXFLAGS HOST_LDFLAGS
+
+CFLAGS=${CFLAGS-}
+CXXFLAGS=${CXXFLAGS-}
+CPPFLAGS=${CPPFLAGS-}
+LDFLAGS=${LDFLAGS-}
+export CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+
+ac_add_options --target=i586-pc-mingw32
+ac_add_options --enable-application=suite
+ac_add_options --enable-default-toolkit=windows
+ac_add_options --enable-optimize="-O1"
+ac_add_options --disable-debug
+ac_add_options --disable-shared
+ac_add_options --enable-static
+ac_add_options --enable-static-rtl
+ac_add_options --disable-tests
+ac_add_options --disable-installer
+ac_add_options --disable-updater
+ac_add_options --disable-accessibility
+ac_add_options --disable-activex
+ac_add_options --disable-activex-scripting
+ac_add_options --without-system-jpg
+ac_add_options --without-system-zlib
+ac_add_options --enable-crypto
+ac_add_options --enable-svg
+ac_add_options --enable-canvas
+ac_add_options --disable-javaxpcom

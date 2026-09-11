@@ -380,6 +380,12 @@ ifdef MINIMO
 tier_99_dirs	+= minimo
 endif
 
+# The meta component must be linked after component libraries and before the
+# application launcher that imports it.
+ifdef MOZ_COMPONENTLIB
+tier_99_dirs	+= embedding/componentlib
+endif
+
 ifdef MOZ_XUL_APP
 ifdef MOZ_INSTALLER
 tier_99_dirs     +=  toolkit/mozapps/installer
