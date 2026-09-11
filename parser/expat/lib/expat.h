@@ -47,7 +47,7 @@
 #ifndef Expat_INCLUDED
 #  define Expat_INCLUDED 1
 
-#  include <stdint.h> // for uint8_t
+#  include "expat_msvc_compat.h" // for uint8_t
 #  include <stdlib.h>
 #  include "expat_external.h"
 

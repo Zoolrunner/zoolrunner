@@ -37,54 +37,33 @@
 
 #include "random_rand_s.h"
 
-/* force stdlib to define rand_s() */
-#if ! defined(_CRT_RAND_S)
-#  define _CRT_RAND_S
-#endif
+#include <windows.h>
 
-// Workaround MinGW GCC trouble with recognizing `rand_s`, likely related
-// to return type `error_t`; the symptom was:
-// > error: implicit declaration of function ‘rand_s’
-#if defined(__MINGW32__)
-#  include <errno.h>
-#endif
-
-#include <stdlib.h> // for rand_s
-#include <string.h> // for memcpy
-
-// Help clang-tidy out with prototype of function `rand_s`
-#if defined(XML_CLANG_TIDY)
-int rand_s(unsigned int *);
-#endif
-
-/* Provide declaration of rand_s() for MinGW-32 (not 64, which has it),
-   as it didn't declare it in its header prior to version 5.3.0 of its
-   runtime package (mingwrt, containing stdlib.h).  The upstream fix
-   was introduced at https://osdn.net/projects/mingw/ticket/39658 . */
-#if defined(__MINGW32__) && defined(__MINGW32_VERSION)                         \
-    && __MINGW32_VERSION < 5003000L && ! defined(__MINGW64_VERSION_MAJOR)
-__declspec(dllimport) int rand_s(unsigned int *);
-#endif
-
-/* Obtain entropy on Windows using the rand_s() function which
- * generates cryptographically secure random numbers.  Internally it
- * uses RtlGenRandom API which is present in Windows XP and later.
+/* Obtain entropy from the same RtlGenRandom entry point used internally by
+ * rand_s().  Calling the VC8 CRT's rand_s() on systems without that entry
+ * point invokes the CRT invalid-parameter handler and terminates the process.
+ * Resolving it here lets Expat use its existing fallback on Windows 95 and
+ * Windows NT 4 while retaining high-quality entropy on systems that provide
+ * RtlGenRandom.
  */
 bool
 writeRandomBytes_rand_s(void *target, size_t count) {
-  size_t bytesWrittenTotal = 0;
+  typedef BOOLEAN(WINAPI * RtlGenRandomFunction)(PVOID, ULONG);
+  HMODULE advapi32 = LoadLibraryA("advapi32.dll");
+  RtlGenRandomFunction rtlGenRandom;
+  BOOLEAN result;
 
-  while (bytesWrittenTotal < count) {
-    unsigned int random32 = 0;
+  if (advapi32 == NULL)
+    return false;
 
-    if (rand_s(&random32))
-      return false; /* failure */
-
-    size_t toUse = count - bytesWrittenTotal;
-    if (toUse > sizeof(random32))
-      toUse = sizeof(random32);
-    memcpy((char *)target + bytesWrittenTotal, &random32, toUse);
-    bytesWrittenTotal += toUse;
+  rtlGenRandom = (RtlGenRandomFunction)GetProcAddress(advapi32,
+                                                       "SystemFunction036");
+  if (rtlGenRandom == NULL) {
+    FreeLibrary(advapi32);
+    return false;
   }
-  return true; /* success */
+
+  result = rtlGenRandom(target, (ULONG)count);
+  FreeLibrary(advapi32);
+  return result != FALSE;
 }

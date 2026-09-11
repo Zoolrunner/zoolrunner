@@ -58,6 +58,10 @@
 #define MOZ_EXPAT_INVALID_CHARACTER (1 << 1)
 #define MOZ_EXPAT_MALFORMED         (1 << 2)
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int MOZ_XMLCheckQName(const char* ptr, const char* end, int ns_aware,
                       const char** colon)
 {
@@ -187,6 +191,10 @@ int MOZ_XMLTranslateEntity(const char* ptr, const char* end, const char** next,
 
   return 0;
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #undef PREFIX
 #undef BYTE_TYPE

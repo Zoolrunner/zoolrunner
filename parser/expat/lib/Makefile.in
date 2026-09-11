@@ -57,7 +57,7 @@ else
 CSRCS		+= random_dev_urandom.c
 endif
 
-EXPORTS		= expat.h
+EXPORTS		= expat.h expat_external.h expat_msvc_compat.h
 
 # We want only the static lib, not the shared lib
 FORCE_STATIC_LIB = 1
@@ -67,4 +67,15 @@ include $(topsrcdir)/config/rules.mk
 DEFINES += -DHAVE_EXPAT_CONFIG_H
 DEFINES += -DwriteRandomBytes_dev_urandom=MOZ_writeRandomBytes_dev_urandom
 DEFINES += -DwriteRandomBytes_rand_s=MOZ_writeRandomBytes_rand_s
+ifdef GNU_CC
 CFLAGS := $(filter-out -std=gnu89,$(CFLAGS)) -std=gnu99
+endif
+
+ifeq ($(OS_ARCH),WINNT)
+ifndef GNU_CC
+# Current Expat uses C99 declaration placement, which the VC8 C frontend does
+# not support.  Its sources are also valid C++, and its public declarations
+# preserve C linkage.
+CFLAGS += -TP
+endif
+endif

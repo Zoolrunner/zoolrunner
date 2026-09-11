@@ -57,6 +57,9 @@
 #define XMLIMPORT
 
 #define XML_UNICODE
+#ifdef XP_WIN
+#define XML_UNICODE_WCHAR_T
+#endif
 
 #define XML_DTD 1
 #define XML_GE 1

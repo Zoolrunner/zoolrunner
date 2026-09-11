@@ -35,7 +35,7 @@
 #if ! defined(RANDOM_RAND_S_H)
 #  define RANDOM_RAND_S_H 1
 
-#  include <stdbool.h>
+#  include "expat_msvc_compat.h"
 #  include <stddef.h> // for size_t
 
 bool writeRandomBytes_rand_s(void *target, size_t count);

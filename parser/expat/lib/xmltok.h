@@ -39,7 +39,7 @@
 #ifndef XmlTok_INCLUDED
 #  define XmlTok_INCLUDED 1
 
-#  include <stdint.h> // uint64_t
+#  include "expat_msvc_compat.h" // uint64_t
 
 #  ifdef __cplusplus
 extern "C" {

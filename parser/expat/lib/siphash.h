@@ -101,7 +101,7 @@
 #define SIPHASH_H
 
 #include <stddef.h> /* size_t */
-#include <stdint.h> /* uint64_t uint32_t uint8_t */
+#include "expat_msvc_compat.h" /* uint64_t uint32_t uint8_t */
 #include "fallthrough.h"
 
 /*
