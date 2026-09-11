@@ -236,6 +236,17 @@ static void DLLErrorInternal(PRIntn oserr)
     const char *error = NULL;
 #ifdef USE_DLFCN
     error = dlerror();  /* $$$ That'll be wrong some of the time - AOF */
+#elif defined(WIN32)
+    char errorBuf[1024];
+    DWORD errorLen = FormatMessageA(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, (DWORD)oserr, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        errorBuf, sizeof(errorBuf), NULL);
+    if (errorLen == 0) {
+        PR_snprintf(errorBuf, sizeof(errorBuf),
+                    "Windows loader error %d", oserr);
+    }
+    error = errorBuf;
 #elif defined(HAVE_STRERROR)
     error = strerror(oserr);  /* this should be okay */
 #else
