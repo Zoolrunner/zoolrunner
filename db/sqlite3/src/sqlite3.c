@@ -14990,7 +14990,9 @@ struct fts5_api {
 /*
 ** Include standard header files as necessary
 */
+#if !defined(_MSC_VER) || _MSC_VER >= 1600
 #include <stdint.h>
+#endif
 #ifdef HAVE_INTTYPES_H
 #include <inttypes.h>
 #endif

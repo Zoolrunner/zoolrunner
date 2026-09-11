@@ -31,6 +31,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --enable-debug-rtl      Use the MSVC debug runtime library"
 ac_help="$ac_help
+  --enable-static-rtl     Use the statically linked MSVC runtime library"
+ac_help="$ac_help
   --enable-n32            Enable n32 ABI support (IRIX only)"
 ac_help="$ac_help
   --enable-64bit          Enable 64-bit support (on certain platforms)"
@@ -866,6 +868,15 @@ if test "${enable_debug_rtl+set}" = set; then
   enableval="$enable_debug_rtl"
    if test "$enableval" = "yes"; then
 	    USE_DEBUG_RTL=1
+      fi
+fi
+
+
+# Check whether --enable-static-rtl or --disable-static-rtl was given.
+if test "${enable_static_rtl+set}" = set; then
+  enableval="$enable_static_rtl"
+   if test "$enableval" = "yes"; then
+	    USE_STATIC_RTL=1
       fi 
 fi
 
@@ -3915,7 +3926,13 @@ EOF
             CFLAGS="$CFLAGS -Od"
         fi
 
-        if test -n "$USE_DEBUG_RTL"; then
+        if test -n "$USE_STATIC_RTL"; then
+            if test -n "$USE_DEBUG_RTL"; then
+                CFLAGS="$CFLAGS -MTd"
+            else
+                CFLAGS="$CFLAGS -MT"
+            fi
+        elif test -n "$USE_DEBUG_RTL"; then
             CFLAGS="$CFLAGS -MDd"
         else
             CFLAGS="$CFLAGS -MD"

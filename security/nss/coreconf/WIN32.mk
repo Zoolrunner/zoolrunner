@@ -31,15 +31,22 @@ else
 	BSDECHO      = echo
 	RC           = rc.exe
 	MT           = mt.exe
-	# Check for clang-cl
-	CLANG_CL    := $(shell expr `$(CC) -? 2>&1 | grep -w clang | wc -l` \> 0)
-	# Determine compiler version
-	ifeq ($(CLANG_CL),1)
+	# MSVC8_ROOT is only set by the genuine VC8 cross-tool wrappers.  Avoid
+	# launching the Windows compiler for every recursive make invocation.
+	ifdef MSVC8_ROOT
+	    CLANG_CL   := 0
+	    CC_VERSION := 14.00.50727.42
+	else
+	    # Check for clang-cl
+	    CLANG_CL    := $(shell expr `$(CC) -? 2>&1 | grep -w clang | wc -l` \> 0)
+	    # Determine compiler version
+	    ifeq ($(CLANG_CL),1)
 	    # clang-cl pretends to be MSVC 2012.
 	    CC_VERSION  := 17.00.00.00
-	else
+	    else
 	    CC_VERSION  := $(shell $(CC) 2>&1 | sed -ne \
-		's|.* \([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\).*|\1|p')
+		's|.* \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,1\}\).*|\1|p')
+	    endif
 	endif
 	# Change the dots to spaces.
 	_CC_VERSION_WORDS := $(subst ., ,$(CC_VERSION))

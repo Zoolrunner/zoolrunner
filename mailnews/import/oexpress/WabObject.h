@@ -44,7 +44,17 @@
 #include "nsIFileSpec.h"
 
 #include <windows.h>
+#if defined(_NATIVE_WCHAR_T_DEFINED) && !defined(UNIX)
+/* WabDefs.h otherwise redefines WCHAR as WORD.  Keep native wchar_t enabled
+ * so this component retains the same C++ ABI as the rest of Mozilla. */
+#define MOZ_WAB_TEMPORARY_UNIX 1
+#define UNIX 1
+#endif
 #include <wab.h>
+#ifdef MOZ_WAB_TEMPORARY_UNIX
+#undef UNIX
+#undef MOZ_WAB_TEMPORARY_UNIX
+#endif
 
 
 class CWabIterator {
@@ -91,5 +101,4 @@ private:
 };
 
 #endif // WABOBJECT_INCLUDED
-
 

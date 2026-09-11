@@ -72,7 +72,11 @@ DLL_SUFFIX = dll
 OS_CFLAGS = -W3 -nologo -GF -Gy
 
 ifdef BUILD_OPT
+ifdef MOZILLA_CLIENT
+OS_CFLAGS += -MT
+else
 OS_CFLAGS += -MD
+endif
 OPTIMIZER = -O2
 DEFINES = -UDEBUG -U_DEBUG -DNDEBUG
 DLLFLAGS = -OUT:"$@"
@@ -91,9 +95,17 @@ else
 # (RTL) in the debug build
 #
 ifdef USE_DEBUG_RTL
+ifdef MOZILLA_CLIENT
+OS_CFLAGS += -MTd
+else
 OS_CFLAGS += -MDd
+endif
+else
+ifdef MOZILLA_CLIENT
+OS_CFLAGS += -MT
 else
 OS_CFLAGS += -MD
+endif
 endif
 OPTIMIZER = -Od -Zi
 #OPTIMIZER = -Zi -Fd$(OBJDIR)/ -Od

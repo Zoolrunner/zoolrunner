@@ -402,6 +402,9 @@ endif
 
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.cpp
 	@$(MAKE_OBJDIR)
+ifeq ($(CROSS_COMPILE)$(INTERNAL_TOOLS),11)
+	$(CCC) -o $@ -c $(CCCFLAGS) $<
+else
 ifeq ($(OS_ARCH)_$(NS_USE_GCC), WINNT_)
 	$(CCC) -Fo$@ -c $(CCCFLAGS) $<
 else
@@ -411,12 +414,16 @@ else
 	$(CCC) -o $@ -c $(CCCFLAGS) $<
 endif
 endif
+endif
 
 WCCFLAGS1 = $(subst /,\\,$(CFLAGS))
 WCCFLAGS2 = $(subst -I,-i=,$(WCCFLAGS1))
 WCCFLAGS3 = $(subst -D,-d,$(WCCFLAGS2))
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.c
 	@$(MAKE_OBJDIR)
+ifeq ($(CROSS_COMPILE)$(INTERNAL_TOOLS),11)
+	$(CC) -o $@ -c $(CFLAGS) $<
+else
 ifeq ($(OS_ARCH)_$(NS_USE_GCC), WINNT_)
 ifeq ($(OS_TARGET), WIN16)
 #	$(MOD_DEPTH)/config/w16opt $(WCCFLAGS3)
@@ -431,6 +438,7 @@ ifeq ($(MOZ_OS2_TOOLS),VACPP)
 	$(CC) -Fo$@ -c $(CFLAGS) $<
 else
 	$(CC) -o $@ -c $(CFLAGS) $<
+endif
 endif
 endif
 

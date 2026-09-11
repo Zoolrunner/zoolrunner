@@ -9,7 +9,11 @@
 #include "ecl-priv.h"
 #include "mpi.h"
 
+#if (!defined(_MSC_VER) || (defined(_MSC_VER) && _MSC_VER > 1400))
 #include <stdint.h>
+#else
+#include "MSStdInt.h"
+#endif
 #include <stdio.h>
 
 typedef uint32_t elem[32];

@@ -121,9 +121,11 @@ TARGETS = $(PROGS) $(PLSRCS:.pl=)
 endif
 
 OUTOPTION = -o # end of the line
+ifneq ($(CROSS_COMPILE)$(INTERNAL_TOOLS),11)
 ifeq (,$(filter-out WINNT OS2,$(OS_ARCH)))
 ifndef NS_USE_GCC
 OUTOPTION = -Fe
+endif
 endif
 endif
 

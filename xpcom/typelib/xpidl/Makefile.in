@@ -68,6 +68,11 @@ CSRCS		= \
 ifdef CROSS_COMPILE
 HOST_PROGRAM	= host_xpidl$(HOST_BIN_SUFFIX)
 HOST_CSRCS	= $(CSRCS)
+
+# XPIDL is a build-time generator.  Its libIDL and GLib dependencies belong
+# to the build host, so do not also try to build a target copy during a cross
+# compile.
+PROGRAM		=
 endif
 
 ifdef STATIC_LIBIDL

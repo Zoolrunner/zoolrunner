@@ -234,6 +234,8 @@ ac_help="$ac_help
   --enable-debug[=DBG]    Enable building with developer debug info
                           (Using compiler flags DBG)"
 ac_help="$ac_help
+  --enable-static-rtl    Use the statically linked MSVC runtime library"
+ac_help="$ac_help
   --disable-optimize      Disable compiler optimization
   --enable-optimize=[OPT] Specify compiler optimization flags [OPT=-O]"
 ac_help="$ac_help
@@ -5102,8 +5104,12 @@ DIRENT_INO=d_ino
 CYGWIN_WRAPPER=
 WIN_TOP_SRC=
 MOZ_USER_DIR=".zoolrunner"
-HOST_AR='$(AR)'
-HOST_AR_FLAGS='$(AR_FLAGS)'
+if test -n "$CROSS_COMPILE"; then
+    HOST_AR_FLAGS='cr $@'
+else
+    HOST_AR='$(AR)'
+    HOST_AR_FLAGS='$(AR_FLAGS)'
+fi
 
 MOZ_JPEG_CFLAGS=
 MOZ_JPEG_LIBS='-L$(DIST)/lib -lmozjpeg'
@@ -6335,7 +6341,7 @@ EOF
     DSO_CFLAGS=
     DSO_PIC_CFLAGS=
     DLL_SUFFIX=.dll
-    RC=rc.exe
+    if test -z "$RC"; then RC=rc.exe; fi
     # certain versions of cygwin's makedepend barf on the 
     # #include <string> vs -I./dist/include/string issue so don't use it
     SYSTEM_MAKEDEPEND=
@@ -6362,11 +6368,12 @@ EOF
         IMPORT_LIB_SUFFIX=dll.a
     else
         TARGET_COMPILER_ABI=msvc
-        HOST_CC='$(CC)'
-        HOST_CXX='$(CXX)'
-        HOST_LD='$(LD)'
-        AR='lib -NOLOGO -OUT:"$@"'
-        AR_FLAGS=
+        if test -z "$CROSS_COMPILE"; then
+            HOST_CC='$(CC)'
+            HOST_CXX='$(CXX)'
+            HOST_LD='$(LD)'
+        fi
+        AR_FLAGS='-NOLOGO -OUT:"$@"'
         RANLIB='echo not_ranlib'
         STRIP='echo not_strip'
         XARGS=xargs
@@ -15795,6 +15802,18 @@ else
   MOZ_DEBUG=
 fi
 
+# Check whether --enable-static-rtl or --disable-static-rtl was given.
+if test "${enable_static_rtl+set}" = set; then
+  enableval="$enable_static_rtl"
+  if test "$enableval" = "yes"; then
+    USE_STATIC_RTL=1
+  else
+    USE_STATIC_RTL=
+  fi
+else
+  USE_STATIC_RTL=
+fi
+
 
 MOZ_DEBUG_ENABLE_DEFS="-DDEBUG -D_DEBUG"
  case "${target_os}" in
@@ -20794,6 +20813,7 @@ s%@MOZ_JS_LIBS@%$MOZ_JS_LIBS%g
 s%@MOZ_PSM@%$MOZ_PSM%g
 s%@BUILD_MODULES@%$BUILD_MODULES%g
 s%@MOZ_DEBUG@%$MOZ_DEBUG%g
+s%@USE_STATIC_RTL@%$USE_STATIC_RTL%g
 s%@MOZ_DEBUG_MODULES@%$MOZ_DEBUG_MODULES%g
 s%@MOZ_PROFILE_MODULES@%$MOZ_PROFILE_MODULES%g
 s%@MOZ_DEBUG_ENABLE_DEFS@%$MOZ_DEBUG_ENABLE_DEFS%g

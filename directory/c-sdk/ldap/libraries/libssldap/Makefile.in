@@ -84,21 +84,32 @@ THREADSLIB	=
 #
 ifeq ($(USE_DLL_EXPORTS_FILE), 1)
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+GENEXPORTS=$(PERL) $(topsrcdir)/ldap/build/genexports.pl
+else
 GENEXPORTS=cmd /c  $(PERL) $(topsrcdir)/ldap/build/genexports.pl
+endif
 else
 GENEXPORTS=$(PERL) $(topsrcdir)/ldap/build/genexports.pl
 endif
 
 # variable definitions for exported symbols
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+        SSLDAP_EXPORT_DEFS= $(OBJDIR_NAME)/nsldapssl32.def
+else
         SSLDAP_EXPORT_DEFS= $(win_srcdir)/../msdos/winsock/nsldapssl32.def
+endif
 else
         SSLDAP_EXPORT_DEFS= $(SSLOBJDEST)/libldap_ssl.exp
 endif
 
 SSLDAP_EXPORT_FLAGS=$(addprefix $(DLLEXPORTS_PREFIX), $(SSLDAP_EXPORT_DEFS))
 
-GENEXPARGS=$(BUILD_DEBUG) $(SSLDAPVERS_SUFFIX) $(SSLDAPVERS)
+GENEXPARGS="$(BUILD_DEBUG)" $(SSLDAPVERS) $(SSLDAPVERS_SUFFIX)
+ifeq ($(CROSS_COMPILE),1)
+GENEXPARGS+=NoVersion
+endif
 endif # USE_DLL_EXPORTS_FILE
 
 ifeq ($(OS_ARCH), SunOS)

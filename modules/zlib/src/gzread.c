@@ -469,6 +469,7 @@ z_size_t ZEXPORT gzfread(voidp buf, z_size_t size, z_size_t nitems,
 #  undef z_gzgetc
 #else
 #  undef gzgetc
+#  define gzgetc MOZ_Z_gzgetc
 #endif
 int ZEXPORT gzgetc(gzFile file) {
     unsigned char buf[1];

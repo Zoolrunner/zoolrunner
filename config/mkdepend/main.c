@@ -47,6 +47,10 @@ in this Software without prior written authorization from The Open Group.
 
 #include <stdarg.h>
 
+#if defined(XP_UNIX)
+#include <unistd.h>
+#endif
+
 #ifdef MINIX
 #define USE_CHMOD	1
 #endif

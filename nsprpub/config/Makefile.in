@@ -123,6 +123,11 @@ ifndef NS_USE_GCC
 OUTOPTION = -Fe
 endif
 endif
+ifdef CROSS_COMPILE
+ifdef INTERNAL_TOOLS
+OUTOPTION = -o # native build-host tools
+endif
+endif
 
 # Redefine MAKE_OBJDIR for just this directory
 define MAKE_OBJDIR

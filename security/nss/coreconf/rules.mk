@@ -238,10 +238,16 @@ alltags:
 	find . -name dist -prune -o \( -name '*.[hc]' -o -name '*.cp' -o -name '*.cpp' \) -print | xargs etags -a
 	find . -name dist -prune -o \( -name '*.[hc]' -o -name '*.cp' -o -name '*.cpp' \) -print | xargs ctags -a
 
+ifdef NSS_USE_UNIX_PATHS
+core_winpath_list = $(1)
+else
+core_winpath_list = $(subst /,\,$(1))
+endif
+
 $(PROGRAM): $(OBJS) $(EXTRA_LIBS)
 	@$(MAKE_OBJDIR)
 ifeq (,$(filter-out _WIN%,$(NS_USE_GCC)_$(OS_TARGET)))
-	$(MKPROG) $(subst /,\\,$(OBJS)) -Fe$@ -link $(LDFLAGS) $(XLDFLAGS) $(subst /,\\,$(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS))
+	$(MKPROG) $(call core_winpath_list,$(OBJS)) -Fe$@ -link $(LDFLAGS) $(XLDFLAGS) $(call core_winpath_list,$(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS))
 ifdef MT
 	if test -f $@.manifest; then \
 		$(MT) -NOLOGO -MANIFEST $@.manifest -OUTPUTRESOURCE:$@\;1; \
@@ -259,7 +265,7 @@ $(LIBRARY): $(OBJS)
 	@$(MAKE_OBJDIR)
 	rm -f $@
 ifeq (,$(filter-out _WIN%,$(NS_USE_GCC)_$(OS_TARGET)))
-	$(AR) $(subst /,\\,$(OBJS))
+	$(AR) $(call core_winpath_list,$(OBJS))
 else
 	$(AR) $(OBJS)
 endif
@@ -301,7 +307,7 @@ ifeq (,$(filter-out WIN%,$(OS_TARGET)))
 ifdef NS_USE_GCC
 	$(LINK_DLL) $(OBJS) $(SUB_SHLOBJS) $(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS) $(LD_LIBS) $(RES)
 else
-	$(LINK_DLL) -MAP $(DLLBASE) $(subst /,\\,$(OBJS) $(SUB_SHLOBJS) $(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS) $(LD_LIBS) $(RES))
+	$(LINK_DLL) -MAP $(DLLBASE) $(call core_winpath_list,$(OBJS) $(SUB_SHLOBJS) $(EXTRA_LIBS) $(EXTRA_SHARED_LIBS) $(OS_LIBS) $(LD_LIBS) $(RES))
 ifdef MT
 	if test -f $@.manifest; then \
 		$(MT) -NOLOGO -MANIFEST $@.manifest -OUTPUTRESOURCE:$@\;2; \
@@ -372,9 +378,11 @@ ifeq (,$(filter /%,$(CURDIR)))
 PWD := $(CURDIR)
 else
 PWD := $(shell pwd)
+ifndef NSS_USE_UNIX_PATHS
 ifeq (,$(findstring ;,$(PATH)))
 ifndef USE_MSYS
 PWD := $(subst \,/,$(shell cygpath -w $(PWD)))
+endif
 endif
 endif
 endif
@@ -967,4 +975,3 @@ $(filter $(OBJDIR)/%$(OBJ_SUFFIX),$(OBJS)): $(OBJDIR)/%$(OBJ_SUFFIX): $(DUMMY_DE
 # name already exists.
 #
 .PHONY: all all_platforms alltags boot clean clobber clobber_all export install libs program realclean release $(OBJDIR)
-

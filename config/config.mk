@@ -578,11 +578,14 @@ endif
 
 
 ifeq ($(OS_ARCH)_$(GNU_CC),WINNT_)
+ifdef USE_STATIC_RTL
+export MSVC8_REQUIRE_STATIC_RTL=1
+endif
 #// Currently, unless USE_STATIC_LIBS is defined, the multithreaded
 #// DLL version of the RTL is used...
 #//
 #//------------------------------------------------------------------------
-ifdef USE_STATIC_LIBS
+ifneq (,$(USE_STATIC_LIBS)$(USE_STATIC_RTL))
 RTL_FLAGS=-MT          # Statically linked multithreaded RTL
 ifneq (,$(MOZ_DEBUG)$(NS_TRACE_MALLOC))
 ifndef MOZ_NO_DEBUG_RTL
@@ -598,13 +601,15 @@ ifndef MOZ_NO_DEBUG_RTL
 RTL_FLAGS=-MDd         # Dynamically linked, multithreaded MSVC4.0 debug RTL
 endif 
 endif # MOZ_DEBUG || NS_TRACE_MALLOC
-endif # USE_STATIC_LIBS
+endif # USE_STATIC_LIBS || USE_STATIC_RTL
 endif # WINNT && !GNU_CC
 
 
 COMPILE_CFLAGS	= $(VISIBILITY_FLAGS) $(DEFINES) $(INCLUDES) $(XCFLAGS) $(PROFILER_CFLAGS) $(DSO_CFLAGS) $(DSO_PIC_CFLAGS) $(CFLAGS) $(RTL_FLAGS) $(OS_COMPILE_CFLAGS)
 COMPILE_CXXFLAGS = $(VISIBILITY_FLAGS) $(DEFINES) $(INCLUDES) $(XCFLAGS) $(PROFILER_CFLAGS) $(DSO_CFLAGS) $(DSO_PIC_CFLAGS)  $(CXXFLAGS) $(RTL_FLAGS) $(OS_COMPILE_CXXFLAGS)
+ifeq ($(HOST_OS_ARCH),WINNT)
 HOST_CFLAGS += $(RTL_FLAGS)
+endif
 
 #
 # Name of the binary code directories

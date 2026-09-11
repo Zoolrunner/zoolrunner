@@ -187,7 +187,9 @@ windows_std {
 	process_line( $type, $expfile, "CODE\tPRELOAD MOVEABLE DISCARDABLE\n" );
 	process_line( $type, $expfile, "DATA\tPRELOAD MOVEABLE SINGLE\n" );
     }
-    process_line( $type, $expfile, "VERSION\t\$2\n" );
+    if ( $arg3 ne "NoVersion" ) {
+	process_line( $type, $expfile, "VERSION\t\$2\n" );
+    }
     process_line( $type, $expfile, "HEAPSIZE\t4096\n" );
     process_line( $type, $expfile, "EXPORTS\n" );
     process_line( $type, $expfile, "\$EXPORTS\n" );
@@ -216,4 +218,3 @@ simple_std {
 
     process_line( $type, $expfile, "\$EXPORTS\n" );
 }
-

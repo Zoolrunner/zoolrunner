@@ -5,8 +5,14 @@
 
 #define HAVE_USLEEP 1
 
-#if defined(_MSC_VER) && _MSC_VER < 1400
+#if defined(_MSC_VER) && _MSC_VER < 1600
 #undef HAVE_STDINT_H
+#ifndef UINT64_C
+#define UINT64_C(value) value##ui64
+#endif
+#ifndef INFINITY
+#define INFINITY HUGE_VAL
+#endif
 #else
 #define HAVE_STDINT_H 1
 #endif

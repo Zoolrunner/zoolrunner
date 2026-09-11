@@ -176,6 +176,12 @@ endif
 ifndef MOZ_DEBUG
 DEFAULT_GMAKE_FLAGS += BUILD_OPT=1
 endif
+ifdef USE_STATIC_RTL
+DEFAULT_GMAKE_FLAGS += USE_STATIC_RTL=1
+endif
+ifdef CROSS_COMPILE
+DEFAULT_GMAKE_FLAGS += NSS_USE_UNIX_PATHS=1
+endif
 ifdef GNU_CC
 DEFAULT_GMAKE_FLAGS += NS_USE_GCC=1 NS_USE_NATIVE=
 else
@@ -217,9 +223,8 @@ DEFAULT_GMAKE_FLAGS += \
 	NATIVE_CC="$(HOST_CC)" \
 	CC="$(CC)" \
 	CCC="$(CXX)" \
-	LINK="$(LD)" \
 	AS="$(AS)" \
-	AR='$(AR) $(AR_FLAGS:$@=$$@)' \
+	AR='$(AR) -NOLOGO -OUT:"$$@"' \
 	RANLIB="$(RANLIB)" \
 	RC="$(RC) $(RCFLAGS)" \
 	OS_ARCH="$(OS_ARCH)" \

@@ -64,8 +64,12 @@ else
 	MT           = mt.exe
 	# Determine compiler version
 	_MSC_VER_6   = 1200	# MSVC 6
+	ifdef MSVC8_ROOT
+	_MSC_VER    := 1400
+	else
 	_MSC_VER    := $(shell $(CC) 2>&1 | sed -ne \
                        's/.*[^0-9.]\([0-9]\{1,\}\)\.\([0-9]\{1,\}\).*/\1\2/p' )
+	endif
 endif
 
 ifdef BUILD_TREE
@@ -124,7 +128,11 @@ else # !NS_USE_GCC
     endif
     endif
     ifdef BUILD_OPT
+    ifdef USE_STATIC_RTL
+	OS_CFLAGS  += -MT
+    else
 	OS_CFLAGS  += -MD
+    endif
 	ifeq (11,$(ALLOW_OPT_CODE_SIZE)$(OPT_CODE_SIZE))
 		OPTIMIZER += -O1
 	else
@@ -143,9 +151,17 @@ else # !NS_USE_GCC
 	# (RTL) in the debug build
 	#
 	ifdef USE_DEBUG_RTL
-		OS_CFLAGS += -MDd
+	ifdef USE_STATIC_RTL
+	    OS_CFLAGS += -MTd
 	else
-		OS_CFLAGS += -MD
+	    OS_CFLAGS += -MDd
+	endif
+	else
+	ifdef USE_STATIC_RTL
+	    OS_CFLAGS += -MT
+	else
+	    OS_CFLAGS += -MD
+	endif
 	endif
 	OPTIMIZER += -Zi -Fd$(OBJDIR)/ -Od
 	NULLSTRING :=
@@ -352,4 +368,3 @@ endif
 # 4013: function undefined; assuming extern returning int
 # 4553: '==' : operator has no effect; did you intend '='?
 # 4551: function call missing argument list
-

@@ -315,7 +315,7 @@ PERL ?= perl
 
 CONFIG_GUESS_SCRIPT := $(wildcard $(TOPSRCDIR)/build/autoconf/config.guess)
 ifdef CONFIG_GUESS_SCRIPT
-  CONFIG_GUESS = $(shell $(CONFIG_GUESS_SCRIPT))
+  CONFIG_GUESS = $(shell $(SHELL) $(CONFIG_GUESS_SCRIPT))
 else
   _IS_FIRST_CHECKOUT := 1
 endif

@@ -402,9 +402,11 @@ else
 ifeq (,$(filter-out _WIN%,$(NS_USE_GCC)_$(OS_TARGET)))
 NEED_ABSOLUTE_PATH := 1
 PWD := $(shell pwd)
+ifndef NSS_USE_UNIX_PATHS
 ifeq (,$(findstring ;,$(PATH)))
 ifndef USE_MSYS
 PWD := $(subst \,/,$(shell cygpath -w $(PWD)))
+endif
 endif
 endif
 
@@ -994,4 +996,3 @@ $(filter $(OBJDIR)/%$(OBJ_SUFFIX),$(OBJS)): $(OBJDIR)/%$(OBJ_SUFFIX): $(DUMMY_DE
 # name already exists.
 #
 .PHONY: all all_platforms alltags boot clean clobber clobber_all export install libs program realclean release $(OBJDIR) $(DIRS)
-

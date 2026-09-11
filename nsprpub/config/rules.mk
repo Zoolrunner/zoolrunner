@@ -294,6 +294,9 @@ $(NFSPWD):
 $(PROGRAM): $(OBJS)
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
+ifdef INTERNAL_TOOLS
+	$(CC) $(OBJS) -o $@ $(LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS)
+else
 	$(CC) $(OBJS) -Fe$@ -link $(LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS)
 ifdef MT
 	@if test -f $@.manifest; then \
@@ -301,6 +304,7 @@ ifdef MT
 		rm -f $@.manifest; \
 	fi
 endif	# MSVC with manifest tool
+endif	# INTERNAL_TOOLS
 else	# WINNT && !GCC
 	$(CC) -o $@ $(CFLAGS) $(OBJS) $(LDFLAGS)
 endif	# WINNT && !GCC
@@ -408,7 +412,11 @@ endif
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.cpp
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
+ifdef INTERNAL_TOOLS
+	$(CCC) -o $@ -c $(CCCFLAGS) $(call pr_abspath,$<)
+else
 	$(CCC) -Fo$@ -c $(CCCFLAGS) $(call pr_abspath,$<)
+endif
 else
 ifdef NEED_ABSOLUTE_PATH
 	$(CCC) -o $@ -c $(CCCFLAGS) $(call pr_abspath,$<)
@@ -423,7 +431,11 @@ WCCFLAGS3 = $(subst -D,-d,$(WCCFLAGS2))
 $(OBJDIR)/%.$(OBJ_SUFFIX): %.c
 	@$(MAKE_OBJDIR)
 ifeq ($(NS_USE_GCC)_$(OS_ARCH),_WINNT)
+ifdef INTERNAL_TOOLS
+	$(CC) -o $@ -c $(CFLAGS) $(call pr_abspath,$<)
+else
 	$(CC) -Fo$@ -c $(CFLAGS) $(call pr_abspath,$<)
+endif
 else
 ifdef NEED_ABSOLUTE_PATH
 	$(CC) -o $@ -c $(CFLAGS) $(call pr_abspath,$<)

@@ -154,14 +154,22 @@ RUNTIMEETCDIR	= $(ETCDIR)
 #
 ifeq ($(USE_DLL_EXPORTS_FILE), 1)
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+GENEXPORTS=$(PERL) $(topsrcdir)/ldap/build/genexports.pl
+else
 GENEXPORTS=cmd /c  $(PERL) $(topsrcdir)/ldap/build/genexports.pl
+endif
 else
 GENEXPORTS=$(PERL) $(topsrcdir)/ldap/build/genexports.pl
 endif
 
 # variable definitions for exported symbols
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+        LDAP_EXPORT_DEFS= $(OBJDIR_NAME)/nsldap32.def
+else
         LDAP_EXPORT_DEFS= $(win_srcdir)/../msdos/winsock/nsldap32.def
+endif
 else
 ifeq ($(OS_ARCH), OS2)
         LDAP_EXPORT_DEFS= $(OBJDIR_NAME)/libldap.def
@@ -173,7 +181,10 @@ endif
 
 LDAP_EXPORT_FLAGS=$(addprefix $(DLLEXPORTS_PREFIX), $(LDAP_EXPORT_DEFS))
 
-GENEXPARGS=$(BUILD_DEBUG) $(LDAPVERS_SUFFIX) $(LDAPVERS)
+GENEXPARGS="$(BUILD_DEBUG)" $(LDAPVERS) $(LDAPVERS_SUFFIX)
+ifeq ($(CROSS_COMPILE),1)
+GENEXPARGS+=NoVersion
+endif
 endif # USE_DLL_EXPORTS_FILE
 
 ifeq ($(OS_ARCH), SunOS)
@@ -255,7 +266,12 @@ ifeq ($(USE_DLL_EXPORTS_FILE), 1)
 # recursive gmake rule to create exported symbols file
 $(LDAP_EXPORT_DEFS):: $(srcdir)/../libldap.ex
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+	$(GENEXPORTS) Win32 Standard $< $(GENEXPARGS) | \
+		$(SED) -e '1s/^LIBRARY.*/LIBRARY $(LDAP_LIBNAME)/' > $@
+else
 	$(GENEXPORTS) Win32 Standard $< $(GENEXPARGS) > $@
+endif
 else
 ifeq ($(OS_ARCH), OS2)
 	echo LIBRARY $(LDAP_LIBNAME) INITINSTANCE TERMINSTANCE > $@

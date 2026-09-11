@@ -87,14 +87,22 @@ THREADSLIB	=
 #
 ifeq ($(USE_DLL_EXPORTS_FILE), 1)
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+GENEXPORTS=$(PERL) $(topsrcdir)/ldap/build/genexports.pl
+else
 GENEXPORTS=cmd /c  $(PERL) $(topsrcdir)/ldap/build/genexports.pl
+endif
 else
 GENEXPORTS=$(PERL) $(topsrcdir)/ldap/build/genexports.pl
 endif
 
 # variable definitions for exported symbols
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+        PRLDAP_EXPORT_DEFS= $(OBJDIR_NAME)/nsldappr32.def
+else
         PRLDAP_EXPORT_DEFS= $(win_srcdir)/../msdos/winsock/nsldappr32.def
+endif
 else
 ifeq ($(OS_ARCH), OS2)
         PRLDAP_EXPORT_DEFS= $(OBJDIR_NAME)/libprldap.def
@@ -106,7 +114,10 @@ endif
 
 PRLDAP_EXPORT_FLAGS=$(addprefix $(DLLEXPORTS_PREFIX), $(PRLDAP_EXPORT_DEFS))
 
-GENEXPARGS=$(BUILD_DEBUG) $(PRLDAPVERS_SUFFIX) $(PRLDAPVERS)
+GENEXPARGS="$(BUILD_DEBUG)" $(PRLDAPVERS) $(PRLDAPVERS_SUFFIX)
+ifeq ($(CROSS_COMPILE),1)
+GENEXPARGS+=NoVersion
+endif
 endif # USE_DLL_EXPORTS_FILE
 
 ifeq ($(OS_ARCH), IRIX)
@@ -178,7 +189,12 @@ ifeq ($(USE_DLL_EXPORTS_FILE), 1)
 # recursive gmake rule to create exported symbols file
 $(PRLDAP_EXPORT_DEFS):: libprldap.ex
 ifeq ($(OS_ARCH), WINNT)
+ifeq ($(CROSS_COMPILE),1)
+	$(GENEXPORTS) Win32 Standard $< $(GENEXPARGS) | \
+		$(SED) -e '1s/^LIBRARY.*/LIBRARY $(PRLDAP_LIBNAME)/' > $@
+else
 	$(GENEXPORTS) Win32 Standard $< $(GENEXPARGS) > $@
+endif
 else
 ifeq ($(OS_ARCH), OS2)
 	echo LIBRARY $(PRLDAP_LIBNAME) INITINSTANCE TERMINSTANCE > $@

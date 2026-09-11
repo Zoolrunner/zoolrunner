@@ -117,15 +117,6 @@
 #ifdef XP_WIN
 #include "cairo-win32.h"
 
-#ifdef MOZILLA_1_8_BRANCH
-extern "C" {
-cairo_surface_t *
-_cairo_win32_surface_create_dib (cairo_format_t format,
-                                 int	        width,
-                                 int	        height);
-}
-#endif
-
 #ifndef M_PI
 #define M_PI		3.14159265358979323846
 #define M_PI_2		1.57079632679489661923
@@ -817,8 +808,8 @@ nsCanvasRenderingContext2D::SetDimensions(PRInt32 width, PRInt32 height)
     mSurface = cairo_win32_surface_create_with_dib (CAIRO_FORMAT_ARGB32,
                                                     mWidth, mHeight);
 #else
-    mSurface = _cairo_win32_surface_create_dib (CAIRO_FORMAT_ARGB32,
-                                                mWidth, mHeight);
+    mSurface = cairo_win32_surface_create_dib (CAIRO_FORMAT_ARGB32,
+                                               mWidth, mHeight);
 #endif
 #elif MOZ_WIDGET_GTK2
     // On most current X servers, using the software-only surface

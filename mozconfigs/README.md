@@ -5,6 +5,9 @@ the layout used by related UXP-based trees:
 
 ```text
 mozconfigs/
+  cross/
+    win32-msvc8-suite.mozconfig
+    win32-msvc8-xulrunner.mozconfig
   macos/
     arm64/
       cocoa_suite_clang.mozconfig
@@ -17,6 +20,11 @@ mozconfigs/
       xlib_browser_gcc.mozconfig
       xlib_suite_gcc.mozconfig
 ```
+
+The cross configurations build the complete Suite or XULRunner for Windows
+x86 with genuine Visual C++ 8.0 through Wine or CrossOver.  See
+`build/win32/msvc8-cross/README.md` for toolchain layout, runtime selection,
+standalone validation, static-CRT policy, and PE auditing.
 
 The macOS arm64 Cocoa Suite and XULRunner configurations are active platform
 bring-up targets. They use the macOS 11.3 SDK at

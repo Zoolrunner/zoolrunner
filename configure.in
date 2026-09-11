@@ -849,8 +849,12 @@ WIN_TOP_SRC=
 
 
 MOZ_USER_DIR=".zoolrunner"
-HOST_AR='$(AR)'
-HOST_AR_FLAGS='$(AR_FLAGS)'
+if test -n "$CROSS_COMPILE"; then
+    HOST_AR_FLAGS='cr $@'
+else
+    HOST_AR='$(AR)'
+    HOST_AR_FLAGS='$(AR_FLAGS)'
+fi
 
 MOZ_JPEG_CFLAGS=
 MOZ_JPEG_LIBS='-L$(DIST)/lib -lmozjpeg'
@@ -1773,7 +1777,7 @@ case "$target" in
     DSO_CFLAGS=
     DSO_PIC_CFLAGS=
     DLL_SUFFIX=.dll
-    RC=rc.exe
+    if test -z "$RC"; then RC=rc.exe; fi
     # certain versions of cygwin's makedepend barf on the 
     # #include <string> vs -I./dist/include/string issue so don't use it
     SYSTEM_MAKEDEPEND=
@@ -1800,11 +1804,12 @@ case "$target" in
         IMPORT_LIB_SUFFIX=dll.a
     else
         TARGET_COMPILER_ABI=msvc
-        HOST_CC='$(CC)'
-        HOST_CXX='$(CXX)'
-        HOST_LD='$(LD)'
-        AR='lib -NOLOGO -OUT:"$@"'
-        AR_FLAGS=
+        if test -z "$CROSS_COMPILE"; then
+            HOST_CC='$(CC)'
+            HOST_CXX='$(CXX)'
+            HOST_LD='$(LD)'
+        fi
+        AR_FLAGS='-NOLOGO -OUT:"$@"'
         RANLIB='echo not_ranlib'
         STRIP='echo not_strip'
         XARGS=xargs
@@ -5741,6 +5746,11 @@ MOZ_ARG_ENABLE_STRING(debug,
   fi ],
   MOZ_DEBUG=)
 
+MOZ_ARG_ENABLE_BOOL(static-rtl,
+[  --enable-static-rtl    Use the statically linked MSVC runtime library],
+    USE_STATIC_RTL=1,
+    USE_STATIC_RTL=)
+
 MOZ_DEBUG_ENABLE_DEFS="-DDEBUG -D_DEBUG"
  case "${target_os}" in
     beos*)
@@ -7165,6 +7175,7 @@ AC_SUBST(MOZ_JS_LIBS)
 AC_SUBST(MOZ_PSM)
 AC_SUBST(BUILD_MODULES)
 AC_SUBST(MOZ_DEBUG)
+AC_SUBST(USE_STATIC_RTL)
 AC_SUBST(MOZ_DEBUG_MODULES)
 AC_SUBST(MOZ_PROFILE_MODULES)
 AC_SUBST(MOZ_DEBUG_ENABLE_DEFS)
