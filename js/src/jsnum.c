@@ -921,14 +921,6 @@ js_strtod(JSContext *cx, const jschar *s, const jschar **ep, jsdouble *dp)
     const jschar *s1 = js_SkipWhiteSpace(s);
     size_t length = js_strlen(s1);
 
-    /*
-     * dtoa requires IEEE double (53-bit) x87 precision.  Windows code outside
-     * SpiderMonkey may change the per-thread control word after the runtime
-     * and Number class have initialized.  Reassert it at the conversion
-     * boundary so JS_strtod's refinement loop is guaranteed to converge.
-     */
-    FIX_FPU();
-
     /* Use cbuf to avoid malloc */
     if (length >= sizeof cbuf) {
         cstr = (char *) JS_malloc(cx, length + 1);

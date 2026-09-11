@@ -49,6 +49,17 @@
 #include "jspubtd.h"
 #include "jsnum.h"
 
+#if (defined XP_WIN || defined XP_OS2) &&                                     \
+    !defined WINCE &&                                                         \
+    !defined __MWERKS__ &&                                                    \
+    (defined _M_IX86 ||                                                       \
+     (defined __GNUC__ && !defined __MINGW32__))
+#include <float.h>
+#define FIX_DTOA_FPU() _control87(MCW_EM | PC_53, MCW_EM | MCW_PC)
+#else
+#define FIX_DTOA_FPU() ((void)0)
+#endif
+
 #ifdef JS_THREADSAFE
 #include "prlock.h"
 #endif
@@ -1249,6 +1260,8 @@ JS_strtod(CONST char *s00, char **se, int *err)
     ULong y, z;
     Bigint *bb, *bb1, *bd, *bd0, *bs, *delta;
 
+    /* dtoa arithmetic requires IEEE double (53-bit) x87 precision. */
+    FIX_DTOA_FPU();
     *err = 0;
 
     bb = bd = bs = delta = NULL;
@@ -2772,6 +2785,9 @@ JS_dtostr(char *buffer, size_t bufferSize, JSDToStrMode mode, int precision, dou
                                 /* the sign and/or decimal point */
     char *numEnd;               /* Pointer past the digits returned by js_dtoa */
     JSBool dtoaRet;
+
+    /* Other Windows code may have changed this thread's x87 control word. */
+    FIX_DTOA_FPU();
 
     JS_ASSERT(bufferSize >= (size_t)(mode <= DTOSTR_STANDARD_EXPONENTIAL ? DTOSTR_STANDARD_BUFFER_SIZE :
             DTOSTR_VARIABLE_BUFFER_SIZE(precision)));
