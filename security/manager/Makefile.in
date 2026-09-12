@@ -224,12 +224,15 @@ DEFAULT_GMAKE_FLAGS += \
 	CC="$(CC)" \
 	CCC="$(CXX)" \
 	AS="$(AS)" \
-	AR='$(AR) -NOLOGO -OUT:"$$@"' \
 	RANLIB="$(RANLIB)" \
-	RC="$(RC) $(RCFLAGS)" \
 	OS_ARCH="$(OS_ARCH)" \
 	CPU_ARCH="$(TARGET_CPU)" \
 	$(NULL)
+ifeq ($(OS_ARCH),WINNT)
+DEFAULT_GMAKE_FLAGS += AR='$(AR) -NOLOGO -OUT:"$$@"' RC="$(RC) $(RCFLAGS)"
+else
+DEFAULT_GMAKE_FLAGS += AR='$(AR) cr "$$@"'
+endif
 SKIP_CHK=1
 endif
 SUBMAKEFILES = boot/Makefile ssl/Makefile pki/Makefile locales/Makefile
