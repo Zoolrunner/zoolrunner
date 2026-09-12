@@ -220,15 +220,67 @@ my $tool_path = join(';', @environment_windows[6 .. 7]);
 $ENV{WINEPATH} = defined $ENV{WINEPATH} && length $ENV{WINEPATH}
     ? "$tool_path;$ENV{WINEPATH}" : $tool_path;
 
-if ($ENV{MSVC8_CROSS_VERBOSE}) {
-    print STDERR "msvc8-cross: $program\n";
-    print STDERR "  [$_]\n" for @tool_args;
-}
-
 # LINK is both a common make variable and an MSVC linker environment
 # variable containing implicit command-line arguments.  Never let a parent
 # make's tool name become an input file such as link.obj.
 delete $ENV{LINK} if $tool eq 'link';
+
+if ($tool eq 'link' && $ENV{MSVC8_USE_PROCESS_HEAP}) {
+    my $heap_source = File::Spec->catfile($script_dir, 'process-heap.c');
+    my @source_stat = stat($heap_source);
+    fail("cannot stat process heap source '$heap_source'") unless @source_stat;
+    my $cache_dir = $ENV{TMPDIR} || '/tmp';
+    my $heap_object = File::Spec->catfile($cache_dir,
+        "zoolrunner-msvc8-process-heap-$<-$source_stat[7]-$source_stat[9].obj");
+    my $lock_dir = "$heap_object.lock";
+
+    if (!-f $heap_object) {
+        my $have_lock;
+        for (1 .. 600) {
+            if (mkdir($lock_dir, 0700)) {
+                $have_lock = 1;
+                last;
+            }
+            last if -f $heap_object;
+            select(undef, undef, undef, 0.1);
+        }
+        if ($have_lock) {
+            if (!-f $heap_object) {
+                my ($object_file, $object_name) = tempfile(
+                    'msvc8-process-heap-XXXXXX', SUFFIX => '.obj',
+                    DIR => $cache_dir, UNLINK => 0);
+                close($object_file);
+                unlink($object_name);
+                my ($source_win, $object_win) =
+                    wine_paths($heap_source, $object_name);
+                my $compiler = File::Spec->catfile($root, 'bin', 'cl.exe');
+                my $compile_status = system($wine_run, '--', $compiler,
+                    '/nologo', '/c', '/TC', '/O1', '/GS-', '/MT',
+                    "/Fo$object_win", $source_win);
+                if ($compile_status != 0 || !-f $object_name) {
+                    unlink($object_name);
+                    rmdir($lock_dir);
+                    fail('could not build the shared process-heap object');
+                }
+                rename($object_name, $heap_object) or do {
+                    unlink($object_name);
+                    rmdir($lock_dir);
+                    fail("cannot install process heap object '$heap_object': $!");
+                };
+            }
+            rmdir($lock_dir);
+        }
+        fail('timed out waiting for the shared process-heap object')
+            unless -f $heap_object;
+    }
+    my ($heap_object_win) = wine_paths($heap_object);
+    unshift @tool_args, $heap_object_win;
+}
+
+if ($ENV{MSVC8_CROSS_VERBOSE}) {
+    print STDERR "msvc8-cross: $program\n";
+    print STDERR "  [$_]\n" for @tool_args;
+}
 
 my $status = system($wine_run, '--', $program, @tool_args);
 unlink @temporary_files if @temporary_files;

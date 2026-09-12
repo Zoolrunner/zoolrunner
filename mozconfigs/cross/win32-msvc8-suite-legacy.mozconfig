@@ -5,6 +5,7 @@ mk_add_options 'export PATH := @TOPSRCDIR@/build/win32/msvc8-cross:@TOPSRCDIR@/o
 mk_add_options 'export DYLD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-suite-legacy/build/unix/libIDL-prefix/lib:$(DYLD_LIBRARY_PATH)'
 mk_add_options 'export LD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-suite-legacy/build/unix/libIDL-prefix/lib:$(LD_LIBRARY_PATH)'
 mk_add_options 'export MSVC8_REQUIRE_STATIC_RTL=1'
+mk_add_options 'export MSVC8_USE_PROCESS_HEAP=1'
 mk_add_options 'export MOZ_META_COMPONENTS=mozcomps'
 mk_add_options 'export MOZ_COMPONENTLIB=1'
 
@@ -41,9 +42,10 @@ Darwin)
 esac
 export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH MSVC8_ROOT
 MSVC8_REQUIRE_STATIC_RTL=1
+MSVC8_USE_PROCESS_HEAP=1
 MOZ_META_COMPONENTS=mozcomps
 MOZ_COMPONENTLIB=1
-export MSVC8_REQUIRE_STATIC_RTL MOZ_META_COMPONENTS MOZ_COMPONENTLIB
+export MSVC8_REQUIRE_STATIC_RTL MSVC8_USE_PROCESS_HEAP MOZ_META_COMPONENTS MOZ_COMPONENTLIB
 
 CC=cl
 CXX=cl

@@ -50,7 +50,14 @@ PL_strdup(const char *s)
 
     n = strlen(s) + 1;
 
-    rv = (char *)malloc(n);
+    /*
+     * Keep the allocation in NSPR's allocator domain.  On Windows builds
+     * using the static C runtime, plc4.dll and nspr4.dll each have a private
+     * CRT heap.  Callers historically pass PL_strdup results to PR_Free (and
+     * XPCOM's NS_Free), so allocating with plc4's local malloc makes those
+     * otherwise valid frees cross CRT heaps.
+     */
+    rv = (char *)PR_Malloc(n);
     if( (char *)0 == rv ) return rv;
 
     (void)memcpy(rv, s, n);
@@ -61,7 +68,7 @@ PL_strdup(const char *s)
 PR_IMPLEMENT(void)
 PL_strfree(char *s)
 {
-    free(s);
+    PR_Free(s);
 }
 
 PR_IMPLEMENT(char *)
@@ -75,7 +82,7 @@ PL_strndup(const char *s, PRUint32 max)
 
     l = PL_strnlen(s, max);
 
-    rv = (char *)malloc(l+1);
+    rv = (char *)PR_Malloc(l+1);
     if( (char *)0 == rv ) return rv;
 
     (void)memcpy(rv, s, l);

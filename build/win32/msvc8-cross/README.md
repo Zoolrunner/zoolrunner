@@ -126,6 +126,14 @@ rejects `/MD` and `/MDd` whenever `MSVC8_REQUIRE_STATIC_RTL` is active.  This
 detects a third-party sub-build that attempts to reintroduce the DLL runtime
 instead of relying on option ordering.
 
+The legacy Suite config also enables `MSVC8_USE_PROCESS_HEAP`.  A small object
+linked into every target image implements the public CRT allocation entry
+points on top of the Win32 process heap.  This preserves `/MT` and avoids a
+VC80 runtime DLL while giving Mozilla's historically cross-DLL C and C++
+allocations one ownership domain.  Without it, each static LIBCMT copy owns a
+different private heap, so a buffer created in one Mozilla DLL can fail when
+another DLL releases it.
+
 The MSVC 8 manifest tool can parse and create manifests under current
 CrossOver but may fail while updating a PE resource.  When a linker-generated
 manifest exists, the shared linker wrapper embeds it with the genuine MSVC 8
