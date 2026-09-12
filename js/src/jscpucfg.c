@@ -183,11 +183,14 @@ int main(int argc, char **argv)
     printf("/* AUTOMATICALLY GENERATED - DO NOT EDIT */\n\n");
 
 #ifdef CROSS_COMPILE
-#if defined(__APPLE__)
+#if defined(XP_MACOSX)
     /*
      * Darwin NSPR uses the same MDCPUCFG (_darwin.cfg) for multiple
-     * processors, and determines which processor to configure for based
-     * on compiler predefined macros.  We do the same thing here.
+     * processors, and determines which target processor to configure for
+     * based on compiler predefined macros.  Do the same only when Darwin is
+     * the target: __APPLE__ describes the build compiler during a cross
+     * build and would otherwise emit a host-dependent header for, e.g., a
+     * WINNT target built on macOS.
      */
     printf("#ifdef __LITTLE_ENDIAN__\n");
     printf("#define IS_LITTLE_ENDIAN 1\n");
@@ -390,4 +393,3 @@ int main(int argc, char **argv)
 
     return EXIT_SUCCESS;
 }
-
