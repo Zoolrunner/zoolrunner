@@ -476,3 +476,6 @@ OPDEF(JSOP_ENUMCONSTELEM, 214,"enumconstelem",NULL,   1,  3,  0,  3,  JOF_BYTE|J
  * which must be moved down when the block pops.
  */
 OPDEF(JSOP_LEAVEBLOCKEXPR,215,"leaveblockexpr",NULL,  3,  0,  0,  1,  JOF_UINT16)
+
+/* Array initializer elision; consumed only by JSOP_INITELEM. */
+OPDEF(JSOP_HOLE,         216,"hole",        NULL,    1,  0,  1,  0,  JOF_BYTE)

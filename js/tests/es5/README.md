@@ -67,3 +67,60 @@ the new methods and `Function.prototype`, and preserves the historical
 in XULRunner and Suite; the 720 Function chapter cases retain the same 440
 passes and 280 failures. The full-suite counts above precede that final flag
 correction; the focused Array and Date Test262 results remain unchanged.
+
+The next implementation adds native `Object.getPrototypeOf`, `Object.keys`, and
+`Object.getOwnPropertyDescriptor`. Descriptor queries preserve accessor identity
+without invoking getters. Prototype queries hide the engine's internal shared
+closure objects and retain embedding access checks. Argument indices are now
+enumerable, function `prototype` is non-enumerable, and the global `undefined`,
+`NaN`, and `Infinity` properties are read-only as required by ES5. Ordinary
+global `var` redeclarations leave those properties unchanged; legacy `const`
+bindings keep their redeclaration checks. Read-only globals are excluded from
+the interpreter optimization that writes directly to global slots. String property
+names `"-0"` and `"0"` remain distinct.
+
+Array literal elisions now leave holes instead of writing `undefined`, and
+literal elements define own properties without invoking inherited setters.
+Explicit `undefined` elements still exist. A dedicated internal hole bytecode
+preserves decompilation; the bytecode cache version changes with it.
+
+Run `object-reflection.js` with the same xpcshell command above, substituting
+its filename. Require `ES5-OBJECT-REFLECTION checks=101 failures=0`. These 101
+assertions and the 50 array/date assertions pass in the macOS arm64 XULRunner
+and Suite builds. Descriptor-writing methods, extensibility controls, and
+strict semantics remain unfinished; these read-only queries do not substitute
+for those implementations.
+
+`TestObjectEmbedding.c` exercises the classic JSAPI access-control callback and
+an XDR encode/decode/execute round trip containing sparse array literals. It
+also checks a global class without the optional global flags, and preserves
+legacy destructuring-`const` redeclaration errors. On
+macOS, after the normal build:
+
+```sh
+clang -DXP_UNIX -DJS_THREADSAFE -DMOZILLA_1_8_BRANCH \
+  -Iobj-zoolrunner-macos-arm64-xulrunner/dist/include/js \
+  -Iobj-zoolrunner-macos-arm64-xulrunner/dist/include/nspr \
+  js/tests/es5/TestObjectEmbedding.c \
+  -Lobj-zoolrunner-macos-arm64-xulrunner/dist/bin -lmozjs \
+  -o /tmp/zoolrunner-es5-embedding
+DYLD_LIBRARY_PATH="$PWD/obj-zoolrunner-macos-arm64-xulrunner/dist/bin" \
+  /tmp/zoolrunner-es5-embedding
+```
+
+Require `ES5-EMBEDDING checks=7 failures=0`; all seven checks pass against both
+XULRunner and Suite libraries. Both builds pass all 169 existing layout assertions after these engine
+changes; the Suite also passes live HTTPS navigation.
+
+The object/array-literal full rerun passes **14,397 of 22,029** cases, with
+**7,632 failures**, no crashes, timeouts, or harness errors. Relative to the
+array/date full rerun, 732 cases newly pass and one previous pass disappears.
+That case, `15.3.5.4_2-96gs`, requires a TypeError for strict-function caller
+access: it previously passed accidentally because the missing descriptor method
+threw a TypeError. It now exposes the unfinished strict-mode behavior. Six real
+global-redeclaration regressions found in the intermediate run were corrected
+and pass again in this rerun.
+
+This full rerun precedes the final two legacy compatibility adjustments for
+unflagged embedding globals and destructuring `const`; both are covered by the
+seven native embedding checks. It does not establish complete ES5 conformance.

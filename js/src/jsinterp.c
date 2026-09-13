@@ -1816,6 +1816,17 @@ js_CheckRedeclaration(JSContext *cx, JSObject *obj, jsid id, uintN attrs,
         goto bad;
     }
 
+    /* ES5 global var declarations may redeclare read-only data properties.
+     * Preserve the separate redeclaration rule for historical const bindings.
+     * Only the variable-declaration caller requests the property back. */
+    if (propp && !(attrs & JSPROP_READONLY) &&
+        (oldAttrs & JSPROP_READONLY) && obj2 == obj && OBJ_IS_NATIVE(obj) &&
+        ((OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) ||
+         obj == cx->globalObject) &&
+        !(((JSScopeProperty *) prop)->flags & SPROP_IS_CONST)) {
+        return JS_TRUE;
+    }
+
     /*
      * From here, return true, or else goto bad on failure to null out params.
      * If our caller doesn't want prop, drop it (we don't need it any longer).
@@ -2366,6 +2377,10 @@ interrupt:
           BEGIN_CASE(JSOP_PUSH)
             PUSH_OPND(JSVAL_VOID);
           END_CASE(JSOP_PUSH)
+
+          BEGIN_CASE(JSOP_HOLE)
+            PUSH_OPND(JSVAL_HOLE);
+          END_CASE(JSOP_HOLE)
 
           BEGIN_CASE(JSOP_POP)
             sp--;
@@ -2936,11 +2951,18 @@ interrupt:
             obj = fp->varobj;
             rval = FETCH_OPND(-1);
             SAVE_SP_AND_PC(fp);
-            ok = OBJ_DEFINE_PROPERTY(cx, obj, ATOM_TO_JSID(atom), rval,
-                                     NULL, NULL,
-                                     JSPROP_ENUMERATE | JSPROP_PERMANENT |
-                                     JSPROP_READONLY,
-                                     NULL);
+            if (OBJ_IS_NATIVE(obj)) {
+                ok = js_DefineNativeProperty(cx, obj, ATOM_TO_JSID(atom), rval,
+                                              NULL, NULL,
+                                              JSPROP_ENUMERATE | JSPROP_PERMANENT |
+                                              JSPROP_READONLY,
+                                              SPROP_IS_CONST, 0, NULL);
+            } else {
+                ok = OBJ_DEFINE_PROPERTY(cx, obj, ATOM_TO_JSID(atom), rval,
+                                         NULL, NULL,
+                                         JSPROP_ENUMERATE | JSPROP_PERMANENT |
+                                         JSPROP_READONLY, NULL);
+            }
             if (!ok)
                 goto out;
             STORE_OPND(-1, rval);
@@ -2953,10 +2975,16 @@ interrupt:
             CHECK_ELEMENT_ID(obj, id);
             rval = FETCH_OPND(-3);
             SAVE_SP_AND_PC(fp);
-            ok = OBJ_DEFINE_PROPERTY(cx, obj, id, rval, NULL, NULL,
-                                     JSPROP_ENUMERATE | JSPROP_PERMANENT |
-                                     JSPROP_READONLY,
-                                     NULL);
+            if (OBJ_IS_NATIVE(obj)) {
+                ok = js_DefineNativeProperty(cx, obj, id, rval, NULL, NULL,
+                                              JSPROP_ENUMERATE | JSPROP_PERMANENT |
+                                              JSPROP_READONLY,
+                                              SPROP_IS_CONST, 0, NULL);
+            } else {
+                ok = OBJ_DEFINE_PROPERTY(cx, obj, id, rval, NULL, NULL,
+                                         JSPROP_ENUMERATE | JSPROP_PERMANENT |
+                                         JSPROP_READONLY, NULL);
+            }
             if (!ok)
                 goto out;
             sp -= 3;
@@ -4719,8 +4747,14 @@ interrupt:
 
             /* Bind a variable only if it's not yet defined. */
             if (!prop) {
-                ok = OBJ_DEFINE_PROPERTY(cx, obj, id, JSVAL_VOID, NULL, NULL,
-                                         attrs, &prop);
+                if (op == JSOP_DEFCONST && OBJ_IS_NATIVE(obj)) {
+                    ok = js_DefineNativeProperty(cx, obj, id, JSVAL_VOID,
+                                                  NULL, NULL, attrs,
+                                                  SPROP_IS_CONST, 0, &prop);
+                } else {
+                    ok = OBJ_DEFINE_PROPERTY(cx, obj, id, JSVAL_VOID, NULL, NULL,
+                                             attrs, &prop);
+                }
                 if (!ok)
                     goto out;
                 JS_ASSERT(prop);
@@ -4737,7 +4771,8 @@ interrupt:
                 obj2 == obj &&
                 OBJ_IS_NATIVE(obj)) {
                 sprop = (JSScopeProperty *) prop;
-                if ((sprop->attrs & JSPROP_PERMANENT) &&
+                if ((sprop->attrs & (JSPROP_PERMANENT | JSPROP_READONLY)) ==
+                    JSPROP_PERMANENT &&
                     SPROP_HAS_VALID_SLOT(sprop, OBJ_SCOPE(obj)) &&
                     SPROP_HAS_STUB_GETTER(sprop) &&
                     SPROP_HAS_STUB_SETTER(sprop)) {
@@ -5255,9 +5290,23 @@ interrupt:
             /* Ensure that id has a type suitable for use with obj. */
             CHECK_ELEMENT_ID(obj, id);
 
-            /* Set the property named by obj[id] to rval. */
+            /* An array elision changes length, but creates no property. */
             SAVE_SP_AND_PC(fp);
-            ok = OBJ_SET_PROPERTY(cx, obj, id, &rval);
+            if (rval == JSVAL_HOLE) {
+                uint32 index;
+
+                JS_ASSERT(op == JSOP_INITELEM);
+                JS_ASSERT(OBJ_GET_CLASS(cx, obj) == &js_ArrayClass);
+                ok = js_ValueToECMAUint32(cx, FETCH_OPND(-2), &index);
+                if (ok)
+                    ok = js_SetLengthProperty(cx, obj, index + 1);
+            } else if (OBJ_GET_CLASS(cx, obj) == &js_ArrayClass) {
+                /* Literal elements are own properties, not assignments. */
+                ok = OBJ_DEFINE_PROPERTY(cx, obj, id, rval, NULL, NULL,
+                                         JSPROP_ENUMERATE, NULL);
+            } else {
+                ok = OBJ_SET_PROPERTY(cx, obj, id, &rval);
+            }
             if (!ok)
                 goto out;
             sp += i;

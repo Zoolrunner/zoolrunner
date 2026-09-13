@@ -292,6 +292,7 @@ struct JSScopeProperty {
 #define SPROP_IS_DUPLICATE              0x02
 #define SPROP_IS_ALIAS                  0x04
 #define SPROP_HAS_SHORTID               0x08
+#define SPROP_IS_CONST                  0x20    /* legacy const declaration */
 #define SPROP_IS_HIDDEN                 0x10    /* a normally-hidden property,
                                                    e.g., function arg or var */
 

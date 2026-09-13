@@ -346,6 +346,10 @@ regressions in `js/tests/es5`; report failures honestly. Adding standard-library
 method names alone does not establish conformance: strict mode, descriptors,
 invocation semantics, parsing, and built-in behavior must also be correct.
 
+Changes to bytecode must update the bytecode cache version and preserve
+function/script decompilation. Exercise engine changes in both XULRunner and
+the Suite, including browser navigation and the existing layout probes.
+
 Selected ECMAScript 2015/ES6 features may also be implemented when practical.
 
 Potentially useful additions include things such as:

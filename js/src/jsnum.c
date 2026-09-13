@@ -637,14 +637,14 @@ js_InitNumberClass(JSContext *cx, JSObject *obj)
     /* ECMA 15.1.1.1 */
     rt = cx->runtime;
     if (!JS_DefineProperty(cx, obj, js_NaN_str, DOUBLE_TO_JSVAL(rt->jsNaN),
-                           NULL, NULL, JSPROP_PERMANENT)) {
+                           NULL, NULL, JSPROP_PERMANENT | JSPROP_READONLY)) {
         return NULL;
     }
 
     /* ECMA 15.1.1.2 */
     if (!JS_DefineProperty(cx, obj, js_Infinity_str,
                            DOUBLE_TO_JSVAL(rt->jsPositiveInfinity),
-                           NULL, NULL, JSPROP_PERMANENT)) {
+                           NULL, NULL, JSPROP_PERMANENT | JSPROP_READONLY)) {
         return NULL;
     }
     return proto;

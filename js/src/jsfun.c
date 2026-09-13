@@ -449,14 +449,11 @@ args_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
     if (JSVAL_IS_INT(id)) {
         slot = JSVAL_TO_INT(id);
         if (slot < fp->argc && !ArgWasDeleted(cx, fp, slot)) {
-            /* XXX ECMA specs DontEnum, contrary to other array-like objects */
+            /* ES5 10.6 makes mapped argument indices enumerable. */
             if (!js_DefineProperty(cx, obj, INT_JSVAL_TO_JSID(id),
                                    fp->argv[slot],
                                    args_getProperty, args_setProperty,
-                                   JS_VERSION_IS_ECMA(cx)
-                                   ? 0
-                                   : JSPROP_ENUMERATE,
-                                   NULL)) {
+                                   JSPROP_ENUMERATE, NULL)) {
                 return JS_FALSE;
             }
             *objp = obj;
@@ -1163,14 +1160,11 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
             return JS_FALSE;
 
         /*
-         * ECMA (15.3.5.2) says that constructor.prototype is DontDelete for
-         * user-defined functions, but DontEnum | ReadOnly | DontDelete for
-         * native "system" constructors such as Object or Function.  So lazily
-         * set the former here in fun_resolve, but eagerly define the latter
-         * in JS_InitClass, with the right attributes.
+         * ES5 13.2: user function prototypes are writable, non-enumerable,
+         * and non-configurable. Native constructors are initialized eagerly
+         * by JS_InitClass with their own attributes.
          */
-        if (!js_SetClassPrototype(cx, obj, proto,
-                                  JSPROP_ENUMERATE | JSPROP_PERMANENT)) {
+        if (!js_SetClassPrototype(cx, obj, proto, JSPROP_PERMANENT)) {
             cx->weakRoots.newborn[GCX_OBJECT] = NULL;
             return JS_FALSE;
         }

@@ -6080,9 +6080,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             if (!EmitNumberOp(cx, atomIndex, cg))
                 return JS_FALSE;
 
-            /* FIXME 260106: holes in a sparse initializer are void-filled. */
+            /* Elisions advance length without creating an own property. */
             if (pn2->pn_type == TOK_COMMA) {
-                if (js_Emit1(cx, cg, JSOP_PUSH) < 0)
+                if (js_Emit1(cx, cg, JSOP_HOLE) < 0)
                     return JS_FALSE;
             } else {
                 if (!js_EmitTree(cx, cg, pn2))

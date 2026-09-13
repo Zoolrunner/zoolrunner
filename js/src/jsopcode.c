@@ -1919,6 +1919,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 #endif
                 /* FALL THROUGH */
 
+              case JSOP_HOLE:
               case JSOP_PUSHOBJ:
               case JSOP_BINDNAME:
               do_JSOP_BINDNAME:

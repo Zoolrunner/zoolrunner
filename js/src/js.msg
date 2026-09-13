@@ -301,3 +301,4 @@ MSG_DEF(JSMSG_COMPILE_EXECED_SCRIPT,  218, 0, JSEXN_TYPEERR, "cannot compile ove
 MSG_DEF(JSMSG_NON_LIST_XML_METHOD,    219, 2, JSEXN_TYPEERR, "cannot call {0} method on an XML list with {1} elements")
 MSG_DEF(JSMSG_EMPTY_ARRAY_REDUCE,     220, 0, JSEXN_TYPEERR, "reduce of empty array with no initial value")
 MSG_DEF(JSMSG_INVALID_DATE,          221, 0, JSEXN_RANGEERR, "invalid date")
+MSG_DEF(JSMSG_OBJECT_REQUIRED,        222, 0, JSEXN_TYPEERR, "Object method requires an object")

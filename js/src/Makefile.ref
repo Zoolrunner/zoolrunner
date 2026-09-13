@@ -241,6 +241,7 @@ JS_CFILES =		\
 	jsmath.c	\
 	jsnum.c		\
 	jsobj.c		\
+	jsobjes5.c	\
 	jsopcode.c      \
 	jsparse.c	\
 	jsprf.c		\

@@ -2271,7 +2271,7 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
 
     proto = JS_InitClass(cx, obj, NULL, &js_ObjectClass, Object, 1,
                          object_props, object_methods, NULL, NULL);
-    if (!proto)
+    if (!proto || !js_InitObjectES5(cx, proto))
         return NULL;
 
     /* ECMA (15.1.2.1) says 'eval' is a property of the global object. */
@@ -2894,7 +2894,7 @@ CheckForStringIndex(jsid id, const jschar *cp, const jschar *end,
             cp++;
         }
     }
-    if (cp == end &&
+    if (!(negative && index == 0) && cp == end &&
         (oldIndex < (JSVAL_INT_MAX / 10) ||
          (oldIndex == (JSVAL_INT_MAX / 10) &&
           c <= (JSVAL_INT_MAX % 10)))) {
@@ -3173,9 +3173,8 @@ Detecting(JSContext *cx, jsbytecode *pc)
         }
 
         /*
-         * Special case #2: handle (document.all == undefined).  Don't worry
-         * about someone redefining undefined, which was added by Edition 3,
-         * so is read/write for backward compatibility.
+         * Special case #2: handle (document.all == undefined). A local
+         * binding may shadow the ES5 read-only global undefined property.
          */
         if (op == JSOP_NAME) {
             atom = GET_ATOM(cx, script, pc);
