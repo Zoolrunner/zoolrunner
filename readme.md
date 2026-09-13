@@ -167,9 +167,22 @@ LD_LIBRARY_PATH=. MOZ_NO_REMOTE=1 ./zoolrunner -browser
 MailNews and Composer can be started from the same suite build with `-mail` and
 `-edit`.
 
+Native macOS arm64 Cocoa Suite and standalone XULRunner builds have also been
+built and run. On 2026-09-13, both passed the 169 assertions in the
+[HTML/CSS regression probes](layout/html/tests/style/README-probes.md); the Suite
+also passed a structural check of the live Basilisk homepage. These are
+development validation results, not a claim of complete website or platform
+conformance. The rendering changes have not yet been validated on Windows.
+
 ## Changes from RetroZilla
 
 Significant work completed after the RetroZilla baseline includes:
+
+* Added structural HTML block elements, standard `inline-block` handling,
+  circular `border-radius` aliases, and viewport width/height/orientation media
+  queries, including resize-driven restyling.
+* Added single-layer `background-size` and `linear-gradient()` rendering through
+  the existing graphics backends, with CSSOM and painting regression fixtures.
 
 * Added initial LoongArch64 Linux support, including NSPR platform metadata and
   an xptcall backend.
@@ -267,31 +280,29 @@ application runtime, not merely a browser-porting exercise.
 
 ## Legacy Windows Compatibility
 
-Preserving RetroZilla's unusually broad legacy Windows compatibility is a
-deliberate ZoolRunner goal. Existing project documentation and source support
-cover Windows 95, Windows 98, Windows Me, Windows NT 3.51, Windows NT 4.0,
-Windows 2000, and Windows XP-era systems. The tree also contains installer and
-compatibility code for later 32-bit-compatible Windows releases, but newer
-Windows versions should not be claimed as tested unless they have actually been
-tested.
+The minimum Windows targets are **Windows 95** and **Windows NT 4.0**.
+The Windows 9x and NT families are independent compatibility targets. Preserve
+Windows 98, Me, 2000, XP, and later compatible releases where practical, and
+record tested service packs and optional updates explicitly. Older NT 3.x
+support is experimental rather than a current minimum requirement.
 
-Do not unnecessarily raise the minimum Windows version. Avoid adding dependencies
-on newer Windows APIs for convenience when an existing implementation works on
-the historical supported systems. Do not require a newer Microsoft compiler
-solely for compiler modernization if doing so would break the legacy Windows
-build environment.
+Windows builds are produced on **Linux or macOS hosts**, using genuine
+**Microsoft Visual C++ 2005 (MSVC 8.0 / VC8)** through **Wine**. CrossOver can
+provide Wine on macOS. Configure, make, and host utilities run natively; the
+Windows compiler, linker, and resource tools run under Wine. Historical VC6 and
+native-Windows build instructions do not describe the current workflow.
 
-The historical Windows toolchain may intentionally remain the supported legacy
-Windows build environment. Current project documentation inherited from
-RetroZilla describes Visual Studio 6.0, VC6 SP5, the VC6 Processor Pack, and
-MozillaBuild 1.2 for release-style Win32 builds, with MozillaBuild 1.5 noted for
-Windows XP/2003 x64 build hosts.
+Use the static CRT and the checked-in cross-build wrappers. The legacy Suite
+configuration aggregates ordinary XPCOM components to stay within the old
+systems' TLS limits and uses the shared process-heap integration for cross-DLL
+allocations. See the [Windows build guide](build/win32/msvc8-cross/README.md).
 
-Using a historical compiler for legacy Windows compatibility does not mean the
-entire project must be developed with historical tools. Contemporary GCC and
-Clang on Linux are useful for diagnostics, warnings, sanitizers, optimization,
-static analysis, architecture bring-up, undefined-behavior discovery, and
-memory-safety work.
+Minimum targets are not a claim that every current binary has been verified on
+those systems. The [compatibility status](build/win32/msvc8-cross/COMPATIBILITY.md)
+records unresolved CRT/import blockers and the required Windows 95 and NT 4
+runtime checks. A successful build or Wine launch alone does not establish
+compatibility. Do not raise the OS or compiler requirements merely for
+convenience.
 
 ## Compatibility Philosophy
 
@@ -336,6 +347,14 @@ reasonably stable. It should avoid crashing on malformed or unsupported content.
 It does not need to correctly render every contemporary website for the platform
 to be successful.
 
+The Basilisk website is a bounded HTML/CSS integration target. Structural
+layout, responsive menus, FAQ checkbox toggles, circular radii, single-layer
+background sizing, and linear gradients are covered by the
+[layout probes](layout/html/tests/style/README-probes.md). Shadows, transitions,
+and keyframe animation remain unfinished; downloadable fonts are excluded from
+this rendering task. Multiple background layers and other newer CSS syntax
+are not implied by the implemented subset.
+
 ## Stability and Security
 
 A major current objective is to eliminate reproducible crashes and fix
@@ -363,9 +382,20 @@ suite, GTK2 XULRunner, Xlib browser, and Xlib suite builds. The GTK2 browser
 configuration uses `-j8`, bundled JPEG/zlib, crypto, SVG, canvas, and the
 optional in-tree libIDL bootstrap.
 
-Legacy Windows build documentation inherited from RetroZilla uses Visual Studio
-6.0-era tooling. Keep those paths working when making changes that affect Win32
-build logic.
+For Windows x86 builds, run the MSVC 2005 tools through Wine from Linux or
+macOS. For the legacy Suite configuration:
+
+```sh
+MSVC8_ROOT=/path/to/msvc8.0 \
+WINE=wine \
+MOZCONFIG="$PWD/mozconfigs/cross/win32-msvc8-suite-legacy.mozconfig" \
+make -f client.mk build
+```
+
+The [Windows build guide](build/win32/msvc8-cross/README.md) describes toolchain
+layout, macOS/CrossOver selection, the XULRunner configuration, packaging, and
+PE auditing. [Mozconfig examples](mozconfigs/README.md) also cover native
+macOS arm64 Cocoa builds.
 
 For incremental builds, run `make` from the corresponding directory in the object
 directory after a full build has completed. For example, after changing a file

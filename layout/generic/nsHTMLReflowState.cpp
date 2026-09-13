@@ -496,6 +496,7 @@ nsHTMLReflowState::InitFrameType()
       break;
 
     case NS_STYLE_DISPLAY_INLINE:
+    case NS_STYLE_DISPLAY_INLINE_BLOCK:
     case NS_STYLE_DISPLAY_MARKER:
     case NS_STYLE_DISPLAY_INLINE_TABLE:
     case NS_STYLE_DISPLAY_INLINE_BOX:
@@ -1853,8 +1854,11 @@ nsHTMLReflowState::InitConstraints(nsPresContext* aPresContext,
 
       AdjustComputedHeight(PR_TRUE);
 
-    } else if (NS_CSS_FRAME_TYPE_FLOATING == mFrameType) {
-      // Floating non-replaced element. First calculate the computed width
+    } else if (NS_CSS_FRAME_TYPE_FLOATING == mFrameType ||
+               mStyleDisplay->mDisplay == NS_STYLE_DISPLAY_INLINE_BLOCK) {
+      // Floats and inline blocks both use shrink-to-fit widths and keep
+      // their specified margins; they do not fill a block containing line.
+      // First calculate the computed width
       if (eStyleUnit_Auto == widthUnit) {
         if ((NS_UNCONSTRAINEDSIZE == aContainingBlockWidth) &&
             (eStyleUnit_Percent == mStylePosition->mWidth.GetUnit())) {

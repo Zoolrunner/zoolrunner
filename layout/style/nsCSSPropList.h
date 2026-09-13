@@ -277,6 +277,10 @@ CSS_PROP_BACKGROUND(background-image, background_image, BackgroundImage, Color, 
 CSS_PROP_BACKGROUND(-moz-background-inline-policy, _moz_background_inline_policy, MozBackgroundInlinePolicy, Color, mBackInlinePolicy, eCSSType_Value, kBackgroundInlinePolicyKTable)
 CSS_PROP_BACKGROUND(-moz-background-origin, _moz_background_origin, MozBackgroundOrigin, Color, mBackOrigin, eCSSType_Value, kBackgroundOriginKTable)
 CSS_PROP_SHORTHAND(background-position, background_position, BackgroundPosition)
+// Use getPropertyValue/setProperty without changing the historical CSS2 ABI.
+#ifndef CSS_PROP_LIST_EXCLUDE_NEW
+CSS_PROP_BACKGROUND(background-size, background_size, BackgroundSize, Color, mBackSize, eCSSType_Value, kBackgroundSizeKTable)
+#endif
 CSS_PROP_BACKGROUND(background-repeat, background_repeat, BackgroundRepeat, Color, mBackRepeat, eCSSType_Value, kBackgroundRepeatKTable)
 #ifndef CSS_PROP_LIST_EXCLUDE_INTERNAL
 CSS_PROP_BACKGROUND(-x-background-x-position, background_x_position, BackgroundXPosition, Color, mBackPositionX, eCSSType_Value, kBackgroundXPositionKTable) // XXX bug 3935

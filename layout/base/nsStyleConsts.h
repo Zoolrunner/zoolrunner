@@ -222,6 +222,9 @@
 #define NS_STYLE_BG_ORIGIN_CONTENT        2
 
 // See nsStyleBackground
+#define NS_STYLE_BG_SIZE_CONTAIN 1
+#define NS_STYLE_BG_SIZE_COVER   2
+
 #define NS_STYLE_BG_REPEAT_OFF                  0x00
 #define NS_STYLE_BG_REPEAT_X                    0x01
 #define NS_STYLE_BG_REPEAT_Y                    0x02

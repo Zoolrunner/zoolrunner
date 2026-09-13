@@ -287,6 +287,8 @@ protected:
   PRBool ParseAzimuth(nsresult& aErrorCode, nsCSSValue& aValue);
   PRBool ParseBackground(nsresult& aErrorCode);
   PRBool ParseBackgroundPosition(nsresult& aErrorCode);
+  PRBool ParseBackgroundSize(nsresult& aErrorCode, nsCSSValue& aValue);
+  PRBool ParseLinearGradient(nsresult& aErrorCode, nsCSSValue& aValue);
   PRBool ParseBorderColor(nsresult& aErrorCode);
   PRBool ParseBorderColors(nsresult& aErrorCode,
                            nsCSSValueList** aResult,
@@ -413,10 +415,6 @@ protected:
   PRPackedBool  mSVGMode : 1;
 #endif
 
-  // True for parsing media lists for HTML attributes, where we have to
-  // ignore CSS comments.
-  PRPackedBool mHTMLMediaMode : 1;
-
   // True if ParseColor should handle rgba() and hsla(), which most of
   // Gecko currently doesn't understand.
   PRPackedBool mHandleAlphaColors : 1;
@@ -519,7 +517,6 @@ CSSParserImpl::CSSParserImpl()
 #ifdef MOZ_SVG
     mSVGMode(PR_FALSE),
 #endif
-    mHTMLMediaMode(PR_FALSE),
     mHandleAlphaColors(PR_TRUE),
     mCaseSensitive(PR_FALSE),
     mParsingCompoundProperty(PR_FALSE)
@@ -956,42 +953,8 @@ CSSParserImpl::ParseMediaList(const nsSubstring& aBuffer,
   aMediaList->Clear();
   nsresult rv = NS_OK;
 
-  if (aHTMLMode) {
-    mHTMLMediaMode = PR_TRUE;
-
-    // XXXldb We need to make the scanner not skip CSS comments!  (Or
-    // should we?)
-
-    // Follow the parsing rules in 
-    // http://www.w3.org/TR/1999/REC-html401-19991224/types.html#type-media-descriptors
-
-    for (PRUint32 sub = 0, sub_end; sub < aBuffer.Length(); sub = sub_end + 1) {
-      sub_end = aBuffer.FindChar(PRUnichar(','), sub);
-      if (sub_end == PRUint32(kNotFound))
-        sub_end = aBuffer.Length();
-
-      PRUint32 parse_start, parse_end;
-      for (parse_start = sub;
-           parse_start < sub_end && nsCRT::IsAsciiSpace(aBuffer[parse_start]);
-           ++parse_start)
-        ;
-
-      for (parse_end = parse_start;
-           parse_end < sub_end &&
-           (nsCRT::IsAsciiAlpha(aBuffer[parse_end]) ||
-            nsCRT::IsAsciiDigit(aBuffer[parse_end]) ||
-            aBuffer[parse_end] == PRUnichar('-'));
-           ++parse_end)
-        ;
-
-      DoParseMediaList(Substring(aBuffer, parse_start, parse_end - parse_start),
-                       aURL, aLineNumber, aMediaList);
-    }
-
-    mHTMLMediaMode = PR_FALSE;
-  } else {
-    rv = DoParseMediaList(aBuffer, aURL, aLineNumber, aMediaList);
-  }
+  // HTML media attributes use the same query grammar as @media/@import.
+  rv = DoParseMediaList(aBuffer, aURL, aLineNumber, aMediaList);
 
   return rv;
 }
@@ -1011,7 +974,7 @@ CSSParserImpl::DoParseMediaList(const nsSubstring& aBuffer,
     return rv;
   }
 
-  if (!GatherMedia(rv, aMediaList, PRUnichar(0)) && !mHTMLMediaMode) {
+  if (!GatherMedia(rv, aMediaList, PRUnichar(0))) {
     OUTPUT_ERROR();
   }
   CLEAR_ERROR();
@@ -1304,39 +1267,29 @@ PRBool CSSParserImpl::GatherMedia(nsresult& aErrorCode,
                                   nsMediaList* aMedia,
                                   PRUnichar aStopSymbol)
 {
+  nsAutoString query;
+  PRInt32 depth = 0;
+  PRBool afterComma = PR_FALSE;
   for (;;) {
-    if (!GetToken(aErrorCode, PR_TRUE)) {
-      REPORT_UNEXPECTED_EOF(PEGatherMediaEOF);
-      break;
+    PRBool haveToken = GetToken(aErrorCode, PR_FALSE);
+    PRBool stop = haveToken && mToken.IsSymbol(aStopSymbol);
+    PRBool comma = haveToken && depth == 0 && mToken.IsSymbol(',');
+    if (!haveToken || stop || comma) {
+      query.Trim(" \t\r\n\f");
+      if (!query.IsEmpty() || afterComma || comma) {
+        nsresult rv = aMedia->AppendQuery(query);
+        if (NS_FAILED(rv)) { aErrorCode = rv; return PR_FALSE; }
+      }
+      query.Truncate();
+      if (stop) { UngetToken(); return PR_TRUE; }
+      if (!haveToken) return aStopSymbol == 0 && NS_SUCCEEDED(aErrorCode);
+      afterComma = PR_TRUE;
+      continue;
     }
-    if (eCSSToken_Ident != mToken.mType) {
-      REPORT_UNEXPECTED_TOKEN(PEGatherMediaNotIdent);
-      UngetToken();
-      break;
-    }
-    ToLowerCase(mToken.mIdent);  // case insensitive from CSS - must be lower cased
-    nsCOMPtr<nsIAtom> medium = do_GetAtom(mToken.mIdent);
-    aMedia->AppendAtom(medium);
-
-    if (!GetToken(aErrorCode, PR_TRUE)) {
-      if (aStopSymbol == PRUnichar(0))
-        return PR_TRUE;
-      REPORT_UNEXPECTED_EOF(PEGatherMediaEOF);
-      break;
-    }
-
-    if (eCSSToken_Symbol == mToken.mType &&
-        mToken.mSymbol == aStopSymbol) {
-      UngetToken();
-      return PR_TRUE;
-    } else if (eCSSToken_Symbol != mToken.mType ||
-               mToken.mSymbol != ',') {
-      REPORT_UNEXPECTED_TOKEN(PEGatherMediaNotComma);
-      UngetToken();
-      break;
-    }
+    if (mToken.IsSymbol('(') || mToken.IsSymbol('[')) ++depth;
+    else if ((mToken.IsSymbol(')') || mToken.IsSymbol(']')) && depth > 0) --depth;
+    mToken.AppendToString(query);
   }
-  return PR_FALSE;
 }
 
 // Parse a CSS2 import rule: "@import STRING | URL [medium [, medium]]"
@@ -4264,6 +4217,13 @@ PRBool CSSParserImpl::ParseSingleValueProperty(nsresult& aErrorCode,
                                                nsCSSProperty aPropID)
 {
   switch (aPropID) {
+  case eCSSProperty_background_size: {
+    PRBool compound = IsParsingCompoundProperty();
+    SetParsingCompoundProperty(PR_TRUE);
+    PRBool parsed = ParseBackgroundSize(aErrorCode, aValue);
+    SetParsingCompoundProperty(compound);
+    return parsed;
+  }
   case eCSSProperty_UNKNOWN:
   case eCSSProperty_background:
   case eCSSProperty_background_position:
@@ -4341,6 +4301,17 @@ PRBool CSSParserImpl::ParseSingleValueProperty(nsresult& aErrorCode,
     return ParseVariant(aErrorCode, aValue, VARIANT_HCK,
                         nsCSSProps::kBackgroundColorKTable);
   case eCSSProperty_background_image:
+    if (!GetToken(aErrorCode, PR_TRUE))
+      return PR_FALSE;
+    if (mToken.mType == eCSSToken_Function &&
+        mToken.mIdent.LowerCaseEqualsLiteral("linear-gradient")) {
+      PRBool compound = IsParsingCompoundProperty();
+      SetParsingCompoundProperty(PR_TRUE);
+      PRBool parsed = ParseLinearGradient(aErrorCode, aValue);
+      SetParsingCompoundProperty(compound);
+      return parsed;
+    }
+    UngetToken();
     return ParseVariant(aErrorCode, aValue, VARIANT_HUO, nsnull);
   case eCSSProperty__moz_background_inline_policy:
     return ParseVariant(aErrorCode, aValue, VARIANT_HK,
@@ -4841,8 +4812,9 @@ PRBool CSSParserImpl::ParseBackground(nsresult& aErrorCode)
   }
 
   // Background properties not settable from the shorthand get reset to their initial value
-  static const PRInt32 numResetProps = 3;
+  static const PRInt32 numResetProps = 4;
   static const nsCSSProperty kBackgroundResetIDs[numResetProps] = {
+    eCSSProperty_background_size,
     eCSSProperty__moz_background_clip,
     eCSSProperty__moz_background_inline_policy,
     eCSSProperty__moz_background_origin
@@ -4851,9 +4823,129 @@ PRBool CSSParserImpl::ParseBackground(nsresult& aErrorCode)
   nsCSSValue initial;
   initial.SetInitialValue();
   for (index = 0; index < numResetProps; ++index) {
-    AppendValue(kBackgroundResetIDs[index], initial);
+    AppendValue(kBackgroundResetIDs[index],
+                index == 0 && values[0].GetUnit() == eCSSUnit_Inherit
+                ? values[0] : initial);
   }
 
+  return PR_TRUE;
+}
+
+// Array layout: direction followed by at least two (color, position) pairs.
+PRBool CSSParserImpl::ParseLinearGradient(nsresult& aErrorCode,
+                                         nsCSSValue& aValue)
+{
+  if (!ExpectSymbol(aErrorCode, '(', PR_FALSE))
+    return PR_FALSE;
+  nsCSSValue direction;
+  direction.SetFloatValue(180.0f, eCSSUnit_Degree);
+  if (!GetToken(aErrorCode, PR_TRUE))
+    return PR_FALSE;
+  if (mToken.mType == eCSSToken_Ident &&
+      mToken.mIdent.LowerCaseEqualsLiteral("to")) {
+    PRInt32 mask = 0;
+    for (PRInt32 i = 0; i < 2; ++i) {
+      if (!GetToken(aErrorCode, PR_TRUE))
+        return PR_FALSE;
+      PRInt32 side = 0;
+      if (mToken.mType == eCSSToken_Ident) {
+        if (mToken.mIdent.LowerCaseEqualsLiteral("top")) side = 1;
+        if (mToken.mIdent.LowerCaseEqualsLiteral("bottom")) side = 2;
+        if (mToken.mIdent.LowerCaseEqualsLiteral("left")) side = 4;
+        if (mToken.mIdent.LowerCaseEqualsLiteral("right")) side = 8;
+      }
+      if (!side) { UngetToken(); break; }
+      if ((side <= 2 && (mask & 3)) || (side >= 4 && (mask & 12)))
+        return PR_FALSE;
+      mask |= side;
+    }
+    if (!mask || !ExpectSymbol(aErrorCode, ',', PR_TRUE))
+      return PR_FALSE;
+    direction.SetIntValue(mask, eCSSUnit_Enumerated);
+  } else {
+    // A turn is a CSS angle too, although the historical generic angle
+    // parser predates that unit. Normalize it locally to degrees.
+    PRBool angle = PR_FALSE;
+    if (mToken.mType == eCSSToken_Dimension &&
+        mToken.mIdent.LowerCaseEqualsLiteral("turn")) {
+      direction.SetFloatValue(mToken.mNumber * 360.0f, eCSSUnit_Degree);
+      angle = PR_TRUE;
+    } else {
+      UngetToken();
+      nsCSSValue value;
+      if (ParseVariant(aErrorCode, value, VARIANT_ANGLE, nsnull)) {
+        direction = value;
+        angle = PR_TRUE;
+      }
+    }
+    if (angle && !ExpectSymbol(aErrorCode, ',', PR_TRUE))
+      return PR_FALSE;
+  }
+  if (direction.IsAngularUnit() &&
+      !(direction.GetFloatValue() >= -FLT_MAX && direction.GetFloatValue() <= FLT_MAX))
+    return PR_FALSE;
+  nsTArray<nsCSSValue> stops;
+  do {
+    nsRefPtr<nsCSSValue::Array> stop = nsCSSValue::Array::Create(2);
+    if (!stop) { aErrorCode = NS_ERROR_OUT_OF_MEMORY; return PR_FALSE; }
+    if (!GetToken(aErrorCode, PR_TRUE))
+      return PR_FALSE;
+    if (mToken.mType == eCSSToken_Ident &&
+        mToken.mIdent.LowerCaseEqualsLiteral("transparent")) {
+      stop->Item(0).SetColorValue(NS_RGBA(0, 0, 0, 0));
+    } else {
+      UngetToken();
+      if (!ParseVariant(aErrorCode, stop->Item(0), VARIANT_COLOR, nsnull))
+        return PR_FALSE;
+    }
+    ParseVariant(aErrorCode, stop->Item(1), VARIANT_LP, nsnull);
+    if (stop->Item(1).GetUnit() != eCSSUnit_Null) {
+      float value = stop->Item(1).GetUnit() == eCSSUnit_Percent ?
+                    stop->Item(1).GetPercentValue() : stop->Item(1).GetFloatValue();
+      if (!(value >= -FLT_MAX && value <= FLT_MAX))
+        return PR_FALSE;
+    }
+    nsCSSValue value;
+    value.SetArrayValue(stop, eCSSUnit_Array);
+    // Array uses a 16-bit count. Reject oversized input before narrowing.
+    if (stops.Length() == 65534 || !stops.AppendElement(value)) {
+      aErrorCode = NS_ERROR_OUT_OF_MEMORY;
+      return PR_FALSE;
+    }
+  } while (ExpectSymbol(aErrorCode, ',', PR_TRUE));
+  if (stops.Length() < 2 || !ExpectSymbol(aErrorCode, ')', PR_TRUE))
+    return PR_FALSE;
+  nsRefPtr<nsCSSValue::Array> gradient = nsCSSValue::Array::Create(stops.Length() + 1);
+  if (!gradient) { aErrorCode = NS_ERROR_OUT_OF_MEMORY; return PR_FALSE; }
+  gradient->Item(0) = direction;
+  for (PRUint32 i = 0; i < stops.Length(); ++i)
+    gradient->Item(i + 1) = stops[i];
+  aValue.SetArrayValue(gradient, eCSSUnit_Array);
+  return PR_TRUE;
+}
+
+PRBool CSSParserImpl::ParseBackgroundSize(nsresult& aErrorCode,
+                                        nsCSSValue& aValue)
+{
+  nsCSSValue x, y;
+  if (!ParsePositiveVariant(aErrorCode, x, VARIANT_AHLP | VARIANT_KEYWORD,
+                            nsCSSProps::kBackgroundSizeKTable))
+    return PR_FALSE;
+  if (x.GetUnit() == eCSSUnit_Inherit || x.GetUnit() == eCSSUnit_Initial ||
+      x.GetUnit() == eCSSUnit_Enumerated) {
+    aValue = x;
+    return PR_TRUE;
+  }
+  if (!ParsePositiveVariant(aErrorCode, y, VARIANT_AUTO | VARIANT_LP, nsnull))
+    y.SetAutoValue();
+  nsRefPtr<nsCSSValue::Array> size = nsCSSValue::Array::Create(2);
+  if (!size) {
+    aErrorCode = NS_ERROR_OUT_OF_MEMORY;
+    return PR_FALSE;
+  }
+  size->Item(0) = x;
+  size->Item(1) = y;
+  aValue.SetArrayValue(size, eCSSUnit_Array);
   return PR_TRUE;
 }
 

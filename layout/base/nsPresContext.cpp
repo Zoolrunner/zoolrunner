@@ -174,6 +174,7 @@ nsPresContext::nsPresContext(nsPresContextType aType)
     mDefaultFantasyFont("fantasy", NS_FONT_STYLE_NORMAL, NS_FONT_VARIANT_NORMAL,
                         NS_FONT_WEIGHT_NORMAL, 0, NSIntPointsToTwips(12))
 {
+  mHasViewportMediaQueries = PR_FALSE;
   // NOTE! nsPresContext::operator new() zeroes out all members, so don't
   // bother initializing members to 0.
 
@@ -615,6 +616,8 @@ nsPresContext::ClearStyleDataAndReflow()
   if (mShell) {
     // Clear out all our style data.
     mShell->StyleSet()->ClearStyleData(this);
+    if (mHasViewportMediaQueries)
+      mShell->ReconstructStyleData();
 
     // Force a reflow of the root frame
     // XXX We really should only do a reflow if a preference that affects

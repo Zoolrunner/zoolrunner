@@ -356,6 +356,8 @@ public:
    * nscoord units (as scaled by the device context).
    */
   void SetVisibleArea(const nsRect& r) { mVisibleArea = r; }
+  void SetHasViewportMediaQueries() { mHasViewportMediaQueries = PR_TRUE; }
+  PRBool HasViewportMediaQueries() const { return mHasViewportMediaQueries; }
 
   /**
    * Return true if this presentation context is a paginated
@@ -684,6 +686,7 @@ protected:
   nscoord               mMinimumFontSize;
 
   nsRect                mVisibleArea;
+  PRBool                mHasViewportMediaQueries;
   nsRect                mPageDim;
 
   nscolor               mDefaultColor;

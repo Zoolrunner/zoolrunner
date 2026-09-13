@@ -3163,20 +3163,78 @@ nsRuleNode::ComputeBackgroundData(nsStyleStruct* aStartStruct,
     bg->mBackgroundFlags |= NS_STYLE_BG_COLOR_TRANSPARENT;
   }
 
-  // background-image: url (stored as image), none, inherit
+  // background-image: URL, linear gradient, none, inherit.
+  if (eCSSUnit_Array == colorData.mBackImage.GetUnit()) {
+    const nsCSSValue::Array* values = colorData.mBackImage.GetArrayValue();
+    nsCOMPtr<nsStyleGradient> gradient = new nsStyleGradient;
+    if (!gradient || !gradient->mStops.SetLength(values->Count() - 1)) {
+      bg->Destroy(mPresContext);
+      return nsnull;
+    }
+    const nsCSSValue& direction = values->Item(0);
+    if (direction.GetUnit() == eCSSUnit_Enumerated) {
+      gradient->mDirection = direction.GetIntValue();
+    } else {
+      double radians = direction.GetFloatValue();
+      if (direction.GetUnit() == eCSSUnit_Degree)
+        radians *= 3.14159265358979323846 / 180;
+      else if (direction.GetUnit() == eCSSUnit_Grad)
+        radians *= 3.14159265358979323846 / 200;
+      gradient->mAngle = radians;
+    }
+    for (PRUint32 i = 1; i < values->Count(); ++i) {
+      const nsCSSValue::Array* pair = values->Item(i).GetArrayValue();
+      nsStyleGradientStop& stop = gradient->mStops[i - 1];
+      stop.mColor = NS_RGBA(0, 0, 0, 0);
+      SetColor(pair->Item(0), NS_RGB(0, 0, 0), mPresContext, aContext,
+               stop.mColor, inherited);
+      nsStyleCoord unused;
+      SetCoord(pair->Item(1), stop.mPosition, unused, SETCOORD_LP,
+               aContext, mPresContext, inherited);
+    }
+    bg->mBackgroundGradient = gradient;
+    bg->mBackgroundImage = nsnull;
+    bg->mBackgroundFlags &= ~NS_STYLE_BG_IMAGE_NONE;
+  }
+
+  // URL images and gradients are mutually exclusive in this single-layer engine.
   if (eCSSUnit_Image == colorData.mBackImage.GetUnit()) {
+    bg->mBackgroundGradient = nsnull;
     bg->mBackgroundImage = colorData.mBackImage.GetImageValue();
     bg->mBackgroundFlags &= ~NS_STYLE_BG_IMAGE_NONE;
   }
-  else if (eCSSUnit_None == colorData.mBackImage.GetUnit()) {
+  else if (eCSSUnit_None == colorData.mBackImage.GetUnit() ||
+           eCSSUnit_Initial == colorData.mBackImage.GetUnit()) {
+    bg->mBackgroundGradient = nsnull;
     bg->mBackgroundImage = nsnull;
     bg->mBackgroundFlags |= NS_STYLE_BG_IMAGE_NONE;
   }
   else if (eCSSUnit_Inherit == colorData.mBackImage.GetUnit()) {
     inherited = PR_TRUE;
     bg->mBackgroundImage = parentBG->mBackgroundImage;
+    bg->mBackgroundGradient = parentBG->mBackgroundGradient;
     bg->mBackgroundFlags &= ~NS_STYLE_BG_IMAGE_NONE;
     bg->mBackgroundFlags |= (parentFlags & NS_STYLE_BG_IMAGE_NONE);
+  }
+
+  // background-size: one keyword, or a pair of lengths/percentages/auto.
+  if (colorData.mBackSize.GetUnit() == eCSSUnit_Inherit) {
+    inherited = PR_TRUE;
+    bg->mBackgroundSizeX = parentBG->mBackgroundSizeX;
+    bg->mBackgroundSizeY = parentBG->mBackgroundSizeY;
+  } else if (colorData.mBackSize.GetUnit() == eCSSUnit_Initial) {
+    bg->mBackgroundSizeX.SetAutoValue();
+    bg->mBackgroundSizeY.SetAutoValue();
+  } else if (colorData.mBackSize.GetUnit() == eCSSUnit_Enumerated) {
+    bg->mBackgroundSizeX.SetIntValue(colorData.mBackSize.GetIntValue(),
+                                    eStyleUnit_Enumerated);
+    bg->mBackgroundSizeY.SetAutoValue();
+  } else if (colorData.mBackSize.GetUnit() == eCSSUnit_Array) {
+    const nsCSSValue::Array* size = colorData.mBackSize.GetArrayValue();
+    SetCoord(size->Item(0), bg->mBackgroundSizeX, parentBG->mBackgroundSizeX,
+             SETCOORD_LP | SETCOORD_AUTO, aContext, mPresContext, inherited);
+    SetCoord(size->Item(1), bg->mBackgroundSizeY, parentBG->mBackgroundSizeY,
+             SETCOORD_LP | SETCOORD_AUTO, aContext, mPresContext, inherited);
   }
 
   // background-repeat: enum, inherit

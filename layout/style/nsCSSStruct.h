@@ -100,6 +100,7 @@ struct nsCSSColor : public nsCSSStruct  {
   nsCSSValue      mColor;
   nsCSSValue      mBackColor;
   nsCSSValue      mBackImage;
+  nsCSSValue      mBackSize;
   nsCSSValue      mBackRepeat;
   nsCSSValue      mBackAttachment;
   nsCSSValue      mBackPositionX;

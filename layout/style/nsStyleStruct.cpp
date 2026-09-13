@@ -1101,6 +1101,8 @@ nsStyleBackground::nsStyleBackground(nsPresContext* aPresContext)
     mBackgroundOrigin(NS_STYLE_BG_ORIGIN_PADDING),
     mBackgroundRepeat(NS_STYLE_BG_REPEAT_XY)
 {
+  mBackgroundSizeX.SetAutoValue();
+  mBackgroundSizeY.SetAutoValue();
   mBackgroundColor = aPresContext->DefaultBackgroundColor();
 }
 
@@ -1113,8 +1115,11 @@ nsStyleBackground::nsStyleBackground(const nsStyleBackground& aSource)
     mBackgroundRepeat(aSource.mBackgroundRepeat),
     mBackgroundXPosition(aSource.mBackgroundXPosition),
     mBackgroundYPosition(aSource.mBackgroundYPosition),
+    mBackgroundSizeX(aSource.mBackgroundSizeX),
+    mBackgroundSizeY(aSource.mBackgroundSizeY),
     mBackgroundColor(aSource.mBackgroundColor),
-    mBackgroundImage(aSource.mBackgroundImage)
+    mBackgroundImage(aSource.mBackgroundImage),
+    mBackgroundGradient(aSource.mBackgroundGradient)
 {
 }
 
@@ -1135,11 +1140,14 @@ nsChangeHint nsStyleBackground::CalcDifference(const nsStyleBackground& aOther) 
   if ((mBackgroundAttachment == aOther.mBackgroundAttachment) &&
       (mBackgroundFlags == aOther.mBackgroundFlags) &&
       (mBackgroundRepeat == aOther.mBackgroundRepeat) &&
+      (mBackgroundSizeX == aOther.mBackgroundSizeX) &&
+      (mBackgroundSizeY == aOther.mBackgroundSizeY) &&
       (mBackgroundColor == aOther.mBackgroundColor) &&
       (mBackgroundClip == aOther.mBackgroundClip) &&
       (mBackgroundInlinePolicy == aOther.mBackgroundInlinePolicy) &&
       (mBackgroundOrigin == aOther.mBackgroundOrigin) &&
       EqualImages(mBackgroundImage, aOther.mBackgroundImage) &&
+      (mBackgroundGradient == aOther.mBackgroundGradient) &&
       ((!(mBackgroundFlags & NS_STYLE_BG_X_POSITION_PERCENT) ||
        (mBackgroundXPosition.mFloat == aOther.mBackgroundXPosition.mFloat)) &&
        (!(mBackgroundFlags & NS_STYLE_BG_X_POSITION_LENGTH) ||
@@ -1163,7 +1171,7 @@ nsChangeHint nsStyleBackground::MaxDifference()
 PRBool nsStyleBackground::HasFixedBackground() const
 {
   return mBackgroundAttachment == NS_STYLE_BG_ATTACHMENT_FIXED &&
-         mBackgroundImage;
+         (mBackgroundImage || mBackgroundGradient);
 }
 
 // --------------------

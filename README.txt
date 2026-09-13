@@ -51,7 +51,9 @@ can be found at the preceding URL along with the releases themselves.
 
 *Windows
 
-   - Windows 95, 98, Me, NT4, 2000 or XP
+   - Minimum targets: Windows 95 or Windows NT 4.0
+   - Later compatible Windows releases are also intended targets.
+   - See build/win32/msvc8-cross/COMPATIBILITY.md for verified runtime status.
    - Intel Pentium class processor (233 MHz or faster recommended)
    - 64 MB RAM
    - 26 MB free hard disk space
@@ -81,7 +83,10 @@ Install into a clean (new) directory. Installing on top of previously
 released builds may cause problems.
 
 Note: These instructions do not tell you how to build ZoolRunner.
-For info on building ZoolRunner, see readme.md in the source tree.
+Windows builds are made on a Linux or macOS host using Wine and Microsoft
+Visual C++ 2005 (MSVC 8.0). CrossOver may provide Wine on macOS.
+For build instructions, see readme.md and build/win32/msvc8-cross/README.md
+in the source tree.
 
 
 Windows Installation Instructions

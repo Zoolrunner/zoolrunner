@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html><head><title>CSS-only FAQ regression</title><style>
+input { display:none; }
+label { display:block; }
+input + label + .answer { display:none; }
+input:checked + label + .answer { display:block; }
+label::after { content:'+'; color:rgb(255,0,0); }
+input:checked + label::after { content:'-'; color:rgb(0,0,255); }
+</style></head><body>
+<input type="checkbox" id="question"><label for="question" id="toggle">Question</label>
+<div class="answer" id="answer">Answer</div><pre id="results">Running...</pre>
+<script type="text/javascript">
+var testDone=false,testResults=[],testFailures=0;
+function check(actual,expected,name){var ok=actual===expected;if(!ok)++testFailures;
+ testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' != '+expected));}
+window.onload=function(){
+ var input=document.getElementById('question'),label=document.getElementById('toggle'),answer=document.getElementById('answer');
+ function state(display,symbol,name){
+  check(getComputedStyle(answer,null).display,display,name+' answer');
+  // This engine does not expose computed 'content'; check the generated
+  // element's style here and inspect the + / - glyph in the visual fixture.
+  check(getComputedStyle(label,':after').color,symbol=='+'?'rgb(255, 0, 0)':'rgb(0, 0, 255)',name+' generated style');
+ }
+ function click(){var event=document.createEvent('MouseEvents');
+  event.initMouseEvent('click',true,true,window,1,0,0,0,0,false,false,false,false,0,null);
+  label.dispatchEvent(event);
+ }
+ state('none','+','closed');click();check(input.checked,true,'label toggles hidden checkbox');
+ state('block','-','opened');click();check(input.checked,false,'label clears hidden checkbox');
+ state('none','+','closed again');
+ document.getElementById('results').appendChild(document.createTextNode('\n'+testResults.join('\n')));testDone=true;
+};
+</script></body></html>

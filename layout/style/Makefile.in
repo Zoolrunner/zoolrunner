@@ -113,12 +113,14 @@ EXPORTS		= \
 		nsStyleContext.h \
 		nsStyleCoord.h \
 		nsStyleSet.h \
+		nsStyleGradient.h \
 		nsStyleStruct.h \
 		nsStyleStructList.h \
 		nsStyleUtil.h \
 		$(NULL)
 
 CPPSRCS		= \
+		nsMediaQuery.cpp \
 		nsCSSAnonBoxes.cpp \
 		nsCSSDataBlock.cpp \
 		nsCSSDeclaration.cpp \
@@ -151,6 +153,7 @@ CPPSRCS		= \
 		nsStyleContext.cpp \
 		nsStyleCoord.cpp \
 		nsStyleSet.cpp \
+		nsStyleGradient.cpp \
 		nsStyleStruct.cpp \
 		nsStyleUtil.cpp \
 		$(NULL)

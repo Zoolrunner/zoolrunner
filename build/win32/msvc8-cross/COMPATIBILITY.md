@@ -1,8 +1,15 @@
 # Windows 95 and Windows NT 4 compatibility status
 
-Windows 95 and Windows NT 4 SP6a are independent minimum targets. A successful
-build, PE version 4.0, or execution under Wine does not establish compatibility
-with either operating system.
+Windows 95 and Windows NT 4.0 are independent minimum operating-system targets.
+The NT 4 validation matrix currently uses SP6a; record the exact service pack
+and do not infer results for other NT 4 installations. A successful build,
+PE version 4.0, or execution under Wine does not establish compatibility with
+either operating system.
+
+Windows builds are hosted on Linux or macOS and use genuine Microsoft Visual
+C++ 2005 (MSVC 8.0 / VC8) through Wine, including CrossOver on macOS. See the
+[build guide](README.md). The results below concern the previously audited
+packages; subsequent source changes require renewed validation.
 
 ## Verified on the cross-build host
 

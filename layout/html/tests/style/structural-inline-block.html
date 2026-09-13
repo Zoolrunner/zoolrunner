@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html><head><title>Structural HTML and inline-block regression</title>
+<style>
+body { font: 16px/20px sans-serif; }
+#row { width: 300px; }
+.box { display: inline-block; width: 100px; height: 40px;
+       margin: 3px; padding: 2px; border: 1px solid; vertical-align: top; }
+#legacy { display: -moz-inline-block; }
+#nest { display: inline-block; width: 120px; }
+#float { float: left; width: 20px; height: 50px; }
+</style></head><body>
+<nav id="navigation"><div id="nav-child">Navigation</div></nav>
+<section id="section"><h2>Heading</h2><div id="section-child">Content</div>
+<section id="nested"><p id="nested-child">Nested section</p></section></section>
+<p id="paragraph">Paragraph<section id="after-paragraph">Block closes paragraph</section>
+<div id="row"><a class="box" id="standard">Standard</a><a class="box" id="legacy">Legacy</a></div>
+<div id="nest"><div id="float"></div></div>
+<custom-element id="custom">Custom element</custom-element>
+<pre id="results">Running...</pre>
+<script type="text/javascript">
+var testDone = false;
+var testFailures = 0;
+var testResults = [];
+function check(value, expected, name) {
+  var ok = value === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? "PASS " : "FAIL ") + name +
+                   (ok ? "" : ": got " + value + ", expected " + expected));
+}
+function runTests() {
+  function el(id) { return document.getElementById(id); }
+  function display(e) { return window.getComputedStyle(e, null).display; }
+  check(document.compatMode, "CSS1Compat", "HTML5 doctype uses standards mode");
+  var tags = ["article", "aside", "figcaption", "figure", "footer", "header",
+              "hgroup", "main", "nav", "section"];
+  for (var i = 0; i < tags.length; ++i) {
+    var e = document.createElement(tags[i]);
+    document.body.appendChild(e);
+    check(display(e), "block", tags[i] + " default display");
+    document.body.removeChild(e);
+  }
+  check(el("nav-child").parentNode, el("navigation"), "nav retains block child");
+  check(el("section-child").parentNode, el("section"), "section retains block child");
+  check(el("nested").parentNode, el("section"), "nested section retained");
+  check(el("nested-child").parentNode, el("nested"), "nested paragraph retained");
+  check(el("after-paragraph").parentNode, document.body, "section closes paragraph");
+  check(display(el("custom")), "inline", "unknown elements remain inline");
+  check(display(el("standard")), "inline-block", "standard computed display");
+  check(el("standard").offsetWidth, 106, "inline-block width includes padding and border");
+  check(el("standard").offsetHeight, 46, "inline-block honors height");
+  check(el("standard").offsetTop, el("legacy").offsetTop, "inline blocks share a line");
+  check(el("standard").offsetWidth, el("legacy").offsetWidth, "legacy spelling retains geometry");
+  check(el("nest").offsetHeight, 50, "inline-block contains floats");
+  var rounded = document.createElement("div");
+  rounded.style.cssText = "border-radius:3px 4px 5px 6px; background-color:rgba(21,115,119,0.2)";
+  document.body.appendChild(rounded);
+  var corners = ["top-left", "top-right", "bottom-right", "bottom-left"];
+  for (var j=0; j<corners.length; ++j)
+    check(window.getComputedStyle(rounded,null).getPropertyValue("border-"+corners[j]+"-radius"),
+          (j+3)+"px", "unprefixed circular radius " + corners[j]);
+  check(rounded.style.getPropertyValue("background-color") !== "", true, "rgba color accepted");
+  document.body.removeChild(rounded);
+  testDone = true;
+  el("results").appendChild(document.createTextNode("\n" + testResults.join("\n")));
+  document.title = (testFailures ? "FAIL" : "PASS") + ": structural HTML and inline-block";
+}
+window.onload = runTests;
+</script></body></html>

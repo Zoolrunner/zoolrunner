@@ -148,6 +148,7 @@ nsCSSColor::nsCSSColor(const nsCSSColor& aCopy)
   : mColor(aCopy.mColor),
     mBackColor(aCopy.mBackColor),
     mBackImage(aCopy.mBackImage),
+    mBackSize(aCopy.mBackSize),
     mBackRepeat(aCopy.mBackRepeat),
     mBackAttachment(aCopy.mBackAttachment),
     mBackPositionX(aCopy.mBackPositionX),
@@ -175,6 +176,7 @@ void nsCSSColor::List(FILE* out, PRInt32 aIndent) const
   mColor.AppendToString(buffer, eCSSProperty_color);
   mBackColor.AppendToString(buffer, eCSSProperty_background_color);
   mBackImage.AppendToString(buffer, eCSSProperty_background_image);
+  mBackSize.AppendToString(buffer, eCSSProperty_background_size);
   mBackRepeat.AppendToString(buffer, eCSSProperty_background_repeat);
   mBackAttachment.AppendToString(buffer, eCSSProperty_background_attachment);
   mBackPositionX.AppendToString(buffer, eCSSProperty_background_x_position);

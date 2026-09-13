@@ -70,6 +70,16 @@ Evaluate changes according to ZoolRunner's goals.
 
 ---
 
+# Documentation Maintenance
+
+Update the relevant documentation alongside code changes. Keep `readme.md`,
+applicable build and test documentation, and this `AGENTS.md` aligned when
+features, support policy, or development workflows change. Document material
+limitations and distinguish intended compatibility from verified build and
+runtime results.
+
+---
+
 # Preserve the Classic Mozilla Application Platform
 
 The following technologies are intentional parts of ZoolRunner and should not be removed or replaced merely because later Mozilla versions removed them:
@@ -561,57 +571,57 @@ The goal is deployment portability, not static linking for its own sake.
 
 # Legacy Windows Compatibility
 
-Preserving RetroZilla's legacy Windows compatibility is an important ZoolRunner requirement.
+The minimum Windows targets are **Windows 95** and **Windows NT 4.0**.
+Treat the Windows 9x and Windows NT families as independent compatibility
+requirements. Preserve support for Windows 98, Windows 98 Second Edition,
+Windows Me, Windows 2000, Windows XP, and later compatible releases where
+practical. Record tested service packs and optional updates explicitly.
 
-Historical supported targets include:
-
-* Windows NT 3.51
-* Windows 95
-* Windows NT 4.0
-* Windows 98
-* Windows 98 Second Edition
-* Windows Me
-* Windows 2000
-* Windows XP
-* later compatible Windows releases
-
-Do not unnecessarily raise the minimum Windows version.
-
+Do not unnecessarily raise either minimum Windows version.
 Do not introduce newer Win32 API dependencies merely for convenience.
 
-## Compiler
+## Compiler and build host
 
-The legacy Windows build uses Microsoft Visual C++ 6 / VC6.
+Windows builds are performed from a **Linux or macOS host**, using genuine
+**Microsoft Visual C++ 2005 (MSVC 8.0 / VC8)** tools through **Wine**.
+CrossOver is a supported Wine provider on macOS. Configure, make, and host
+utilities run natively on the build host; target compiler, linker, and resource
+tools run through Wine. Native Windows/VC6 builds are historical workflows,
+not the current Windows build procedure.
 
-Preserve VC6 source compatibility where reasonably practical.
-
+Preserve MSVC 2005 source compatibility in code used by Windows targets.
 Do not require a newer Microsoft compiler merely because it is newer.
+Modern compiler diagnostics, sanitizers, and architecture work may use current
+GCC/Clang on Linux or macOS.
 
-Modern compiler diagnostics, sanitizers, and architecture work may be performed on Linux using current GCC/Clang.
+Use the existing wrappers and mozconfigs documented in
+[build/win32/msvc8-cross/README.md](build/win32/msvc8-cross/README.md).
+Keep the static CRT policy and the legacy Suite's component aggregation and
+shared process-heap integration. Do not reintroduce a VC80 runtime DLL dependency.
 
-The Windows build may intentionally remain based on a historical compiler in order to preserve old Windows compatibility.
-
-If a VC6-generated 32-bit executable works correctly on both historical and current Windows versions, a separate modern-MSVC build is not inherently required.
+A successful cross-build or Wine launch does not prove Windows 95 or NT 4.0
+runtime compatibility. Preserve the distinction between minimum targets and
+verified binaries. Track import/CRT blockers and actual operating-system tests
+in [COMPATIBILITY.md](build/win32/msvc8-cross/COMPATIBILITY.md).
 
 ## Dependency updates
 
-Dependency updates must take legacy Windows into account.
+Dependency updates must take Windows 95, Windows NT 4.0, and MSVC 2005 into account.
+Small MSVC 2005 compatibility patches are acceptable. Do not perform major
+third-party rewrites merely to support that compiler. If necessary, freeze the
+legacy Windows build at the newest practical compatible dependency version.
 
-Small VC6 compatibility patches are acceptable.
-
-Do not perform major third-party rewrites merely to support VC6.
-
-If necessary, freeze the legacy Windows build at the newest practical compatible dependency version.
-
-Do not claim NT 3.51 or Windows 95 compatibility for a changed dependency until actually tested.
+Do not claim Windows 95 or Windows NT 4.0 compatibility for a changed dependency
+until actually tested on the target operating system.
 
 ## Older Windows experiments
 
-Windows NT 3.1, Windows NT 3.5, and Windows 3.1/Win32s are interesting possible experimental targets.
+Windows NT 3.1, Windows NT 3.5, Windows NT 3.51, and Windows 3.1/Win32s are
+possible experimental targets. Preserve useful historical support code, but
+these systems are not current minimum requirements.
 
-They are not currently hard compatibility requirements.
-
-Do not compromise required NT 3.51/Windows 95 support merely to support these experiments.
+Do not compromise required Windows 95/Windows NT 4.0 support to support these
+experiments.
 
 ---
 

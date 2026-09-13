@@ -309,7 +309,7 @@ public:
     nsCSSValue& Item(PRUint16 aIndex) { return (*this)[aIndex]; }
     const nsCSSValue& Item(PRUint16 aIndex) const { return (*this)[aIndex]; }
 
-    PRUint16 Count() { return mCount; }
+    PRUint16 Count() const { return mCount; }
 
     PRBool operator==(const Array& aOther)
     {

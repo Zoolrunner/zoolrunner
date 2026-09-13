@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html><head><title>Linear gradient regression</title>
+<style>#parent { color: rgb(12, 34, 56); background-image:linear-gradient(to right, red, blue); }
+#subject { width:160px; height:80px; font-size:10px; }
+</style></head><body><div id="parent"><div id="subject"></div></div>
+<pre id="results">Running...</pre><script type="text/javascript">
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,name) {
+  var ok=actual===expected;if(!ok)++testFailures;
+  testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' != '+expected));
+}
+function runTests() {
+  var e=document.getElementById('subject'),s=e.style;
+  function value(){return getComputedStyle(e,null).backgroundImage;}
+  var cases=[
+    ['linear-gradient(red, blue)','linear-gradient(180deg, rgb(255, 0, 0), rgb(0, 0, 255))'],
+    ['linear-gradient(90deg, red, blue)','linear-gradient(90deg, rgb(255, 0, 0), rgb(0, 0, 255))'],
+    ['linear-gradient(.5turn, red, blue)','linear-gradient(180deg, rgb(255, 0, 0), rgb(0, 0, 255))'],
+    ['linear-gradient(100grad, red, blue)','linear-gradient(90deg, rgb(255, 0, 0), rgb(0, 0, 255))'],
+    ['linear-gradient(to right top, red, blue)','linear-gradient(to top right, rgb(255, 0, 0), rgb(0, 0, 255))'],
+    ['linear-gradient(to bottom, red 20%, blue 2em)','linear-gradient(to bottom, rgb(255, 0, 0) 20%, rgb(0, 0, 255) 20px)'],
+    ['linear-gradient(currentColor, transparent)','linear-gradient(180deg, rgb(12, 34, 56), rgba(0, 0, 0, 0))'],
+    ['inherit','linear-gradient(to right, rgb(255, 0, 0), rgb(0, 0, 255))']];
+  for(var i=0;i<cases.length;++i){
+    s.setProperty('background-image',cases[i][0],'');
+    check(value(),cases[i][1],'computed '+cases[i][0]);
+    s.cssText=s.cssText;
+    check(value(),cases[i][1],'round trip '+cases[i][0]);
+  }
+  s.cssText='background: linear-gradient(296deg, #c9e1db, #c9d4e1, #d4c9e1, #dbdbdb, #e3d8c7, #e1e3c7); background-size:200% 200%';
+  check(value().indexOf('linear-gradient(296deg,'),0,'site gradient shorthand');
+  check(getComputedStyle(e,null).getPropertyValue('background-size'),'200% 200%','site gradient size');
+  s.cssText='background-image:linear-gradient(rgba(10,20,30,.5),transparent)';
+  var alpha=value();s.cssText=s.cssText;
+  check(value(),alpha,'RGBA serialization retains alpha');
+  var invalid=['linear-gradient(red)','linear-gradient()','linear-gradient(90, red, blue)',
+    'linear-gradient(to, red, blue)','linear-gradient(to left right, red, blue)',
+    'linear-gradient(to top top, red, blue)','linear-gradient(red, blue,)',
+    'linear-gradient(90deg red, blue)','linear-gradient(red 20% 30%, blue)',
+    'linear-gradient(red, blue),linear-gradient(white,black)',
+    'linear-gradient(inherit, blue)','linear-gradient(red, 40%, blue)',
+    'linear-gradient(1000000000000000000000000000000000000000000000000000deg,red,blue)'];
+  for(i=0;i<invalid.length;++i){
+    s.cssText='background-image:linear-gradient(red,blue)';
+    var before=value();s.setProperty('background-image',invalid[i],'');
+    check(value(),before,'reject '+invalid[i]);
+  }
+  s.cssText='background-image:linear-gradient(red,blue);background-image:none';
+  check(value(),'none','none clears gradient');
+  s.cssText='background:linear-gradient(red,blue);background:green';
+  check(value(),'none','shorthand clears gradient');
+  s.cssText='background-image:linear-gradient(red,blue);background-image:url(data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)';
+  check(value().indexOf('data:image/gif')!=-1,true,'URL replaces gradient');
+  var frame=document.createElement('iframe');document.body.appendChild(frame);
+  var d=frame.contentDocument;d.open();d.write('<html><body><div id="q"></div></body></html>');d.close();
+  var q=d.getElementById('q');
+  check(d.compatMode,'BackCompat','quirks fixture');
+  q.style.cssText='background-image:linear-gradient(red 30,blue)';
+  check(frame.contentWindow.getComputedStyle(q,null).backgroundImage,'none','unitless stop rejected in quirks');
+  q.style.cssText='background-image:linear-gradient(123456,blue)';
+  check(frame.contentWindow.getComputedStyle(q,null).backgroundImage,'none','numeric color rejected in quirks');
+  q.style.cssText='background-size:12 14px';
+  check(frame.contentWindow.getComputedStyle(q,null).getPropertyValue('background-size'),'auto auto','unitless size rejected in quirks');
+  document.body.removeChild(frame);
+  document.getElementById('results').appendChild(document.createTextNode('\n'+testResults.join('\n')));
+  testDone=true;
+}
+window.onload=runTests;
+</script></body></html>

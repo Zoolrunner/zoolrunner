@@ -3320,7 +3320,8 @@ nsTreeBodyFrame::ScrollInternal(const ScrollParts& aParts, PRInt32 aRow)
   // See if we have a transparent background or a background image.  
   // If we do, then we cannot blit.
   const nsStyleBackground* background = GetStyleBackground();
-  if (background->mBackgroundImage || background->IsTransparent() || 
+  if (background->mBackgroundImage || background->mBackgroundGradient ||
+      background->IsTransparent() ||
       PR_ABS(delta)*mRowHeight >= mRect.height) {
     Invalidate();
   } else {

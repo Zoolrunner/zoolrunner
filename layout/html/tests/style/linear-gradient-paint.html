@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html><head><title>Linear gradient painting probes</title>
+<style>body { margin:10px; background:white; }
+#marker { width:330px; height:4px; background:#00ff00; }
+.box { width:160px; height:80px; margin:0 10px 10px 0; display:inline-block;
+       vertical-align:top; background-color:blue; }
+#grid { width:340px; font-size:0; }
+</style></head><body><div id="marker"></div><div id="grid">
+<div class="box" style="background-image:linear-gradient(red,blue)"></div><div class="box" style="background-image:linear-gradient(90deg,red,blue)"></div>
+<div class="box" style="background-image:linear-gradient(to top right,red,blue)"></div><div class="box" style="background-image:linear-gradient(90deg,red 40%,blue 40%)"></div>
+<div class="box" style="background-image:linear-gradient(90deg,red 60%,white 20%,blue)"></div><div class="box" style="background-image:linear-gradient(90deg,red -100%,blue 100%)"></div>
+<div class="box" style="background-image:linear-gradient(90deg,red,transparent)"></div><div class="box" style="background-image:linear-gradient(90deg,red,blue);background-size:200% 200%"></div>
+<div class="box" style="background-image:linear-gradient(90deg,red,blue);background-size:40px 40px"></div><div class="box" style="background-image:linear-gradient(296deg,#c9e1db,#c9d4e1,#d4c9e1,#dbdbdb,#e3d8c7,#e1e3c7);background-size:200% 200%"></div>
+<div class="box" style="background-image:linear-gradient(90deg,red,blue);background-size:200% 200%;background-position:100% 100%"></div><div class="box" style="background-image:linear-gradient(90deg,red 10px,blue 30px);background-size:50px auto"></div>
+</div></body></html>

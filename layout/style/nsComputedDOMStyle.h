@@ -177,6 +177,7 @@ private:
   nsresult GetBackgroundAttachment(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetBackgroundColor(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetBackgroundImage(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
+  nsresult GetBackgroundSize(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetBackgroundRepeat(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetBackgroundClip(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetBackgroundInlinePolicy(nsIFrame *aFrame, nsIDOMCSSValue** aValue);

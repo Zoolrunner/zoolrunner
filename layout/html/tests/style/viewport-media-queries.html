@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html><head><title>Viewport media query regression</title></head><body>
+<iframe id="viewport" style="width:1000px;height:400px;border:0"></iframe>
+<pre id="results">Running...</pre>
+<script type="text/javascript">
+var testFailures = 0, testResults = [], testDone = false;
+function check(value, expected, name) {
+  var ok = value === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? "PASS " : "FAIL ") + name +
+                  (ok ? "" : ": got " + value + ", expected " + expected));
+}
+function finish() {
+  document.getElementById("results").appendChild(document.createTextNode("\n" + testResults.join("\n")));
+  document.title = (testFailures ? "FAIL" : "PASS") + ": viewport media queries";
+  testDone = true;
+}
+window.onload = function() {
+  var frame = document.getElementById("viewport");
+  frame.onload = function() {
+    if (!frame.contentDocument.getElementById("menu")) return;
+    frame.onload = null;
+    var d=frame.contentDocument, w=frame.contentWindow;
+    function style(id, prop) { return w.getComputedStyle(d.getElementById(id),null).getPropertyValue(prop); }
+    function width(id) { return d.getElementById(id).offsetWidth; }
+    function sample(size) {
+      check(w.innerWidth,size,"viewport width " + size);
+      check(style("menu","display"),size<=800?"none":"inline-block","menu at " + size);
+      check(width("range"),size>=600&&size<=800?20:10,"AND range at " + size);
+      check(width("negated"),size>800?20:10,"NOT negates whole query at " + size);
+      check(width("list"),size<=800?20:10,"comma alternatives at " + size);
+      check(width("invalid"),10,"invalid queries never match at " + size);
+      check(width("attr"),size<=800?20:10,"style media attribute at " + size);
+      check(width("linked"),size<=800?20:10,"link media attribute at " + size);
+      check(width("imported"),size<=800?20:10,"import media query at " + size);
+    }
+    var sizes=[1000,800,801,600,599,1000], index=0;
+    function next() {
+      sample(sizes[index]);
+      if (++index<sizes.length) {
+        frame.style.width=sizes[index]+"px";
+        setTimeout(next,100);
+      } else {
+        try {
+          var sheet=d.styleSheets[0], n=sheet.cssRules.length;
+          sheet.insertRule('@media screen and (max-width:1200px) {#range{width:30px}}', n);
+          check(width("range"),30,"insertRule applies media query");
+          var media=sheet.cssRules[n].media;
+          check(media.mediaText,"screen and (max-width: 1200px)","query serialization");
+          media.mediaText="(max-width:800px)";
+          check(width("range"),10,"mediaText updates matching");
+          media.appendMedium("screen");
+          check(width("range"),30,"appendMedium applies alternative");
+          media.deleteMedium("SCREEN");
+          check(width("range"),10,"deleteMedium normalizes case");
+          sheet.deleteRule(n);
+          sheet.insertRule('@media not screen and (unknown: 1), screen {#range{width:40px}}',n);
+          check(width("range"),40,"invalid query does not discard valid alternative");
+          sheet.deleteRule(n);
+          sheet.insertRule('@media (min-width: 0px) and (max-height:400px) and (orientation:landscape) {#range{width:50px}}',n);
+          check(width("range"),50,"height and orientation features");
+          sheet.deleteRule(n);
+          sheet.insertRule('@media (width: 1000px) {#range{width:60px}}',n);
+          check(width("range"),60,"exact width feature");
+          sheet.deleteRule(n);
+          d.documentElement.style.fontSize="1000px";
+          sheet.insertRule('@media (min-width: 2em) and (min-width: 2ex) {#range{width:70px}}',n);
+          check(width("range"),70,"relative query units use initial font");
+          sheet.deleteRule(n);
+          d.documentElement.style.fontSize="";
+          sheet.insertRule('@media (min-width: 10in) {#range{width:80px}}',n);
+          check(width("range"),80,"physical length unit");
+          sheet.deleteRule(n);
+          sheet.insertRule('@media (width) and (height) {#range{width:90px}}',n);
+          check(width("range"),90,"boolean dimension features");
+          sheet.deleteRule(n);
+          sheet.insertRule('@media not all and (min-width), not all and (width: 1unknown) {#range{width:99px}}',n);
+          check(width("range"),10,"malformed and unknown values remain false under NOT");
+          sheet.deleteRule(n);
+        } catch(e) {check(String(e),"no exception","CSSOM operations");}
+        frame.style.width="700px";
+        setTimeout(function() {
+          check(style("menu","display"),"none","narrow menu starts closed");
+          w.location.hash="menu";
+          setTimeout(function() {
+            check(style("menu","display"),"inline-block",":target opens narrow menu");
+            w.location.hash="hidemenu";
+            setTimeout(function() {
+              check(style("menu","display"),"none","leaving :target closes narrow menu");
+              finish();
+            },100);
+          },100);
+        },100);
+      }
+    }
+    setTimeout(next,100);
+  };
+  frame.src="viewport-media-queries-frame.html";
+};
+</script></body></html>

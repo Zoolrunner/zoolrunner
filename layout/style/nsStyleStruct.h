@@ -45,6 +45,7 @@
 #include "nsFont.h"
 #include "nsVoidArray.h"
 #include "nsStyleCoord.h"
+#include "nsStyleGradient.h"
 #include "nsStyleConsts.h"
 #include "nsChangeHint.h"
 #include "nsPresContext.h"
@@ -190,8 +191,11 @@ struct nsStyleBackground : public nsStyleStruct {
   } mBackgroundXPosition,         // [reset]
     mBackgroundYPosition;         // [reset]
 
+  // Enumerated contain/cover is stored in X; Y is auto in that case.
+  nsStyleCoord mBackgroundSizeX, mBackgroundSizeY; // [reset]
   nscolor mBackgroundColor;       // [reset]
   nsCOMPtr<imgIRequest> mBackgroundImage; // [reset]
+  nsCOMPtr<nsStyleGradient> mBackgroundGradient; // [reset]
 
   PRBool IsTransparent() const
   {

@@ -2804,6 +2804,51 @@ nsCSSRendering::PaintBackground(nsPresContext* aPresContext,
                         aBorder, aPadding, aUsePrintSettings, aBGClipRect);
 }
 
+// Resolve a single raster background against its positioning area. Keep the
+// calculation in double until it is bounded, including extreme percentages.
+static nsSize
+ComputeBackgroundSize(const nsStyleBackground& aStyle, const nsSize& aIntrinsic,
+                      const nsSize& aArea, float aPixelSize, PRBool aHasIntrinsic = PR_TRUE)
+{
+  double width = aIntrinsic.width, height = aIntrinsic.height;
+  const nsStyleCoord& x = aStyle.mBackgroundSizeX;
+  const nsStyleCoord& y = aStyle.mBackgroundSizeY;
+  if (width <= 0 || height <= 0)
+    return nsSize(0, 0);
+  if (x.GetUnit() == eStyleUnit_Enumerated && !aHasIntrinsic) {
+    width = aArea.width;
+    height = aArea.height;
+  } else if (x.GetUnit() == eStyleUnit_Enumerated) {
+    double sx = double(aArea.width) / width;
+    double sy = double(aArea.height) / height;
+    double scale = x.GetIntValue() == NS_STYLE_BG_SIZE_CONTAIN
+                   ? PR_MIN(sx, sy) : PR_MAX(sx, sy);
+    width *= scale;
+    height *= scale;
+  } else {
+    if (x.GetUnit() == eStyleUnit_Coord)
+      width = x.GetCoordValue();
+    else if (x.GetUnit() == eStyleUnit_Percent)
+      width = double(aArea.width) * x.GetPercentValue();
+    if (y.GetUnit() == eStyleUnit_Coord)
+      height = y.GetCoordValue();
+    else if (y.GetUnit() == eStyleUnit_Percent)
+      height = double(aArea.height) * y.GetPercentValue();
+    if (aHasIntrinsic && x.GetUnit() == eStyleUnit_Auto && y.GetUnit() != eStyleUnit_Auto)
+      width = height * aIntrinsic.width / aIntrinsic.height;
+    if (aHasIntrinsic && y.GetUnit() == eStyleUnit_Auto && x.GetUnit() != eStyleUnit_Auto)
+      height = width * aIntrinsic.height / aIntrinsic.width;
+  }
+  if (!(width > 0) || !(height > 0))
+    return nsSize(0, 0);
+  // A nonzero tile occupies at least a device pixel. This also bounds the
+  // number of draws for very small author-specified sizes.
+  double limit = double(nscoord_MAX) / 4;
+  width = PR_MIN(limit, PR_MAX(double(aPixelSize), width));
+  height = PR_MIN(limit, PR_MAX(double(aPixelSize), height));
+  return nsSize(NSToCoordRound(width), NSToCoordRound(height));
+}
+
 void
 nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
                                       nsIRenderingContext& aRenderingContext,
@@ -2862,41 +2907,33 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
   }
 
   // if there is no background image or background images are turned off, try a color.
-  if (!aColor.mBackgroundImage || !canDrawBackgroundImage) {
-    PaintBackgroundColor(aPresContext, aRenderingContext, aForFrame, bgClipArea,
-                         aColor, aBorder, aPadding, canDrawBackgroundColor);
-    return;
-  }
-
-  // We have a background image
-
-  // Lookup the image
-  imgIRequest *req = aPresContext->LoadImage(aColor.mBackgroundImage,
-                                             aForFrame);
-
-  PRUint32 status = imgIRequest::STATUS_ERROR;
-  if (req)
-    req->GetImageStatus(&status);
-
-  if (!req || !(status & imgIRequest::STATUS_FRAME_COMPLETE) || !(status & imgIRequest::STATUS_SIZE_AVAILABLE)) {
+  if ((!aColor.mBackgroundImage && !aColor.mBackgroundGradient) ||
+      !canDrawBackgroundImage) {
     PaintBackgroundColor(aPresContext, aRenderingContext, aForFrame, bgClipArea,
                          aColor, aBorder, aPadding, canDrawBackgroundColor);
     return;
   }
 
   nsCOMPtr<imgIContainer> image;
-  req->GetImage(getter_AddRefs(image));
-
-  nsSize imageSize;
-  image->GetWidth(&imageSize.width);
-  image->GetHeight(&imageSize.height);
-
-  float p2t;
-  p2t = aPresContext->ScaledPixelsToTwips();
-  imageSize.width = NSIntPixelsToTwips(imageSize.width, p2t);
-  imageSize.height = NSIntPixelsToTwips(imageSize.height, p2t);
-
-  req = nsnull;
+  nsSize imageSize(0, 0);
+  float p2t = aPresContext->ScaledPixelsToTwips();
+  if (aColor.mBackgroundImage) {
+    imgIRequest* req = aPresContext->LoadImage(aColor.mBackgroundImage, aForFrame);
+    PRUint32 status = imgIRequest::STATUS_ERROR;
+    if (req) req->GetImageStatus(&status);
+    if (req && (status & imgIRequest::STATUS_FRAME_COMPLETE) &&
+        (status & imgIRequest::STATUS_SIZE_AVAILABLE))
+      req->GetImage(getter_AddRefs(image));
+    if (!image) {
+      PaintBackgroundColor(aPresContext, aRenderingContext, aForFrame, bgClipArea,
+                           aColor, aBorder, aPadding, canDrawBackgroundColor);
+      return;
+    }
+    image->GetWidth(&imageSize.width);
+    image->GetHeight(&imageSize.height);
+    imageSize.width = NSIntPixelsToTwips(imageSize.width, p2t);
+    imageSize.height = NSIntPixelsToTwips(imageSize.height, p2t);
+  }
 
   nsRect bgOriginArea;
 
@@ -2935,11 +2972,54 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
     }
   }
 
+  nsSize positioningSize = bgOriginArea.Size();
+  if (aColor.mBackgroundAttachment == NS_STYLE_BG_ATTACHMENT_FIXED) {
+    nsIFrame* root = aPresContext->PresShell()->FrameManager()->GetRootFrame();
+    if (aPresContext->IsPaginated())
+      root = nsLayoutUtils::GetPageFrame(aForFrame);
+    if (root && root->GetView()) {
+      nsRect area = root->GetView()->GetBounds();
+      nsIScrollableFrame* scrollable = GetRootScrollableFrame(aPresContext, root);
+      if (scrollable)
+        area.Deflate(scrollable->GetActualScrollbarSizes());
+      positioningSize = area.Size();
+    }
+  } else if (frameType == nsLayoutAtoms::canvasFrame) {
+    nsIFrame* root = aForFrame->GetFirstChild(nsnull);
+    if (root) {
+      nsRect area = root->GetRect();
+      area.Deflate(root->GetStyleBorder()->GetBorder());
+      positioningSize = area.Size();
+    }
+  }
+  nsSize intrinsicSize = imageSize;
+  if (aColor.mBackgroundGradient) {
+    imageSize = ComputeBackgroundSize(aColor, positioningSize, positioningSize,
+                                      p2t, PR_FALSE);
+    image = aColor.mBackgroundGradient->GetImage(imageSize, p2t);
+    if (!image) {
+      PaintBackgroundColor(aPresContext, aRenderingContext, aForFrame, bgClipArea,
+                           aColor, aBorder, aPadding, canDrawBackgroundColor);
+      return;
+    }
+    image->GetWidth(&intrinsicSize.width);
+    image->GetHeight(&intrinsicSize.height);
+    intrinsicSize.width = NSIntPixelsToTwips(intrinsicSize.width, p2t);
+    intrinsicSize.height = NSIntPixelsToTwips(intrinsicSize.height, p2t);
+  } else {
+    imageSize = ComputeBackgroundSize(aColor, intrinsicSize, positioningSize, p2t);
+  }
+
   // Based on the repeat setting, compute how many tiles we should
   // lay down for each axis. The value computed is the maximum based
   // on the dirty rect before accounting for the background-position.
   nscoord tileWidth = imageSize.width;
   nscoord tileHeight = imageSize.height;
+  if (tileWidth <= 0 || tileHeight <= 0) {
+    PaintBackgroundColor(aPresContext, aRenderingContext, aForFrame, bgClipArea,
+                         aColor, aBorder, aPadding, canDrawBackgroundColor);
+    return;
+  }
   PRBool  needBackgroundColor = !(aColor.mBackgroundFlags &
                                   NS_STYLE_BG_COLOR_TRANSPARENT);
   PRIntn  repeat = aColor.mBackgroundRepeat;
@@ -3225,8 +3305,24 @@ nsCSSRendering::PaintBackgroundWithSC(nsPresContext* aPresContext,
   nsRect tileRect(x0, y0, (x1 - x0), (y1 - y0));
   nsRect drawRect;
 
-  if (drawRect.IntersectRect(tileRect, dirtyRect))
-    aRenderingContext.DrawTile(image, x0, y0, &drawRect);
+  if (drawRect.IntersectRect(tileRect, dirtyRect)) {
+    if (imageSize == intrinsicSize) {
+      aRenderingContext.DrawTile(image, x0, y0, &drawRect);
+    } else {
+      // DrawImage provides scaling on every historical graphics backend;
+      // clip on all platforms, since each destination is a complete tile.
+      aRenderingContext.PushState();
+      aRenderingContext.SetClipRect(drawRect, nsClipCombine_kIntersect);
+      nsRect source(0, 0, intrinsicSize.width, intrinsicSize.height);
+      for (nscoord y = y0; y < drawRect.YMost(); y += tileHeight) {
+        for (nscoord x = x0; x < drawRect.XMost(); x += tileWidth) {
+          nsRect destination(x, y, tileWidth, tileHeight);
+          aRenderingContext.DrawImage(image, source, destination);
+        }
+      }
+      aRenderingContext.PopState();
+    }
+  }
 
 #if (!defined(XP_UNIX) && !defined(XP_BEOS)) || defined(XP_MACOSX)
   // Restore clipping

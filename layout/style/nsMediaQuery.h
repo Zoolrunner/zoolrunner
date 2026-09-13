@@ -35,48 +35,41 @@
  * the terms of any one of the MPL, the GPL or the LGPL.
  *
  * ***** END LICENSE BLOCK ***** */
-#ifndef nsIMediaList_h_
-#define nsIMediaList_h_
+#ifndef nsMediaQuery_h_
+#define nsMediaQuery_h_
 
-#include "nsIDOMMediaList.h"
-#include "nsAString.h"
-#include "nsCOMArray.h"
+#include "nsISupports.h"
+#include "nsCOMPtr.h"
 #include "nsIAtom.h"
-#include "nsMediaQuery.h"
+#include "nsString.h"
+#include "nsTArray.h"
 class nsPresContext;
-class nsICSSStyleSheet;
-class nsCSSStyleSheet;
+class MediaQueryParser;
 
-class nsMediaList : public nsIDOMMediaList {
+// Immutable after Parse(), so cloned media lists can share parsed queries.
+class nsMediaQuery : public nsISupports {
 public:
-  nsMediaList();
-
   NS_DECL_ISUPPORTS
+  nsMediaQuery() : mValid(PR_FALSE), mNegated(PR_FALSE) {}
+  nsresult Parse(const nsAString& aText);
+  PRBool Matches(nsPresContext* aContext) const;
+  const nsString& Text() const { return mText; }
 
-  NS_DECL_NSIDOMMEDIALIST
-
-  nsresult GetText(nsAString& aMediaText);
-  nsresult SetText(const nsAString& aMediaText);
-  PRBool Matches(nsPresContext* aPresContext);
-  nsresult SetStyleSheet(nsICSSStyleSheet* aSheet);
-  nsresult AppendQuery(const nsAString& aText);
-
-  nsresult Clone(nsMediaList** aResult);
-
-  PRInt32 Count() { return mArray.Count(); }
-
-  void Clear() { mArray.Clear(); }
-
-protected:
-  ~nsMediaList();
-
-  nsresult Delete(const nsAString & aOldMedium);
-  nsresult Append(const nsAString & aOldMedium);
-
-  nsCOMArray<nsMediaQuery> mArray;
-  // not refcounted; sheet will let us know when it goes away
-  // mStyleSheet is the sheet that needs to be dirtied when this medialist
-  // changes
-  nsCSSStyleSheet*         mStyleSheet;
+private:
+  ~nsMediaQuery() {}
+  friend class MediaQueryParser;
+  struct Expression {
+    enum Feature { Width, Height, Orientation } mFeature;
+    enum Range { Equal, Minimum, Maximum } mRange;
+    enum Unit { Pixels, Em, Ex } mUnit;
+    double mValue;
+    PRBool mHasValue;
+    PRBool mLandscape;
+  };
+  nsString mText;
+  nsCOMPtr<nsIAtom> mType;
+  nsTArray<Expression> mExpressions;
+  PRBool mValid;
+  PRBool mNegated;
 };
-#endif /* !defined(nsIMediaList_h_) */
+#endif

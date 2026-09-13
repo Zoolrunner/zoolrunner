@@ -3089,7 +3089,12 @@ PresShell::ResizeReflow(nscoord aWidth, nscoord aHeight)
   
   if (mPresContext) {
     nsRect r(0, 0, aWidth, aHeight);
+    nsRect oldArea = mPresContext->GetVisibleArea();
     mPresContext->SetVisibleArea(r);
+    if (mPresContext->HasViewportMediaQueries() &&
+        (oldArea.width != r.width || oldArea.height != r.height)) {
+      ReconstructStyleData();
+    }
   }
 
   if (rootFrame) {

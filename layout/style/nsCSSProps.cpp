@@ -100,7 +100,7 @@ nsCSSProps::ReleaseTable(void)
 }
 
 struct CSSPropertyAlias {
-  char name[sizeof("-moz-outline-offset")];
+  char name[sizeof("border-bottom-right-radius")];
   nsCSSProperty id;
 };
 
@@ -110,7 +110,12 @@ static const CSSPropertyAlias gAliases[] = {
   { "-moz-outline-color", eCSSProperty_outline_color },
   { "-moz-outline-style", eCSSProperty_outline_style },
   { "-moz-outline-width", eCSSProperty_outline_width },
-  { "-moz-outline-offset", eCSSProperty_outline_offset }
+  { "-moz-outline-offset", eCSSProperty_outline_offset },
+  { "border-radius", eCSSProperty__moz_border_radius },
+  { "border-top-left-radius", eCSSProperty__moz_border_radius_topLeft },
+  { "border-top-right-radius", eCSSProperty__moz_border_radius_topRight },
+  { "border-bottom-left-radius", eCSSProperty__moz_border_radius_bottomLeft },
+  { "border-bottom-right-radius", eCSSProperty__moz_border_radius_bottomRight }
   // Don't forget to update the sizeof in CSSPropertyAlias above with the
   // longest string when you add stuff here.
 };
@@ -296,6 +301,12 @@ const PRInt32 nsCSSProps::kBackgroundOriginKTable[] = {
   eCSSKeyword_padding,    NS_STYLE_BG_ORIGIN_PADDING,
   eCSSKeyword_content,    NS_STYLE_BG_ORIGIN_CONTENT,
   eCSSKeyword_UNKNOWN,-1
+};
+
+const PRInt32 nsCSSProps::kBackgroundSizeKTable[] = {
+  eCSSKeyword_contain, NS_STYLE_BG_SIZE_CONTAIN,
+  eCSSKeyword_cover, NS_STYLE_BG_SIZE_COVER,
+  -1
 };
 
 const PRInt32 nsCSSProps::kBackgroundRepeatKTable[] = {
@@ -511,6 +522,7 @@ const PRInt32 nsCSSProps::kDirectionKTable[] = {
 const PRInt32 nsCSSProps::kDisplayKTable[] = {
   eCSSKeyword_inline,             NS_STYLE_DISPLAY_INLINE,
   eCSSKeyword_block,              NS_STYLE_DISPLAY_BLOCK,
+  eCSSKeyword_inline_block,       NS_STYLE_DISPLAY_INLINE_BLOCK,
   eCSSKeyword__moz_inline_block,  NS_STYLE_DISPLAY_INLINE_BLOCK,
   eCSSKeyword_list_item,          NS_STYLE_DISPLAY_LIST_ITEM,
   eCSSKeyword__moz_run_in,        NS_STYLE_DISPLAY_RUN_IN,
@@ -1203,6 +1215,7 @@ static const nsCSSProperty gMozOutlineRadiusSubpropTable[] = {
 };
 
 static const nsCSSProperty gBackgroundSubpropTable[] = {
+  eCSSProperty_background_size,
   eCSSProperty_background_color,
   eCSSProperty_background_image,
   eCSSProperty_background_repeat,

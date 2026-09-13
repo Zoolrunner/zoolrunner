@@ -1,9 +1,14 @@
-# MSVC 8 cross-build support
+# MSVC 2005 cross-build support
 
-This directory lets the existing Mozilla configure/make build invoke the
-32-bit Microsoft Visual C++ 8.0 tools through either Wine on Unix or CrossOver
-on macOS.  The wrappers are shared by both hosts; only runtime discovery is
-host-sensitive.
+Windows builds are made from a **Linux or macOS host**, using genuine
+**Microsoft Visual C++ 2005 (MSVC 8.0 / VC8)** tools through **Wine**. CrossOver
+is a supported Wine provider on macOS. This directory connects those tools to
+the existing Mozilla configure/make build; the wrappers are shared by both
+hosts, and only runtime discovery is host-sensitive.
+
+The minimum target operating systems are **Windows 95** and **Windows NT 4.0**.
+These are compatibility requirements; see [COMPATIBILITY.md](COMPATIBILITY.md)
+for actual validation results and unresolved runtime blockers.
 
 The target is Windows x86.  Programs needed while building remain native to
 the build host and use `HOST_CC`, `HOST_CXX`, `HOST_LD`, and `HOST_AR`.

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html><head><title>Background size regression</title>
+<style>body { font: 16px sans-serif; } #parent { background-size: 37% 29px; }
+#subject { width: 200px; height: 120px; font-size: 10px; }</style></head>
+<body><div id="parent"><div id="subject"></div></div><pre id="results">Running...</pre>
+<script type="text/javascript">
+var testDone=false, testFailures=0, testResults=[];
+function check(actual, expected, name) {
+  var ok=actual===expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' != '+expected));
+}
+function runTests() {
+  var e=document.getElementById('subject'), s=e.style;
+  function value() { return getComputedStyle(e,null).getPropertyValue('background-size'); }
+  check(value(),'auto auto','initial size');
+  var cases=[['200% 200%','200% 200%'],['30px','30px auto'],['auto 40px','auto 40px'],
+    ['auto','auto auto'],['2em 3em','20px 30px'],['0 50%','0px 50%'],
+    ['contain','contain'],['cover','cover'],['inherit','37% 29px']];
+  for(var i=0;i<cases.length;++i) {
+    s.setProperty('background-size',cases[i][0],'');
+    check(value(),cases[i][1],'computed '+cases[i][0]);
+  }
+  var invalid=['-1px','20px -10%','cover auto','contain cover','10px 20px 30px',
+    'auto inherit','10px, 20px','cover garbage','auto -2px'];
+  for(i=0;i<invalid.length;++i) {
+    s.setProperty('background-size','17px 19px','');
+    s.setProperty('background-size',invalid[i],'');
+    check(value(),'17px 19px','reject '+invalid[i]);
+  }
+  s.cssText='background-size: 37px 41px; background: red';
+  check(value(),'auto auto','background shorthand resets size');
+  s.cssText='background: red; background-size: 37px 41px';
+  check(value(),'37px 41px','size after shorthand');
+  s.cssText=s.cssText;
+  check(value(),'37px 41px','declaration round trip retains size');
+  s.cssText='background-size: 37px 41px; background-color: red; background-image: none; background-repeat: repeat; background-attachment: scroll; background-position: 0 0';
+  s.cssText=s.cssText;
+  check(value(),'37px 41px','longhand round trip retains earlier size');
+  s.cssText='background: inherit';
+  check(value(),'37% 29px','background shorthand inherits size');
+  s.cssText='background-size: cover !important; background-size: contain';
+  check(value(),'cover','important size');
+  document.getElementById('results').appendChild(document.createTextNode('\n'+testResults.join('\n')));
+  testDone=true;
+}
+window.onload=runTests;
+</script></body></html>

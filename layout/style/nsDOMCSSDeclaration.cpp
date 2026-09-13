@@ -398,6 +398,7 @@ CSS2PropertiesTearoff::QueryInterface(REFNSIID aIID, void** aInstancePtr)
     return NS_OK;                                                            \
   }
 
+#define CSS_PROP_LIST_EXCLUDE_NEW
 #define CSS_PROP_LIST_EXCLUDE_INTERNAL
 #define CSS_PROP_SHORTHAND(name_, id_, method_) \
   CSS_PROP(name_, id_, method_, X, X, X, X)
@@ -414,4 +415,5 @@ CSS_PROP(X, outline_offset, MozOutlineOffset, X, X, X, X)
 #undef CSS_PROP_SHORTHAND
 #undef CSS_PROP_NOTIMPLEMENTED
 #undef CSS_PROP_LIST_EXCLUDE_INTERNAL
+#undef CSS_PROP_LIST_EXCLUDE_NEW
 #undef CSS_PROP

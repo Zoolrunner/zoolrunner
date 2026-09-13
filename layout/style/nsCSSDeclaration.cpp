@@ -303,6 +303,32 @@ PRBool nsCSSDeclaration::AppendCSSValueToString(nsCSSProperty aProperty, const n
 {
   nsCSSUnit unit = aValue.GetUnit();
 
+  if (aProperty == eCSSProperty_background_image && unit == eCSSUnit_Array) {
+    const nsCSSValue::Array* gradient = aValue.GetArrayValue();
+    aResult.AppendLiteral("linear-gradient(");
+    if (gradient->Item(0).GetUnit() == eCSSUnit_Enumerated) {
+      PRInt32 side = gradient->Item(0).GetIntValue();
+      aResult.AppendLiteral("to");
+      if (side & 1) aResult.AppendLiteral(" top");
+      if (side & 2) aResult.AppendLiteral(" bottom");
+      if (side & 4) aResult.AppendLiteral(" left");
+      if (side & 8) aResult.AppendLiteral(" right");
+    } else {
+      AppendCSSValueToString(eCSSProperty_azimuth, gradient->Item(0), aResult);
+    }
+    for (PRUint32 i = 1; i < gradient->Count(); ++i) {
+      aResult.AppendLiteral(", ");
+      const nsCSSValue::Array* stop = gradient->Item(i).GetArrayValue();
+      AppendCSSValueToString(eCSSProperty_color, stop->Item(0), aResult);
+      if (stop->Item(1).GetUnit() != eCSSUnit_Null) {
+        aResult.AppendLiteral(" ");
+        AppendCSSValueToString(eCSSProperty_background_x_position, stop->Item(1), aResult);
+      }
+    }
+    aResult.AppendLiteral(")");
+    return PR_TRUE;
+  }
+
   if (eCSSUnit_Null == unit) {
     return PR_FALSE;
   }
@@ -421,7 +447,10 @@ PRBool nsCSSDeclaration::AppendCSSValueToString(nsCSSProperty aProperty, const n
     nsAutoString tmpStr;
     nscolor color = aValue.GetColorValue();
 
-    aResult.AppendLiteral("rgb(");
+    if (NS_GET_A(color) == 255)
+      aResult.AppendLiteral("rgb(");
+    else
+      aResult.AppendLiteral("rgba(");
 
     NS_NAMED_LITERAL_STRING(comma, ", ");
 
@@ -435,6 +464,12 @@ PRBool nsCSSDeclaration::AppendCSSValueToString(nsCSSProperty aProperty, const n
     tmpStr.Truncate();
     tmpStr.AppendInt(NS_GET_B(color), 10);
     aResult.Append(tmpStr);
+    if (NS_GET_A(color) != 255) {
+      aResult.AppendLiteral(", ");
+      tmpStr.Truncate();
+      tmpStr.AppendFloat(NS_GET_A(color) / 255.0f);
+      aResult.Append(tmpStr);
+    }
 
     aResult.Append(PRUnichar(')'));
   }
@@ -591,6 +626,11 @@ nsCSSDeclaration::GetValue(nsCSSProperty aProperty,
       break;
     }
     case eCSSProperty_background: {
+      nsCSSValue size;
+      GetValueOrImportantValue(eCSSProperty_background_size, size);
+      if (size.GetUnit() != eCSSUnit_Null &&
+          size.GetUnit() != eCSSUnit_Initial)
+        break; // The legacy shorthand syntax cannot represent this size.
       if (AppendValueToString(eCSSProperty_background_color, aValue))
         aValue.Append(PRUnichar(' '));
       if (AppendValueToString(eCSSProperty_background_image, aValue))
@@ -935,6 +975,13 @@ nsCSSDeclaration::TryBackgroundShorthand(nsAString & aString,
                                          PRInt32 & aBgPositionX,
                                          PRInt32 & aBgPositionY) const
 {
+  // The legacy shorthand serializer cannot include a size. Leave the
+  // longhands in order so serializing and reparsing cannot reset that size.
+  nsCSSValue size;
+  GetValueOrImportantValue(eCSSProperty_background_size, size);
+  if (size.GetUnit() != eCSSUnit_Null)
+    return;
+
   // 0 means not in the mOrder array; otherwise it's index+1
   // check if we have at least two properties set; otherwise, no need to
   // use a shorthand

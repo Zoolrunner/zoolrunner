@@ -1,0 +1,40 @@
+<!DOCTYPE html><html><head><title>Background size paint pairs</title><style>body{margin:10px;background:white}.row{position:relative;width:330px;height:90px}.actual,.reference{position:absolute;top:0;width:160px;height:80px;background-color:#00ff00;overflow:hidden}.actual{left:0;background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACgAAAAUCAIAAABwJOjsAAAAKElEQVR4nGP4z8BANqJA639KtI5aPGrxqMWjFo9aPGrxqMWjFg8xiwFg7R0O36r+MwAAAABJRU5ErkJggg==)}.reference{left:170px}.red,.blue{position:absolute;top:0;height:100%;width:50%}.red{left:0;background:red}.blue{left:50%;background:blue}</style></head><body>
+<div class="row"><div class="actual" style="background-size:80px 40px;background-repeat:no-repeat;background-position:0px 0px"></div><div class="reference">
+<div style="position:absolute;left:0px;top:0px;width:80px;height:40px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="background-size:50% 50%;background-repeat:no-repeat;background-position:0px 0px"></div><div class="reference">
+<div style="position:absolute;left:0px;top:0px;width:80px;height:40px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="width:120px;background-size:contain;background-repeat:no-repeat;background-position:0px 0px"></div><div class="reference" style="width:120px">
+<div style="position:absolute;left:0px;top:0px;width:120px;height:60px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="width:120px;background-size:cover;background-repeat:no-repeat;background-position:0px 0px"></div><div class="reference" style="width:120px">
+<div style="position:absolute;left:0px;top:0px;width:160px;height:80px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="background-size:auto 30px;background-repeat:no-repeat;background-position:0px 0px"></div><div class="reference">
+<div style="position:absolute;left:0px;top:0px;width:60px;height:30px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="background-size:40px auto;background-repeat:repeat;background-position:0px 0px"></div><div class="reference">
+<div style="position:absolute;left:0px;top:0px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:40px;top:0px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:80px;top:0px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:120px;top:0px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:0px;top:20px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:40px;top:20px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:80px;top:20px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:120px;top:20px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:0px;top:40px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:40px;top:40px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:80px;top:40px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:120px;top:40px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:0px;top:60px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:40px;top:60px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:80px;top:60px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+<div style="position:absolute;left:120px;top:60px;width:40px;height:20px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="background-size:80px 40px;background-repeat:no-repeat;background-position:80px 40px"></div><div class="reference">
+<div style="position:absolute;left:80px;top:40px;width:80px;height:40px"><div class="red"></div><div class="blue"></div></div>
+</div></div>
+<div class="row"><div class="actual" style="background-size:0 40px;background-repeat:repeat;background-position:0px 0px"></div><div class="reference">
+</div></div>
+</body></html>

@@ -944,6 +944,10 @@ nsComputedDOMStyle::GetBackgroundImage(nsIFrame *aFrame,
   if (color) {
     if (color->mBackgroundFlags & NS_STYLE_BG_IMAGE_NONE) {
       val->SetIdent(nsLayoutAtoms::none);
+    } else if (color->mBackgroundGradient) {
+      nsAutoString gradient;
+      color->mBackgroundGradient->ToString(gradient, mT2P);
+      val->SetIdent(NS_ConvertUCS2toUTF8(gradient));
     } else {
       nsCOMPtr<nsIURI> uri;
       if (color->mBackgroundImage) {
@@ -1002,6 +1006,40 @@ nsComputedDOMStyle::GetBackgroundOrigin(nsIFrame *aFrame,
   val->SetIdent(backgroundOrigin);
 
   return CallQueryInterface(val, aValue);
+}
+
+nsresult
+nsComputedDOMStyle::GetBackgroundSize(nsIFrame *aFrame,
+                                      nsIDOMCSSValue** aValue)
+{
+  const nsStyleBackground* background = nsnull;
+  GetStyleData(eStyleStruct_Background, (const nsStyleStruct*&)background,
+               aFrame);
+  nsDOMCSSValueList* list = GetROCSSValueList(PR_FALSE);
+  NS_ENSURE_TRUE(list, NS_ERROR_OUT_OF_MEMORY);
+  if (background) {
+    const nsStyleCoord* coords[2] = { &background->mBackgroundSizeX,
+                                     &background->mBackgroundSizeY };
+    PRInt32 count = coords[0]->GetUnit() == eStyleUnit_Enumerated ? 1 : 2;
+    for (PRInt32 i = 0; i < count; ++i) {
+      nsROCSSPrimitiveValue* val = GetROCSSPrimitiveValue();
+      if (!val || !list->AppendCSSValue(val)) {
+        delete val;
+        delete list;
+        return NS_ERROR_OUT_OF_MEMORY;
+      }
+      switch (coords[i]->GetUnit()) {
+        case eStyleUnit_Coord: val->SetTwips(coords[i]->GetCoordValue()); break;
+        case eStyleUnit_Percent: val->SetPercent(coords[i]->GetPercentValue()); break;
+        case eStyleUnit_Enumerated:
+          val->SetIdent(nsCSSProps::ValueToKeyword(coords[i]->GetIntValue(),
+                                                  nsCSSProps::kBackgroundSizeKTable));
+          break;
+        default: val->SetIdent(NS_LITERAL_CSTRING("auto")); break;
+      }
+    }
+  }
+  return CallQueryInterface(list, aValue);
 }
 
 nsresult
@@ -3671,6 +3709,7 @@ nsComputedDOMStyle::GetQueryablePropertyMap(PRUint32* aLength)
     COMPUTED_STYLE_MAP_ENTRY(background_color,              BackgroundColor),
     COMPUTED_STYLE_MAP_ENTRY(background_image,              BackgroundImage),
     //// COMPUTED_STYLE_MAP_ENTRY(background_position,      BackgroundPosition),
+    COMPUTED_STYLE_MAP_ENTRY(background_size, BackgroundSize),
     COMPUTED_STYLE_MAP_ENTRY(background_repeat,             BackgroundRepeat),
     //// COMPUTED_STYLE_MAP_ENTRY(border,                   Border),
     //// COMPUTED_STYLE_MAP_ENTRY(border_bottom,            BorderBottom),

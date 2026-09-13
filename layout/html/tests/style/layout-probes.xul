@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        width="1100" height="800" onload="runNext()">
+<browser id="test" type="content" flex="1"/>
+<script><![CDATA[
+var files = ["structural-inline-block.html", "viewport-media-queries.html", "background-size.html", "linear-gradient.html", "faq-toggle.html"];
+var index = 0, failures = 0;
+function runNext() {
+  if (index == files.length) {
+    dump("LAYOUT-PROBES failures=" + failures + "\n");
+    Components.classes["@mozilla.org/toolkit/app-startup;1"]
+      .getService(Components.interfaces.nsIAppStartup)
+      .quit(Components.interfaces.nsIAppStartup.eForceQuit);
+    return;
+  }
+  var file = files[index++];
+  var io = Components.classes["@mozilla.org/network/io-service;1"]
+                     .getService(Components.interfaces.nsIIOService);
+  var registry = Components.classes["@mozilla.org/chrome/chrome-registry;1"]
+                     .getService(Components.interfaces.nsIChromeRegistry);
+  // Load the resolved file URL as content, rather than giving the HTML tests
+  // the system principal associated with a chrome URL.
+  var uri = registry.convertChromeURL(io.newURI("chrome://layoutprobes/content/" + file,null,null));
+  var browser = document.getElementById("test");
+  browser.setAttribute("src",uri.spec);
+  var attempts = 0;
+  setTimeout(function poll() {
+    var w=browser.contentWindow.wrappedJSObject || browser.contentWindow;
+    if (browser.contentDocument.location.href == uri.spec && w.testDone) {
+      for (var i=0; i<w.testResults.length; ++i)
+        dump("LAYOUT-PROBES " + file + " " + w.testResults[i] + "\n");
+      failures += w.testFailures;
+      runNext();
+    } else if (++attempts == 100) {
+      ++failures;
+      dump("LAYOUT-PROBES FAIL timeout: " + file + "\n");
+      runNext();
+    } else {
+      setTimeout(poll,100);
+    }
+  },100);
+}
+]]></script>
+</window>

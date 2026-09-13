@@ -93,6 +93,7 @@
 #include "nsCOMPtr.h"
 #include "nsHashKeys.h"
 #include "nsStyleUtil.h"
+#include "nsFont.h"
 #include "nsQuickSort.h"
 #include "nsContentUtils.h"
 #include "nsIJSContextStack.h"
@@ -676,10 +677,13 @@ static PLDHashTableOps AttributeSelectorOps = {
 //--------------------------------
 
 struct RuleCascadeData {
-  RuleCascadeData(nsIAtom *aMedium, PRBool aQuirksMode)
+  RuleCascadeData(nsPresContext* aContext, PRBool aQuirksMode)
     : mRuleHash(aQuirksMode),
       mStateSelectors(),
-      mMedium(aMedium),
+      mMedium(aContext->Medium()),
+      mViewport(aContext->GetVisibleArea()),
+      mInitialFont(*aContext->GetDefaultFont(kPresContext_DefaultVariableFont_ID)),
+      mPixelScale(aContext->ScaledPixelsToTwips()),
       mNext(nsnull)
   {
     PL_DHashTableInit(&mAttributeSelectors, &AttributeSelectorOps, nsnull,
@@ -701,6 +705,9 @@ struct RuleCascadeData {
   nsVoidArray* AttributeListFor(nsIAtom* aAttribute);
 
   nsCOMPtr<nsIAtom> mMedium;
+  nsRect mViewport;
+  nsFont mInitialFont;
+  float mPixelScale;
   RuleCascadeData*  mNext; // for a different medium
 };
 
@@ -834,11 +841,11 @@ nsMediaList::GetText(nsAString& aMediaText)
   aMediaText.Truncate();
 
   for (PRInt32 i = 0, i_end = mArray.Count(); i < i_end; ++i) {
-    nsIAtom* medium = mArray[i];
+    nsMediaQuery* medium = mArray[i];
     NS_ENSURE_TRUE(medium, NS_ERROR_FAILURE);
 
     nsAutoString buffer;
-    medium->ToString(buffer);
+    buffer.Assign(medium->Text());
     aMediaText.Append(buffer);
     if (i + 1 < i_end) {
       aMediaText.AppendLiteral(", ");
@@ -878,9 +885,9 @@ nsMediaList::SetText(const nsAString& aMediaText)
 PRBool
 nsMediaList::Matches(nsPresContext* aPresContext)
 {
-  if (-1 != mArray.IndexOf(aPresContext->Medium()) ||
-      -1 != mArray.IndexOf(nsLayoutAtoms::all))
-    return PR_TRUE;
+  for (PRInt32 i = 0; i < mArray.Count(); ++i) {
+    if (mArray[i]->Matches(aPresContext)) return PR_TRUE;
+  }
   return mArray.Count() == 0;
 }
 
@@ -965,7 +972,7 @@ nsMediaList::Item(PRUint32 aIndex, nsAString& aReturn)
 {
   PRInt32 index = aIndex;
   if (0 <= index && index < Count()) {
-    MediumAt(aIndex)->ToString(aReturn);
+    aReturn.Assign(mArray[aIndex]->Text());
   } else {
     SetDOMStringToNull(aReturn);
   }
@@ -1008,43 +1015,49 @@ nsMediaList::AppendMedium(const nsAString& aNewMedium)
 }
 
 nsresult
+nsMediaList::AppendQuery(const nsAString& aText)
+{
+  nsRefPtr<nsMediaQuery> query = new nsMediaQuery();
+  if (!query) return NS_ERROR_OUT_OF_MEMORY;
+  nsresult rv = query->Parse(aText);
+  NS_ENSURE_SUCCESS(rv, rv);
+  return mArray.AppendObject(query) ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
+}
+
+nsresult
 nsMediaList::Delete(const nsAString& aOldMedium)
 {
-  if (aOldMedium.IsEmpty())
-    return NS_ERROR_DOM_NOT_FOUND_ERR;
-
-  nsCOMPtr<nsIAtom> old = do_GetAtom(aOldMedium);
-  NS_ENSURE_TRUE(old, NS_ERROR_OUT_OF_MEMORY);
-
-  PRInt32 indx = mArray.IndexOf(old);
-
-  if (indx < 0) {
-    return NS_ERROR_DOM_NOT_FOUND_ERR;
+  nsRefPtr<nsMediaList> parsed = new nsMediaList();
+  if (!parsed) return NS_ERROR_OUT_OF_MEMORY;
+  nsresult rv = parsed->SetText(aOldMedium);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (parsed->Count() != 1) return NS_ERROR_DOM_NOT_FOUND_ERR;
+  const nsString& text = parsed->mArray[0]->Text();
+  for (PRInt32 i = 0; i < mArray.Count(); ++i) {
+    if (mArray[i]->Text().Equals(text)) {
+      mArray.RemoveObjectAt(i);
+      return NS_OK;
+    }
   }
-
-  mArray.RemoveObjectAt(indx);
-
-  return NS_OK;
+  return NS_ERROR_DOM_NOT_FOUND_ERR;
 }
 
 nsresult
 nsMediaList::Append(const nsAString& aNewMedium)
 {
-  if (aNewMedium.IsEmpty())
-    return NS_ERROR_DOM_NOT_FOUND_ERR;
-
-  nsCOMPtr<nsIAtom> media = do_GetAtom(aNewMedium);
-  NS_ENSURE_TRUE(media, NS_ERROR_OUT_OF_MEMORY);
-
-  PRInt32 indx = mArray.IndexOf(media);
-
-  if (indx >= 0) {
-    mArray.RemoveObjectAt(indx);
+  nsRefPtr<nsMediaList> parsed = new nsMediaList();
+  if (!parsed) return NS_ERROR_OUT_OF_MEMORY;
+  nsresult rv = parsed->SetText(aNewMedium);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (parsed->Count() != 1) return NS_OK;
+  const nsString& text = parsed->mArray[0]->Text();
+  for (PRInt32 i = 0; i < mArray.Count(); ++i) {
+    if (mArray[i]->Text().Equals(text)) {
+      mArray.RemoveObjectAt(i);
+      break;
+    }
   }
-
-  mArray.AppendObject(media);
-
-  return NS_OK;
+  return mArray.AppendObject(parsed->mArray[0]) ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
 }
 
 // -------------------------------
@@ -3917,23 +3930,34 @@ static void PutRulesInList(nsObjectHashtable* aRuleArrays,
 RuleCascadeData*
 nsCSSRuleProcessor::GetRuleCascade(nsPresContext* aPresContext)
 {
-  // Having RuleCascadeData objects be per-medium works for now since
-  // nsCSSRuleProcessor objects are per-document.  (For a given set
-  // of stylesheets they can vary based on medium (@media) or document
-  // (@-moz-document).)  Things will get a little more complicated if
-  // we implement media queries, though.
+  // Rule processors are per-document. Query-dependent cascades also depend
+  // on viewport dimensions, so reuse them only while those dimensions match.
 
   RuleCascadeData **cascadep = &mRuleCascades;
   RuleCascadeData *cascade;
   nsIAtom *medium = aPresContext->Medium();
   while ((cascade = *cascadep)) {
-    if (cascade->mMedium == medium)
-      return cascade;
+    if (cascade->mMedium == medium) {
+      nsRect viewport = aPresContext->GetVisibleArea();
+      if (!aPresContext->HasViewportMediaQueries() ||
+          (cascade->mViewport.width == viewport.width &&
+           cascade->mViewport.height == viewport.height &&
+           cascade->mPixelScale == aPresContext->ScaledPixelsToTwips() &&
+           cascade->mInitialFont.Equals(*aPresContext->GetDefaultFont(
+             kPresContext_DefaultVariableFont_ID))))
+        return cascade;
+      // Keep at most one cascade per medium, rather than retaining every
+      // window size encountered during an interactive resize.
+      *cascadep = cascade->mNext;
+      delete cascade;
+      cascade = nsnull;
+      break;
+    }
     cascadep = &cascade->mNext;
   }
 
   if (mSheets.Count() != 0) {
-    cascade = new RuleCascadeData(medium,
+    cascade = new RuleCascadeData(aPresContext,
                                   eCompatibility_NavQuirks == aPresContext->CompatibilityMode());
     if (cascade) {
       CascadeEnumData data(aPresContext, cascade->mRuleHash.Arena());
@@ -3948,7 +3972,10 @@ nsCSSRuleProcessor::GetRuleCascade(nsPresContext* aPresContext)
         cascade = nsnull;
       }
 
-      *cascadep = cascade;
+      if (cascade) {
+        cascade->mNext = *cascadep;
+        *cascadep = cascade;
+      }
     }
   }
   return cascade;
