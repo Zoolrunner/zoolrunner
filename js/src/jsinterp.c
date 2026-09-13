@@ -1191,6 +1191,13 @@ js_Invoke(JSContext *cx, uintN argc, uintN flags)
 have_fun:
         /* Get private data and set derived locals from it. */
         fun = (JSFunction *) JS_GetPrivate(cx, funobj);
+        if ((flags & JSINVOKE_CONSTRUCT) &&
+            (fun->flags & JSFUN_NO_CONSTRUCT)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_NOT_CONSTRUCTOR, "function");
+            ok = JS_FALSE;
+            goto out2;
+        }
         nslots = (fun->nargs > argc) ? fun->nargs - argc : 0;
         if (FUN_INTERPRETED(fun)) {
             native = NULL;

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html><head><title>Opacity group painting</title>
+<style>
+body { margin: 20px; background: white; color: black; font: 16px sans-serif; }
+.row { height: 120px; position: relative; }
+.actual, .expected { position: absolute; top: 0; width: 120px; height: 100px; }
+.actual { left: 0; } .expected { left: 160px; }
+.red { background: #ff0000; } .half { opacity: .5; }
+.square { position: absolute; width: 70px; height: 70px; }
+.a { left: 0; top: 0; } .b { left: 40px; top: 30px; }
+.clip { width: 90px; height: 80px; overflow: hidden; }
+</style></head><body>
+<p>Left: opacity groups. Right: opaque reference colors. Each pair must match.</p>
+<div class="row"><div class="actual red half"></div><div class="expected" style="background:#ff8080"></div></div>
+<div class="row"><div class="actual half"><div class="square red a"></div><div class="square red b"></div></div><div class="expected"><div class="square a" style="background:#ff8080"></div><div class="square b" style="background:#ff8080"></div></div></div>
+<div class="row"><div class="actual half"><div class="red half" style="width:120px;height:100px"></div></div><div class="expected" style="background:#ffbfbf"></div></div>
+<div class="row"><div class="actual clip"><div class="red half" style="position:relative;left:30px;top:20px;width:120px;height:100px"></div></div><div class="expected"><div style="position:absolute;left:30px;top:20px;width:60px;height:60px;background:#ff8080"></div></div></div>
+<p style="opacity:.98">This text must remain visible. <span style="opacity:.8">Nested translucent text must also remain visible.</span></p>
+<p style="opacity:0">This line must be invisible.</p>
+<p>Scroll and resize: groups must repaint without trails or stale clipping.</p>
+</body></html>

@@ -79,7 +79,8 @@ static NS_DEFINE_CID(kRegionCID, NS_REGION_CID);
 
 //////////////////////////////////////////////////////////////////////
 
-NS_IMPL_ISUPPORTS2(nsThebesRenderingContext, nsIRenderingContext, nsIThebesRenderingContext)
+NS_IMPL_ISUPPORTS3(nsThebesRenderingContext, nsIRenderingContext,
+                   nsIThebesRenderingContext, nsIRenderingContextFilter)
 
 nsThebesRenderingContext::nsThebesRenderingContext() :
     mLineStyle(nsLineStyle_kNone)
@@ -909,7 +910,8 @@ nsThebesRenderingContext::PushFilter(const nsRect& twRect, PRBool aAreaIsOpaque,
             this, twRect.x, twRect.y, twRect.width, twRect.height,
             aAreaIsOpaque, aOpacity));
 
-    mOpacityArray.AppendElement(aOpacity);
+    if (!mOpacityArray.AppendElement(aOpacity))
+        return NS_ERROR_OUT_OF_MEMORY;
 
     mThebes->Save();
     mThebes->Clip(GFX_RECT_FROM_TWIPS_RECT(twRect));

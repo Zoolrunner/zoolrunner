@@ -45,6 +45,7 @@
 #include "nsViewManager.h"
 #include "nsUnitConversion.h"
 #include "nsIRenderingContext.h"
+#include "nsIRenderingContextFilter.h"
 #include "nsIDeviceContext.h"
 #include "nsGfxCIID.h"
 #include "nsIScrollableView.h"
@@ -1332,6 +1333,43 @@ void nsViewManager::RenderViews(nsView *aRootView, nsIRenderingContext& aRC,
       NS_WARNING("Transparent window enabled");
       NS_ASSERTION(aRCSurface, "Cannot support transparent windows with doublebuffering disabled");
     }
+  }
+
+  // Backends with native alpha groups can composite the display list directly.
+  // The historical black/white blender remains available for other backends.
+  nsCOMPtr<nsIRenderingContextFilter> filters = do_QueryInterface(&aRC);
+  if (filters && !translucentWindow) {
+    nsIRenderingContext* contexts[1] = { &aRC };
+    PRInt32 failedFilters = 0;
+    for (PRInt32 i = 0; i < aDisplayList.Count(); ++i) {
+      DisplayListElement2* element =
+        NS_STATIC_CAST(DisplayListElement2*, aDisplayList.ElementAt(i));
+      if (element->mFlags & PUSH_CLIP)
+        PushStateAndClip(contexts, 1, element->mBounds);
+      if (element->mFlags & PUSH_FILTER) {
+        if (failedFilters ||
+            NS_FAILED(filters->PushFilter(element->mBounds,
+                        !(element->mFlags & VIEW_TRANSPARENT),
+                        element->mView->GetOpacity())))
+          ++failedFilters;
+      }
+      if (element->mFlags & VIEW_RENDERED) {
+        if (element->mFlags & VIEW_CLIPPED)
+          PushStateAndClip(contexts, 1, element->mBounds);
+        RenderDisplayListElement(element, &aRC);
+        if (element->mFlags & VIEW_CLIPPED)
+          PopState(contexts, 1);
+      }
+      if (element->mFlags & POP_FILTER) {
+        if (failedFilters)
+          --failedFilters;
+        else
+          filters->PopFilter();
+      }
+      if (element->mFlags & POP_CLIP)
+        PopState(contexts, 1);
+    }
+    return;
   }
 
   // Create a buffer wrapping aRC (which is usually the double-buffering offscreen buffer).

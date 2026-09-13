@@ -319,6 +319,14 @@ Selective standards improvements are welcome when:
 * achievable without major architectural replacement
 * helpful for correctness or interoperability
 
+The Basilisk (`basilisk-browser.org`) and Pale Moon (`palemoon.org`) websites
+are required HTML/CSS rendering regression targets. Downloadable fonts and
+external font libraries are outside this work's scope. Implement the needed
+features in the engine rather than adding site-specific rendering exceptions.
+Do not claim complete rendering based only on parser/CSSOM tests: compare
+painting and layout, exercise menus and resizing, and test the browser and Suite.
+Track remaining feature gaps in the README and layout probe documentation.
+
 Acid2 and Acid3 may be used as bounded standards/regression targets.
 
 Passing such tests is useful but does not justify destroying the project's architecture.
@@ -331,7 +339,12 @@ Do not introduce major later-Gecko subsystems solely to pass a web compatibility
 
 Improving SpiderMonkey is acceptable.
 
-A reasonable future target is strong ECMAScript 5 compatibility.
+Full ECMAScript 5 compatibility, using the corrected ECMAScript 5.1
+specification, is a required modernization target. It is not yet achieved.
+Track progress with the pinned historical Test262 suite and focused native
+regressions in `js/tests/es5`; report failures honestly. Adding standard-library
+method names alone does not establish conformance: strict mode, descriptors,
+invocation semantics, parsing, and built-in behavior must also be correct.
 
 Selected ECMAScript 2015/ES6 features may also be implemented when practical.
 
@@ -349,7 +362,9 @@ Do not replace SpiderMonkey wholesale merely to obtain modern JavaScript.
 
 Do not import enormous portions of later SpiderMonkey without first determining whether the functionality can be implemented cleanly in the existing engine.
 
-If a JavaScript feature requires disproportionate architectural work, it may be intentionally omitted.
+Features beyond ECMAScript 5.1 may be intentionally omitted when they require
+disproportionate architectural work. Preserve the classic embedding APIs while
+implementing the required ES5 behavior.
 
 ---
 

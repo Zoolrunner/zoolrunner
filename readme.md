@@ -335,6 +335,18 @@ When platform internals are modernized, application-visible behavior should
 remain compatible where practical. New behavior should be documented when it
 changes assumptions that existing applications may depend on.
 
+## ECMAScript Compatibility
+
+Full ECMAScript 5.1 is a required target for the existing SpiderMonkey engine.
+It is not yet implemented. The initial 2026-09-13 Test262 baseline passed
+13,548 of 22,029 test/mode cases, with 8,481 failures and no process crashes or
+timeouts. Major gaps include property descriptors, strict mode, JSON, function
+binding, and built-in edge cases. The first array/date implementation recovered
+118 cases without regressions in a full rerun; 8,363 cases still failed. See
+[ES5 testing](js/tests/es5/README.md) for
+the pinned suite, commands, scope, and progress. Historical embedding APIs and
+Mozilla application compatibility remain requirements.
+
 ## Web Compatibility
 
 Full compatibility with the contemporary Web is not currently a ZoolRunner
@@ -354,6 +366,13 @@ background sizing, and linear gradients are covered by the
 and keyframe animation remain unfinished; downloadable fonts are excluded from
 this rendering task. Multiple background layers and other newer CSS syntax
 are not implied by the implemented subset.
+
+The Pale Moon website is another required HTML/CSS rendering target, excluding
+external font libraries and downloads. Its homepage and shared subpage styles
+require flexbox alignment, layered backgrounds, shadows, and opacity groups.
+Complete rendering is not yet verified. Native opacity groups now use an
+optional rendering-context interface; historical backends retain the existing
+blender path. See the layout probes for painting coverage.
 
 ## Stability and Security
 

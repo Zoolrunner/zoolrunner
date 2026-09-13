@@ -58,6 +58,7 @@ EXPORTS		= \
 		nsMargin.h \
 		nsTransform2D.h \
 		nsIRenderingContext.h \
+		nsIRenderingContextFilter.h \
 		nsIFontMetrics.h \
 		nsIDeviceContext.h \
 		nsIImage.h \

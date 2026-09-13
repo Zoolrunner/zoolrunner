@@ -1,5 +1,5 @@
-These regression probes exercise the layout features used by the Basilisk
-homepage. They are small, locally authored fixtures; the website's HTML,
+These regression probes exercise layout features used by the Basilisk and
+Pale Moon websites. They are small, locally authored fixtures; the website's HTML,
 stylesheets, images, and fonts are not bundled here.
 
 Open `structural-inline-block.html`, `viewport-media-queries.html`,
@@ -67,3 +67,17 @@ Multiple background layers, background shorthand `/` sizing, radial/repeating
 gradient functions, and newer gradient syntax are not implemented here.
 Shadows, transitions, and keyframe animations remain separate work.
 Downloadable fonts are outside this work's scope.
+
+`opacity-paint.html` compares opacity groups with opaque reference colors. It
+checks overlapping children (opacity must apply to the group), nested opacity,
+clipping, and translucent text. The native Thebes backend uses optional alpha
+groups rather than its unimplemented legacy blender. Other backends retain
+the existing blender implementation. Include scrolling/resizing and menu hover
+repaints in visual checks; CSSOM assertions cannot detect missing paint.
+
+The macOS bitmap test in [gfx/tests](../../../../gfx/tests/README-quartz-opacity.md)
+checks native compositing without monitor color profiles. On 2026-09-13 the
+XULRunner and Suite each passed the 169 HTML/CSS assertions after the opacity
+changes; the Suite also passed the live Basilisk structural check. Pale Moon's
+menu and download link now paint in the native comparison, but flexbox sizing
+and alignment, shadows, and subpage background layers remain unfinished.

@@ -1587,9 +1587,9 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
             ArrayExtraMode mode)
 {
     jsval *vp, *sp, *origsp, *oldsp;
-    jsuint length, newlen;
+    jsuint length, newlen, remaining, i;
     JSObject *callable, *thisp, *newarr;
-	jsint start, end, step, i;
+    jsint step;
     void *mark;
     JSStackFrame *fp;
     JSBool ok, cond, hole;
@@ -1617,10 +1617,13 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
     newarr = NULL;
     ok = JS_TRUE;
 #endif
-	start = 0, end = length, step = 1;
+    remaining = length;
+    i = 0;
+    step = 1;
     switch (mode) {
-	case REDUCE_RIGHT:
-        start = length - 1, end = -1, step = -1;
+      case REDUCE_RIGHT:
+        i = length - 1;
+        step = -1;
         /* FALL THROUGH */
       case REDUCE:
         if (length == 0 && argc == 1) {
@@ -1631,9 +1634,22 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
         if (argc >= 2) {
             *rval = argv[1];
         } else {
-            if (!GetArrayElement(cx, obj, start, &hole, rval))
+            /* ES5 15.4.4.21/22: the first present property supplies the
+             * accumulator. Holes do not supply an undefined accumulator. */
+            hole = JS_TRUE;
+            while (remaining) {
+                if (!GetArrayElement(cx, obj, i, &hole, rval))
+                    return JS_FALSE;
+                --remaining;
+                i += step;
+                if (!hole)
+                    break;
+            }
+            if (hole) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_EMPTY_ARRAY_REDUCE);
                 return JS_FALSE;
-            start += step;
+            }
         }
         break;
       case MAP:
@@ -1678,7 +1694,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
     fp = cx->fp;
     oldsp = fp->sp;
 
-    for (i = start; i != end; i += step) {
+    for (; remaining; --remaining, i += step) {
         ok = GetArrayElement(cx, obj, i, &hole, vp);
         if (!ok)
             break;
@@ -1696,7 +1712,13 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
 		if (REDUCE_MODE(mode))
             *sp++ = *rval;
         *sp++ = *vp;
-        *sp++ = INT_TO_JSVAL(i);
+        /* Array-like indices cover the full uint32 range, not only the
+         * smaller range of tagged immediate integers. */
+        if (!js_NewNumberValue(cx, (jsdouble)i, sp)) {
+            ok = JS_FALSE;
+            goto out;
+        }
+        ++sp;
         *sp++ = OBJECT_TO_JSVAL(obj);
 
         /* Do the call. */
@@ -1878,16 +1900,30 @@ Array(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return InitArrayObject(cx, obj, length, vector);
 }
 
+static JSBool
+array_isArray(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+              jsval *rval)
+{
+    *rval = BOOLEAN_TO_JSVAL(argc != 0 && !JSVAL_IS_PRIMITIVE(argv[0]) &&
+                            OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) == &js_ArrayClass);
+    return JS_TRUE;
+}
+
 JSObject *
 js_InitArrayClass(JSContext *cx, JSObject *obj)
 {
-    JSObject *proto;
+    JSObject *proto, *ctor;
 
     proto = JS_InitClass(cx, obj, NULL, &js_ArrayClass, Array, 1,
                          NULL, array_methods, NULL, NULL);
 
     /* Initialize the Array prototype object so it gets a length property. */
     if (!proto || !InitArrayObject(cx, proto, 0, NULL))
+        return NULL;
+    /* JSFunctionSpec keeps its historical 8-bit flags field. */
+    ctor = JS_GetConstructor(cx, proto);
+    if (!ctor || !JS_DefineFunction(cx, ctor, "isArray", array_isArray, 1,
+                                    JSFUN_NO_CONSTRUCT))
         return NULL;
     return proto;
 }

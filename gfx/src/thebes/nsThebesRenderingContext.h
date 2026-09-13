@@ -42,6 +42,7 @@
 #include "nsCOMPtr.h"
 #include "nsTArray.h"
 #include "nsIRenderingContext.h"
+#include "nsIRenderingContextFilter.h"
 #include "nsRenderingContextImpl.h"
 #include "nsIDeviceContext.h"
 #include "nsIFontMetrics.h"
@@ -62,6 +63,7 @@ class nsIImage;
 class nsThebesDrawingSurface;
 
 class nsThebesRenderingContext : public nsIThebesRenderingContext,
+                                public nsIRenderingContextFilter,
                                  public nsRenderingContextImpl
 {
 public:

@@ -42,6 +42,7 @@
 #include <OpenGL/gl.h>
 #endif
 
+#include <limits.h>
 #include "cairoint.h"
 #include "cairo-private.h"
 #include "cairo-quartz2.h"
@@ -659,7 +660,8 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 	    quartzSource = NULL;
 	    clone = NULL;
 	    surface->sourceImageNeedsFlip =
-		cairo_surface_is_quartzgl (spat->surface);
+		cairo_surface_is_quartzgl (spat->surface) &&
+		((cairo_quartzgl_surface_t *) spat->surface)->y_grows_down;
 
 	    if (cairo_surface_is_quartzgl (spat->surface)) {
 		cairo_surface_reference (spat->surface);
@@ -690,11 +692,31 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 	    _cairo_surface_get_extents (spat->surface, &extents);
 	    surface->sourceImageRect =
 		CGRectMake (0, 0, extents.width, extents.height);
+	    /* Pattern coordinates are logical surface coordinates. Opacity groups
+	     * have device offsets, so include both surfaces' device transforms
+	     * when mapping image pixels back onto the destination. */
 	    matrix = spat->base.matrix;
+	    {
+		cairo_matrix_t device;
+		cairo_matrix_init (&device,
+		                  spat->surface->device_x_scale, 0, 0,
+		                  spat->surface->device_y_scale,
+		                  spat->surface->device_x_offset,
+		                  spat->surface->device_y_offset);
+		cairo_matrix_multiply (&matrix, &matrix, &device);
+	    }
 	    if (cairo_matrix_invert (&matrix) != CAIRO_STATUS_SUCCESS) {
 		CGImageRelease (surface->sourceImage);
 		surface->sourceImage = NULL;
 		return DO_UNSUPPORTED;
+	    }
+	    {
+		cairo_matrix_t device;
+		cairo_matrix_init (&device, surface->base.device_x_scale, 0, 0,
+		                  surface->base.device_y_scale,
+		                  surface->base.device_x_offset,
+		                  surface->base.device_y_offset);
+		cairo_matrix_multiply (&matrix, &matrix, &device);
 	    }
 	    _cairo_quartzgl_cairo_matrix_to_quartz
 		(&matrix, &surface->sourceImageTransform);
@@ -1497,8 +1519,19 @@ _cairo_quartzgl_surface_mask (void *abstract_surface,
 {
     cairo_quartzgl_surface_t *surface = (cairo_quartzgl_surface_t *) abstract_surface;
 
-    return CAIRO_STATUS_SUCCESS;
-    /*return CAIRO_INT_STATUS_UNSUPPORTED;*/
+    /* cairo_paint_with_alpha uses a solid mask. Quartz global alpha is
+     * equivalent for OVER, including nested opacity groups. Other mask/operator
+     * combinations need Cairo's fallback, not a successful no-op. */
+    if (mask->type == CAIRO_PATTERN_SOLID && op == CAIRO_OPERATOR_OVER) {
+        cairo_solid_pattern_t *solid = (cairo_solid_pattern_t *) mask;
+        cairo_int_status_t status;
+        CGContextSaveGState (surface->cgContext);
+        CGContextSetAlpha (surface->cgContext, solid->color.alpha);
+        status = _cairo_quartzgl_surface_paint (abstract_surface, op, source);
+        CGContextRestoreGState (surface->cgContext);
+        return status;
+    }
+    return CAIRO_INT_STATUS_UNSUPPORTED;
 }
 
 static cairo_int_status_t
@@ -1688,6 +1721,13 @@ cairo_quartzgl_surface_create (cairo_format_t format,
     int stride;
     int bitsPerComponent;
 
+    /* Strides and extents below are signed ints. Check before multiplying,
+     * including on 32-bit hosts used by the historical Quartz backend. */
+    if (width > INT_MAX / 4 || height > INT_MAX) {
+        _cairo_error (CAIRO_STATUS_NO_MEMORY);
+        return (cairo_surface_t*) &_cairo_surface_nil;
+    }
+
     if (format == CAIRO_FORMAT_ARGB32) {
 	cgColorspace = CGColorSpaceCreateDeviceRGB();
 	stride = width * 4;
@@ -1718,7 +1758,12 @@ cairo_quartzgl_surface_create (cairo_format_t format,
         return (cairo_surface_t*) &_cairo_surface_nil;
     }
 
-    imageData = malloc (height * stride);
+    if (height && (size_t) stride > (size_t) -1 / height) {
+        CGColorSpaceRelease (cgColorspace);
+        _cairo_error (CAIRO_STATUS_NO_MEMORY);
+        return (cairo_surface_t*) &_cairo_surface_nil;
+    }
+    imageData = malloc ((size_t) height * stride);
     if (!imageData) {
 	CGColorSpaceRelease (cgColorspace);
 	_cairo_error (CAIRO_STATUS_NO_MEMORY);
@@ -1733,9 +1778,15 @@ cairo_quartzgl_surface_create (cairo_format_t format,
 				 cgColorspace,
 				 bitinfo);
     CGColorSpaceRelease (cgColorspace);
+    if (!cgc) {
+        free (imageData);
+        _cairo_error (CAIRO_STATUS_NO_MEMORY);
+        return (cairo_surface_t*) &_cairo_surface_nil;
+    }
 
     surf = _cairo_quartzgl_surface_create_internal (cgc, NULL, width, height, y_grows_down);
     if (!surf) {
+        free (imageData);
 	CGContextRelease (cgc);
 	// create_internal will have set an error
         return (cairo_surface_t*) &_cairo_surface_nil;

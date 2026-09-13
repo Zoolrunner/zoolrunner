@@ -67,6 +67,10 @@ struct JSFunction {
     JSClass      *clasp;        /* if non-null, constructor for this class */
 };
 
+/* Internal function flag; it is not a property attribute or a public API flag. */
+#define JSFUN_NO_CONSTRUCT   0x4000 /* no [[Construct]] or implicit prototype */
+#define JSFUN_INTERNAL_FLAGS_MASK (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT)
+
 #define JSFUN_INTERPRETED    0x8000 /* use u.i if set, u.n if unset */
 
 #define FUN_INTERPRETED(fun) ((fun)->flags & JSFUN_INTERPRETED)

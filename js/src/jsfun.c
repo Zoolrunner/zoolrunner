@@ -1121,6 +1121,9 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
         JSObject *proto, *parentProto;
         jsval pval;
 
+        if (fun->flags & JSFUN_NO_CONSTRUCT)
+            return JS_TRUE;
+
         proto = parentProto = NULL;
         if (fun->object != obj && fun->object) {
             /*
@@ -2092,7 +2095,7 @@ js_InitFunctionClass(JSContext *cx, JSObject *obj)
     if (!fun->u.i.script)
         goto bad;
     fun->u.i.script->code[0] = JSOP_STOP;
-    fun->flags |= JSFUN_INTERPRETED;
+    fun->flags |= JSFUN_INTERPRETED | JSFUN_NO_CONSTRUCT;
     return proto;
 
 bad:
@@ -2148,7 +2151,7 @@ js_NewFunction(JSContext *cx, JSObject *funobj, JSNative native, uintN nargs,
     /* Initialize all function members. */
     fun->object = NULL;
     fun->nargs = nargs;
-    fun->flags = flags & JSFUN_FLAGS_MASK;
+    fun->flags = flags & JSFUN_INTERNAL_FLAGS_MASK;
     fun->u.n.native = native;
     fun->u.n.extra = 0;
     fun->u.n.spare = 0;
@@ -2204,7 +2207,7 @@ js_DefineFunction(JSContext *cx, JSObject *obj, JSAtom *atom, JSNative native,
     if (!OBJ_DEFINE_PROPERTY(cx, obj, ATOM_TO_JSID(atom),
                              OBJECT_TO_JSVAL(fun->object),
                              NULL, NULL,
-                             attrs & ~JSFUN_FLAGS_MASK, NULL)) {
+                             attrs & ~JSFUN_INTERNAL_FLAGS_MASK, NULL)) {
         return NULL;
     }
     return fun;
@@ -2234,7 +2237,18 @@ js_ValueToFunction(JSContext *cx, jsval *vp, uintN flags)
         js_ReportIsNotFunction(cx, vp, flags);
         return NULL;
     }
-    return (JSFunction *) JS_GetPrivate(cx, obj);
+    {
+        JSFunction *fun = (JSFunction *) JS_GetPrivate(cx, obj);
+        if ((flags & JSV2F_CONSTRUCT) && fun &&
+            (fun->flags & JSFUN_NO_CONSTRUCT)) {
+            /* Reject before the constructor path reads .prototype or
+             * allocates a receiver. That property may have a user getter. */
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_NOT_CONSTRUCTOR, "function");
+            return NULL;
+        }
+        return fun;
+    }
 }
 
 JSObject *

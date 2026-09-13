@@ -64,6 +64,7 @@
 #include "jsconfig.h"
 #include "jscntxt.h"
 #include "jsdate.h"
+#include "jsfun.h"
 #include "jsinterp.h"
 #include "jsnum.h"
 #include "jsobj.h"
@@ -1528,6 +1529,40 @@ static const char* months[] =
    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
+/* ES5 15.9.5.43, including the expanded-year form at TimeClip's limits. */
+static JSBool
+date_toISOString(JSContext *cx, JSObject *obj, uintN argc,
+                  jsval *argv, jsval *rval)
+{
+    jsdouble *date;
+    jsint year;
+    char yearbuf[8], buf[32];
+    JSString *str;
+
+    date = date_getProlog(cx, obj, argv);
+    if (!date)
+        return JS_FALSE;
+    if (!JSDOUBLE_IS_FINITE(*date)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INVALID_DATE);
+        return JS_FALSE;
+    }
+    year = YearFromTime(*date);
+    if (year >= 0 && year <= 9999)
+        JS_snprintf(yearbuf, sizeof yearbuf, "%04d", year);
+    else
+        JS_snprintf(yearbuf, sizeof yearbuf, "%c%06d",
+                    year < 0 ? '-' : '+', year < 0 ? -year : year);
+    JS_snprintf(buf, sizeof buf, "%s-%02d-%02dT%02d:%02d:%02d.%03dZ",
+                yearbuf, MonthFromTime(*date) + 1, DateFromTime(*date),
+                HourFromTime(*date), MinFromTime(*date), SecFromTime(*date),
+                msFromTime(*date));
+    str = JS_NewStringCopyZ(cx, buf);
+    if (!str)
+        return JS_FALSE;
+    *rval = STRING_TO_JSVAL(str);
+    return JS_TRUE;
+}
+
 static JSBool
 date_toGMTString(JSContext *cx, JSObject *obj, uintN argc,
                  jsval *argv, jsval *rval)
@@ -2122,6 +2157,11 @@ js_InitDateClass(JSContext *cx, JSObject *obj)
     proto = JS_InitClass(cx, obj, NULL, &js_DateClass, Date, MAXARGS,
                          NULL, date_methods, NULL, date_static_methods);
     if (!proto)
+        return NULL;
+
+    /* Internal function flags do not fit the legacy JSFunctionSpec table. */
+    if (!JS_DefineFunction(cx, proto, "toISOString", date_toISOString, 0,
+                           JSFUN_NO_CONSTRUCT))
         return NULL;
 
     /* Alias toUTCString with toGMTString.  (ECMA B.2.6) */
