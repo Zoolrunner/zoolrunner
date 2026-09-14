@@ -131,8 +131,8 @@ MarkIds(JSContext *cx, JSTempValueRooter *root)
     }
 }
 
-static JSBool
-obj_keys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+JSBool
+js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     JSObject *target, *result;
     RootedIds ids;
@@ -883,7 +883,7 @@ js_InitObjectES5(JSContext *cx, JSObject *proto)
            JS_DefineFunction(cx, ctor, "preventExtensions", obj_preventExtensions, 1, JSFUN_NO_CONSTRUCT) &&
            JS_DefineFunction(cx, ctor, "getPrototypeOf", obj_getPrototypeOf,
                               1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "keys", obj_keys, 1, JSFUN_NO_CONSTRUCT) &&
+           JS_DefineFunction(cx, ctor, "keys", js_ObjectKeys, 1, JSFUN_NO_CONSTRUCT) &&
            JS_DefineFunction(cx, ctor, "getOwnPropertyDescriptor",
                               obj_getOwnPropertyDescriptor, 2, JSFUN_NO_CONSTRUCT);
 }

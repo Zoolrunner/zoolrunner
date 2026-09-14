@@ -274,7 +274,14 @@ typedef enum JSCharType {
 
 /* XXXbe unify on A/X/Y tbls, avoid ctype.h? */
 /* XXXbe fs, etc. ? */
-#define JS_ISSPACE(c)   ((JS_CCODE(c) & 0x00070000) == 0x00040000)
+/* ES5 whitespace and line terminators, including BOM and Unicode 3.0 Zs.
+ * U+0085 and U+200B are not ECMAScript whitespace. */
+#define JS_ISSPACE(c) \
+    (((c) >= 0x0009 && (c) <= 0x000d) || (c) == 0x0020 || \
+     (c) == 0x00a0 || (c) == 0x1680 || (c) == 0x180e || \
+     ((c) >= 0x2000 && (c) <= 0x200a) || (c) == 0x2028 || \
+     (c) == 0x2029 || (c) == 0x202f || (c) == 0x205f || \
+     (c) == 0x3000 || (c) == 0xfeff)
 #define JS_ISPRINT(c)   ((c) < 128 && isprint(c))
 
 #define JS_ISUPPER(c)   (JS_CTYPE(c) == JSCT_UPPERCASE_LETTER)

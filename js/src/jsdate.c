@@ -1563,6 +1563,34 @@ date_toISOString(JSContext *cx, JSObject *obj, uintN argc,
     return JS_TRUE;
 }
 
+/* ES5 15.9.5.44 is intentionally generic; conversion precedes lookup. */
+static JSBool
+date_toJSON(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval v;
+    jsdouble d;
+
+    if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_NUMBER, rval))
+        return JS_FALSE;
+    v = *rval;
+    if (JSVAL_IS_NUMBER(v)) {
+        d = JSVAL_IS_INT(v) ? JSVAL_TO_INT(v) : *JSVAL_TO_DOUBLE(v);
+        if (!JSDOUBLE_IS_FINITE(d)) {
+            *rval = JSVAL_NULL;
+            return JS_TRUE;
+        }
+    }
+    if (!JS_GetProperty(cx, obj, "toISOString", rval))
+        return JS_FALSE;
+    if (!js_IsCallable(cx, *rval)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_INCOMPATIBLE_PROTO,
+                             "Date", "toJSON", "toISOString");
+        return JS_FALSE;
+    }
+    return js_InternalCall(cx, obj, *rval, 0, NULL, rval);
+}
+
 static JSBool
 date_toGMTString(JSContext *cx, JSObject *obj, uintN argc,
                  jsval *argv, jsval *rval)
@@ -2161,7 +2189,11 @@ js_InitDateClass(JSContext *cx, JSObject *obj)
 
     /* Internal function flags do not fit the legacy JSFunctionSpec table. */
     if (!JS_DefineFunction(cx, proto, "toISOString", date_toISOString, 0,
-                           JSFUN_NO_CONSTRUCT))
+                           JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS) ||
+        !JS_DefineFunction(cx, proto, "toJSON", date_toJSON, 1,
+                           JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS) ||
+        !js_SetBuiltinMethodFlags(cx, proto, date_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
         return NULL;
 
     /* Alias toUTCString with toGMTString.  (ECMA B.2.6) */

@@ -53,6 +53,7 @@
 #include "jstypes.h"
 #include "jsutil.h" /* Added by JSIFY */
 #include "jsapi.h"
+#include "jsfun.h"
 #include "jsatom.h"
 #include "jscntxt.h"
 #include "jsconfig.h"
@@ -623,12 +624,16 @@ js_InitNumberClass(JSContext *cx, JSObject *obj)
     /* XXX must do at least once per new thread, so do it per JSContext... */
     FIX_FPU();
 
-    if (!JS_DefineFunctions(cx, obj, number_functions))
+    if (!JS_DefineFunctions(cx, obj, number_functions) ||
+        !js_SetBuiltinMethodFlags(cx, obj, number_functions, JSFUN_NO_CONSTRUCT))
         return NULL;
 
     proto = JS_InitClass(cx, obj, NULL, &js_NumberClass, Number, 1,
                          NULL, number_methods, NULL, NULL);
     if (!proto || !(ctor = JS_GetConstructor(cx, proto)))
+        return NULL;
+    if (!js_SetBuiltinMethodFlags(cx, proto, number_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
         return NULL;
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_ZERO);
     if (!JS_DefineConstDoubles(cx, ctor, number_constants))

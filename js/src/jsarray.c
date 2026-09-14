@@ -1879,6 +1879,9 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
     /* Initialize the Array prototype object so it gets a length property. */
     if (!proto || !InitArrayObject(cx, proto, 0, NULL))
         return NULL;
+    if (!js_SetBuiltinMethodFlags(cx, proto, array_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+        return NULL;
     /* JSFunctionSpec keeps its historical 8-bit flags field. */
     ctor = JS_GetConstructor(cx, proto);
     if (!ctor || !JS_DefineFunction(cx, ctor, "isArray", array_isArray, 1,

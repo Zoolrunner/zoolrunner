@@ -169,3 +169,46 @@ preceding full run. The allocation review also checks 50,000 own property names
 and shrinking 20,000 sparse non-enumerable array indices. Clang's static analyzer
 reports no diagnostics in `jsobjes5.c`; this is not a security audit or proof of
 conformance. No failing Test262 cases or strict-mode runs have been excluded.
+
+
+## Native JSON, binding, and receiver semantics (2026-09-14, in progress)
+
+`jsjson.c` implements the ES5 JSON grammar without evaluating source, reviver
+walking, serialization with replacers and indentation, and cycle detection.
+JSON participates in eager and lazy standard-class initialization without changing
+public runtime layouts or the serialized JSProto enumeration. `Date.toJSON`,
+`Function.bind`, `String.trim`, general object argument lists for `apply`, and
+null/undefined receiver validation are implemented in the existing engine.
+Bound functions preserve the XPConnect reserved slots, trace their bound state,
+and forward construction and `instanceof` to their target. Native built-in
+methods do not acquire constructor behavior. Numeric and quoted accessor names
+are accepted by the existing parser.
+
+The receiver/String stage passed 20,400 of 22,029 Test262 cases, with 1,629
+failures and no crashes, timeouts, or harness errors; it introduced no failures
+against the preceding 20,010-pass run. The initial native JSON chapter run passes
+all 206 cases. These are intermediate measurements, not conformance completion.
+The combined byte-loader run passes 21,021 cases and fails 1,008, with no crashes,
+timeouts, or harness errors. It gains 627 passes and loses six accidental passes
+where a missing `bind` previously threw the TypeError intended for a strict
+caller-access check. Correct Unicode runs are in progress.
+
+Run `json-bind-string.js` alongside the previous three focused scripts. Its
+71 assertions cover grammar rejection, Unicode whitespace, callback ordering,
+reviver deletion, JSON prototype handling, cycles, generic Date serialization,
+bound calls/construction, poisoned accessors, and collection while values are
+reachable only through engine state. The earlier 219 assertions still pass in
+the XULRunner build. All 290 assertions and 13 embedding checks pass in both macOS arm64 builds.
+The embedding check covers lazy/eager JSON and cloning a bound function. Suite
+live HTTPS navigation and all 169 layout assertions pass after waiting for the
+browser document shell to exist before starting the integration probe.
+
+
+Unicode source transport is being corrected in the runner: the historical shell
+`load` path maps each file byte to a code unit and cannot load the upstream UTF-8
+source faithfully. The new shell `evaluate` entry point uses the Unicode global
+script compiler. The driver passes the complete unmodified source through an
+ASCII-escaped transport string, and the preflight checks a supplementary Unicode
+character. Reports label this transport explicitly. Earlier byte-loader totals
+remain historical measurements and must not be presented as Unicode-conformance
+results. No test assertions or failure annotations are changed.

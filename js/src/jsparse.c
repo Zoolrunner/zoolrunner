@@ -5503,14 +5503,17 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                         op = (atom == rt->atomState.getAtom)
                             ? JSOP_GETTER
                             : JSOP_SETTER;
-                        if (js_MatchToken(cx, ts, TOK_NAME)) {
-                            pn3 = NewParseNode(cx, ts, PN_NAME, tc);
+                        ts->flags |= TSF_KEYWORD_IS_NAME;
+                        tt = js_GetToken(cx, ts);
+                        ts->flags &= ~TSF_KEYWORD_IS_NAME;
+                        if (tt == TOK_NAME || tt == TOK_STRING || tt == TOK_NUMBER) {
+                            pn3 = NewParseNode(cx, ts, PN_NULLARY, tc);
                             if (!pn3)
                                 return NULL;
-                            pn3->pn_atom = CURRENT_TOKEN(ts).t_atom;
-                            pn3->pn_expr = NULL;
-                            pn3->pn_slot = -1;
-                            pn3->pn_attrs = 0;
+                            if (tt == TOK_NUMBER)
+                                pn3->pn_dval = CURRENT_TOKEN(ts).t_dval;
+                            else
+                                pn3->pn_atom = CURRENT_TOKEN(ts).t_atom;
 
                             /* We have to fake a 'function' token here. */
                             CURRENT_TOKEN(ts).t_op = JSOP_NOP;
@@ -5519,6 +5522,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                             pn2 = NewBinary(cx, TOK_COLON, op, pn3, pn2, tc);
                             goto skip;
                         }
+                        js_UngetToken(ts);
+                        tt = TOK_NAME;
                     }
                     /* else fall thru ... */
                 }

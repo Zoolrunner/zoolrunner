@@ -335,6 +335,12 @@ extern JSObject*
 js_InitBlockClass(JSContext *cx, JSObject* obj);
 
 extern JSObject *
+js_InitJSONClass(JSContext *cx, JSObject *obj);
+
+extern JSBool
+js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval);
+
+extern JSObject *
 js_InitObjectClass(JSContext *cx, JSObject *obj);
 
 extern JSBool

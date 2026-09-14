@@ -69,7 +69,22 @@ struct JSFunction {
 
 /* Internal function flag; it is not a property attribute or a public API flag. */
 #define JSFUN_NO_CONSTRUCT   0x4000 /* no [[Construct]] or implicit prototype */
-#define JSFUN_INTERNAL_FLAGS_MASK (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT)
+#define JSFUN_BOUND_FUNCTION 0x1000 /* ES5 bound target/this/arguments slots */
+#define JSFUN_REQUIRE_THIS   0x2000 /* native CheckObjectCoercible receiver */
+#define JSFUN_INTERNAL_FLAGS_MASK \
+    (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS | JSFUN_BOUND_FUNCTION)
+
+extern JSBool
+js_IsCallable(JSContext *cx, jsval v);
+
+extern JSBool
+js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
+                JSBool construct, jsval *rval);
+
+/* Mark built-in methods without widening the public JSFunctionSpec flags. */
+extern JSBool
+js_SetBuiltinMethodFlags(JSContext *cx, JSObject *obj, JSFunctionSpec *methods,
+                         uintN flags);
 
 #define JSFUN_INTERPRETED    0x8000 /* use u.i if set, u.n if unset */
 

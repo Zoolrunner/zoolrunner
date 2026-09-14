@@ -350,7 +350,11 @@ suite, including inherited earlier-edition coverage. Do not exclude failing
 cases, weaken their assertions, or substitute focused test totals for a full
 run. Passing the suite is not a proof that every specification behavior has
 been tested. Keep any earlier-edition tests separate when ES5 intentionally
-changes their required semantics.
+changes their required semantics. The conformance runner must preserve Unicode
+source through the shell's Unicode global-script compiler and pass its source
+transport preflight; the historical byte-oriented `load` path is not suitable
+for the upstream UTF-8 test files. Include callback/reentrancy and garbage-
+collection regressions when adding native standard-library state.
 
 Changes to bytecode must update the bytecode cache version and preserve
 function/script decompilation. Exercise engine changes in both XULRunner and

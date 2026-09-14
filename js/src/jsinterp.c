@@ -1210,6 +1210,19 @@ have_fun:
             nslots += fun->u.n.extra;
         }
 
+        if ((fun->flags & JSFUN_REQUIRE_THIS) &&
+            (JSVAL_IS_NULL(thisv) || JSVAL_IS_VOID(thisv))) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_INCOMPATIBLE_PROTO,
+                                 "builtin", "method", "null or undefined");
+            ok = JS_FALSE;
+            goto out2;
+        }
+        /* Non-strict functions still substitute their global object.  Keep
+         * the original value in vp[1] for native receiver checks. */
+        if (JSVAL_IS_VOID(thisv))
+            thisv = JSVAL_NULL;
+
         if (JSFUN_BOUND_METHOD_TEST(fun->flags)) {
             /* Handle bound method special case. */
             thisp = parent;
@@ -1941,6 +1954,12 @@ js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
         fun = js_ValueToFunction(cx, vp, JSV2F_CONSTRUCT);
         if (!fun)
             return JS_FALSE;
+    }
+
+    if (fun && (fun->flags & JSFUN_BOUND_FUNCTION)) {
+        JSBool ok = js_InvokeBound(cx, obj2, argc, vp + 2, JS_TRUE, vp);
+        cx->fp->sp = vp + 1;
+        return ok;
     }
 
     clasp = &js_ObjectClass;

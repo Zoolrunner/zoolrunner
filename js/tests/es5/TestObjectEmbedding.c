@@ -4,10 +4,17 @@
 #include <stdio.h>
 #include <string.h>
 
+static JSBool
+ResolveStandard(JSContext *cx, JSObject *obj, jsval id)
+{
+    JSBool resolved;
+    return JS_ResolveStandardClass(cx, obj, id, &resolved);
+}
+
 static JSClass globalClass = {
     "global", 0, /* Historical embedders need not set JSCLASS_GLOBAL_FLAGS. */
     JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JS_EnumerateStub, ResolveStandard, JS_ConvertStub, JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
 static JSObject *protectedObject;
@@ -42,7 +49,7 @@ int main(void)
 {
     JSRuntime *rt;
     JSContext *cx;
-    JSObject *global;
+    JSObject *global, *clone;
     JSScript *script = NULL, *decoded = NULL;
     JSXDRState *encoder = NULL, *decoder = NULL;
     uint32 length;
@@ -59,7 +66,21 @@ int main(void)
     global = JS_NewObject(cx, &globalClass, NULL, NULL);
     if (!global) goto out;
     JS_SetGlobalObject(cx, global);
+    if (!Evaluate(cx, global,
+        "typeof JSON==='object' && JSON.parse('[1]')[0]===1 && "
+        "Object.getPrototypeOf(JSON)===Object.prototype")) goto out;
     if (!JS_InitStandardClasses(cx, global)) goto out;
+    if (!Evaluate(cx, global,
+        "JSON.stringify({a:1})==='{\"a\":1}' && "
+        "Object.prototype.toString.call(JSON)==='[object JSON]'")) goto out;
+    if (!Evaluate(cx, global,
+        "var boundForClone=(function(a,b){return this.x+a+b;}).bind({x:4},5); true") ||
+        !JS_GetProperty(cx, global, "boundForClone", &result)) goto out;
+    clone = JS_CloneFunctionObject(cx, JSVAL_TO_OBJECT(result), global);
+    if (!clone || !JS_DefineProperty(cx, global, "clonedBound",
+                                      OBJECT_TO_JSVAL(clone), NULL, NULL, 0)) goto out;
+    JS_GC(cx);
+    if (!Evaluate(cx, global, "clonedBound(6)===15 && clonedBound.length===1")) goto out;
     protectedObject = JS_NewObject(cx, NULL, NULL, global);
     if (!protectedObject ||
         !JS_DefineProperty(cx, global, "protectedObject",

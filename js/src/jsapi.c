@@ -1267,6 +1267,7 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitCallClass(cx, obj) &&
            js_InitExceptionClasses(cx, obj) &&
            js_InitMathClass(cx, obj) &&
+           js_InitJSONClass(cx, obj) &&
            js_InitNumberClass(cx, obj) &&
            js_InitRegExpClass(cx, obj) &&
            js_InitStringClass(cx, obj) &&
@@ -1310,6 +1311,10 @@ StdNameToAtom(JSContext *cx, JSStdName *stdn)
     const char *name;
 
     offset = stdn->atomOffset;
+    /* New standard objects need not change the historical runtime layout or
+     * the serialized JSProto enumeration.  Offset zero means no atom slot. */
+    if (!offset)
+        return js_Atomize(cx, stdn->name, strlen(stdn->name), ATOM_PINNED);
     atom = OFFSET_TO_ATOM(cx->runtime, offset);
     if (!atom) {
         name = stdn->name;
@@ -1333,6 +1338,7 @@ static JSStdName standard_class_atoms[] = {
     {js_InitBooleanClass,               EAGER_ATOM_AND_CLASP(Boolean)},
     {js_InitDateClass,                  EAGER_ATOM_AND_CLASP(Date)},
     {js_InitMathClass,                  EAGER_ATOM_AND_CLASP(Math)},
+    {js_InitJSONClass,                  0, "JSON", NULL},
     {js_InitNumberClass,                EAGER_ATOM_AND_CLASP(Number)},
     {js_InitStringClass,                EAGER_ATOM_AND_CLASP(String)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
@@ -1465,7 +1471,9 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
     /* Try for class constructors/prototypes named by well-known atoms. */
     stdnm = NULL;
     for (i = 0; standard_class_atoms[i].init; i++) {
-        atom = OFFSET_TO_ATOM(rt, standard_class_atoms[i].atomOffset);
+        atom = StdNameToAtom(cx, &standard_class_atoms[i]);
+        if (!atom)
+            return JS_FALSE;
         if (idstr == ATOM_TO_STRING(atom)) {
             stdnm = &standard_class_atoms[i];
             break;
@@ -1559,7 +1567,9 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
 
     /* Initialize any classes that have not been resolved yet. */
     for (i = 0; standard_class_atoms[i].init; i++) {
-        atom = OFFSET_TO_ATOM(rt, standard_class_atoms[i].atomOffset);
+        atom = StdNameToAtom(cx, &standard_class_atoms[i]);
+        if (!atom)
+            return JS_FALSE;
         if (!AlreadyHasOwnProperty(cx, obj, atom) &&
             !standard_class_atoms[i].init(cx, obj)) {
             return JS_FALSE;
@@ -1626,7 +1636,9 @@ JS_EnumerateResolvedStandardClasses(JSContext *cx, JSObject *obj,
 
     /* Enumerate only classes that *have* been resolved. */
     for (j = 0; standard_class_atoms[j].init; j++) {
-        atom = OFFSET_TO_ATOM(rt, standard_class_atoms[j].atomOffset);
+        atom = StdNameToAtom(cx, &standard_class_atoms[j]);
+        if (!atom)
+            return NULL;
         ida = EnumerateIfResolved(cx, obj, atom, ida, &i, &found);
         if (!ida)
             return NULL;

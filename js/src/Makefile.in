@@ -83,6 +83,7 @@ CSRCS		= \
 		jshash.c \
 		jsinterp.c \
 		jsiter.c \
+		jsjson.c \
 		jslock.c \
 		jslog2.c \
 		jslong.c \

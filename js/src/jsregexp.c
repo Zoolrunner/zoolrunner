@@ -4139,6 +4139,9 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
 
     if (!proto || !(ctor = JS_GetConstructor(cx, proto)))
         return NULL;
+    if (!js_SetBuiltinMethodFlags(cx, proto, regexp_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+        return NULL;
     if (!JS_AliasProperty(cx, ctor, "input",        "$_") ||
         !JS_AliasProperty(cx, ctor, "multiline",    "$*") ||
         !JS_AliasProperty(cx, ctor, "lastMatch",    "$&") ||

@@ -303,3 +303,5 @@ MSG_DEF(JSMSG_EMPTY_ARRAY_REDUCE,     220, 0, JSEXN_TYPEERR, "reduce of empty ar
 MSG_DEF(JSMSG_INVALID_DATE,          221, 0, JSEXN_RANGEERR, "invalid date")
 MSG_DEF(JSMSG_OBJECT_REQUIRED,        222, 0, JSEXN_TYPEERR, "Object method requires an object")
 MSG_DEF(JSMSG_BAD_DESCRIPTOR,        223, 0, JSEXN_TYPEERR, "invalid property descriptor or forbidden property change")
+MSG_DEF(JSMSG_BAD_JSON,              224, 0, JSEXN_SYNTAXERR, "invalid JSON text")
+MSG_DEF(JSMSG_JSON_CYCLE,            225, 0, JSEXN_TYPEERR, "cyclic value in JSON serialization")

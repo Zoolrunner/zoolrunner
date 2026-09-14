@@ -338,12 +338,16 @@ changes assumptions that existing applications may depend on.
 ## ECMAScript Compatibility
 
 Full ECMAScript 5.1 is a required target for the existing SpiderMonkey engine.
-It is not yet implemented. The 2026-09-13 Test262 baseline passed 13,548 of
-22,029 test/mode cases. The latest completed full run passes **20,010** and
-fails **2,019**, without crashes, timeouts, or harness errors. Native Object
-reflection, descriptor writing, creation, and integrity controls are implemented,
-along with array-length, mapped-arguments, and RegExp property corrections.
-Strict mode, JSON, function binding, and built-in edge cases remain unfinished.
+It is not yet implemented. Historical byte-loader Test262 runs reached
+**21,021 passes and 1,008 failures** among 22,029 test/mode cases, without
+crashes, timeouts, or harness errors. That loader did not faithfully decode
+Unicode source; complete runs through the corrected Unicode script compiler
+are in progress. Native Object reflection, descriptor writing, creation, and
+integrity controls are implemented, along with JSON, function binding, `trim`,
+receiver validation, and array/arguments/RegExp property corrections. Both macOS
+arm64 applications pass 290 focused JavaScript assertions, 13 embedding checks,
+and 169 layout assertions; the Suite also passes live HTTPS navigation.
+Strict mode and further parsing/built-in edge cases remain unfinished.
 The completion target is zero failures in the full suite, not just focused tests.
 See [ES5 testing](js/tests/es5/README.md) for the pinned suite, commands, known
 false positives, and validation scope. Historical embedding APIs and Mozilla

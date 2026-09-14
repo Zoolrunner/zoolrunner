@@ -58,8 +58,12 @@ def main():
             source = Path(work) / 'case.js'
             driver = Path(work) / 'driver.js'
             prefix = '"use strict";\nvar strict_mode = true;\n' if strict else 'var strict_mode = false;\n'
-            source.write_text(prefix + harness + '\n' + record['test'] + '\n', encoding='utf-8')
-            driver.write_text('try { load(' + json.dumps(str(source)) + ');\n'
+            code = prefix + harness + '\n' + record['test'] + '\n'
+            source.write_text(code, encoding='utf-8')
+            # An ASCII transport string preserves every UTF-16 code unit;
+            # evaluate compiles a global script, not an eval activation.
+            driver.write_text('try { evaluate(' + json.dumps(code, ensure_ascii=True) +
+                              ', ' + json.dumps(str(source)) + ');\n'
                               'print("ZOOL262 PASS");\n'
                               '} catch (e) { print("ZOOL262 THROW " + String(e)); }\n', encoding='utf-8')
             try:
@@ -87,7 +91,9 @@ def main():
     # A missing primitive needed by harness initialization must not turn every
     # test into a misleading language failure (or a passing negative test).
     for strict in [False, True]:
-        preflight = run(('harness-preflight', strict, {'test': ''}))
+        preflight = run(('harness-preflight', strict, {'test':
+            'if ("𐒠".length !== 2 || "𐒠".charCodeAt(0) !== 0xD801 || '
+            '"𐒠".charCodeAt(1) !== 0xDCA0) throw Error("Unicode source transport");'}))
         if preflight['status'] != 'pass':
             parser.error('harness initialization failed: ' + str(preflight))
     started = time.monotonic()
@@ -102,7 +108,7 @@ def main():
     counts = {status: sum(r['status'] == status for r in results)
               for status in ['pass', 'fail', 'timeout', 'crash', 'harness-error']}
     revision = subprocess.check_output(['git', '-C', str(suite), 'rev-parse', 'HEAD'], text=True).strip()
-    report = {'suite_revision': revision, 'shell': str(shell), 'filter': args.filter,
+    report = {'source_transport': 'unicode-global-script', 'suite_revision': revision, 'shell': str(shell), 'filter': args.filter,
               'seconds': round(time.monotonic() - started, 2), 'counts': counts, 'results': results}
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + '\n')

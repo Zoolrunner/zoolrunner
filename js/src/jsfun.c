@@ -1061,7 +1061,9 @@ fun_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 
       case ARGS_LENGTH:
       case FUN_ARITY:
-            *vp = INT_TO_JSVAL((jsint)fun->nargs);
+        if (fun->flags & JSFUN_BOUND_FUNCTION)
+            return JS_GetReservedSlot(cx, obj, 5, vp);
+        *vp = INT_TO_JSVAL((jsint)fun->nargs);
         break;
 
       case FUN_NAME:
@@ -1144,7 +1146,7 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
         JSObject *proto, *parentProto;
         jsval pval;
 
-        if (fun->flags & JSFUN_NO_CONSTRUCT)
+        if (fun->flags & (JSFUN_NO_CONSTRUCT | JSFUN_BOUND_FUNCTION))
             return JS_TRUE;
 
         proto = parentProto = NULL;
@@ -1442,7 +1444,19 @@ fun_hasInstance(JSContext *cx, JSObject *obj, jsval v, JSBool *bp)
 {
     jsval pval;
     JSString *str;
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, obj);
 
+    if (fun && (fun->flags & JSFUN_BOUND_FUNCTION)) {
+        if (!JS_GetReservedSlot(cx, obj, 2, &pval))
+            return JS_FALSE;
+        obj = JSVAL_TO_OBJECT(pval);
+        if (!obj->map->ops->hasInstance) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_BAD_INSTANCEOF_RHS, "bound target");
+            return JS_FALSE;
+        }
+        return obj->map->ops->hasInstance(cx, obj, v, bp);
+    }
     if (!OBJ_GET_PROPERTY(cx, obj,
                           ATOM_TO_JSID(cx->runtime->atomState
                                        .classPrototypeAtom),
@@ -1488,7 +1502,17 @@ fun_reserveSlots(JSContext *cx, JSObject *obj)
     JSFunction *fun;
 
     fun = (JSFunction *) JS_GetPrivate(cx, obj);
-    return (fun && FUN_INTERPRETED(fun)) ? fun->u.i.nregexps : 0;
+    /* JS_InitClass defines Function.prototype properties before private
+     * function data exists. Reserve its realm slot at that first allocation. */
+    if (!fun)
+        return 1;
+    if (fun->flags & JSFUN_BOUND_FUNCTION)
+        return 4;
+    if (fun && FUN_INTERPRETED(fun)) {
+        /* Function.prototype owns the realm's shared ThrowTypeError. */
+        return fun->u.i.nregexps + ((fun->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0);
+    }
+    return 0;
 }
 
 /*
@@ -1574,23 +1598,31 @@ fun_toSource(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 #endif
 
+JSBool
+js_IsCallable(JSContext *cx, jsval v)
+{
+    JSObject *obj;
+    if (JSVAL_IS_PRIMITIVE(v))
+        return JS_FALSE;
+    obj = JSVAL_TO_OBJECT(v);
+    return VALUE_IS_FUNCTION(cx, v) || OBJ_GET_CLASS(cx, obj)->call ||
+           (obj->map->ops != &js_ObjectOps && obj->map->ops->call);
+}
+
 static const char call_str[] = "call";
 
 static JSBool
 fun_call(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
-    jsval fval, *sp, *oldsp;
+    jsval fval, thisv, *sp, *oldsp;
     JSString *str;
     void *mark;
     uintN i;
     JSStackFrame *fp;
     JSBool ok;
 
-    if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_FUNCTION, &argv[-1]))
-        return JS_FALSE;
-    fval = argv[-1];
-
-    if (!VALUE_IS_FUNCTION(cx, fval)) {
+    fval = OBJECT_TO_JSVAL(obj);
+    if (!js_IsCallable(cx, fval)) {
         str = JS_ValueToString(cx, fval);
         if (str) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -1601,15 +1633,8 @@ fun_call(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return JS_FALSE;
     }
 
-    if (argc == 0) {
-        /* Call fun with its global object as the 'this' param if no args. */
-        obj = NULL;
-    } else {
-        /* Otherwise convert the first arg to 'this' and skip over it. */
-        if (!JSVAL_IS_PRIMITIVE(argv[0]))
-            obj = JSVAL_TO_OBJECT(argv[0]);
-        else if (!js_ValueToObject(cx, argv[0], &obj))
-            return JS_FALSE;
+    thisv = argc ? argv[0] : JSVAL_VOID;
+    if (argc) {
         argc--;
         argv++;
     }
@@ -1621,7 +1646,7 @@ fun_call(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
     /* Push fval, obj, and the args. */
     *sp++ = fval;
-    *sp++ = OBJECT_TO_JSVAL(obj);
+    *sp++ = thisv;
     for (i = 0; i < argc; i++)
         *sp++ = argv[i];
 
@@ -1645,7 +1670,7 @@ fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSString *str;
     JSObject *aobj;
     jsuint length;
-    JSBool arraylike, ok;
+    JSBool ok;
     void *mark;
     uintN i;
     JSStackFrame *fp;
@@ -1655,11 +1680,8 @@ fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return fun_call(cx, obj, argc, argv, rval);
     }
 
-    if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_FUNCTION, &argv[-1]))
-        return JS_FALSE;
-    fval = argv[-1];
-
-    if (!VALUE_IS_FUNCTION(cx, fval)) {
+    fval = OBJECT_TO_JSVAL(obj);
+    if (!js_IsCallable(cx, fval)) {
         str = JS_ValueToString(cx, fval);
         if (str) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -1676,39 +1698,33 @@ fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
     if (argc >= 2) {
         /* If the 2nd arg is null or void, call the function with 0 args. */
-        if (JSVAL_IS_NULL(argv[1]) || JSVAL_IS_VOID(argv[1])) {
-            argc = 0;
-        } else {
-            /* The second arg must be an array (or arguments object). */
-            arraylike = JS_FALSE;
-            if (!JSVAL_IS_PRIMITIVE(argv[1])) {
-                aobj = JSVAL_TO_OBJECT(argv[1]);
-                if (!js_IsArrayLike(cx, aobj, &arraylike, &length))
-                    return JS_FALSE;
-            }
-            if (!arraylike) {
+        if (!JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
+            /* ES5 accepts any object as the argument list. */
+            if (JSVAL_IS_PRIMITIVE(argv[1])) {
                 JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                                      JSMSG_BAD_APPLY_ARGS, "apply");
                 return JS_FALSE;
             }
+            aobj = JSVAL_TO_OBJECT(argv[1]);
+            if (!js_GetLengthProperty(cx, aobj, &length))
+                return JS_FALSE;
         }
     }
 
-    /* Convert the first arg to 'this' and skip over it. */
-    if (!JSVAL_IS_PRIMITIVE(argv[0]))
-        obj = JSVAL_TO_OBJECT(argv[0]);
-    else if (!js_ValueToObject(cx, argv[0], &obj))
+    /* Do not silently discard arguments on implementation-limit overflow. */
+    if (length >= ARRAY_INIT_LIMIT) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_TOO_MANY_FUN_ARGS);
         return JS_FALSE;
-
-    /* Allocate stack space for fval, obj, and the args. */
-    argc = (uintN)JS_MIN(length, ARRAY_INIT_LIMIT - 1);
+    }
+    argc = (uintN)length;
     sp = js_AllocStack(cx, 2 + argc, &mark);
     if (!sp)
         return JS_FALSE;
 
-    /* Push fval, obj, and aobj's elements as args. */
+    /* Preserve the receiver until the target's invocation semantics apply. */
     *sp++ = fval;
-    *sp++ = OBJECT_TO_JSVAL(obj);
+    *sp++ = argv[0];
     for (i = 0; i < argc; i++) {
         ok = JS_GetElement(cx, aobj, (jsint)i, sp);
         if (!ok)
@@ -1783,11 +1799,149 @@ out:
 }
 #endif
 
+/* Bound function state occupies per-instance reserved slots, after the two
+ * slots reserved for XPConnect. It is invisible to property enumeration. */
+JSBool
+js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
+                JSBool construct, jsval *rval)
+{
+    jsval state[3], *sp, *base, *oldsp;
+    JSTempValueRooter root;
+    JSStackFrame *fp = cx->fp;
+    jsuint count, i;
+    void *mark;
+    JSBool ok = JS_FALSE;
+
+    if (!JS_CHECK_STACK_SIZE(cx, state)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
+        return JS_FALSE;
+    }
+    state[0] = state[1] = state[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, state, &root);
+    for (i = 0; i < 3; i++) {
+        if (!JS_GetReservedSlot(cx, bound, i + 2, &state[i])) goto out;
+    }
+    if (!js_GetLengthProperty(cx, JSVAL_TO_OBJECT(state[2]), &count)) goto out;
+    if (count >= ARRAY_INIT_LIMIT || argc >= ARRAY_INIT_LIMIT - count) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS);
+        goto out;
+    }
+    base = sp = js_AllocStack(cx, 2 + count + argc, &mark);
+    if (!sp) goto out;
+    *sp++ = state[0];
+    *sp++ = construct ? JSVAL_NULL : state[1];
+    for (i = 0; i < count; i++) {
+        if (!JS_GetElement(cx, JSVAL_TO_OBJECT(state[2]), i, sp++)) {
+            js_FreeStack(cx, mark);
+            goto out;
+        }
+    }
+    for (i = 0; i < argc; i++) *sp++ = argv[i];
+    oldsp = fp->sp;
+    fp->sp = sp;
+    ok = construct ? js_InvokeConstructor(cx, base, count + argc) :
+         js_Invoke(cx, count + argc, JSINVOKE_INTERNAL | JSINVOKE_SKIP_CALLER);
+    if (ok) *rval = base[0];
+    fp->sp = oldsp;
+    js_FreeStack(cx, mark);
+out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+fun_bound(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return js_InvokeBound(cx, JSVAL_TO_OBJECT(argv[-2]), argc, argv,
+                           (cx->fp->flags & JSFRAME_CONSTRUCTING) != 0, rval);
+}
+
+static JSBool
+ThrowTypeError(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+    return JS_FALSE;
+}
+
+static JSBool
+fun_bind(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSFunction *fun, *thrower;
+    JSObject *bound, *array, *proto;
+    jsval roots[3];
+    JSTempValueRooter root;
+    JSScope *scope;
+    jsdouble length = 0;
+    uintN count = argc ? argc - 1 : 0;
+    JSBool ok = JS_FALSE;
+
+    if (!js_IsCallable(cx, OBJECT_TO_JSVAL(obj))) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_INCOMPATIBLE_PROTO, "Function", "bind", "object");
+        return JS_FALSE;
+    }
+    roots[0] = roots[1] = roots[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
+    if (OBJ_GET_CLASS(cx, obj) == &js_FunctionClass) {
+        if (!JS_GetProperty(cx, obj, "length", &roots[0]) ||
+            !JS_ValueToNumber(cx, roots[0], &length)) goto out;
+        length = js_DoubleToInteger(length) - count;
+        if (length < 0) length = 0;
+    }
+    fun = js_NewFunction(cx, NULL, fun_bound, 0, JSFUN_BOUND_FUNCTION,
+                         OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(argv[-2])), NULL);
+    if (!fun) goto out;
+    bound = fun->object;
+    *rval = OBJECT_TO_JSVAL(bound);
+    /* Acquire the own scope before storing reserved values. Otherwise the
+     * later slotless poison accessors can detach the shared scope with a
+     * freeslot below those values, hiding them from the garbage collector. */
+    JS_LOCK_OBJ(cx, bound);
+    scope = js_GetMutableScope(cx, bound);
+    JS_UNLOCK_OBJ(cx, bound);
+    if (!scope) goto out;
+    array = js_NewArrayObject(cx, count, count ? argv + 1 : NULL);
+    if (!array) goto out;
+    roots[1] = OBJECT_TO_JSVAL(array);
+    if (!JS_NewNumberValue(cx, length, &roots[0]) ||
+        !JS_SetReservedSlot(cx, bound, 2, OBJECT_TO_JSVAL(obj)) ||
+        !JS_SetReservedSlot(cx, bound, 3, argc ? argv[0] : JSVAL_VOID) ||
+        !JS_SetReservedSlot(cx, bound, 4, roots[1]) ||
+        !JS_SetReservedSlot(cx, bound, 5, roots[0])) goto out;
+
+    proto = OBJ_GET_PROTO(cx, bound);
+    if (!JS_GetReservedSlot(cx, proto, 2, &roots[2])) goto out;
+    if (JSVAL_IS_VOID(roots[2])) {
+        thrower = js_NewFunction(cx, NULL, ThrowTypeError, 0, JSFUN_NO_CONSTRUCT,
+                                 OBJ_GET_PARENT(cx, proto), NULL);
+        if (!thrower) goto out;
+        roots[2] = OBJECT_TO_JSVAL(thrower->object);
+        if (!JS_SetReservedSlot(cx, proto, 2, roots[2])) goto out;
+        JS_LOCK_OBJ(cx, thrower->object);
+        scope = js_GetMutableScope(cx, thrower->object);
+        if (scope) scope->flags |= SCOPE_NONEXTENSIBLE;
+        JS_UNLOCK_OBJ(cx, thrower->object);
+        if (!scope) goto out;
+    }
+    ok = JS_DefineProperty(cx, bound, "caller", JSVAL_VOID,
+                           (JSPropertyOp)JSVAL_TO_OBJECT(roots[2]),
+                           (JSPropertyOp)JSVAL_TO_OBJECT(roots[2]),
+                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED | JSPROP_PERMANENT) &&
+         JS_DefineProperty(cx, bound, "arguments", JSVAL_VOID,
+                           (JSPropertyOp)JSVAL_TO_OBJECT(roots[2]),
+                           (JSPropertyOp)JSVAL_TO_OBJECT(roots[2]),
+                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED | JSPROP_PERMANENT);
+out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static JSFunctionSpec function_methods[] = {
+    {"bind", fun_bind, 1, 0, 0},
 #if JS_HAS_TOSOURCE
     {js_toSource_str,   fun_toSource,   0,0,0},
 #endif
-    {js_toString_str,   fun_toString,   1,0,0},
+    {js_toString_str,   fun_toString,   0,0,0},
     {"apply",           fun_apply,      2,0,0},
     {call_str,          fun_call,       1,0,0},
 #ifdef NARCISSUS
@@ -2098,6 +2252,22 @@ bad:
     return JS_FALSE;
 }
 
+JSBool
+js_SetBuiltinMethodFlags(JSContext *cx, JSObject *obj, JSFunctionSpec *methods,
+                         uintN flags)
+{
+    JSFunctionSpec *fs;
+    jsval v;
+
+    for (fs = methods; fs->name; fs++) {
+        if (!JS_GetProperty(cx, obj, fs->name, &v))
+            return JS_FALSE;
+        JS_ASSERT(VALUE_IS_FUNCTION(cx, v));
+        ((JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(v)))->flags |= flags;
+    }
+    return JS_TRUE;
+}
+
 JSObject *
 js_InitFunctionClass(JSContext *cx, JSObject *obj)
 {
@@ -2116,6 +2286,9 @@ js_InitFunctionClass(JSContext *cx, JSObject *obj)
         goto bad;
     fun->u.i.script->code[0] = JSOP_STOP;
     fun->flags |= JSFUN_INTERPRETED | JSFUN_NO_CONSTRUCT;
+    if (!js_SetBuiltinMethodFlags(cx, proto, function_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+        goto bad;
     return proto;
 
 bad:
@@ -2203,6 +2376,25 @@ js_CloneFunctionObject(JSContext *cx, JSObject *funobj, JSObject *parent)
     if (!js_LinkFunctionObject(cx, fun, newfunobj)) {
         cx->weakRoots.newborn[GCX_OBJECT] = NULL;
         return NULL;
+    }
+    if (fun->flags & JSFUN_BOUND_FUNCTION) {
+        JSTempValueRooter root;
+        JSScope *scope;
+        jsval value;
+        uintN i;
+        JSBool ok = JS_TRUE;
+
+        JS_PUSH_TEMP_ROOT_OBJECT(cx, newfunobj, &root);
+        JS_LOCK_OBJ(cx, newfunobj);
+        scope = js_GetMutableScope(cx, newfunobj);
+        JS_UNLOCK_OBJ(cx, newfunobj);
+        if (!scope) ok = JS_FALSE;
+        for (i = 2; ok && i < 6; i++) {
+            ok = JS_GetReservedSlot(cx, funobj, i, &value) &&
+                 JS_SetReservedSlot(cx, newfunobj, i, value);
+        }
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!ok) return NULL;
     }
     return newfunobj;
 }

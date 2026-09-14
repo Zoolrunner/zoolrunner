@@ -62,6 +62,7 @@
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsgc.h"
+#include "jsfun.h"
 #include "jsinterp.h"
 #include "jslock.h"
 #include "jsnum.h"
@@ -2220,7 +2221,33 @@ str_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 #endif /* JS_HAS_STR_HTML_HELPERS */
 
+static JSBool
+str_trim(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str;
+    const jschar *chars;
+    size_t begin, end;
+
+    str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
+    if (!str)
+        return JS_FALSE;
+    argv[-1] = STRING_TO_JSVAL(str);
+    chars = JSSTRING_CHARS(str);
+    begin = 0;
+    end = JSSTRING_LENGTH(str);
+    while (begin < end && JS_ISSPACE(chars[begin]))
+        begin++;
+    while (end > begin && JS_ISSPACE(chars[end - 1]))
+        end--;
+    str = js_NewDependentString(cx, str, begin, end - begin, 0);
+    if (!str)
+        return JS_FALSE;
+    *rval = STRING_TO_JSVAL(str);
+    return JS_TRUE;
+}
+
 static JSFunctionSpec string_methods[] = {
+    {"trim", str_trim, 0, JSFUN_GENERIC_NATIVE | JSFUN_THISP_PRIMITIVE, 0},
 #if JS_HAS_TOSOURCE
     {"quote",               str_quote,              0,JSFUN_GENERIC_NATIVE|
                                                       JSFUN_THISP_PRIMITIVE,0},
@@ -2419,7 +2446,8 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
     JSObject *proto;
 
     /* Define the escape, unescape functions in the global object. */
-    if (!JS_DefineFunctions(cx, obj, string_functions))
+    if (!JS_DefineFunctions(cx, obj, string_functions) ||
+        !js_SetBuiltinMethodFlags(cx, obj, string_functions, JSFUN_NO_CONSTRUCT))
         return NULL;
 
     proto = JS_InitClass(cx, obj, NULL, &js_StringClass, String, 1,
@@ -2429,6 +2457,9 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
         return NULL;
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE,
                  STRING_TO_JSVAL(cx->runtime->emptyString));
+    if (!js_SetBuiltinMethodFlags(cx, proto, string_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+        return NULL;
     return proto;
 }
 

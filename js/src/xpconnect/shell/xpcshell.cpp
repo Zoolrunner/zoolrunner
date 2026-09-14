@@ -206,6 +206,39 @@ Dump(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+/* Compile Unicode source as a global script, without eval's scope semantics
+ * or the historical file loader's byte-to-code-unit conversion. */
+JS_STATIC_DLL_CALLBACK(JSBool)
+Evaluate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *source, *name;
+    JSScript *script;
+    const char *filename = "evaluate";
+    JSBool ok;
+
+    source = JS_ValueToString(cx, argc ? argv[0] : JSVAL_VOID);
+    if (!source)
+        return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(source);
+    if (argc > 1) {
+        name = JS_ValueToString(cx, argv[1]);
+        if (!name)
+            return JS_FALSE;
+        argv[1] = STRING_TO_JSVAL(name);
+        filename = JS_GetStringBytes(name);
+        if (!filename)
+            return JS_FALSE;
+    }
+    script = JS_CompileUCScriptForPrincipals(cx, obj, gJSPrincipals,
+                                            JS_GetStringChars(source),
+                                            JS_GetStringLength(source), filename, 1);
+    if (!script)
+        return JS_FALSE;
+    ok = compileOnly || JS_ExecuteScript(cx, obj, script, rval);
+    JS_DestroyScript(cx, script);
+    return ok;
+}
+
 JS_STATIC_DLL_CALLBACK(JSBool)
 Load(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -351,6 +384,7 @@ Clear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static JSFunctionSpec glob_functions[] = {
     {"print",           Print,          0},
     {"load",            Load,           1},
+    {"evaluate",        Evaluate,       1},
     {"quit",            Quit,           0},
     {"version",         Version,        1},
     {"build",           BuildDate,      0},

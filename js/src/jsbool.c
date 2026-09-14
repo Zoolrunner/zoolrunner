@@ -44,6 +44,7 @@
 #include "jstypes.h"
 #include "jsutil.h" /* Added by JSIFY */
 #include "jsapi.h"
+#include "jsfun.h"
 #include "jsatom.h"
 #include "jsbool.h"
 #include "jscntxt.h"
@@ -169,6 +170,9 @@ js_InitBooleanClass(JSContext *cx, JSObject *obj)
     proto = JS_InitClass(cx, obj, NULL, &js_BooleanClass, Boolean, 1,
                         NULL, boolean_methods, NULL, NULL);
     if (!proto)
+        return NULL;
+    if (!js_SetBuiltinMethodFlags(cx, proto, boolean_methods,
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
         return NULL;
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_FALSE);
     return proto;
