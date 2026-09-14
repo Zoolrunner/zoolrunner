@@ -1,0 +1,75 @@
+name: macOS applications
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.app }} / ${{ matrix.arch }} / SDK 11.3
+    runs-on: macos-15
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x86_64]
+        app: [suite, browser, calendar, xulrunner]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      ZR_BUILD_JOBS: '3'
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install host build dependencies
+        run: brew install autoconf glib pkgconf perl
+      - name: Install the pinned macOS 11.3 SDK
+        run: |
+          sh build/macosx/fetch-sdk.sh "$RUNNER_TEMP/zoolrunner-sdk"
+          echo "ZR_MACOS_SDK=$RUNNER_TEMP/zoolrunner-sdk/MacOSX11.3.sdk" >> "$GITHUB_ENV"
+      - name: Build
+        env:
+          ZR_ARCH: ${{ matrix.arch }}
+          ZR_APP: ${{ matrix.app }}
+        run: |
+          export MOZCONFIG="$GITHUB_WORKSPACE/mozconfigs/macos/$ZR_ARCH/cocoa_${ZR_APP}_clang.mozconfig"
+          make -f client.mk build 2>&1 | tee build.log
+      - name: Package relocatable development artifacts
+        env:
+          ZR_ARCH: ${{ matrix.arch }}
+          ZR_APP: ${{ matrix.app }}
+        run: python3 build/macosx/package-ci.py "$ZR_ARCH" "$ZR_APP" 2>&1 | tee package.log
+      - name: Upload application
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zoolrunner-macos-${{ matrix.arch }}-${{ matrix.app }}-sdk11.3
+          path: artifacts/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: logs-macos-${{ matrix.arch }}-${{ matrix.app }}
+          path: |
+            build.log
+            package.log
+            artifacts/*-calendar-tests/*.log
+            obj-zoolrunner-macos-${{ matrix.arch }}-${{ matrix.app }}/config.log
+            obj-zoolrunner-macos-${{ matrix.arch }}-${{ matrix.app }}/config/autoconf.mk
+          if-no-files-found: warn
+          retention-days: 7

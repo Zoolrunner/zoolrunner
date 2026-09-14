@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<!-- Platform application lifecycle regression. MPL 1.1/GPL 2.0/LGPL 2.1. -->
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="Application lifecycle regression" onload="runNext()">
+<script><![CDATA[
+var applications = [
+    ["composer", "chrome://editor/content/editor.xul", "content-frame"],
+    ["composer", "chrome://editor/content/editor.xul", "content-frame"],
+    ["composer", "chrome://editor/content/editor.xul", "content-frame"],
+    ["addressbook", "chrome://messenger/content/addressbook/addressbook.xul", "dirTree"],
+    ["inspector", "chrome://inspector/content/inspector.xul", "winInspectorMain"],
+    ["venkman", "chrome://venkman/content/venkman.xul", "venkman-window"]
+];
+var index = 0, checks = 0, failures = 0;
+function check(ok, label) {
+    ++checks;
+    if (!ok) ++failures;
+    dump((ok ? "PASS " : "FAIL ") + label + "\n");
+}
+function finish() {
+    var messages = {}, count = {};
+    Components.classes["@mozilla.org/consoleservice;1"]
+        .getService(Components.interfaces.nsIConsoleService).getMessageArray(messages, count);
+    for (var i = 0; i < count.value; ++i) {
+        dump("LIFECYCLE-CONSOLE " + messages.value[i].message + "\n");
+        try {
+            var error = messages.value[i].QueryInterface(Components.interfaces.nsIScriptError);
+            if (!(error.flags & error.warningFlag)) ++failures;
+        } catch (e) {}
+    }
+    dump("PLATFORM-LIFECYCLE checks=" + checks + " failures=" + failures + "\n");
+    Components.classes["@mozilla.org/toolkit/app-startup;1"]
+        .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+function runNext() {
+    if (index == applications.length) { finish(); return; }
+    var app = applications[index++];
+    var w = window.openDialog(app[1], "lifecycle-" + index, "chrome,dialog=no", "about:blank");
+    setTimeout(function() {
+        var updates = 0, editor = null;
+        try {
+            check(!!w.document.getElementById(app[2]), app[0] + " startup");
+            if (app[0] == "composer") {
+                editor = w.GetCurrentEditor();
+                // Deliberately leave this observer registered, as old apps do.
+                // A dying document must stop updates at the platform layer.
+                w.GetCurrentCommandManager().addCommandObserver({
+                    observe: function() { ++updates; }
+                }, "cmd_save");
+                editor.insertText("Compatibility check");
+                check(updates > 0, "live editor command notifications");
+                check(w.document.getElementById("content-frame").contentDocument.body.textContent
+                      .indexOf("Compatibility check") >= 0, "Composer text insertion");
+                editor.undo(1);
+                check(w.document.getElementById("content-frame").contentDocument.body.textContent
+                      .indexOf("Compatibility check") < 0, "Composer undo");
+                editor.insertText("Closing with pending selection updates");
+                editor.resetModificationCount();
+            }
+            w.close();
+        } catch (e) { check(false, String(e)); }
+        var atClose = updates;
+        setTimeout(function() {
+            check(w.closed, app[0] + " close");
+            if (editor) check(updates == atClose, "no late editor notifications");
+            // Keep the editor alive across window teardown to exercise delayed
+            // destruction independently of the window's cleared script global.
+            editor = null;
+            runNext();
+        }, 500);
+    }, 3500);
+}
+]]></script>
+</window>

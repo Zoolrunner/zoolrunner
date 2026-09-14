@@ -19,11 +19,17 @@ static JSClass globalClass = {
 };
 static JSObject *protectedObject;
 static unsigned checks;
+static JSBool denyConstructor;
 
 static JSBool
 CheckAccess(JSContext *cx, JSObject *obj, jsval id, JSAccessMode mode,
             jsval *value)
 {
+    if (denyConstructor && JSVAL_IS_STRING(id) &&
+        strcmp(JS_GetStringBytes(JSVAL_TO_STRING(id)), "constructor") == 0) {
+        JS_ReportError(cx, "embedding denied constructor access");
+        return JS_FALSE;
+    }
     if (obj == protectedObject) {
         JS_ReportError(cx, "embedding denied access");
         return JS_FALSE;
@@ -45,11 +51,44 @@ Evaluate(JSContext *cx, JSObject *global, const char *source)
     return JS_TRUE;
 }
 
+static JSBool
+CheckBootstrap(JSRuntime *rt)
+{
+    JSContext *cx = JS_NewContext(rt, 8192);
+    JSObject *global;
+    JSBool ok = JS_FALSE;
+    if (!cx) return JS_FALSE;
+    JS_BeginRequest(cx);
+    global = JS_NewObject(cx, &globalClass, NULL, NULL);
+    if (!global) goto out;
+    JS_SetGlobalObject(cx, global);
+    /* A DOM security context may not permit constructor reads during startup.
+     * Internal class initialization must not invoke that script-visible getter.
+     */
+    denyConstructor = JS_TRUE;
+    JS_SetCheckObjectAccessCallback(rt, CheckAccess);
+    if (!Evaluate(cx, global,
+        "typeof Object.keys==='function' && "
+        "Object.hasOwnProperty.call({x:1},'x') && "
+        "Object.getPrototypeOf(Object)===Function.prototype && "
+        "Object.getPrototypeOf(Function.prototype)===Object.prototype")) goto out;
+    denyConstructor = JS_FALSE;
+    JS_SetCheckObjectAccessCallback(rt, NULL);
+    ok = JS_TRUE;
+out:
+    denyConstructor = JS_FALSE;
+    JS_SetCheckObjectAccessCallback(rt, NULL);
+    JS_EndRequest(cx);
+    JS_DestroyContext(cx);
+    return ok;
+}
+
 int main(void)
 {
     JSRuntime *rt;
     JSContext *cx;
-    JSObject *global, *clone;
+    JSObject *global, *clone, *scope;
+    JSFunction *handler;
     JSScript *script = NULL, *decoded = NULL;
     JSXDRState *encoder = NULL, *decoder = NULL;
     uint32 length;
@@ -62,6 +101,7 @@ int main(void)
 
     rt = JS_NewRuntime(8 * 1024 * 1024);
     if (!rt) return 1;
+    if (!CheckBootstrap(rt)) { JS_DestroyRuntime(rt); JS_ShutDown(); return 1; }
     cx = JS_NewContext(rt, 8192);
     if (!cx) { JS_DestroyRuntime(rt); return 1; }
     JS_BeginRequest(cx);
@@ -72,6 +112,20 @@ int main(void)
         "typeof JSON==='object' && JSON.parse('[1]')[0]===1 && "
         "Object.getPrototypeOf(JSON)===Object.prototype")) goto out;
     if (!JS_InitStandardClasses(cx, global)) goto out;
+    /* Event handlers and embedders put ordinary objects on the scope chain. */
+    scope = JS_NewObject(cx, NULL, NULL, global);
+    if (!scope || !JS_DefineProperty(cx, global, "embeddingScope",
+                                     OBJECT_TO_JSVAL(scope), NULL, NULL, 0)) goto out;
+    if (!Evaluate(cx, global,
+        "embeddingScope.method=function(){'use strict';return this;};true")) goto out;
+    handler = JS_CompileFunction(cx, scope, "handler", 0, NULL,
+                                "return method();", 16, "object-scope", 1);
+    ++checks;
+    if (!handler || !JS_CallFunction(cx, scope, handler, 0, NULL, &result) ||
+        result != OBJECT_TO_JSVAL(scope)) {
+        fprintf(stderr, "FAIL object scope lost its implicit receiver\n");
+        goto out;
+    }
     if (!Evaluate(cx, global,
         "JSON.stringify({a:1})==='{\"a\":1}' && "
         "Object.prototype.toString.call(JSON)==='[object JSON]'")) goto out;

@@ -115,6 +115,18 @@ JSClass js_ObjectClass = {
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
+/* Internal eval and named-function environments have declarative bindings.
+ * Preserve Object's hooks and prototype behavior, but distinguish these
+ * environments from ordinary embedding objects when supplying call receivers.
+ */
+JSClass js_DeclarativeScopeClass = {
+    js_Object_str,
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
+    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,   JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
 #if JS_HAS_OBJ_PROTO_PROP
 
 static JSBool
@@ -1326,7 +1338,7 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     }
     /* An empty lexical environment is transparent for non-strict eval.
      * Strict declarations use it as their variable environment as well. */
-    scope = js_NewObject(cx, &js_ObjectClass, NULL, outer);
+    scope = js_NewObject(cx, &js_DeclarativeScopeClass, NULL, outer);
     if (!scope) return JS_FALSE;
     JS_PUSH_TEMP_ROOT_OBJECT(cx, scope, &scopeRoot);
     OBJ_SET_PROTO(cx, scope, NULL);
@@ -2363,6 +2375,8 @@ js_InitBlockClass(JSContext *cx, JSObject* obj)
     return proto;
 }
 
+extern JSFunctionSpec js_object_static_methods[];
+
 JSObject *
 js_InitObjectClass(JSContext *cx, JSObject *obj)
 {
@@ -2371,8 +2385,9 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
     JSFunction *fun;
 
     proto = JS_InitClass(cx, obj, NULL, &js_ObjectClass, Object, 1,
-                         object_props, object_methods, NULL, NULL);
-    if (!proto || !js_InitObjectES5(cx, proto) ||
+                         object_props, object_methods, NULL,
+                         js_object_static_methods);
+    if (!proto ||
         !js_SetBuiltinMethodFlags(cx, proto, object_methods,
                                   JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
         return NULL;

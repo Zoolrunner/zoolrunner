@@ -188,6 +188,12 @@ Do not consider a platform-level change validated merely because it compiles.
 
 The browser should be used as a major integration test.
 
+For Cocoa activation/focus changes, test typing immediately after opening the
+first window, before switching applications. Verify text insertion as well as
+Command shortcuts, a second window, and reactivation. Include the case where
+the native window becomes key before its Gecko first responder is installed.
+Use disposable test profiles and leave existing user processes/profiles intact.
+
 ---
 
 # Full Suite Policy
@@ -370,6 +376,27 @@ collection regressions when adding native standard-library state.
 Changes to bytecode must update the bytecode cache version and preserve
 function/script decompilation. Exercise engine changes in both XULRunner and
 the Suite, including browser navigation and the existing layout probes.
+
+Built-in initialization changes must also exercise real chrome and content
+window globals; xpcshell alone does not cover DOM security/bootstrap ordering.
+Run `js/tests/es5/window-app/application.ini` and the native embedding test,
+and smoke-test unchanged historical applications such as ChatZilla in Suite
+and XULRunner. Install Object static methods through JS_InitClass's constructor
+reference, without reading prototype.constructor during class bootstrap.
+Do not work around an engine regression by requiring old applications to change.
+Preserve historical accessor syntax in explicitly selected legacy JavaScript
+versions used by component/subscript loaders and unversioned XUL scripts;
+retain escaped regexp line breaks used by Composer in legacy mode. Default
+ES5 and strict code must retain their grammar checks. Distinguish declarative eval/function environments
+from embedding object scopes: unqualified XBL/DOM/JSAPI methods need their
+historical object receiver. Run `legacy-application.js`, the embedding/window
+checks, and `calendar/test/run-compatibility.py` against Calendar. Exercise
+Calendar startup and all four views as well as shell tests; compilation and
+Test262 alone do not establish application compatibility.
+Run `editor/composer/tests/run-lifecycle.py` for editor/lifecycle changes and
+`js/tests/es5/debugger-lifecycle.js` for debugger changes. Do not dispatch editor
+commands into dying docshells or retain raw script iterators across callbacks;
+callbacks may close windows, collect scripts, or turn debugging off.
 
 Selected ECMAScript 2015/ES6 features may also be implemented when practical.
 
@@ -576,6 +603,19 @@ Do not require developers to separately configure/build bundled dependencies usi
 Avoid unnecessary build-time dependencies.
 
 A checkout should contain enough of its obscure or obsolete build dependencies to remain reasonably buildable on contemporary systems.
+
+---
+
+# macOS Build Matrix
+
+Keep `mozconfigs/macos/common.mozconfig`, the per-architecture application
+profiles, `.github/workflows/macos.yml`, and `mozconfigs/macos/README.md` aligned.
+macOS builds currently require SDK **11.3**; do not silently select a newer
+host SDK. Maintain both arm64 and x86_64 configurations for complete application
+targets. Keep host tools native when cross-compiling x86_64 from Apple Silicon.
+CI artifacts must resolve links into the build checkout and retain executable
+permissions. Distinguish local build checks from actual GitHub-hosted runs and
+from runtime validation on the minimum deployment OS.
 
 ---
 

@@ -317,4 +317,125 @@ obj-zoolrunner-macos-arm64-suite/dist/bin/xpcshell \
 ```
 
 Require six `failures=0` summaries with counts 55, 49, 71, 68, 101, and 50.
-Build and run `TestObjectEmbedding.c` as described above; require 15 checks.
+Build and run `TestObjectEmbedding.c` as described above; require 18 checks.
+
+### Window bootstrap / ChatZilla regression (2026-09-14)
+
+Installing Object static methods via `JS_GetConstructor(Object.prototype)`
+during bootstrap triggered embedding access checks before DOM globals were
+ready. Object initialization aborted, leaving inherited methods and ES5 static
+methods missing. Registering the same methods through JS_InitClass's static
+function table avoids that premature script-visible lookup. ChatZilla source
+and historical APIs are unchanged.
+
+`TestObjectEmbedding.c` initially gained a sixteenth check here. That lazy-bootstrap check
+runs with an embedding callback denying constructor access and reproduces the
+failure with the previous engine. Existing protected-object checks still verify
+that reflection honors embedding access restrictions.
+
+The standalone window test includes 12 bootstrap assertions across chrome and
+content globals: inherited hasOwnProperty, ES5 static methods, constructor identities
+and prototype chains, and legacy watch/__defineGetter__ methods. Run with a
+fresh temporary profile (the test exits the application):
+
+```sh
+profile=$(mktemp -d /tmp/zool-window-test.XXXXXX)
+DYLD_LIBRARY_PATH="$PWD/obj-zoolrunner-macos-arm64-xulrunner/dist/bin" \
+MOZ_NO_REMOTE=1 obj-zoolrunner-macos-arm64-xulrunner/dist/bin/xulrunner-bin \
+  "$PWD/js/tests/es5/window-app/application.ini" -profile "$profile"
+```
+
+Require `WINDOW-BOOTSTRAP checks=17 failures=0`. The profile may contain runtime
+files; remove that temporary directory after inspecting results.
+
+Unmodified ChatZilla 0.9.86.1 initializes with its input widget in Suite and in a
+temporary standalone XULRunner wrapper, using fresh profiles and no configured
+IRC startup URLs. Standalone packaging remains separate work. These smoke tests
+do not establish IRC connectivity or universal historical-app compatibility.
+At this stage both macOS builds passed 12 window assertions, 16 embedding
+checks, 394 focused JavaScript assertions, and 169 layout assertions. The latest
+expanded counts are recorded below. Suite live HTTPS
+homepage structural navigation also passes.
+
+After the bootstrap fix, both macOS engines again pass all 11,540 pinned
+Test262 cases, with zero failures, crashes, timeouts, or harness errors. Updated
+report hashes and validation counts are in `conformance-results.json`.
+
+### Historical application syntax and object scopes (2026-09-14)
+
+Calendar exposed ES5 regressions in unchanged component and XBL scripts.
+`legacy-application.js` checks 58 assertions across JS 1.5/1.6/1.7/1.8 and the
+default version: legacy regexp continuations, accessor argument lists, and data/accessor overrides
+remain accepted in explicitly selected historical language versions, while
+ES5-default and strict syntax validation remains active. Component/subscript
+loaders already select the historical version. Unversioned XUL scripts now
+select JS 1.7 as well, restoring Composer's escaped regexp line breaks without
+weakening ordinary HTML/ES5 parsing. EOF after a regexp escape remains an error
+in every mode. Application scripts need no edits.
+Run it with `xpcshell -f js/tests/es5/legacy-application.js` and require
+`LEGACY-APPLICATION checks=58 failures=0`.
+
+The embedding test now requires 18 checks. It includes a strict method called
+by an unqualified name from a plain embedding object scope, reproducing the
+lost receiver in the earlier interpreter. Internal eval and named-function
+scopes are explicitly declarative; arbitrary embedding objects retain their
+implicit receiver. The window fixture now requires 17 checks, including a real
+XUL command handler's element method and a strict global function. An external,
+unversioned XUL script checks historical setters, property overrides, and regexp
+continuations, reproducing the unchanged Composer script-loading failure. Existing
+strict-mode checks cover the distinct strict-eval receiver behavior.
+
+Run Calendar's eight existing unit tests without modifying their sources:
+
+```sh
+python3 calendar/test/run-compatibility.py \
+  --shell obj-zoolrunner-macos-arm64-calendar/dist/bin/xpcshell \
+  --library-path obj-zoolrunner-macos-arm64-calendar/dist/bin \
+  --report-dir /tmp/zool-calendar-tests
+```
+
+The runner gives each test an isolated profile/storage directory and supplies
+the two assertion helpers missing from the older bundled harness. Omit
+`--library-path` when testing a packaged runtime. Require
+`CALENDAR-COMPATIBILITY tests=8 failures=0`. Native macOS packaging runs these
+tests for Calendar, and legacy syntax/embedding checks for all four runtimes.
+Fresh-profile Calendar GUI validation additionally checks startup, all four
+views, forward/backward navigation, and absence of JavaScript console errors.
+These checks complement Test262; they do not prove every old application works.
+
+To repeat the macOS Calendar GUI check from a desktop session:
+
+```sh
+python3 calendar/test/run-window-compatibility.py \
+  --archive artifacts/zoolrunner-macos-arm64-calendar-sdk11.3.tar.gz \
+  --report /tmp/zool-calendar-window.log
+```
+
+It extracts a private runtime, registers only a test overlay, and uses a fresh
+profile. Require `CALENDAR-WINDOW views=4 failures=0`. The installed application
+and user profiles are not used. This desktop check is separate from hosted CI.
+
+The remaining Composer scripted-close observer errors are fixed in the native
+commands updater. It stops notifying and scheduling work when its document or
+docshell is being destroyed, including when an editor reference survives window
+closure. Notification groups recheck state between observer calls. Application
+scripts remain unchanged.
+
+A Venkman crash exposed a raw script-list iterator surviving reentrant debugger
+callbacks. JSD now snapshots reference-counted script wrappers before callbacks
+and skips wrappers invalidated by GC or debugger shutdown. Run
+`debugger-lifecycle.js` through xpcshell and require
+`DEBUGGER-LIFECYCLE checks=5 failures=0` (metadata, surviving scripts, callback
+shutdown/restart, and invalid-argument checks). This runs in native packaging.
+See [application lifecycle tests](../../../editor/composer/tests/README.md) for
+the 24-check GUI regression covering repeated Composer edit/undo/close cycles
+and Address Book, Inspector, and Venkman startup/close with no console errors.
+
+Final engine validation after these compatibility fixes: both Suite and
+XULRunner pass all 11,540 pinned Test262 cases, 394 focused JavaScript assertions,
+58 legacy-language assertions, 18 embedding checks, 17 window assertions, and
+169 layout assertions. All eight SDK 11.3 macOS builds/packages were refreshed;
+native packages pass reflection, legacy-language, and embedding checks, with
+Calendar additionally passing its eight existing unit tests. Updated report
+hashes and application lifecycle results are recorded in
+`conformance-results.json`.

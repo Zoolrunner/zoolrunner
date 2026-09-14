@@ -37,6 +37,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+#include "nsCOMArray.h"
 #include "jsd_xpc.h"
 #include "jsdbgapi.h"
 #include "jscntxt.h"
@@ -2680,20 +2681,37 @@ NS_IMETHODIMP
 jsdService::EnumerateScripts (jsdIScriptEnumerator *enumerator)
 {
     ASSERT_VALID_CONTEXT;
+    NS_ENSURE_ARG_POINTER(enumerator);
     
     JSDScript *script;
     JSDScript *iter = NULL;
     nsresult rv = NS_OK;
     
+    // Script callbacks can collect scripts, compile new ones, or turn the
+    // debugger off. Never carry a raw linked-list iterator across such a call.
+    // Wrappers remain alive and are invalidated when their scripts disappear.
+    nsCOMArray<jsdIScript> scripts;
     JSD_LockScriptSubsystem(mCx);
     while((script = JSD_IterateScripts(mCx, &iter))) {
         nsCOMPtr<jsdIScript> jsdis =
             getter_AddRefs(jsdScript::FromPtr(mCx, script));
-        rv = enumerator->EnumerateScript (jsdis);
+        if (!jsdis || !scripts.AppendObject(jsdis)) {
+            rv = NS_ERROR_OUT_OF_MEMORY;
+            break;
+        }
+    }
+    JSD_UnlockScriptSubsystem(mCx);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    for (PRInt32 i = 0; i < scripts.Count(); ++i) {
+        PRBool valid = PR_FALSE;
+        scripts[i]->GetIsValid(&valid);
+        if (!valid)
+            continue;
+        rv = enumerator->EnumerateScript(scripts[i]);
         if (NS_FAILED(rv))
             break;
     }
-    JSD_UnlockScriptSubsystem(mCx);
 
     return rv;
 }

@@ -157,13 +157,24 @@ nsMacShellService::SetDefaultBrowser(PRBool aClaimAllTypes, PRBool aForAllUsers)
   if (aClaimAllTypes) {
     ::_LSSetDefaultSchemeHandlerURL(CFSTR("ftp"), firefoxURL);
 
+#ifdef __LP64__
+    // The private weak-binding API is absent from 64-bit Launch Services.
+    CFStringRef bundleID = ::CFBundleGetIdentifier(CFBundleGetMainBundle());
+    if (!bundleID) {
+      ::CFRelease(firefoxURL);
+      return NS_ERROR_FAILURE;
+    }
+    ::LSSetDefaultRoleHandlerForContentType(CFSTR("public.html"),
+                                           kLSRolesAll, bundleID);
+#else
     FSRef firefoxFSRef;
     // CFURLGetFSRef returns true if the conversion was successful 
-    if (::CFURLGetFSRef(firefoxURL, &firefoxFSRef)); {
+    if (::CFURLGetFSRef(firefoxURL, &firefoxFSRef)) {
       // Set the default opener for html/htm files
       ::_LSSetWeakBindingForType(0, 0, CFSTR("html"), kLSRolesAll, &firefoxFSRef);
       ::_LSSetWeakBindingForType(0, 0, CFSTR("htm"), kLSRolesAll, &firefoxFSRef);
     }
+#endif
   }
   ::_LSSaveAndRefresh();
 
@@ -366,8 +377,12 @@ nsMacShellService::OnStateChange(nsIWebProgress* aWebProgress,
         if (err == noErr) {
           AppleEvent reply = { typeNull, nil };
           // Sent the event we built, the reply event isn't necessary
+#ifdef __LP64__
+          err = ::AESendMessage(&tAppleEvent, &reply, kAENoReply, kNoTimeOut);
+#else
           err = ::AESend(&tAppleEvent, &reply, kAENoReply, kAENormalPriority,
                          kNoTimeOut, nil, nil);
+#endif
           ::AEDisposeDesc(&tAppleEvent);
         }
       }

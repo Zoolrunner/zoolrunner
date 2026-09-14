@@ -80,7 +80,7 @@ STATIC_COMPONENTS_LINKER_PATH = -L$(DIST)/lib/components
 endif
 
 ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
-TK_LIBS := -framework Cocoa $(TK_LIBS)
+TK_LIBS := -framework Cocoa -framework Carbon $(TK_LIBS)
 endif
 
 LIBS = \
@@ -317,30 +317,34 @@ AB_CD = $(MOZ_UI_LOCALE)
 AB := $(firstword $(subst -, ,$(AB_CD)))
 
 clean clobber repackage::
-	rm -rf $(DIST)/$(APP_NAME).app
+	rm -rf "$(DIST)/$(APP_NAME).app"
 
 libs repackage:: $(PROGRAM)
-	mkdir -p $(DIST)/$(APP_NAME).app/Contents/MacOS
-	rsync -a --exclude CVS --exclude "*.in" $(srcdir)/macbuild/Contents $(DIST)/$(APP_NAME).app --exclude English.lproj
-	mkdir -p $(DIST)/$(APP_NAME).app/Contents/Resources/$(AB).lproj
-	rsync -a --exclude CVS --exclude "*.in" $(srcdir)/macbuild/Contents/Resources/English.lproj/ $(DIST)/$(APP_NAME).app/Contents/Resources/$(AB).lproj
-	sed -e "s/@APP_VERSION@/$(APP_VERSION)/" -e "s/@APP_NAME@/$(APP_NAME)/" $(srcdir)/macbuild/Contents/Info.plist.in > $(DIST)/$(APP_NAME).app/Contents/Info.plist
-	sed -e "s/@APP_VERSION@/$(APP_VERSION)/" -e "s/@APP_NAME@/$(APP_NAME)/" $(srcdir)/macbuild/Contents/Resources/English.lproj/InfoPlist.strings.in | iconv -f UTF-8 -t UTF-16 > $(DIST)/$(APP_NAME).app/Contents/Resources/$(AB).lproj/InfoPlist.strings
-	rsync -a $(DIST)/bin/ $(DIST)/$(APP_NAME).app/Contents/MacOS
-	rm -f $(DIST)/$(APP_NAME).app/Contents/MacOS/$(PROGRAM) $(DIST)/$(APP_NAME).app/Contents/MacOS/mangle $(DIST)/$(APP_NAME).app/Contents/MacOS/shlibsign
-	rsync -aL $(PROGRAM) $(DIST)/$(APP_NAME).app/Contents/MacOS
-	mkdir -p $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
+	mkdir -p "$(DIST)/$(APP_NAME).app/Contents/MacOS"
+	rsync -a --exclude CVS --exclude "*.in" $(srcdir)/macbuild/Contents "$(DIST)/$(APP_NAME).app" --exclude English.lproj
+	mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Resources/$(AB).lproj"
+	rsync -a --exclude CVS --exclude "*.in" $(srcdir)/macbuild/Contents/Resources/English.lproj/ "$(DIST)/$(APP_NAME).app/Contents/Resources/$(AB).lproj"
+	sed -e "s/@APP_VERSION@/$(APP_VERSION)/" -e "s/@APP_NAME@/$(APP_NAME)/" -e "s/@APP_EXECUTABLE@/$(PROGRAM)/" $(srcdir)/macbuild/Contents/Info.plist.in > "$(DIST)/$(APP_NAME).app/Contents/Info.plist"
+	sed -e "s/@APP_VERSION@/$(APP_VERSION)/" -e "s/@APP_NAME@/$(APP_NAME)/" $(srcdir)/macbuild/Contents/Resources/English.lproj/InfoPlist.strings.in | iconv -f UTF-8 -t UTF-16 > "$(DIST)/$(APP_NAME).app/Contents/Resources/$(AB).lproj/InfoPlist.strings"
+	rsync -a $(DIST)/bin/ "$(DIST)/$(APP_NAME).app/Contents/MacOS"
+	rm -f "$(DIST)/$(APP_NAME).app/Contents/MacOS/$(PROGRAM)" "$(DIST)/$(APP_NAME).app/Contents/MacOS/mangle" "$(DIST)/$(APP_NAME).app/Contents/MacOS/shlibsign"
+	rsync -aL $(PROGRAM) "$(DIST)/$(APP_NAME).app/Contents/MacOS"
+	mkdir -p "$(DIST)/$(APP_NAME).app/Contents/Plug-Ins"
 # Bug 297227: the next line only exists to repair broken depend builds, it can
 # go away once that bug has been closed for a while.
-	rm -rf $(DIST)/$(APP_NAME).app/Contents/Plug-Ins/PrintPDE.plugin
-	rsync -a --copy-unsafe-links $(DIST)/package/PrintPDE.plugin $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
-	-cp -L $(DIST)/bin/mangle $(DIST)/bin/shlibsign $(DIST)/$(APP_NAME).app/Contents/MacOS
-	cp -RL $(DIST)/branding/firefox.icns $(DIST)/$(APP_NAME).app/Contents/Resources/firefox.icns
-	cp -RL $(DIST)/branding/document.icns $(DIST)/$(APP_NAME).app/Contents/Resources/document.icns
-	cp -RL $(DIST)/package/mozillaSuite.rsrc $(DIST)/$(APP_NAME).app/Contents/Resources/$(PROGRAM).rsrc
-	echo -n APPLMOZB > $(DIST)/$(APP_NAME).app/Contents/PkgInfo
+	rm -rf "$(DIST)/$(APP_NAME).app/Contents/Plug-Ins/PrintPDE.plugin"
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+	rsync -a --copy-unsafe-links $(DIST)/package/PrintPDE.plugin "$(DIST)/$(APP_NAME).app/Contents/Plug-Ins"
+endif
+	-cp -L $(DIST)/bin/mangle $(DIST)/bin/shlibsign "$(DIST)/$(APP_NAME).app/Contents/MacOS"
+	cp -RL $(DIST)/branding/firefox.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/firefox.icns"
+	cp -RL $(DIST)/branding/document.icns "$(DIST)/$(APP_NAME).app/Contents/Resources/document.icns"
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+	cp -RL $(DIST)/package/mozillaSuite.rsrc "$(DIST)/$(APP_NAME).app/Contents/Resources/$(PROGRAM).rsrc"
+endif
+	echo -n APPLMOZB > "$(DIST)/$(APP_NAME).app/Contents/PkgInfo"
 #       remove CVS dirs from packaged app
-	find $(DIST)/$(APP_NAME).app -type d -name "CVS" -prune -exec rm -rf {} \;
+	find "$(DIST)/$(APP_NAME).app" -type d -name "CVS" -prune -exec rm -rf {} \;
 
 endif
 

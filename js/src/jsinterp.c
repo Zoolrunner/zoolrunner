@@ -4238,8 +4238,13 @@ interrupt:
             }
             PUSH_OPND(rval);
             /* Declarative and global bindings supply no implicit receiver.
-             * A with environment still supplies its binding object. */
-            if (OBJ_GET_CLASS(cx, obj) != &js_WithClass)
+             * Object environments include both with objects and historical
+             * embedding scopes (DOM event targets, XBL elements, JSAPI scopes).
+             */
+            clasp = OBJ_GET_CLASS(cx, obj);
+            if (clasp == &js_CallClass || clasp == &js_BlockClass ||
+                clasp == &js_DeclarativeScopeClass ||
+                (clasp != &js_WithClass && !OBJ_GET_PARENT(cx, obj)))
                 obj = NULL;
           END_CASE(JSOP_NAME)
 
@@ -5164,7 +5169,7 @@ interrupt:
                 ok = JS_FALSE;
                 goto out;
             }
-            parent = js_NewObject(cx, &js_ObjectClass, NULL, obj2);
+            parent = js_NewObject(cx, &js_DeclarativeScopeClass, NULL, obj2);
             if (!parent) {
                 ok = JS_FALSE;
                 goto out;

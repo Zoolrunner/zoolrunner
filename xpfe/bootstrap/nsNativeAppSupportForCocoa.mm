@@ -221,9 +221,9 @@ PRBool NS_CanRun()
 #if defined(MAC_OS_X_VERSION_10_6) && \
     MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
   [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-  [[NSRunningApplication currentApplication]
-    activateWithOptions:NSApplicationActivateAllWindows |
-                        NSApplicationActivateIgnoringOtherApps];
+  // nsCocoaWindow::Show activates through NSApplication once a real window
+  // exists.  Do not issue a separate process activation during early startup:
+  // AppKit has not yet established the window's keyboard/text-input state.
 #elif defined(MAC_OS_X_VERSION_10_3) && \
       MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_3
   if (::GetCurrentProcess(&psn) == noErr)

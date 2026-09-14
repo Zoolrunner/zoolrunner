@@ -81,10 +81,13 @@
 @interface TopLevelWindowData : NSObject
 {
 @private
-
+  BOOL mGeckoActive;
 }
 
 - (id)initWithWindow:(NSWindow*)inWindow;
+
+// Claim activation before dispatch, which can reenter focus handling.
+- (BOOL)claimGeckoActivation;
 
 @end
 

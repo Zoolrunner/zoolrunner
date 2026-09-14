@@ -118,7 +118,7 @@ endif
 endif
 
 ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
-TK_LIBS := -framework Cocoa $(TK_LIBS)
+TK_LIBS := -framework Cocoa -framework Carbon $(TK_LIBS)
 endif
 
 LIBS += \
@@ -374,7 +374,9 @@ libs repackage:: $(PROGRAM)
 	rm -f $(DIST)/$(APP_NAME).app/Contents/MacOS/$(PROGRAM) $(DIST)/$(APP_NAME).app/Contents/MacOS/mangle $(DIST)/$(APP_NAME).app/Contents/MacOS/shlibsign
 	rsync -aL $(PROGRAM) $(DIST)/$(APP_NAME).app/Contents/MacOS
 	mkdir -p $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
+ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 	rsync -a --copy-unsafe-links $(DIST)/package/PrintPDE.plugin $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
+endif
 	-cp -L $(DIST)/bin/mangle $(DIST)/bin/shlibsign $(DIST)/$(APP_NAME).app/Contents/MacOS
 	cp -RL $(DIST)/branding/sunbird.icns $(DIST)/$(APP_NAME).app/Contents/Resources/sunbird.icns
 	cp -RL $(DIST)/branding/sb_ICS.icns $(DIST)/$(APP_NAME).app/Contents/Resources/sb_ICS.icns

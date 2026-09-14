@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<!-- Classic Calendar/XBL compatibility smoke test. MPL 1.1/GPL 2.0/LGPL 2.1. -->
+<overlay xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul">
+<script><![CDATA[
+window.addEventListener("load", function() {
+    setTimeout(function() {
+        var failures = 0;
+        function check(ok, label) {
+            if (!ok) ++failures;
+            dump((ok ? "PASS " : "FAIL ") + label + "\n");
+        }
+        try {
+            check(!!document.getElementById("view-deck"), "Calendar startup");
+            var views = ["day", "week", "multiweek", "month"];
+            for (var i = 0; i < views.length; ++i) {
+                switchToView(views[i]);
+                check(currentView().id == views[i] + "-view", views[i] + " view");
+                currentView().moveView(1);
+                currentView().moveView(-1);
+            }
+        } catch (e) { check(false, String(e)); }
+        // Allow queued XBL layout callbacks to run before checking the console.
+        setTimeout(function() {
+            var messages = {}, count = {};
+            Components.classes["@mozilla.org/consoleservice;1"]
+                .getService(Components.interfaces.nsIConsoleService)
+                .getMessageArray(messages, count);
+            for (var i = 0; i < count.value; ++i) {
+                var message = messages.value[i];
+                dump("CALENDAR-CONSOLE " + message.message + "\n");
+                try {
+                    var error = message.QueryInterface(Components.interfaces.nsIScriptError);
+                    if (!(error.flags & error.warningFlag)) ++failures;
+                } catch (e) {}
+            }
+            dump("CALENDAR-WINDOW views=4 failures=" + failures + "\n");
+            Components.classes["@mozilla.org/toolkit/app-startup;1"]
+                .getService(Components.interfaces.nsIAppStartup).quit(3);
+        }, 1000);
+    }, 4000);
+}, false);
+]]></script>
+</overlay>

@@ -174,6 +174,15 @@ also passed a structural check of the live Basilisk homepage. These are
 development validation results, not a claim of complete website or platform
 conformance. The rendering changes have not yet been validated on Windows.
 
+Cocoa startup now activates the application through AppKit after ordering its
+first ordinary window, and delivers Gecko activation when the first keyboard
+responder arrives after the native window became key. See the
+[macOS startup keyboard checks](mozconfigs/macos/arm64/README.md#startup-keyboard-regression)
+when changing activation or focus handling; Command shortcuts alone do not
+validate text input.
+The user confirmed on 2026-09-14 that the rebuilt macOS app accepts typing
+immediately after startup without switching applications.
+
 ## Changes from RetroZilla
 
 Significant work completed after the RetroZilla baseline includes:
@@ -324,6 +333,17 @@ Mozilla and XUL namespace URIs, preference names, protocol identifiers,
 application-facing APIs, historical XULRunner conventions, and user-agent
 compatibility tokens where changing them could break existing applications.
 
+## macOS Application Build Matrix
+
+macOS mozconfigs cover Suite, Browser, Calendar/Sunbird, and XULRunner for both
+Apple Silicon and x86_64. The XULRunner profiles also build the Simple example
+and standalone Layout Debugger. All profiles require **macOS SDK 11.3**.
+See [macOS build instructions](mozconfigs/macos/README.md) for configuration
+paths, dependencies, packaging, and the eight-job GitHub Actions workflow.
+All eight configurations build locally. Calendar GUI startup still has a
+JavaScript compatibility failure; a successful build is not a full application
+runtime validation. GitHub-hosted execution awaits the first workflow run.
+
 ## XULRunner Application Compatibility
 
 XULRunner-style standalone applications are a first-class use case. ZoolRunner
@@ -352,10 +372,33 @@ suite is not an exhaustive proof. See [ES5 testing](js/tests/es5/README.md) for
 the pinned revision, reproducible commands, historical measurements, and the
 application/embedding validation record. Historical Mozilla embedding APIs and
 application compatibility remain requirements. Both the Suite and XULRunner
-builds pass the full suite, 394 focused JavaScript assertions, 15 embedding
+builds pass the full suite, 394 focused JavaScript assertions, 18 embedding
 checks, and 169 layout assertions; Suite live HTTPS navigation also passes.
 These results are from macOS 15.7.1 arm64 and do not establish legacy Windows
 runtime compatibility.
+
+ChatZilla's startup `Object.hasOwnProperty` error was an engine bootstrap
+regression. Object's ES5 static methods now use the normal class initialization
+path, avoiding a premature constructor lookup in window globals. Unchanged
+ChatZilla initializes in both Suite and a temporary standalone XULRunner
+wrapper. Chrome/content window regression checks also cover the constructor
+chains and legacy methods. This verifies startup, not IRC network operation
+or compatibility with every historical application.
+
+Calendar's legacy accessor syntax and XBL method receivers are also preserved
+in the engine, without changing Calendar scripts. Explicit historical language
+versions accept the older accessor forms; default ES5 and strict grammar still
+reject invalid forms. Declarative eval/function scopes remain distinct from
+DOM/XBL object scopes. Compatibility checks cover 58 legacy-language assertions,
+17 chrome/content and event-handler assertions, and Calendar's eight unchanged
+unit tests, including memory/SQLite providers. Fresh-profile Calendar GUI tests
+exercise startup and navigation in day, week, multiweek, and month views.
+Composer's historical regexp syntax is restored for legacy scripts;
+unversioned XUL scripts use the classic JS 1.7 grammar while HTML scripts keep
+the ES5 default. Composer edit/undo/close cycles now pass with no late command
+observer errors. The native updater stops at document teardown, and JSD script
+enumeration remains safe when callbacks collect scripts or stop debugging.
+See [application lifecycle checks](editor/composer/tests/README.md).
 
 ## Web Compatibility
 

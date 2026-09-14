@@ -3795,8 +3795,15 @@ static void ConvertCocoaKeyEventToMacEvent(NSEvent* cocoaEvent, EventRecord& mac
 {
   if (!mGeckoChild) return NO;   // we've been destroyed
 
-  nsFocusEvent event(PR_TRUE, NS_GOTFOCUS, mGeckoChild);
-  mGeckoChild->DispatchWindowEvent(event);
+  // A window can become key before a Gecko view is its first responder.
+  // In that case TopLevelWindowData could not deliver the activation event.
+  if ([[self window] isKeyWindow] &&
+      [[self ensureWindowData] claimGeckoActivation]) {
+    [self viewsWindowDidBecomeKey];
+  } else {
+    nsFocusEvent event(PR_TRUE, NS_GOTFOCUS, mGeckoChild);
+    mGeckoChild->DispatchWindowEvent(event);
+  }
 
   return [super becomeFirstResponder];
 }

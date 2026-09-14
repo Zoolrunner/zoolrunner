@@ -1942,7 +1942,14 @@ skipline:
                 if (c == '\\') {
                     ADD_TO_TOKENBUF(c);
                     c = GetChar(ts);
-                    if (c == '\n' || c == EOF) {
+                    /* Classic application scripts allow escaped line breaks
+                     * in regexp literals. ES5 default/strict code does not.
+                     * EOF must remain an error in every language version.
+                     */
+                    if (c == EOF ||
+                        (c == '\n' &&
+                         (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                          (ts->flags & TSF_STRICT_MODE)))) {
                         UngetChar(ts, c);
                         js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                      JSMSG_UNTERMINATED_REGEXP);

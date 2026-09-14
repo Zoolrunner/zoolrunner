@@ -1256,6 +1256,12 @@ XULContentSinkImpl::OpenScript(const PRUnichar** aAttributes,
 
   // Don't process scripts that aren't JavaScript
   if (isJavaScript) {
+      // XUL is the historical application language. Unversioned scripts must
+      // retain its JS 1.7 grammar, including syntax used by old Composer and
+      // extension scripts. HTML/web scripts keep the engine's ES5 default.
+      if (!jsVersionString ||
+          ::JS_StringToVersion(jsVersionString) == JSVERSION_DEFAULT)
+          jsVersionString = ::JS_VersionToString(JSVERSION_1_7);
       nsXULPrototypeScript* script =
           new nsXULPrototypeScript(aLineNumber, jsVersionString, hasE4XOption,
                                    &rv);

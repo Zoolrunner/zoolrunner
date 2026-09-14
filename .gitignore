@@ -36,3 +36,6 @@ $RECYCLE.BIN/
 
 #object directories
 obj-*/
+
+# Local CI packaging output
+/artifacts/

@@ -235,6 +235,7 @@ struct JSObject {
 extern JS_FRIEND_DATA(JSObjectOps) js_ObjectOps;
 extern JS_FRIEND_DATA(JSObjectOps) js_WithObjectOps;
 extern JSClass  js_ObjectClass;
+extern JSClass  js_DeclarativeScopeClass;
 extern JSClass  js_WithClass;
 extern JSClass  js_BlockClass;
 
@@ -342,9 +343,6 @@ js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 
 extern JSObject *
 js_InitObjectClass(JSContext *cx, JSObject *obj);
-
-extern JSBool
-js_InitObjectES5(JSContext *cx, JSObject *proto);
 
 /* Select Object.prototype method names shared between jsapi.c and jsobj.c. */
 extern const char js_watch_str[];

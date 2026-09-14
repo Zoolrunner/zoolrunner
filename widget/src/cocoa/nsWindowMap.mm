@@ -118,6 +118,7 @@
 {
   if ((self = [super init]))
   {
+    mGeckoActive = NO;
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(windowBecameKey:)
                                                  name:NSWindowDidBecomeKeyNotification
@@ -142,10 +143,19 @@
   [super dealloc];
 }
 
+- (BOOL)claimGeckoActivation
+{
+  if (mGeckoActive)
+    return NO;
+  mGeckoActive = YES;
+  return YES;
+}
+
 - (void)windowBecameKey:(NSNotification*)inNotification
 {
   id firstResponder = [[inNotification object] firstResponder];
-  if ([firstResponder isKindOfClass:[ChildView class]])
+  if ([firstResponder isKindOfClass:[ChildView class]] &&
+      [self claimGeckoActivation])
   {
     [firstResponder viewsWindowDidBecomeKey];
   }
@@ -153,6 +163,7 @@
 
 - (void)windowResignedKey:(NSNotification*)inNotification
 {
+  mGeckoActive = NO;
   id firstResponder = [[inNotification object] firstResponder];
   if ([firstResponder isKindOfClass:[ChildView class]])
   {

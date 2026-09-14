@@ -35,3 +35,62 @@ FSSpec, AEPackObject, and resource-fork interfaces, so arm64 currently provides
 only the existing startup entry points and lets Cocoa handle ordinary
 application lifecycle events. Unsupported legacy scripting events fail without
 entering another architecture's implementation.
+
+
+## Startup keyboard regression
+
+The Cocoa window backend orders an ordinary window and requests activation
+through `NSApplication`. Activating only the process with `NSRunningApplication`
+can leave AppKit's active/text-input state behind the visible window state.
+The Suite no longer sends a separate early process activation request before
+its first window exists. If a window becomes key before a Gecko view becomes
+its first responder, that view supplies the missed Gecko activation event when
+it accepts focus. Popups and invisible windows do not request activation.
+
+Use a disposable profile for these checks; do not terminate an existing user
+process or automate against its profile. Rebuild the app bundle as well as the
+widget component before testing. Test both Finder launch and direct executable
+launch, and repeat with a standalone XUL application when changing shared
+widget code.
+
+1. Quit the test application completely and start it again. Before switching
+   to another application, click its address bar or a XUL textbox and type.
+   Confirm that characters appear, rather than merely observing key events.
+2. Press Command-A, type replacement text, and check that it replaces the
+   selection. Exercise Backspace, arrows, and Command-C/Command-V as well.
+3. Open `widget/src/cocoa/tests/startup-keyboard.html` in the browser and repeat
+   with its input and textarea. For a cold-start content test, supply that file
+   as the startup URL and click a field before touching browser chrome.
+4. Repeat in a second window, then switch applications and back. Verify that
+   typing still works and focus returns to the expected field.
+5. With a suitable keyboard layout, also check an Option/dead-key accent and
+   IME composition. Do not bypass AppKit text interpretation to fix startup.
+
+During the 2026-09-14 investigation on macOS 15.7.1 arm64, native probes observed
+an inactive application at startup with the previous process-activation path.
+The updated Suite reached active/key-window state and delivered native text
+callbacks without switching applications. On 2026-09-14, the user confirmed
+that the rebuilt app resolves the reported issue: typing works immediately
+after startup without switching to another application and back. This confirms
+the reported startup regression; it does not establish completion of every
+keyboard-layout, IME, or additional-window check above.
+
+The Suite and XULRunner builds succeeded; the
+Suite also passed the existing 169 layout assertions and live HTTPS navigation
+probe with the activation changes. The standalone XULRunner application passed
+the same 169 layout assertions.
+
+### Local XULRunner signature after rebuilding
+
+During the 2026-09-14 bootstrap validation, the rebuilt development XULRunner
+launcher was killed before startup with `Taskgated Invalid Signature`, although
+`codesign --verify` accepted it on disk. Refreshing its local ad-hoc signature
+restored startup:
+
+```sh
+codesign --force --sign - obj-zoolrunner-macos-arm64-xulrunner/dist/bin/xulrunner-bin
+```
+
+After that refresh, unchanged ChatZilla and the chrome/content window bootstrap
+test both passed. This is a local development signature, not distribution
+signing or notarization.

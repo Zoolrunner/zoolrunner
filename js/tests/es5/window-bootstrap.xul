@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<!-- Classic window-global bootstrap regression; MPL 1.1/GPL 2.0/LGPL 2.1. -->
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="Window builtin regression" onload="setTimeout(run, 1000)">
+  <button id="legacy-handler" oncommand="captureReceiver(); captureGlobal(globalReceiverProbe());"/>
+  <browser id="content" type="content" src="data:text/html,&lt;title&gt;Content global&lt;/title&gt;"/>
+  <script type="application/x-javascript" src="legacy-window-syntax.js"/>
+  <script><![CDATA[
+var checks = 0, failures = 0;
+function check(value, label) {
+    ++checks;
+    if (!value) ++failures;
+    dump((value ? "PASS " : "FAIL ") + label + "\n");
+}
+function checkWindow(w, label) {
+    w = w.wrappedJSObject || w;
+    var O = w.Object, F = w.Function;
+    check(typeof O.hasOwnProperty == "function" &&
+          O.hasOwnProperty.call({x: 1}, "x"), label + " inherited hasOwnProperty");
+    check(typeof O.keys == "function" && O.keys({x: 1})[0] == "x",
+          label + " ES5 static method");
+    check(O.getPrototypeOf(O) === F.prototype, label + " Object constructor chain");
+    check(O.getPrototypeOf(F.prototype) === O.prototype, label + " Function prototype chain");
+    check(O.prototype.constructor === O, label + " constructor identity");
+    var legacy = new O();
+    legacy.__defineGetter__("getter", function() { return 7; });
+    legacy.watch("watched", function(id, oldValue, newValue) { return newValue + 1; });
+    legacy.watched = 2;
+    check(legacy.getter === 7 && legacy.watched === 3, label + " legacy methods");
+}
+function run() {
+    try {
+        checkWindow(window, "chrome");
+        legacyWindowObject.value = 42;
+        check(legacyWindowValue === 42, "unversioned XUL legacy setter");
+        check(legacyWindowObject.overridden === 7, "unversioned XUL accessor override");
+        check(legacyWindowRegexp.test("http://example.invalid/"), "unversioned XUL regexp continuation");
+        var button = document.getElementById("legacy-handler");
+        var receiver = null, globalReceiver = null;
+        button.captureReceiver = function() { "use strict"; receiver = this; };
+        button.captureGlobal = function(value) { globalReceiver = value; };
+        window.globalReceiverProbe = function() { "use strict"; return this; };
+        button.doCommand();
+        check(receiver === button, "event handler object scope receiver");
+        check(globalReceiver === undefined, "event handler global binding receiver");
+        checkWindow(document.getElementById("content").contentWindow, "content");
+    } catch (e) { check(false, String(e)); }
+    dump("WINDOW-BOOTSTRAP checks=" + checks + " failures=" + failures + "\n");
+    Components.classes["@mozilla.org/toolkit/app-startup;1"]
+        .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+  ]]></script>
+</window>

@@ -869,25 +869,23 @@ INTEGRITY_METHOD(obj_isSealed, JS_FALSE, JS_TRUE)
 INTEGRITY_METHOD(obj_isFrozen, JS_TRUE, JS_TRUE)
 #undef INTEGRITY_METHOD
 
-JSBool
-js_InitObjectES5(JSContext *cx, JSObject *proto)
-{
-    JSObject *ctor = JS_GetConstructor(cx, proto);
-    if (!ctor)
-        return JS_FALSE;
-    return JS_DefineFunction(cx, ctor, "getOwnPropertyNames", obj_getOwnPropertyNames, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "seal", obj_seal, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "freeze", obj_freeze, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "isSealed", obj_isSealed, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "isFrozen", obj_isFrozen, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "defineProperty", obj_defineProperty, 3, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "defineProperties", obj_defineProperties, 2, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "create", obj_create, 2, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "isExtensible", obj_isExtensible, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "preventExtensions", obj_preventExtensions, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "getPrototypeOf", obj_getPrototypeOf,
-                              1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "keys", js_ObjectKeys, 1, JSFUN_NO_CONSTRUCT) &&
-           JS_DefineFunction(cx, ctor, "getOwnPropertyDescriptor",
-                              obj_getOwnPropertyDescriptor, 2, JSFUN_NO_CONSTRUCT);
-}
+/* Install these through JS_InitClass's direct constructor reference.  Reading
+ * prototype.constructor here would invoke embedding security checks before
+ * a lazily initialized DOM window has finished bootstrapping its classes.
+ */
+JSFunctionSpec js_object_static_methods[] = {
+    {"getOwnPropertyNames", obj_getOwnPropertyNames, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"seal", obj_seal, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"freeze", obj_freeze, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"isSealed", obj_isSealed, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"isFrozen", obj_isFrozen, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"defineProperty", obj_defineProperty, 3, JSFUN_NO_CONSTRUCT, 0},
+    {"defineProperties", obj_defineProperties, 2, JSFUN_NO_CONSTRUCT, 0},
+    {"create", obj_create, 2, JSFUN_NO_CONSTRUCT, 0},
+    {"isExtensible", obj_isExtensible, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"preventExtensions", obj_preventExtensions, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"getPrototypeOf", obj_getPrototypeOf, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"keys", js_ObjectKeys, 1, JSFUN_NO_CONSTRUCT, 0},
+    {"getOwnPropertyDescriptor", obj_getOwnPropertyDescriptor, 2, JSFUN_NO_CONSTRUCT, 0},
+    {0, 0, 0, 0, 0}
+};

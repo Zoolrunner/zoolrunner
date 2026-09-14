@@ -7,8 +7,8 @@
   "harness_layout": "separate-global-script",
   "timezone": "America/Los_Angeles",
   "runner_sha256": "5120b9020a1778fa6c479e129d26ab86f09dac7b77cf716a831e2d48d29748e7",
-  "source_base_commit": "cac537046e751b2d042398e9c492f9f392c8848b",
-  "engine_diff_sha256": "76fa73e48becf06ff69e6004c37dd4c1976e5067c693158e409fde7405b7311b",
+  "source_base_commit": "b056ca4b5638312c5bf190f9eef8144b7523946e",
+  "engine_diff_sha256": "14df297aa51909e31936c8c5f2c22d4137488803ed5d4352181dceca0df8cfd9",
   "applications": {
     "suite": {
       "counts": {
@@ -22,11 +22,14 @@
         "non_strict": 10894,
         "strict": 646
       },
-      "full_report_sha256": "97778488ce1a7a1a62a916c8f5d381b513fe6ecc8d8293b0f3d75d39b4f1bb1f",
+      "full_report_sha256": "fa67b026c68968cf41a73e8cda51db5155f6fdac42a709b84baac4190be07b07",
       "focused_assertions": 394,
-      "embedding_checks": 15,
+      "embedding_checks": 18,
       "layout_assertions": 169,
-      "live_https_navigation": true
+      "live_https_navigation": true,
+      "window_bootstrap_assertions": 17,
+      "chatzilla_startup": true,
+      "legacy_language_assertions": 58
     },
     "xul": {
       "counts": {
@@ -40,10 +43,59 @@
         "non_strict": 10894,
         "strict": 646
       },
-      "full_report_sha256": "c8868f5eb810d445e1c0f4adba062bccf8e6b28f88d560e2780062e13465e8dc",
+      "full_report_sha256": "eb088b06937fed72e8c8d6c1f5a89ad8881cf4587694d2d465c7c058eead181a",
       "focused_assertions": 394,
-      "embedding_checks": 15,
-      "layout_assertions": 169
+      "embedding_checks": 18,
+      "layout_assertions": 169,
+      "window_bootstrap_assertions": 17,
+      "chatzilla_startup": true,
+      "legacy_language_assertions": 58
     }
-  }
+  },
+  "validation_date": "2026-09-14",
+  "compatibility_scope": "Unmodified Calendar unit tests and four GUI views; repeated Composer edit/undo/close cycles; Address Book, Inspector and Venkman startup/close; ChatZilla startup in Suite/XULRunner; legacy XUL syntax and receiver checks. No script errors in the lifecycle fixture. IRC connectivity, Intel GUI behavior, and universal historical application compatibility are not established.",
+  "application_loader_diff_sha256": "d44c27cbe609656b5ed811660c337d17b8a51979b55e8be84e6e5996d77d85a5",
+  "additional_application_checks": {
+    "calendar": {
+      "unchanged_unit_tests": 8,
+      "window_views": 4,
+      "view_navigation": true,
+      "javascript_console_errors": 0
+    },
+    "browser": {
+      "packaged_window_startup": true
+    },
+    "suite": {
+      "composer_startup_and_text_insertion": true,
+      "addressbook_window": true,
+      "inspector_window": true,
+      "venkman_window": true,
+      "composer_scripted_close": true,
+      "lifecycle_assertions": 24,
+      "lifecycle_consecutive_runs": 3,
+      "lifecycle_script_errors": 0,
+      "packaged_lifecycle_assertions": 24
+    }
+  },
+  "macos_builds": {
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "applications": [
+      "suite",
+      "browser",
+      "calendar",
+      "xulrunner"
+    ],
+    "sdk": "11.3",
+    "native_packaged_checks": {
+      "object_reflection": 101,
+      "legacy_language": 58,
+      "embedding": 18,
+      "debugger_lifecycle": 5
+    },
+    "github_hosted_run": false
+  },
+  "application_lifecycle_diff_sha256": "d27b30770ed50b30681fb46108542eaf3467262db10e4a23f7b0546f93863784"
 }

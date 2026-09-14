@@ -912,15 +912,12 @@ NS_IMETHODIMP nsCocoaWindow::Show(PRBool bState)
     // steal focus from their parent window.
     if (mWindowType != eWindowType_popup &&
         mWindowType != eWindowType_invisible) {
-#if defined(MAC_OS_X_VERSION_10_6) && \
-    MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_6
-      [[NSRunningApplication currentApplication]
-        activateWithOptions:NSApplicationActivateAllWindows |
-                            NSApplicationActivateIgnoringOtherApps];
-#else
-      [NSApp activateIgnoringOtherApps:YES];
-#endif
+      // Go through NSApplication so AppKit updates its own active state and
+      // text-input context as well as bringing the process to the front.
+      // NSRunningApplication activation can leave the first window visible
+      // while NSApp is inactive, until the user switches away and back.
       [mWindow makeKeyAndOrderFront:nil];
+      [NSApp activateIgnoringOtherApps:YES];
     } else {
       [mWindow orderFront:nil];
     }

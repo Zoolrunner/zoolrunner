@@ -228,7 +228,9 @@ nsSafariProfileMigrator::GetSourceHomePageURL(nsACString& aResult)
     return NS_ERROR_FAILURE;
 
   char homePageValue[256] = "";
-  CopyPascalStringToC((ConstStr255Param)homePagePValue, homePageValue);
+  // The Pascal-string conversion helper is unavailable in the 64-bit SDK.
+  memcpy(homePageValue, homePagePValue + 1, homePagePValue[0]);
+  homePageValue[homePagePValue[0]] = '\0';
   aResult.Assign(homePageValue);
 
   ::ICStop(internetConfig);

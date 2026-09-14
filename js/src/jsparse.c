@@ -5641,7 +5641,14 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                             if (pn2) {
                                 JSFunction *accessor = (JSFunction *) JS_GetPrivate(
                                     cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
-                                if (accessor->nargs != (op == JSOP_GETTER ? 0 : 1)) {
+                                /* Historical language versions allow accessor argument
+                                 * lists used by unchanged XUL/XPCOM applications.
+                                 * Keep ES5 grammar for the default version and for
+                                 * accessors opting into strict mode.
+                                 */
+                                if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                                     (accessor->flags & JSFUN_STRICT)) &&
+                                    accessor->nargs != (op == JSOP_GETTER ? 0 : 1)) {
                                     StrictSyntaxError(cx, ts);
                                     return NULL;
                                 }
@@ -5714,10 +5721,12 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             ATOM_LIST_SEARCH(entry, &properties, propertyAtom);
             if (entry) {
                 previousKind = ALE_INDEX(entry);
-                if ((propertyKind == 1 &&
-                     ((previousKind & 6) || (tc->flags & TCF_STRICT_MODE))) ||
-                    (propertyKind != 1 &&
-                     ((previousKind & 1) || (previousKind & propertyKind)))) {
+                if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                     (tc->flags & TCF_STRICT_MODE)) &&
+                    ((propertyKind == 1 &&
+                      ((previousKind & 6) || (tc->flags & TCF_STRICT_MODE))) ||
+                     (propertyKind != 1 &&
+                      ((previousKind & 1) || (previousKind & propertyKind))))) {
                     StrictSyntaxError(cx, ts);
                     return NULL;
                 }

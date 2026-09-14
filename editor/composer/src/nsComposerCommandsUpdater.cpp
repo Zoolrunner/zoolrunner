@@ -84,7 +84,14 @@ nsComposerCommandsUpdater::NotifyDocumentCreated()
 NS_IMETHODIMP
 nsComposerCommandsUpdater::NotifyDocumentWillBeDestroyed()
 {
-  // cancel any outstanding udpate timer
+  // Document teardown can itself change the selection/transaction state.
+  // Stop callbacks from rearming the timer or notifying a window whose script
+  // global has already been cleared. This updater belongs to this document;
+  // a replacement editor installs a new updater.
+  mDOMWindow = nsnull;
+  mDocShell = nsnull;
+
+  // Cancel any outstanding update timer.
   if (mUpdateTimer)
   {
     mUpdateTimer->Cancel();
@@ -255,6 +262,9 @@ nsComposerCommandsUpdater::Init(nsIDOMWindow* aDOMWindow)
 nsresult
 nsComposerCommandsUpdater::PrimeUpdateTimer()
 {
+  if (!mDOMWindow)
+    return NS_OK;
+
   if (!mUpdateTimer)
   {
     nsresult rv = NS_OK;
@@ -271,6 +281,12 @@ nsComposerCommandsUpdater::PrimeUpdateTimer()
 
 void nsComposerCommandsUpdater::TimerCallback()
 {
+  if (!mDOMWindow)
+    return;
+  nsCOMPtr<nsPICommandUpdater> updater = GetCommandUpdater();
+  if (!updater)
+    return;
+
   // if the selection state has changed, update stuff
   PRBool isCollapsed = SelectionIsCollapsed();
   if (isCollapsed != mSelectionCollapsed)
@@ -300,53 +316,49 @@ nsComposerCommandsUpdater::UpdateDirtyState(PRBool aNowDirty)
 nsresult
 nsComposerCommandsUpdater::UpdateCommandGroup(const nsAString& aCommandGroup)
 {
-  nsCOMPtr<nsPICommandUpdater> commandUpdater = GetCommandUpdater();
-  if (!commandUpdater) return NS_ERROR_FAILURE;
-
-  
   // This hardcoded list of commands is temporary.
   // This code should use nsIControllerCommandGroup.
   if (aCommandGroup.EqualsLiteral("undo"))
   {
-    commandUpdater->CommandStatusChanged("cmd_undo");
-    commandUpdater->CommandStatusChanged("cmd_redo");
+    UpdateOneCommand("cmd_undo");
+    UpdateOneCommand("cmd_redo");
   }
   else if (aCommandGroup.EqualsLiteral("select") ||
            aCommandGroup.EqualsLiteral("style"))
   {
-    commandUpdater->CommandStatusChanged("cmd_bold");
-    commandUpdater->CommandStatusChanged("cmd_italic");
-    commandUpdater->CommandStatusChanged("cmd_underline");
-    commandUpdater->CommandStatusChanged("cmd_tt");
+    UpdateOneCommand("cmd_bold");
+    UpdateOneCommand("cmd_italic");
+    UpdateOneCommand("cmd_underline");
+    UpdateOneCommand("cmd_tt");
 
-    commandUpdater->CommandStatusChanged("cmd_strikethrough");
-    commandUpdater->CommandStatusChanged("cmd_superscript");
-    commandUpdater->CommandStatusChanged("cmd_subscript");
-    commandUpdater->CommandStatusChanged("cmd_nobreak");
+    UpdateOneCommand("cmd_strikethrough");
+    UpdateOneCommand("cmd_superscript");
+    UpdateOneCommand("cmd_subscript");
+    UpdateOneCommand("cmd_nobreak");
 
-    commandUpdater->CommandStatusChanged("cmd_em");
-    commandUpdater->CommandStatusChanged("cmd_strong");
-    commandUpdater->CommandStatusChanged("cmd_cite");
-    commandUpdater->CommandStatusChanged("cmd_abbr");
-    commandUpdater->CommandStatusChanged("cmd_acronym");
-    commandUpdater->CommandStatusChanged("cmd_code");
-    commandUpdater->CommandStatusChanged("cmd_samp");
-    commandUpdater->CommandStatusChanged("cmd_var");
+    UpdateOneCommand("cmd_em");
+    UpdateOneCommand("cmd_strong");
+    UpdateOneCommand("cmd_cite");
+    UpdateOneCommand("cmd_abbr");
+    UpdateOneCommand("cmd_acronym");
+    UpdateOneCommand("cmd_code");
+    UpdateOneCommand("cmd_samp");
+    UpdateOneCommand("cmd_var");
    
-    commandUpdater->CommandStatusChanged("cmd_increaseFont");
-    commandUpdater->CommandStatusChanged("cmd_decreaseFont");
+    UpdateOneCommand("cmd_increaseFont");
+    UpdateOneCommand("cmd_decreaseFont");
 
-    commandUpdater->CommandStatusChanged("cmd_paragraphState");
-    commandUpdater->CommandStatusChanged("cmd_fontFace");
-    commandUpdater->CommandStatusChanged("cmd_fontColor");
-    commandUpdater->CommandStatusChanged("cmd_backgroundColor");
-    commandUpdater->CommandStatusChanged("cmd_highlight");
+    UpdateOneCommand("cmd_paragraphState");
+    UpdateOneCommand("cmd_fontFace");
+    UpdateOneCommand("cmd_fontColor");
+    UpdateOneCommand("cmd_backgroundColor");
+    UpdateOneCommand("cmd_highlight");
   }  
   else if (aCommandGroup.EqualsLiteral("save"))
   {
     // save commands (most are not in C++)
-    commandUpdater->CommandStatusChanged("cmd_setDocumentModified");
-    commandUpdater->CommandStatusChanged("cmd_save");
+    UpdateOneCommand("cmd_setDocumentModified");
+    UpdateOneCommand("cmd_save");
   }
   return NS_OK;  
 }
@@ -385,6 +397,14 @@ nsComposerCommandsUpdater::GetCommandUpdater()
 {
   nsCOMPtr<nsIDocShell> docShell = do_QueryReferent(mDocShell);
   NS_ENSURE_TRUE(docShell, nsnull);
+  PRBool destroying = PR_FALSE;
+  docShell->IsBeingDestroyed(&destroying);
+  if (destroying) {
+    // The window global may be gone before the editor releases its listeners.
+    // Treat this as terminal even if a retained editor delays PreDestroy.
+    NotifyDocumentWillBeDestroyed();
+    return nsnull;
+  }
   nsCOMPtr<nsICommandManager> manager = do_GetInterface(docShell);
   nsCOMPtr<nsPICommandUpdater> updater = do_QueryInterface(manager);
   nsPICommandUpdater* retVal = nsnull;
@@ -399,8 +419,9 @@ nsComposerCommandsUpdater::GetCommandUpdater()
 nsresult
 nsComposerCommandsUpdater::Notify(nsITimer *timer)
 {
-  NS_ASSERTION(timer == mUpdateTimer.get(), "Hey, this ain't my timer!");
-  TimerCallback();
+  // A canceled timer may already have queued its notification.
+  if (timer == mUpdateTimer.get())
+    TimerCallback();
   return NS_OK;
 }
 
