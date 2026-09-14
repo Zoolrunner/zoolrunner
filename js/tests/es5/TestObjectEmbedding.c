@@ -56,7 +56,9 @@ int main(void)
     jsval result;
     int status = 1;
     const char *literal =
-        "var a=[,,undefined,,]; a.length===4 && !(0 in a) && (2 in a) && !(3 in a)";
+        "'use strict'; var a=[,,undefined,,];"
+        "function xdrStrict(x){x=9;return this===undefined && arguments[0]===1;}"
+        "a.length===4 && !(0 in a) && (2 in a) && !(3 in a) && xdrStrict(1)";
 
     rt = JS_NewRuntime(8 * 1024 * 1024);
     if (!rt) return 1;
@@ -115,6 +117,15 @@ int main(void)
         !Evaluate(cx, global,
         "var denied=false; try { eval('var legacyDestructured;'); }"
         "catch(e) { denied=e instanceof TypeError; } denied")) goto out;
+    JS_SetVersion(cx, JSVERSION_DEFAULT);
+    if (!Evaluate(cx, global,
+        "var strictCloneSource=function(x){'use strict';x=9;return this===null && arguments[0]===1;};true") ||
+        !JS_GetProperty(cx, global, "strictCloneSource", &result)) goto out;
+    clone = JS_CloneFunctionObject(cx, JSVAL_TO_OBJECT(result), global);
+    if (!clone || !JS_DefineProperty(cx, global, "strictClone",
+                                      OBJECT_TO_JSVAL(clone), NULL, NULL, 0)) goto out;
+    JS_GC(cx);
+    if (!Evaluate(cx, global, "strictClone.call(null,1)")) goto out;
     script = JS_CompileScript(cx, global, literal, strlen(literal), "elisions", 1);
     encoder = JS_XDRNewMem(cx, JSXDR_ENCODE);
     decoder = JS_XDRNewMem(cx, JSXDR_DECODE);
@@ -126,7 +137,7 @@ int main(void)
     if (!JS_XDRScript(decoder, &decoded)) goto out;
     ++checks;
     if (!JS_ExecuteScript(cx, global, decoded, &result) || result != JSVAL_TRUE) {
-        fprintf(stderr, "FAIL XDR sparse literal round trip\n");
+        fprintf(stderr, "FAIL XDR strict function and sparse literal round trip\n");
         goto out;
     }
     status = 0;

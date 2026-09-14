@@ -961,7 +961,7 @@ lexHex:
                 localMax = n;
                 break;
             case 'd':
-                if (inRange) {
+                if (inRange || (src < end - 1 && *src == '-')) {
                     JS_ReportErrorNumber(state->context,
                                          js_GetErrorMessage, NULL,
                                          JSMSG_BAD_CLASS_RANGE);
@@ -974,14 +974,14 @@ lexHex:
             case 'S':
             case 'w':
             case 'W':
-                if (inRange) {
+                if (inRange || (src < end - 1 && *src == '-')) {
                     JS_ReportErrorNumber(state->context,
                                          js_GetErrorMessage, NULL,
                                          JSMSG_BAD_CLASS_RANGE);
                     return JS_FALSE;
                 }
-                target->u.ucclass.bmsize = 65535;
-                return JS_TRUE;
+                localMax = 65535;
+                break;
             case '0':
             case '1':
             case '2':
@@ -2009,7 +2009,7 @@ JSRegExp *
 js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
                 JSString *str, JSString *opt, JSBool flat)
 {
-    uintN flags;
+    uintN flags, flag;
     jschar *s;
     size_t i, n;
     char charBuf[2];
@@ -2020,13 +2020,13 @@ js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
         for (i = 0, n = JSSTRING_LENGTH(opt); i < n; i++) {
             switch (s[i]) {
             case 'g':
-                flags |= JSREG_GLOB;
+                flag = JSREG_GLOB;
                 break;
             case 'i':
-                flags |= JSREG_FOLD;
+                flag = JSREG_FOLD;
                 break;
             case 'm':
-                flags |= JSREG_MULTILINE;
+                flag = JSREG_MULTILINE;
                 break;
             default:
                 charBuf[0] = (char)s[i];
@@ -2036,6 +2036,14 @@ js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
                                             JSMSG_BAD_FLAG, charBuf);
                 return NULL;
             }
+            if (flags & flag) {
+                charBuf[0] = (char)s[i];
+                charBuf[1] = '\0';
+                js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                             JSMSG_BAD_FLAG, charBuf);
+                return NULL;
+            }
+            flags |= flag;
         }
     }
     return js_NewRegExp(cx, ts, str, flags, flat);
@@ -2536,13 +2544,13 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         }
         break;
     case REOP_DIGIT:
-        if (x->cp != gData->cpend && JS_ISDIGIT(*x->cp)) {
+        if (x->cp != gData->cpend && JS7_ISDEC(*x->cp)) {
             result = x;
             result->cp++;
         }
         break;
     case REOP_NONDIGIT:
-        if (x->cp != gData->cpend && !JS_ISDIGIT(*x->cp)) {
+        if (x->cp != gData->cpend && !JS7_ISDEC(*x->cp)) {
             result = x;
             result->cp++;
         }
@@ -3926,7 +3934,8 @@ regexp_compile(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 goto created;
             }
         }
-        str = js_ValueToString(cx, argv[0]);
+        str = JSVAL_IS_VOID(argv[0]) ? cx->runtime->emptyString
+                                     : js_ValueToString(cx, argv[0]);
         if (!str)
             return JS_FALSE;
         argv[0] = STRING_TO_JSVAL(str);
@@ -4034,7 +4043,7 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         goto out;
 
     /* Now that obj is unlocked, it's safe to (potentially) grab the GC lock. */
-    if (argc == 0) {
+    if (argc == 0 && JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT) {
         str = cx->regExpStatics.pendingInput;
         if (!str) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -4092,8 +4101,8 @@ static JSFunctionSpec regexp_methods[] = {
 #endif
     {js_toString_str,   js_regexp_toString,     0,0,0},
     {"compile",         regexp_compile,         1,0,0},
-    {"exec",            regexp_exec,            0,0,0},
-    {"test",            regexp_test,            0,0,0},
+    {"exec",            regexp_exec,            1,0,0},
+    {"test",            regexp_test,            1,0,0},
     {0,0,0,0,0}
 };
 
@@ -4133,7 +4142,7 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
     JSObject *proto, *ctor;
     jsval rval;
 
-    proto = JS_InitClass(cx, obj, NULL, &js_RegExpClass, RegExp, 1,
+    proto = JS_InitClass(cx, obj, NULL, &js_RegExpClass, RegExp, 2,
                          regexp_props, regexp_methods,
                          regexp_static_props, NULL);
 

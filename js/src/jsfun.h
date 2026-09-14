@@ -69,10 +69,11 @@ struct JSFunction {
 
 /* Internal function flag; it is not a property attribute or a public API flag. */
 #define JSFUN_NO_CONSTRUCT   0x4000 /* no [[Construct]] or implicit prototype */
+#define JSFUN_STRICT         0x0800 /* interpreted ES5 strict function */
 #define JSFUN_BOUND_FUNCTION 0x1000 /* ES5 bound target/this/arguments slots */
 #define JSFUN_REQUIRE_THIS   0x2000 /* native CheckObjectCoercible receiver */
 #define JSFUN_INTERNAL_FLAGS_MASK \
-    (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS | JSFUN_BOUND_FUNCTION)
+    (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS | JSFUN_BOUND_FUNCTION | JSFUN_STRICT)
 
 extern JSBool
 js_IsCallable(JSContext *cx, jsval v);

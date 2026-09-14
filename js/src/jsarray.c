@@ -293,6 +293,21 @@ SetArrayElement(JSContext *cx, JSObject *obj, jsuint index, jsval v)
 }
 
 static JSBool
+DefineArrayElement(JSContext *cx, JSObject *obj, jsuint index, jsval v)
+{
+    jsid id;
+
+    if (index <= JSVAL_INT_MAX) {
+        id = INT_TO_JSID(index);
+    } else {
+        if (!BigIndexToId(cx, obj, index, JS_TRUE, &id))
+            return JS_FALSE;
+        JS_ASSERT(id != JSVAL_VOID);
+    }
+    return OBJ_DEFINE_PROPERTY(cx, obj, id, v, NULL, NULL, JSPROP_ENUMERATE, NULL);
+}
+
+static JSBool
 DeleteArrayElement(JSContext *cx, JSObject *obj, jsuint index)
 {
     jsid id;
@@ -937,9 +952,8 @@ sort_compare(void *arg, const void *a, const void *b, int *result)
 
         argv[0] = av;
         argv[1] = bv;
-        ok = js_InternalCall(cx,
-                             OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(fval)),
-                             fval, 2, argv, ca->localroot);
+        ok = js_InternalInvokeValue(cx, JSVAL_VOID, fval, 0,
+                                    2, argv, ca->localroot);
         if (ok) {
             ok = js_ValueToNumber(cx, *ca->localroot, &cmp);
 
@@ -985,8 +999,8 @@ array_sort(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
      */
     JSBool all_strings;
 
-    if (argc > 0) {
-        if (JSVAL_IS_PRIMITIVE(argv[0])) {
+    if (argc > 0 && !JSVAL_IS_VOID(argv[0])) {
+        if (!js_IsCallable(cx, argv[0])) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                                  JSMSG_BAD_SORT_ARG);
             return JS_FALSE;
@@ -1107,18 +1121,32 @@ array_sort(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static JSBool
 array_push(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
-    jsuint length, newlength;
+    jsuint length;
+    jsdouble index;
+    uintN i;
+    jsid id;
+    JSString *str;
+    JSAtom *atom;
 
     if (!js_GetLengthProperty(cx, obj, &length))
         return JS_FALSE;
-    newlength = length + argc;
-    if (!InitArrayElements(cx, obj, length, newlength, argv))
+    index = length;
+    for (i = 0; i < argc; ++i, ++index) {
+        if (index <= JSVAL_INT_MAX) {
+            id = INT_TO_JSID((jsint)index);
+        } else {
+            str = js_NumberToString(cx, index);
+            if (!str || !(atom = js_AtomizeString(cx, str, 0)))
+                return JS_FALSE;
+            id = ATOM_TO_JSID(atom);
+        }
+        if (!OBJ_SET_PROPERTY(cx, obj, id, &argv[i]))
+            return JS_FALSE;
+    }
+    if (!js_NewNumberValue(cx, index, rval))
         return JS_FALSE;
-
-    /* Per ECMA-262, return the new array length. */
-    if (!IndexToValue(cx, newlength, rval))
-        return JS_FALSE;
-    return js_SetLengthProperty(cx, obj, newlength);
+    return OBJ_SET_PROPERTY(cx, obj,
+                            ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), rval);
 }
 
 static JSBool
@@ -1284,7 +1312,7 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                 return JS_FALSE;
 
             /* Copy *vp to new array unless it's a hole. */
-            if (!hole && !SetArrayElement(cx, obj2, last - begin, *vp))
+            if (!hole && !DefineArrayElement(cx, obj2, last - begin, *vp))
                 return JS_FALSE;
         }
 
@@ -1311,6 +1339,10 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                 !SetOrDeleteArrayElement(cx, obj, last - delta, hole, *vp)) {
                 return JS_FALSE;
             }
+        }
+        for (last = length; last > length - delta; ) {
+            if (!DeleteArrayElement(cx, obj, --last))
+                return JS_FALSE;
         }
         length -= delta;
     }
@@ -1340,7 +1372,7 @@ array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
     /* Treat obj as the first argument; see ECMA 15.4.4.4. */
     --argv;
-    JS_ASSERT(obj == JSVAL_TO_OBJECT(argv[0]));
+    argv[0] = OBJECT_TO_JSVAL(obj);
 
     /* Create a new Array object and store it in the rval local root. */
     nobj = js_NewArrayObject(cx, 0, NULL);
@@ -1371,7 +1403,7 @@ array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                      * Per ECMA 262, 15.4.4.4, step 9, ignore non-existent
                      * properties.
                      */
-                    if (!hole && !SetArrayElement(cx, nobj, length + slot, *vp))
+                    if (!hole && !DefineArrayElement(cx, nobj, length + slot, *vp))
                         return JS_FALSE;
                 }
                 length += alength;
@@ -1379,7 +1411,7 @@ array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             }
         }
 
-        if (!SetArrayElement(cx, nobj, length, v))
+        if (!DefineArrayElement(cx, nobj, length, v))
             return JS_FALSE;
         length++;
     }
@@ -1423,7 +1455,7 @@ array_slice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         }
         begin = (jsuint)d;
 
-        if (argc > 1) {
+        if (argc > 1 && !JSVAL_IS_VOID(argv[1])) {
             if (!js_ValueToNumber(cx, argv[1], &d))
                 return JS_FALSE;
             d = js_DoubleToInteger(d);
@@ -1444,7 +1476,7 @@ array_slice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     for (slot = begin; slot < end; slot++) {
         if (!GetArrayElement(cx, obj, slot, &hole, vp))
             return JS_FALSE;
-        if (!hole && !SetArrayElement(cx, nobj, slot - begin, *vp))
+        if (!hole && !DefineArrayElement(cx, nobj, slot - begin, *vp))
             return JS_FALSE;
     }
     return js_SetLengthProperty(cx, nobj, end - begin);
@@ -1547,7 +1579,8 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
 {
     jsval *vp, *sp, *origsp, *oldsp;
     jsuint length, newlen, remaining, i;
-    JSObject *callable, *thisp, *newarr;
+    JSObject *callable, *newarr;
+    jsval thisv;
     jsint step;
     void *mark;
     JSStackFrame *fp;
@@ -1632,13 +1665,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
     if (length == 0)
         return JS_TRUE;
 
-    if (argc > 1 && !REDUCE_MODE(mode)) {
-        if (!js_ValueToObject(cx, argv[1], &thisp))
-            return JS_FALSE;
-        argv[1] = OBJECT_TO_JSVAL(thisp);
-    } else {
-        thisp = NULL;
-    }
+    thisv = (argc > 1 && !REDUCE_MODE(mode)) ? argv[1] : JSVAL_VOID;
 
     /*
      * For all but REDUCE, we call with 3 args (value, index, array), plus
@@ -1667,7 +1694,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
          */
         sp = origsp;
         *sp++ = OBJECT_TO_JSVAL(callable);
-        *sp++ = OBJECT_TO_JSVAL(thisp);
+        *sp++ = thisv;
 		if (REDUCE_MODE(mode))
             *sp++ = *rval;
         *sp++ = *vp;
@@ -1708,7 +1735,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
             *rval = vp[1];
             break;
           case MAP:
-            ok = SetArrayElement(cx, newarr, i, vp[1]);
+            ok = DefineArrayElement(cx, newarr, i, vp[1]);
             if (!ok)
                 goto out;
             break;
@@ -1716,7 +1743,7 @@ array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
             if (!cond)
                 break;
             /* Filter passed *vp, push as result. */
-            ok = SetArrayElement(cx, newarr, newlen++, *vp);
+            ok = DefineArrayElement(cx, newarr, newlen++, *vp);
             if (!ok)
                 goto out;
             break;

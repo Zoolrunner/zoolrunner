@@ -2090,9 +2090,9 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
          * and the interpreter will look up 'arguments' in the function's call
          * object.
          */
-        if (pn->pn_op == JSOP_NAME &&
+        if ((pn->pn_op == JSOP_NAME || pn->pn_op == JSOP_DELNAME) &&
             atom == cx->runtime->atomState.argumentsAtom) {
-            pn->pn_op = JSOP_ARGUMENTS;
+            pn->pn_op = pn->pn_op == JSOP_DELNAME ? JSOP_FALSE : JSOP_ARGUMENTS;
             return JS_TRUE;
         }
 
@@ -5773,21 +5773,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 return JS_FALSE;
             break;
 #endif
-#if JS_HAS_LVALUE_RETURN
-          case TOK_LP:
-            if (pn2->pn_op != JSOP_SETCALL) {
-                JS_ASSERT(pn2->pn_op == JSOP_CALL || pn2->pn_op == JSOP_EVAL);
-                pn2->pn_op = JSOP_SETCALL;
-            }
-            top = CG_OFFSET(cg);
-            if (!js_EmitTree(cx, cg, pn2))
-                return JS_FALSE;
-            if (js_NewSrcNote2(cx, cg, SRC_PCBASE, CG_OFFSET(cg) - top) < 0)
-                return JS_FALSE;
-            if (js_Emit1(cx, cg, JSOP_DELELEM) < 0)
-                return JS_FALSE;
-            break;
-#endif
+
           case TOK_LB:
             if (!EmitElemOp(cx, pn2, JSOP_DELELEM, cg))
                 return JS_FALSE;

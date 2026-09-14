@@ -501,7 +501,12 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
         length = script->length;
         prologLength = PTRDIFF(script->main, script->code, jsbytecode);
         JS_ASSERT((int16)script->version != JSVERSION_UNKNOWN);
-        version = (uint32)script->version | (script->numGlobalVars << 16);
+        /* Bit 13 is unused by the language version/XML option. Preserve
+         * strictness without changing the legacy script record framing. */
+        JS_ASSERT(!(script->version & 0x6000));
+        version = (uint32)script->version | (script->numGlobalVars << 16) |
+                  (script->strictMode ? 0x2000 : 0) |
+                  (script->needsArguments ? 0x4000 : 0);
         lineno = (uint32)script->lineno;
         depth = (uint32)script->depth;
 
@@ -547,7 +552,9 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
             return JS_FALSE;
         if (magic >= JSXDR_MAGIC_SCRIPT_2) {
             script->main += prologLength;
-            script->version = (JSVersion) (version & 0xffff);
+            script->version = (JSVersion) (version & 0x9fff);
+            script->strictMode = (version & 0x2000) != 0;
+            script->needsArguments = (version & 0x4000) != 0;
             script->numGlobalVars = (uint16) (version >> 16);
 
             /* If we know nsrcnotes, we allocated space for notes in script. */
@@ -1383,6 +1390,10 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
     memcpy(script->code, CG_PROLOG_BASE(cg), prologLength * sizeof(jsbytecode));
     memcpy(script->main, CG_BASE(cg), mainLength * sizeof(jsbytecode));
     script->numGlobalVars = cg->treeContext.numGlobalVars;
+    script->strictMode = (cg->treeContext.flags & TCF_STRICT_MODE) != 0 ||
+                         (fun && (fun->flags & JSFUN_STRICT));
+    script->needsArguments =
+        (cg->treeContext.flags & (TCF_FUN_USES_ARGUMENTS | TCF_FUN_HEAVYWEIGHT)) != 0;
     if (!js_InitAtomMap(cx, &script->atomMap, &cg->atomList))
         goto bad;
 

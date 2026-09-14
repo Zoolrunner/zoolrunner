@@ -340,20 +340,31 @@ Do not introduce major later-Gecko subsystems solely to pass a web compatibility
 Improving SpiderMonkey is acceptable.
 
 Full ECMAScript 5 compatibility, using the corrected ECMAScript 5.1
-specification, is a required modernization target. It is not yet achieved.
-Track progress with the pinned historical Test262 suite and focused native
+specification, is a required modernization target. The pinned historical
+Test262 suite now passes all 11,540 required-mode cases on macOS arm64; this is
+not an exhaustive proof of specification correctness. Preserve that result and
+track coverage with the pinned suite and focused native
 regressions in `js/tests/es5`; report failures honestly. Adding standard-library
 method names alone does not establish conformance: strict mode, descriptors,
 invocation semantics, parsing, and built-in behavior must also be correct.
 The completion target is zero failures in the complete pinned ES5.1 Test262
 suite, including inherited earlier-edition coverage. Do not exclude failing
 cases, weaken their assertions, or substitute focused test totals for a full
-run. Passing the suite is not a proof that every specification behavior has
+run. Use the pinned upstream runner's mode policy: unmarked tests run in
+non-strict mode, and every `onlyStrict` case runs in strict mode. This historical
+branch explicitly states that not all unmarked tests are strict-compatible.
+Keep optional `--unmarked-default both` runs as additional diagnostics and label
+them separately; do not change language semantics to satisfy contradictory
+requirements introduced by forcing legacy cases into strict mode. Passing the suite is not a proof that every specification behavior has
 been tested. Keep any earlier-edition tests separate when ES5 intentionally
 changes their required semantics. The conformance runner must preserve Unicode
 source through the shell's Unicode global-script compiler and pass its source
 transport preflight; the historical byte-oriented `load` path is not suitable
-for the upstream UTF-8 test files. Include callback/reentrancy and garbage-
+for the upstream UTF-8 test files. Compile harness setup separately in the same
+global object so it cannot mask a test's own directive prologue or satisfy an
+expected exception. Follow the upstream negative exception patterns. Record
+the timezone: the historical fixed-date cases require America/Los_Angeles;
+other timezone runs are separate portability checks. Include callback/reentrancy and garbage-
 collection regressions when adding native standard-library state.
 
 Changes to bytecode must update the bytecode cache version and preserve

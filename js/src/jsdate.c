@@ -596,6 +596,95 @@ date_UTC(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return js_NewNumberValue(cx, d, rval);
 }
 
+/* ES5.1 simplified ISO format. Read fixed-width fields within the string. */
+static JSBool
+ReadISOField(const jschar *s, size_t length, size_t *offset,
+             uintN digits, int *value)
+{
+    uintN i;
+    int n = 0;
+    if (length - *offset < digits)
+        return JS_FALSE;
+    for (i = 0; i < digits; ++i) {
+        if (!JS7_ISDEC(s[*offset]))
+            return JS_FALSE;
+        n = n * 10 + s[(*offset)++] - '0';
+    }
+    *value = n;
+    return JS_TRUE;
+}
+
+static JSBool
+ParseISODate(const jschar *s, size_t length, jsdouble *result)
+{
+    size_t pos = 0;
+    int year, month = 1, day = 1, hour = 0, minute = 0, second = 0, ms = 0;
+    int sign = 1, zoneSign = 0, zoneHour = 0, zoneMinute = 0, monthDays;
+    JSBool extended = length && (s[0] == '+' || s[0] == '-');
+    static const int days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
+
+    if (extended)
+        sign = s[pos++] == '-' ? -1 : 1;
+    if (!ReadISOField(s, length, &pos, extended ? 6 : 4, &year) ||
+        (extended && sign == -1 && year == 0))
+        return JS_FALSE;
+    year *= sign;
+    if (pos < length && s[pos] == '-') {
+        ++pos;
+        if (!ReadISOField(s, length, &pos, 2, &month))
+            return JS_FALSE;
+        if (pos < length && s[pos] == '-') {
+            ++pos;
+            if (!ReadISOField(s, length, &pos, 2, &day))
+                return JS_FALSE;
+        }
+    }
+    if (month < 1 || month > 12 || day < 1)
+        return JS_FALSE;
+    monthDays = days[month - 1] + (month == 2 && DaysInYear(year) == 366);
+    if (day > monthDays)
+        return JS_FALSE;
+    if (pos < length) {
+        if (s[pos++] != 'T' ||
+            !ReadISOField(s, length, &pos, 2, &hour) ||
+            pos == length || s[pos++] != ':' ||
+            !ReadISOField(s, length, &pos, 2, &minute))
+            return JS_FALSE;
+        if (pos < length && s[pos] == ':') {
+            ++pos;
+            if (!ReadISOField(s, length, &pos, 2, &second))
+                return JS_FALSE;
+            if (pos < length && s[pos] == '.') {
+                ++pos;
+                if (!ReadISOField(s, length, &pos, 3, &ms))
+                    return JS_FALSE;
+            }
+        }
+        if (hour > 24 || minute > 59 || second > 59 ||
+            (hour == 24 && (minute || second || ms)))
+            return JS_FALSE;
+        if (pos < length) {
+            if (s[pos] == 'Z') {
+                ++pos;
+            } else {
+                if (s[pos] != '+' && s[pos] != '-')
+                    return JS_FALSE;
+                zoneSign = s[pos++] == '+' ? 1 : -1;
+                if (!ReadISOField(s, length, &pos, 2, &zoneHour) ||
+                    pos == length || s[pos++] != ':' ||
+                    !ReadISOField(s, length, &pos, 2, &zoneMinute) ||
+                    zoneHour > 23 || zoneMinute > 59)
+                    return JS_FALSE;
+            }
+        }
+    }
+    if (pos != length)
+        return JS_FALSE;
+    *result = date_msecFromDate(year, month - 1, day, hour, minute, second, ms) -
+              zoneSign * (zoneHour * 60 + zoneMinute) * msPerMinute;
+    return fabs(*result) <= 8.64e15;
+}
+
 static JSBool
 date_parseString(JSString *str, jsdouble *result)
 {
@@ -617,6 +706,15 @@ date_parseString(JSString *str, jsdouble *result)
     JSBool seenplusminus = JS_FALSE;
     int temp;
     JSBool seenmonthname = JS_FALSE;
+
+    /* Recognized ISO-shaped input must not fall through to permissive
+     * legacy parsing after an invalid field. Other historical forms remain. */
+    if ((limit >= 4 && JS7_ISDEC(s[0]) && JS7_ISDEC(s[1]) &&
+         JS7_ISDEC(s[2]) && JS7_ISDEC(s[3]) &&
+         (limit == 4 || s[4] == 'T' ||
+          (limit > 5 && s[4] == '-' && JS7_ISDEC(s[5])))) ||
+        (limit >= 7 && (s[0] == '+' || s[0] == '-') && JS7_ISDEC(s[1])))
+        return ParseISODate(s, limit, result);
 
     if (limit == 0)
         goto syntax;

@@ -1,0 +1,49 @@
+{
+  "platform": "macOS 15.7.1 arm64",
+  "suite_revision": "7da91bceb9ce7613f87db47ddd1292a2dda58b42",
+  "suite_clean": true,
+  "mode_policy": "upstream non_strict default; all annotated strict cases included",
+  "source_transport": "unicode-global-script",
+  "harness_layout": "separate-global-script",
+  "timezone": "America/Los_Angeles",
+  "runner_sha256": "5120b9020a1778fa6c479e129d26ab86f09dac7b77cf716a831e2d48d29748e7",
+  "source_base_commit": "cac537046e751b2d042398e9c492f9f392c8848b",
+  "engine_diff_sha256": "76fa73e48becf06ff69e6004c37dd4c1976e5067c693158e409fde7405b7311b",
+  "applications": {
+    "suite": {
+      "counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "97778488ce1a7a1a62a916c8f5d381b513fe6ecc8d8293b0f3d75d39b4f1bb1f",
+      "focused_assertions": 394,
+      "embedding_checks": 15,
+      "layout_assertions": 169,
+      "live_https_navigation": true
+    },
+    "xul": {
+      "counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "c8868f5eb810d445e1c0f4adba062bccf8e6b28f88d560e2780062e13465e8dc",
+      "focused_assertions": 394,
+      "embedding_checks": 15,
+      "layout_assertions": 169
+    }
+  }
+}

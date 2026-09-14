@@ -711,6 +711,10 @@ OwnNames(JSContext *cx, JSObject *target)
     JSScopeProperty *sprop;
     jsint i, n, capacity = 0, nextCapacity;
     jsid swap;
+    if ((target == cx->globalObject ||
+         (OBJ_GET_CLASS(cx, target)->flags & JSCLASS_IS_GLOBAL)) &&
+        !JS_EnumerateStandardClasses(cx, target))
+        return NULL;
     ids = JS_Enumerate(cx, target);
     if (!ids || !OBJ_IS_NATIVE(target)) return ids;
     JS_DestroyIdArray(cx, ids);

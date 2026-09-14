@@ -2,7 +2,8 @@
 
 The target is the complete [ECMAScript 5.1 specification](https://262.ecma-international.org/5.1/),
 the corrected edition of ES5, in the existing SpiderMonkey implementation.
-This is unfinished engine work, not a claim of current conformance.
+The pinned suite now passes all 11,540 required-mode cases on macOS arm64.
+This is a measured test result, not a proof of every specification behavior.
 
 Use the official TC39 historical Test262 ES5 branch, pinned to
 `7da91bceb9ce7613f87db47ddd1292a2dda58b42`. Keep the external suite outside the
@@ -19,8 +20,8 @@ python3 js/tests/es5/run-test262.py \
 ```
 
 The runner uses the suite's own metadata parser and harness files. It runs each
-chapter test in a fresh xpcshell process in strict and non-strict modes, subject
-to the upstream mode annotations. Expected exceptions use upstream negative-test
+chapter test in a fresh xpcshell process using the upstream mode annotations
+and the upstream non-strict default for unmarked tests. Expected exceptions use upstream negative-test
 patterns. Crashes, timeouts, harness initialization failures, and missing result
 markers cannot pass. The unrelated internationalization suite is excluded.
 Reports retain each test/mode result; `--filter` selects a path substring.
@@ -34,8 +35,8 @@ Initial baseline on macOS arm64, 2026-09-13, commit `f130af13`:
 | Strict | 6,696 | 4,439 |
 | Total | 13,548 | 8,481 |
 
-There were no crashes, timeouts, or harness errors in these 22,029 cases. Strict
-mode is not implemented: passing a test prefixed with `"use strict"` does not
+There were no crashes, timeouts, or harness errors in these 22,029 cases. At that baseline, strict
+mode was not implemented: passing a test prefixed with `"use strict"` does not
 establish that strict semantics worked. Test262 is evidence, not an exhaustive
 proof of specification compliance. Browser, Suite, and embedding regressions
 must also be checked after engine changes. Windows 95/NT 4.0 runtime validation
@@ -171,7 +172,7 @@ reports no diagnostics in `jsobjes5.c`; this is not a security audit or proof of
 conformance. No failing Test262 cases or strict-mode runs have been excluded.
 
 
-## Native JSON, binding, and receiver semantics (2026-09-14, in progress)
+## Native JSON, binding, and receiver semantics (2026-09-14)
 
 `jsjson.c` implements the ES5 JSON grammar without evaluating source, reviver
 walking, serialization with replacers and indentation, and cycle detection.
@@ -191,7 +192,7 @@ all 206 cases. These are intermediate measurements, not conformance completion.
 The combined byte-loader run passes 21,021 cases and fails 1,008, with no crashes,
 timeouts, or harness errors. It gains 627 passes and loses six accidental passes
 where a missing `bind` previously threw the TypeError intended for a strict
-caller-access check. Correct Unicode runs are in progress.
+caller-access check. The Unicode measurements below supersede this byte-loader result.
 
 Run `json-bind-string.js` alongside the previous three focused scripts. Its
 71 assertions cover grammar rejection, Unicode whitespace, callback ordering,
@@ -204,7 +205,7 @@ live HTTPS navigation and all 169 layout assertions pass after waiting for the
 browser document shell to exist before starting the integration probe.
 
 
-Unicode source transport is being corrected in the runner: the historical shell
+Unicode source transport was corrected in the runner: the historical shell
 `load` path maps each file byte to a code unit and cannot load the upstream UTF-8
 source faithfully. The new shell `evaluate` entry point uses the Unicode global
 script compiler. The driver passes the complete unmodified source through an
@@ -212,3 +213,108 @@ ASCII-escaped transport string, and the preflight checks a supplementary Unicode
 character. Reports label this transport explicitly. Earlier byte-loader totals
 remain historical measurements and must not be presented as Unicode-conformance
 results. No test assertions or failure annotations are changed.
+
+
+## Upstream mode policy and strict-mode implementation
+
+The pinned upstream `tools/packaging/test262.py` sets `--unmarked_default` to
+`non_strict` with an explicit comment that not all tests are strict-compatible.
+The local runner now follows that policy and still runs every `onlyStrict` case
+in strict mode. `--unmarked-default both` preserves the earlier 22,029-case
+experiment as an additional diagnostic. For example, `S15.3.4.4_A3_T6.js`
+requires a null call receiver to become the global object and has no mode tag;
+forcing it into strict mode contradicts ES5 10.4.3. No test source, assertion,
+or upstream annotation is altered. Earlier totals used both modes for unmarked
+cases and are not the required-mode conformance total.
+
+Before strict-mode changes, Unicode diagnostic runs completed at 21,047 passes /
+982 failures in the Suite and 21,061 / 968 in XULRunner. The latter includes the
+shared ES5 whitespace predicate and the last bound-state guards. Neither run
+had crashes, timeouts, or harness errors. Strict-mode parsing and execution are
+implemented in the following stage; those diagnostic totals are intermediate
+measurements.
+
+
+## Strict execution and remaining conformance work (2026-09-14)
+
+Strict function/script metadata now survives bytecode serialization. Directive
+prologues, strict bindings and early errors, raw call receivers, isolated direct
+eval environments, indirect global eval, strict arguments snapshots, and shared
+poison accessors are implemented in the existing interpreter. Property writes
+and deletes enforce strict failures, including the property-cache path.
+Library corrections include callback receivers, operand conversion order,
+object literal property definitions, regexp validation, array result properties,
+and ISO date parsing. Historical explicit `__proto__` initializers remain
+supported; callable RegExp objects and implicit RegExp input remain available
+only with an explicitly selected historical language version.
+
+Required-mode Unicode runs progressed through 11,278/11,540, 11,389/11,540,
+and 11,470/11,540 passes (262, 151, and 70 failures respectively), with no
+crashes, timeouts, or harness errors. These intermediate runs precede the latest
+array/parser corrections and the harness separation below. They are not a
+completion claim. `strict-mode.js` adds 46 regression assertions; all 336 focused
+JavaScript assertions passed in the Suite engine at that intermediate point.
+The final application and embedding results are recorded below.
+
+The harness now compiles separately from each test, in the same global object.
+Concatenating harness declarations before a test masks a test's own directive
+prologue, including `10.1.1-2gs`, `-5gs`, and `-8gs`. The test source is unchanged.
+Negative tests follow their actual metadata exception pattern; an intentional
+`$FAIL` is the expected outcome of the historical negative `S12.5_A2` test.
+Harness initialization is outside the test's exception handler and cannot
+satisfy a negative test. The default timezone is `America/Los_Angeles`, matching
+fixed epoch expectations in the historical Date constructor tests; use
+`--timezone` for separate portability runs. Reports record timezone and harness
+layout alongside source transport, suite revision, and mode policy.
+
+
+## Complete pinned-suite pass
+
+Both final macOS 15.7.1 arm64 builds pass **11,540 / 11,540**, with zero
+failures, crashes, timeouts, or harness errors. The external suite checkout is
+clean at the pinned revision. Each full run contains 10,894 non-strict cases
+and all 646 annotated strict cases. The final builds also pass all 394 focused
+assertions, 15 embedding checks, and 169 layout assertions. Suite live HTTPS
+navigation passes, and the temporary Suite profile is unregistered with the
+previous profile selection restored. Windows runtime validation remains
+separate.
+
+[Conformance results](conformance-results.json) records the suite revision,
+runner hash, source patch hash, full-report hashes, environment, mode counts,
+and integration totals. No test source, assertion, or metadata was changed.
+These are complete passes of this pinned suite, not an exhaustive proof of the
+entire specification.
+
+`strict-mode.js` now has 55 assertions, including primitive getters, setters,
+method calls, parenthesized non-directives, and decompilation/recompilation of
+strict functions. `library-edge-cases.js` adds 49 assertions for ISO parsing,
+regexp flags and ranges, accessor arity, URI noncharacters, missing optional
+arguments, generic array mutation, and conversion ordering. Together with the
+four earlier files, this gives 394 focused JavaScript assertions. Run all six
+files with separate `-f` arguments and require each `failures=0` summary;
+xpcshell can print a script error without returning a nonzero process status.
+
+The embedding program now has 15 checks, covering strict JSAPI function clones
+and a bytecode round trip containing a strict function and sparse array.
+Eager arguments creation exposed an uninitialized instruction pointer in an
+inline frame before a resolve callback. Initializing the frame before exposure
+fixes the reproduced crash; 30 consecutive Suite embedding runs pass. The
+XULRunner embedding check and 169 layout assertions also pass. Static analysis
+still reports historical diagnostics; this work is not a security audit.
+
+
+Run the focused checks against either build:
+
+```sh
+DYLD_LIBRARY_PATH="$PWD/obj-zoolrunner-macos-arm64-suite/dist/bin" \
+obj-zoolrunner-macos-arm64-suite/dist/bin/xpcshell \
+  -f js/tests/es5/strict-mode.js \
+  -f js/tests/es5/library-edge-cases.js \
+  -f js/tests/es5/json-bind-string.js \
+  -f js/tests/es5/object-descriptors.js \
+  -f js/tests/es5/object-reflection.js \
+  -f js/tests/es5/array-date.js
+```
+
+Require six `failures=0` summaries with counts 55, 49, 71, 68, 101, and 50.
+Build and run `TestObjectEmbedding.c` as described above; require 15 checks.

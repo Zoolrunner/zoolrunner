@@ -382,6 +382,8 @@ MaybeSetupFrame(JSContext *cx, JSObject *chain, JSStackFrame *oldfp,
      * Variables gets the correct variables object: the one from the special
      * frame's caller.
      */
+    if (oldfp && (oldfp->flags & JSFRAME_EVAL_COMPILER))
+        return;
     if (oldfp &&
         oldfp->varobj &&
         oldfp->scopeChain == chain &&
@@ -498,6 +500,10 @@ js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
     /* Prevent GC activation while compiling. */
     JS_KEEP_ATOMS(cx->runtime);
 
+    if (cx->fp->flags & JSFRAME_STRICT_EVAL) {
+        cg->treeContext.flags |= TCF_STRICT_MODE;
+        ts->flags |= TSF_STRICT_MODE;
+    }
     pn = Statements(cx, ts, &cg->treeContext);
     if (!pn) {
         ok = JS_FALSE;
@@ -695,6 +701,42 @@ CheckFinalReturn(JSContext *cx, JSTokenStream *ts, JSParseNode *pn)
                            JSMSG_NO_RETURN_VALUE, JSMSG_ANON_NO_RETURN_VALUE);
 }
 
+static JSBool
+StrictSyntaxError(JSContext *cx, JSTokenStream *ts)
+{
+    return js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                       JSMSG_STRICT_SYNTAX);
+}
+
+static JSBool
+StrictReserved(JSAtom *atom)
+{
+    static const char *words[] = {
+        "implements", "interface", "let", "package", "private", "protected",
+        "public", "static", "yield"
+    };
+    JSString *str = ATOM_TO_STRING(atom);
+    const jschar *chars = JSSTRING_CHARS(str);
+    size_t length = JSSTRING_LENGTH(str), i, j;
+    for (i = 0; i < JS_ARRAY_LENGTH(words); i++) {
+        if (strlen(words[i]) != length) continue;
+        for (j = 0; j < length && chars[j] == (jschar)words[i][j]; j++) {}
+        if (j == length) return JS_TRUE;
+    }
+    return JS_FALSE;
+}
+
+static JSBool
+RestrictedBinding(JSContext *cx, JSAtom *atom)
+{
+    /* Parameter bindings use hidden atoms with the same string key. */
+    return js_EqualStrings(ATOM_TO_STRING(atom),
+                           ATOM_TO_STRING(cx->runtime->atomState.evalAtom)) ||
+           js_EqualStrings(ATOM_TO_STRING(atom),
+                           ATOM_TO_STRING(cx->runtime->atomState.argumentsAtom)) ||
+           StrictReserved(atom);
+}
+
 static JSParseNode *
 FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
              JSTreeContext *tc)
@@ -702,8 +744,9 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     JSStackFrame *fp, frame;
     JSObject *funobj;
     JSStmtInfo stmtInfo;
-    uintN oldflags, firstLine;
+    uintN oldflags, firstLine, oldStrict;
     JSParseNode *pn;
+    JSScopeProperty *sprop;
 
     fp = cx->fp;
     funobj = fun->object;
@@ -728,6 +771,9 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     stmtInfo.flags = SIF_BODY_BLOCK;
 
     oldflags = tc->flags;
+    oldStrict = ts->flags & TSF_STRICT_MODE;
+    if (tc->flags & TCF_STRICT_MODE)
+        ts->flags |= TSF_STRICT_MODE;
     tc->flags &= ~(TCF_RETURN_EXPR | TCF_RETURN_VOID);
     tc->flags |= TCF_IN_FUNCTION;
 
@@ -738,6 +784,24 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
      */
     firstLine = ts->lineno;
     pn = Statements(cx, ts, tc);
+    if (tc->flags & TCF_STRICT_MODE) {
+        fun->flags |= JSFUN_STRICT;
+        if (pn && fun->atom && RestrictedBinding(cx, fun->atom)) {
+            StrictSyntaxError(cx, ts);
+            pn = NULL;
+        }
+        /* A body's directive applies to the parameters parsed before it. */
+        for (sprop = SCOPE_LAST_PROP(OBJ_SCOPE(funobj)); pn && sprop;
+             sprop = sprop->parent) {
+            if (sprop->getter == js_GetArgument &&
+                ((sprop->flags & SPROP_IS_DUPLICATE) ||
+                 RestrictedBinding(cx, JSID_TO_ATOM(sprop->id)))) {
+                StrictSyntaxError(cx, ts);
+                pn = NULL;
+            }
+        }
+    }
+    ts->flags = (ts->flags & ~TSF_STRICT_MODE) | oldStrict;
 
     js_PopStatement(tc);
 
@@ -1191,6 +1255,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
     /* Initialize early for possible flags mutation via DestructuringExpr. */
     TREE_CONTEXT_INIT(&funtc);
+    funtc.flags |= tc->flags & TCF_STRICT_MODE;
 
     /* Now parse formal argument list and compute fun->nargs. */
     MUST_MATCH_TOKEN(TOK_LP, JSMSG_PAREN_BEFORE_FORMAL);
@@ -1419,7 +1484,8 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_funAtom = objAtom;
     pn->pn_op = op;
     pn->pn_body = body;
-    pn->pn_flags = funtc.flags & (TCF_FUN_FLAGS | TCF_HAS_DEFXMLNS);
+    pn->pn_flags = (funtc.flags & (TCF_FUN_FLAGS | TCF_HAS_DEFXMLNS)) |
+                   ((fun->flags & JSFUN_STRICT) ? TCF_STRICT_MODE : 0);
     pn->pn_tryCount = funtc.tryCount;
     TREE_CONTEXT_FINISH(&funtc);
     return result;
@@ -1445,8 +1511,11 @@ FunctionExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 static JSParseNode *
 Statements(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 {
-    JSParseNode *pn, *pn2, *saveBlock;
+    JSParseNode *pn, *pn2, *saveBlock, *literal;
     JSTokenType tt;
+    JSBool directive = !tc->topStmt || (tc->topStmt->flags & SIF_BODY_BLOCK);
+    static const jschar strictDirective[] = {'u','s','e',' ','s','t','r','i','c','t'};
+    JSBool directiveOctal = JS_FALSE;
 
     CHECK_RECURSION();
 
@@ -1467,6 +1536,32 @@ Statements(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
             return NULL;
         }
         ts->flags |= TSF_OPERAND;
+
+        if (directive) {
+            literal = pn2->pn_type == TOK_SEMI ? pn2->pn_kid : NULL;
+            if (!literal || literal->pn_type != TOK_STRING ||
+                (literal->pn_attrs & TOKF_PAREN)) {
+                directive = JS_FALSE;
+            } else {
+                directiveOctal |= (literal->pn_attrs & TOKF_OCTAL) != 0;
+                if (!(literal->pn_attrs & (TOKF_ESCAPE | TOKF_PAREN)) &&
+                       JSSTRING_LENGTH(ATOM_TO_STRING(literal->pn_atom)) == 10 &&
+                       !memcmp(JSSTRING_CHARS(ATOM_TO_STRING(literal->pn_atom)),
+                               strictDirective, sizeof(strictDirective))) {
+                    /* Escaped spellings are not strict-mode directives. */
+                    tc->flags |= TCF_STRICT_MODE;
+                    ts->flags |= TSF_STRICT_MODE;
+                    if (cx->fp->flags & JSFRAME_EVAL_COMPILER) {
+                        cx->fp->varobj = cx->fp->scopeChain;
+                        cx->fp->fun = NULL;
+                    }
+                    if (directiveOctal) {
+                        StrictSyntaxError(cx, ts);
+                        return NULL;
+                    }
+                }
+            }
+        }
 
         /* Detect a function statement for the TOK_LC case in Statement. */
         if (pn2->pn_type == TOK_FUNCTION && !AT_TOP_LEVEL(tc))
@@ -1684,6 +1779,8 @@ BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
     JSScopeProperty *sprop;
     JSAtomListElement *ale;
 
+    if ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, atom))
+        return StrictSyntaxError(cx, data->ts);
     blockObj = data->obj;
     sprop = SCOPE_GET_PROPERTY(OBJ_SCOPE(blockObj), ATOM_TO_JSID(atom));
     ATOM_LIST_SEARCH(ale, &tc->decls, atom);
@@ -1739,6 +1836,8 @@ BindVarOrConst(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
     JSPropertyOp getter, setter;
     JSScopeProperty *sprop;
 
+    if ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, atom))
+        return StrictSyntaxError(cx, data->ts);
     stmt = js_LexicalLookup(tc, atom, NULL, JS_FALSE);
     ATOM_LIST_SEARCH(ale, &tc->decls, atom);
     op = data->op;
@@ -3283,6 +3382,10 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         break;
 
       case TOK_WITH:
+        if (tc->flags & TCF_STRICT_MODE) {
+            StrictSyntaxError(cx, ts);
+            return NULL;
+        }
         pn = NewParseNode(cx, ts, PN_BINARY, tc);
         if (!pn)
             return NULL;
@@ -3818,6 +3921,10 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         continue;
     switch (pn2->pn_type) {
       case TOK_NAME:
+        if ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, pn2->pn_atom)) {
+            StrictSyntaxError(cx, ts);
+            return NULL;
+        }
         pn2->pn_op = JSOP_SETNAME;
         if (pn2->pn_atom == cx->runtime->atomState.argumentsAtom)
             tc->flags |= TCF_FUN_HEAVYWEIGHT;
@@ -4096,6 +4203,8 @@ SetIncOpKid(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         return JS_FALSE;
     switch (kid->pn_type) {
       case TOK_NAME:
+        if ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, kid->pn_atom))
+            return StrictSyntaxError(cx, ts);
         op = (tt == TOK_INC)
              ? (preorder ? JSOP_INCNAME : JSOP_NAMEINC)
              : (preorder ? JSOP_DECNAME : JSOP_NAMEDEC);
@@ -4191,6 +4300,10 @@ UnaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
          */
         while (pn2->pn_type == TOK_RP)
             pn2 = pn2->pn_kid;
+        if ((tc->flags & TCF_STRICT_MODE) && pn2->pn_type == TOK_NAME) {
+            StrictSyntaxError(cx, ts);
+            return NULL;
+        }
         pn->pn_kid = pn2;
         break;
 
@@ -5465,7 +5578,13 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
       case TOK_LC:
       {
         JSBool afterComma;
+        JSAtomList properties;
+        JSAtomListElement *entry;
+        JSAtom *propertyAtom;
+        JSString *propertyString;
+        uintN propertyKind, previousKind;
 
+        ATOM_LIST_INIT(&properties);
         pn = NewParseNode(cx, ts, PN_LIST, tc);
         if (!pn)
             return NULL;
@@ -5519,6 +5638,14 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                             CURRENT_TOKEN(ts).t_op = JSOP_NOP;
                             CURRENT_TOKEN(ts).type = TOK_FUNCTION;
                             pn2 = FunctionExpr(cx, ts, tc);
+                            if (pn2) {
+                                JSFunction *accessor = (JSFunction *) JS_GetPrivate(
+                                    cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
+                                if (accessor->nargs != (op == JSOP_GETTER ? 0 : 1)) {
+                                    StrictSyntaxError(cx, ts);
+                                    return NULL;
+                                }
+                            }
                             pn2 = NewBinary(cx, TOK_COLON, op, pn3, pn2, tc);
                             goto skip;
                         }
@@ -5571,6 +5698,36 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif
             if (!pn2)
                 return NULL;
+            pn3 = pn2->pn_left;
+            if (pn3->pn_type == TOK_NUMBER) {
+                propertyString = js_NumberToString(cx, pn3->pn_dval);
+                if (!propertyString)
+                    return NULL;
+                propertyAtom = js_AtomizeString(cx, propertyString, 0);
+            } else {
+                propertyAtom = pn3->pn_atom;
+            }
+            if (!propertyAtom)
+                return NULL;
+            propertyKind = pn2->pn_op == JSOP_GETTER ? 2
+                           : pn2->pn_op == JSOP_SETTER ? 4 : 1;
+            ATOM_LIST_SEARCH(entry, &properties, propertyAtom);
+            if (entry) {
+                previousKind = ALE_INDEX(entry);
+                if ((propertyKind == 1 &&
+                     ((previousKind & 6) || (tc->flags & TCF_STRICT_MODE))) ||
+                    (propertyKind != 1 &&
+                     ((previousKind & 1) || (previousKind & propertyKind)))) {
+                    StrictSyntaxError(cx, ts);
+                    return NULL;
+                }
+                propertyKind |= previousKind;
+            } else {
+                entry = js_IndexAtom(cx, propertyAtom, &properties);
+                if (!entry)
+                    return NULL;
+            }
+            ALE_SET_INDEX(entry, propertyKind);
             PN_APPEND(pn, pn2);
 
             tt = js_GetToken(cx, ts);
@@ -5622,6 +5779,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             return NULL;
 
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_IN_PAREN);
+        if (pn2->pn_type == TOK_STRING)
+            pn2->pn_attrs |= TOKF_PAREN;
         if (pn2->pn_type == TOK_RP ||
             (js_CodeSpec[pn2->pn_op].prec >= js_CodeSpec[JSOP_GETPROP].prec &&
              !afterDot)) {
@@ -5687,6 +5846,16 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         if (!pn)
             return NULL;
         pn->pn_atom = CURRENT_TOKEN(ts).t_atom;
+        if (tt == TOK_STRING)
+            pn->pn_attrs = CURRENT_TOKEN(ts).flags;
+        if (tt == TOK_NAME && !afterDot && (tc->flags & TCF_IN_FUNCTION) &&
+            pn->pn_atom == cx->runtime->atomState.argumentsAtom)
+            tc->flags |= TCF_FUN_USES_ARGUMENTS;
+        if (tt == TOK_NAME && !afterDot && (tc->flags & TCF_STRICT_MODE) &&
+            StrictReserved(pn->pn_atom)) {
+            StrictSyntaxError(cx, ts);
+            return NULL;
+        }
 #if JS_HAS_XML_SUPPORT
         if (tt == TOK_XMLPI)
             pn->pn_atom2 = CURRENT_TOKEN(ts).t_atom2;

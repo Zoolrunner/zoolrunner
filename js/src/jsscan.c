@@ -1059,6 +1059,7 @@ NewToken(JSTokenStream *ts, ptrdiff_t adjust)
 
     ts->cursor = (ts->cursor + 1) & NTOKENS_MASK;
     tp = &CURRENT_TOKEN(ts);
+    tp->flags = 0;
     tp->ptr = ts->linebuf.ptr + adjust;
     tp->pos.begin.index = ts->linepos +
                           PTRDIFF(tp->ptr, ts->linebuf.base, jschar) -
@@ -1109,8 +1110,16 @@ js_GetToken(JSContext *cx, JSTokenStream *ts)
         ts->lookahead--;
         ts->cursor = (ts->cursor + 1) & NTOKENS_MASK;
         tt = CURRENT_TOKEN(ts).type;
-        if (tt != TOK_EOL || (ts->flags & TSF_NEWLINES))
+        if (tt != TOK_EOL || (ts->flags & TSF_NEWLINES)) {
+            if ((ts->flags & TSF_STRICT_MODE) &&
+                (CURRENT_TOKEN(ts).flags & TOKF_OCTAL)) {
+                js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                            JSMSG_STRICT_SYNTAX);
+                ts->flags |= TSF_ERROR;
+                return TOK_ERROR;
+            }
             return tt;
+        }
     }
 
     /* If there was a fatal error, keep returning TOK_ERROR. */
@@ -1291,18 +1300,27 @@ retry:
     }
 
     hadUnicodeEscape = JS_FALSE;
-    if (JS_ISIDSTART(c) ||
-        (c == '\\' &&
-         (c = GetUnicodeEscape(ts),
-          hadUnicodeEscape = JS_ISIDSTART(c)))) {
+    if (c == '\\') {
+        c = GetUnicodeEscape(ts);
+        if (!JS_ISIDSTART(c)) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                         JSMSG_ILLEGAL_CHARACTER);
+            goto error;
+        }
+        hadUnicodeEscape = JS_TRUE;
+    }
+    if (JS_ISIDSTART(c)) {
         INIT_TOKENBUF();
         for (;;) {
             ADD_TO_TOKENBUF(c);
             c = GetChar(ts);
             if (c == '\\') {
                 c = GetUnicodeEscape(ts);
-                if (!JS_ISIDENT(c))
-                    break;
+                if (!JS_ISIDENT(c)) {
+                    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                 JSMSG_ILLEGAL_CHARACTER);
+                    goto error;
+                }
                 hadUnicodeEscape = JS_TRUE;
             } else {
                 if (!JS_ISIDENT(c))
@@ -1315,20 +1333,22 @@ retry:
          * Check for keywords unless we saw Unicode escape or parser asks
          * to ignore keywords.
          */
-        if (!hadUnicodeEscape &&
-            !(ts->flags & TSF_KEYWORD_IS_NAME) &&
+        if (!(ts->flags & TSF_KEYWORD_IS_NAME) &&
             TOKENBUF_OK() &&
             (kw = FindKeyword(TOKENBUF_BASE(), TOKENBUF_LENGTH()))) {
             if (kw->tokentype == TOK_RESERVED) {
-                if (!js_ReportCompileErrorNumber(cx, ts,
-                                                 JSREPORT_TS |
-                                                 JSREPORT_WARNING |
-                                                 JSREPORT_STRICT,
-                                                 JSMSG_RESERVED_ID,
-                                                 kw->chars)) {
+                if (!strcmp(kw->chars, "class") || !strcmp(kw->chars, "enum") ||
+                    !strcmp(kw->chars, "extends") || !strcmp(kw->chars, "super")) {
+                    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                 JSMSG_RESERVED_ID, kw->chars);
                     goto error;
                 }
             } else if (kw->version <= JSVERSION_NUMBER(cx)) {
+                if (hadUnicodeEscape) {
+                    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                 JSMSG_RESERVED_ID, kw->chars);
+                    goto error;
+                }
                 tt = kw->tokentype;
                 tp->t_op = (JSOp) kw->op;
                 goto out;
@@ -1358,8 +1378,14 @@ retry:
             if (JS_TOLOWER(c) == 'x') {
                 ADD_TO_TOKENBUF(c);
                 c = GetChar(ts);
+                if (!JS7_ISHEX(c)) {
+                    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                 JSMSG_ILLEGAL_CHARACTER);
+                    goto error;
+                }
                 radix = 16;
             } else if (JS7_ISDEC(c)) {
+                tp->flags |= TOKF_OCTAL;
                 radix = 8;
             }
         }
@@ -1454,6 +1480,7 @@ retry:
                 goto error;
             }
             if (c == '\\') {
+                tp->flags |= TOKF_ESCAPE;
                 switch (c = GetChar(ts)) {
                   case 'b': c = '\b'; break;
                   case 'f': c = '\f'; break;
@@ -1463,6 +1490,9 @@ retry:
                   case 'v': c = '\v'; break;
 
                   default:
+                    if ((c >= '1' && c <= '9') ||
+                        (c == '0' && JS7_ISDEC(PeekChar(ts))))
+                        tp->flags |= TOKF_OCTAL;
                     if ('0' <= c && c < '8') {
                         int32 val = JS7_UNDEC(c);
 
@@ -1492,6 +1522,10 @@ retry:
                                   + JS7_UNHEX(cp[2])) << 4)
                                 + JS7_UNHEX(cp[3]);
                             SkipChars(ts, 4);
+                        } else {
+                            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                        JSMSG_SYNTAX_ERROR);
+                            goto error;
                         }
                     } else if (c == 'x') {
                         jschar cp[2];
@@ -1499,6 +1533,10 @@ retry:
                             JS7_ISHEX(cp[0]) && JS7_ISHEX(cp[1])) {
                             c = (JS7_UNHEX(cp[0]) << 4) + JS7_UNHEX(cp[1]);
                             SkipChars(ts, 2);
+                        } else {
+                            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                        JSMSG_SYNTAX_ERROR);
+                            goto error;
                         }
                     } else if (c == '\n' && JS_VERSION_IS_ECMA(cx)) {
                         /* ECMA follows C by removing escaped newlines. */
@@ -1889,6 +1927,7 @@ skipline:
             JSObject *obj;
             uintN flags;
             JSBool inCharClass = JS_FALSE;
+            uintN flag;
 
             INIT_TOKENBUF();
             for (;;) {
@@ -1903,6 +1942,12 @@ skipline:
                 if (c == '\\') {
                     ADD_TO_TOKENBUF(c);
                     c = GetChar(ts);
+                    if (c == '\n' || c == EOF) {
+                        UngetChar(ts, c);
+                        js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                     JSMSG_UNTERMINATED_REGEXP);
+                        goto error;
+                    }
                 } else if (c == '[') {
                     inCharClass = JS_TRUE;
                 } else if (c == ']') {
@@ -1915,13 +1960,19 @@ skipline:
             }
             for (flags = 0; ; ) {
                 if (MatchChar(ts, 'g'))
-                    flags |= JSREG_GLOB;
+                    flag = JSREG_GLOB;
                 else if (MatchChar(ts, 'i'))
-                    flags |= JSREG_FOLD;
+                    flag = JSREG_FOLD;
                 else if (MatchChar(ts, 'm'))
-                    flags |= JSREG_MULTILINE;
+                    flag = JSREG_MULTILINE;
                 else
                     break;
+                if (flags & flag) {
+                    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                 JSMSG_BAD_REGEXP_FLAG);
+                    goto error;
+                }
+                flags |= flag;
             }
             c = PeekChar(ts);
             if (JS7_ISLET(c)) {
@@ -2061,6 +2112,12 @@ skipline:
     }
 
 out:
+    if (tt != TOK_ERROR && (ts->flags & TSF_STRICT_MODE) &&
+        (tp->flags & TOKF_OCTAL)) {
+        js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                    JSMSG_STRICT_SYNTAX);
+        goto error;
+    }
     JS_ASSERT(tt != TOK_EOL);
     ts->flags |= TSF_DIRTYLINE;
 

@@ -112,6 +112,9 @@ typedef struct JSInlineFrame {
 #define JSFRAME_POP_BLOCKS   0x1000 /* scope chain contains blocks to pop */
 #define JSFRAME_GENERATOR    0x2000 /* frame belongs to generator-iterator */
 
+#define JSFRAME_EVAL_COMPILER 0x4000 /* explicit eval compilation environment */
+#define JSFRAME_STRICT_EVAL   0x8000 /* inherit strictness for direct eval */
+
 #define JSFRAME_OVERRIDE_SHIFT 24   /* override bit-set params; see jsfun.c */
 #define JSFRAME_OVERRIDE_BITS  8
 
@@ -333,8 +336,17 @@ js_Invoke(JSContext *cx, uintN argc, uintN flags);
     js_InternalInvoke(cx, obj, fval, JSINVOKE_CONSTRUCT, argc, argv, rval)
 
 extern JSBool
+js_InternalInvokeValue(JSContext *cx, jsval thisv, jsval fval, uintN flags,
+                       uintN argc, jsval *argv, jsval *rval);
+
+extern JSBool
 js_InternalInvoke(JSContext *cx, JSObject *obj, jsval fval, uintN flags,
                   uintN argc, jsval *argv, jsval *rval);
+
+extern JSBool
+js_InternalGetOrSetValue(JSContext *cx, JSObject *obj, jsval thisv,
+                         jsid id, jsval fval, JSAccessMode mode,
+                         uintN argc, jsval *argv, jsval *rval);
 
 extern JSBool
 js_InternalGetOrSet(JSContext *cx, JSObject *obj, jsid id, jsval fval,

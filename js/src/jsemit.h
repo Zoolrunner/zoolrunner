@@ -180,8 +180,10 @@ struct JSTreeContext {              /* tree context for semantic checks */
 #define TCF_FUN_USES_NONLOCALS 0x40 /* function refers to non-local names */
 #define TCF_FUN_HEAVYWEIGHT    0x80 /* function needs Call object per call */
 #define TCF_FUN_IS_GENERATOR  0x100 /* parsed yield statement in function */
-#define TCF_FUN_FLAGS         0x1E0 /* flags to propagate from FunctionBody */
+#define TCF_FUN_USES_ARGUMENTS 0x1000 /* snapshot strict arguments on entry */
+#define TCF_FUN_FLAGS         0x11E0 /* flags to propagate from FunctionBody */
 #define TCF_HAS_DEFXMLNS      0x200 /* default xml namespace = ...; parsed */
+#define TCF_STRICT_MODE       0x800 /* ES5 strict code, independent of warnings */
 #define TCF_HAS_FUNCTION_STMT 0x400 /* block contains a function statement */
 
 #define TREE_CONTEXT_INIT(tc)                                                 \

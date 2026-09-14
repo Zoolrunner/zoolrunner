@@ -120,6 +120,10 @@ num_parseInt(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     jsdouble d;
     const jschar *bp, *ep;
 
+    str = js_ValueToString(cx, argv[0]);
+    if (!str)
+        return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(str);
     if (argc > 1) {
         if (!js_ValueToECMAInt32(cx, argv[1], &radix))
             return JS_FALSE;
@@ -130,14 +134,17 @@ num_parseInt(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
         return JS_TRUE;
     }
-
-    str = js_ValueToString(cx, argv[0]);
-    if (!str)
-        return JS_FALSE;
     /* XXXbe js_strtointeger shouldn't require NUL termination */
     bp = js_UndependString(cx, str);
     if (!bp)
         return JS_FALSE;
+    if (radix == 0) {
+        const jschar *digits = bp;
+        while (JS_ISSPACE(*digits)) ++digits;
+        if (*digits == '+' || *digits == '-') ++digits;
+        radix = digits[0] == '0' && (digits[1] == 'x' || digits[1] == 'X')
+                ? 16 : 10;
+    }
     if (!js_strtointeger(cx, bp, &ep, radix, &d))
         return JS_FALSE;
     if (ep == bp) {
@@ -271,7 +278,7 @@ num_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     }
     d = JSVAL_IS_INT(v) ? (jsdouble)JSVAL_TO_INT(v) : *JSVAL_TO_DOUBLE(v);
     base = 10;
-    if (argc != 0) {
+    if (argc != 0 && !JSVAL_IS_VOID(argv[0])) {
         if (!js_ValueToECMAInt32(cx, argv[0], &base))
             return JS_FALSE;
         if (base < 2 || base > 36) {

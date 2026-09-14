@@ -385,7 +385,8 @@ exn_mark(JSContext *cx, JSObject *obj, void *arg)
 
     priv = GetExnPrivate(cx, obj);
     if (priv) {
-        GC_MARK(cx, priv->message, "exception message");
+        if (priv->message)
+            GC_MARK(cx, priv->message, "exception message");
         GC_MARK(cx, priv->filename, "exception filename");
         elem = priv->stackElems;
         for (vcount = i = 0; i != priv->stackDepth; ++i, ++elem) {
@@ -463,7 +464,7 @@ exn_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
         str = JSVAL_TO_STRING(id);
 
         atom = cx->runtime->atomState.messageAtom;
-        if (str == ATOM_TO_STRING(atom)) {
+        if (str == ATOM_TO_STRING(atom) && priv->message) {
             prop = js_message_str;
             v = STRING_TO_JSVAL(priv->message);
             goto define;
@@ -767,7 +768,7 @@ Exception(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, JSVAL_VOID);
 
     /* Set the 'message' property. */
-    if (argc != 0) {
+    if (argc != 0 && !JSVAL_IS_VOID(argv[0])) {
         message = js_ValueToString(cx, argv[0]);
         if (!message) {
             ok = JS_FALSE;
@@ -775,7 +776,7 @@ Exception(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         }
         argv[0] = STRING_TO_JSVAL(message);
     } else {
-        message = cx->runtime->emptyString;
+        message = NULL;
     }
 
     /* Set the 'fileName' property. */
@@ -1052,7 +1053,7 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
 
         /* Make a constructor function for the current name. */
         atom = cx->runtime->atomState.classAtoms[exceptions[i].key];
-        fun = js_DefineFunction(cx, obj, atom, exceptions[i].native, 3, 0);
+        fun = js_DefineFunction(cx, obj, atom, exceptions[i].native, 1, 0);
         if (!fun)
             break;
 

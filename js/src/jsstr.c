@@ -507,9 +507,12 @@ enum string_tinyid {
     STRING_LENGTH = -1
 };
 
+static JSBool
+str_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp);
+
 static JSPropertySpec string_props[] = {
     {js_length_str,     STRING_LENGTH,
-                        JSPROP_READONLY|JSPROP_PERMANENT|JSPROP_SHARED, 0,0},
+                        JSPROP_READONLY|JSPROP_PERMANENT|JSPROP_SHARED, str_getProperty,0},
     {0,0,0,0,0}
 };
 
@@ -603,7 +606,7 @@ JSClass js_StringClass = {
     js_String_str,
     JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE |
     JSCLASS_HAS_CACHED_PROTO(JSProto_String),
-    JS_PropertyStub,   JS_PropertyStub,   str_getProperty,   JS_PropertyStub,
+    JS_PropertyStub,   JS_PropertyStub,   JS_PropertyStub,   JS_PropertyStub,
     str_enumerate, (JSResolveOp)str_resolve, JS_ConvertStub, JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
@@ -734,7 +737,7 @@ str_substring(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         else if (begin > length)
             begin = length;
 
-        if (argc == 1) {
+        if (argc == 1 || JSVAL_IS_VOID(argv[1])) {
             end = length;
         } else {
             if (!js_ValueToNumber(cx, argv[1], &d))
@@ -872,9 +875,7 @@ str_localeCompare(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         return JS_FALSE;
     argv[-1] = STRING_TO_JSVAL(str);
 
-    if (argc == 0) {
-        *rval = JSVAL_ZERO;
-    } else {
+    {
         thatStr = js_ValueToString(cx, argv[0]);
         if (!thatStr)
             return JS_FALSE;
@@ -1154,7 +1155,8 @@ match_or_replace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         reobj = JSVAL_TO_OBJECT(argv[0]);
         re = (JSRegExp *) JS_GetPrivate(cx, reobj);
     } else {
-        src = js_ValueToString(cx, argv[0]);
+        src = JSVAL_IS_VOID(argv[0]) && !(data->flags & FORCE_FLAT)
+              ? cx->runtime->emptyString : js_ValueToString(cx, argv[0]);
         if (!src)
             return JS_FALSE;
         if (data->optarg < argc) {
@@ -1428,7 +1430,7 @@ find_replen(JSContext *cx, ReplaceData *rdata, size_t *sizep)
 
         /* Push lambda and its 'this' parameter. */
         *sp++ = OBJECT_TO_JSVAL(lambda);
-        *sp++ = OBJECT_TO_JSVAL(OBJ_GET_PARENT(cx, lambda));
+        *sp++ = JSVAL_VOID;
 
 #define PUSH_REGEXP_STATIC(sub)                                               \
     JS_BEGIN_MACRO                                                            \
@@ -1596,6 +1598,16 @@ str_replace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSBool ok;
     jschar *chars;
     size_t leftlen, rightlen, length;
+
+    str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
+    if (!str)
+        return JS_FALSE;
+    argv[-1] = STRING_TO_JSVAL(str);
+    /* The shared matcher accepts the already-converted string receiver. */
+    obj = (JSObject *) STRING_TO_JSVAL(str);
+    if (!JSVAL_IS_REGEXP(cx, argv[0]) &&
+        !JS_ConvertValue(cx, argv[0], JSTYPE_STRING, &argv[0]))
+        return JS_FALSE;
 
     if (JS_TypeOfValue(cx, argv[1]) == JSTYPE_FUNCTION) {
         lambda = JSVAL_TO_OBJECT(argv[1]);
@@ -1829,7 +1841,23 @@ str_split(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return JS_FALSE;
     *rval = OBJECT_TO_JSVAL(arrayobj);
 
-    if (argc == 0) {
+    /* Use the second argument as the split limit, if given. */
+    limited = (argc > 1) && !JSVAL_IS_VOID(argv[1]);
+    limit = 0; /* Avoid warning. */
+    if (limited) {
+        if (!js_ValueToNumber(cx, argv[1], &d))
+            return JS_FALSE;
+
+        /* Clamp limit between 0 and 1 + string length. */
+        if (!js_DoubleToECMAUint32(cx, d, &limit))
+            return JS_FALSE;
+        if (limit > JSSTRING_LENGTH(str))
+            limit = 1 + JSSTRING_LENGTH(str);
+    }
+
+    if (argc == 0 || JSVAL_IS_VOID(argv[0])) {
+        if (limited && limit == 0)
+            return JS_TRUE;
         v = STRING_TO_JSVAL(str);
         ok = JS_SetElement(cx, arrayobj, 0, &v);
     } else {
@@ -1854,20 +1882,6 @@ str_split(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             tmp.chars = JSSTRING_CHARS(str2);
             sep = &tmp;
             re = NULL;
-        }
-
-        /* Use the second argument as the split limit, if given. */
-        limited = (argc > 1) && !JSVAL_IS_VOID(argv[1]);
-        limit = 0; /* Avoid warning. */
-        if (limited) {
-            if (!js_ValueToNumber(cx, argv[1], &d))
-                return JS_FALSE;
-
-            /* Clamp limit between 0 and 1 + string length. */
-            if (!js_DoubleToECMAUint32(cx, d, &limit))
-                return JS_FALSE;
-            if (limit > JSSTRING_LENGTH(str))
-                limit = 1 + JSSTRING_LENGTH(str);
         }
 
         len = i = 0;
@@ -2025,7 +2039,7 @@ str_slice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             begin = length;
         }
 
-        if (argc == 1) {
+        if (argc == 1 || JSVAL_IS_VOID(argv[1])) {
             end = length;
         } else {
             if (!js_ValueToNumber(cx, argv[1], &d))
@@ -2293,9 +2307,9 @@ static JSFunctionSpec string_methods[] = {
 #endif
 
     /* Python-esque sequence methods. */
-    {"concat",              str_concat,             0,JSFUN_GENERIC_NATIVE|
+    {"concat",              str_concat,             1,JSFUN_GENERIC_NATIVE|
                                                       JSFUN_THISP_PRIMITIVE,0},
-    {"slice",               str_slice,              0,JSFUN_GENERIC_NATIVE|
+    {"slice",               str_slice,              2,JSFUN_GENERIC_NATIVE|
                                                       JSFUN_THISP_PRIMITIVE,0},
 
     /* HTML string methods. */
@@ -2443,7 +2457,8 @@ js_FinishDeflatedStringCache(JSRuntime *rt)
 JSObject *
 js_InitStringClass(JSContext *cx, JSObject *obj)
 {
-    JSObject *proto;
+    JSObject *proto, *ctor;
+    jsval v;
 
     /* Define the escape, unescape functions in the global object. */
     if (!JS_DefineFunctions(cx, obj, string_functions) ||
@@ -2459,6 +2474,12 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
                  STRING_TO_JSVAL(cx->runtime->emptyString));
     if (!js_SetBuiltinMethodFlags(cx, proto, string_methods,
                                   JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+        return NULL;
+    if (!JS_GetProperty(cx, obj, "String", &v))
+        return NULL;
+    ctor = JSVAL_TO_OBJECT(v);
+    if (!js_SetBuiltinMethodFlags(cx, ctor, string_static_methods,
+                                  JSFUN_NO_CONSTRUCT))
         return NULL;
     return proto;
 }
@@ -4843,8 +4864,7 @@ Utf8ToOneUcs4Char(const uint8 *utf8Buffer, int utf8Length)
             JS_ASSERT((*utf8Buffer & 0xC0) == 0x80);
             ucs4Char = ucs4Char<<6 | (*utf8Buffer++ & 0x3F);
         }
-        if (ucs4Char < minucs4Char ||
-            ucs4Char == 0xFFFE || ucs4Char == 0xFFFF) {
+        if (ucs4Char < minucs4Char) {
             ucs4Char = 0xFFFD;
         }
     }

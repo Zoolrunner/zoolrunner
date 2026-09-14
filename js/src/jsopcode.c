@@ -4218,6 +4218,8 @@ out:
 JSBool
 js_DecompileScript(JSPrinter *jp, JSScript *script)
 {
+    if (script->strictMode && js_printf(jp, "\t\"use strict\";\n") < 0)
+        return JS_FALSE;
     return js_DecompileCode(jp, script, script->code, (uintN)script->length, 0);
 }
 
@@ -4234,6 +4236,9 @@ js_DecompileFunctionBody(JSPrinter *jp, JSFunction *fun)
         js_printf(jp, native_code_str);
         return JS_TRUE;
     }
+    if ((fun->flags & JSFUN_STRICT) &&
+        js_printf(jp, "\t\"use strict\";\n") < 0)
+        return JS_FALSE;
     script = fun->u.i.script;
     scope = fun->object ? OBJ_SCOPE(fun->object) : NULL;
     save = jp->scope;
@@ -4393,6 +4398,11 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     indent = jp->indent;
     jp->indent += 4;
     if (FUN_INTERPRETED(fun) && fun->object) {
+        if ((fun->flags & JSFUN_STRICT) &&
+            js_printf(jp, "\t\"use strict\";\n") < 0) {
+            jp->indent = indent;
+            return JS_FALSE;
+        }
         oldscope = jp->scope;
         jp->scope = scope;
         len = fun->u.i.script->code + fun->u.i.script->length - pc;

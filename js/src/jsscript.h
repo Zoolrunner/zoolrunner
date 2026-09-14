@@ -70,6 +70,8 @@ struct JSScript {
     jsbytecode   *main;         /* main entry point, after predef'ing prolog */
     uint16       version;       /* JS version under which script was compiled */
     uint16       numGlobalVars; /* declared global var/const/function count */
+    JSBool       strictMode;    /* ES5 strict execution semantics */
+    JSBool       needsArguments; /* body refers to arguments (or direct eval) */
     JSAtomMap    atomMap;       /* maps immediate index to literal struct */
     const char   *filename;     /* source filename or null */
     uintN        lineno;        /* base line number of script */

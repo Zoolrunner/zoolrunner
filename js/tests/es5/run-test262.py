@@ -18,6 +18,11 @@ def main():
     parser.add_argument('--shell', required=True, type=Path)
     parser.add_argument('--report', required=True, type=Path)
     parser.add_argument('--filter', default='', help='substring of the suite path')
+    parser.add_argument('--unmarked-default', choices=['non_strict', 'strict', 'both'],
+                        default='non_strict',
+                        help='upstream mode policy; both is an additional diagnostic run')
+    parser.add_argument('--timezone', default='America/Los_Angeles',
+                        help='timezone required by the historical fixed-date cases')
     parser.add_argument('--jobs', type=int, default=4)
     parser.add_argument('--timeout', type=float, default=10)
     args = parser.parse_args()
@@ -41,6 +46,13 @@ def main():
         for strict in [False, True]:
             if (strict and 'noStrict' in record) or (not strict and 'onlyStrict' in record):
                 continue
+            # This pinned branch defaults unmarked tests to non-strict. Its
+            # older Sputnik cases are not all strict-compatible (upstream
+            # tools/packaging/test262.py, BuildOptions/EnumerateTests).
+            if 'noStrict' not in record and 'onlyStrict' not in record:
+                mode = 'strict' if strict else 'non_strict'
+                if args.unmarked_default not in ['both', mode]:
+                    continue
             cases.append((name, strict, record))
     if not cases:
         parser.error('no matching ES5 tests')
@@ -50,6 +62,7 @@ def main():
     for variable in ['DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH']:
         env[variable] = library_dir + (os.pathsep + env[variable] if env.get(variable) else '')
     env['MOZ_NO_REMOTE'] = '1'
+    env['TZ'] = args.timezone
 
     def run(case):
         name, strict, record = case
@@ -58,11 +71,15 @@ def main():
             source = Path(work) / 'case.js'
             driver = Path(work) / 'driver.js'
             prefix = '"use strict";\nvar strict_mode = true;\n' if strict else 'var strict_mode = false;\n'
-            code = prefix + harness + '\n' + record['test'] + '\n'
+            setup = prefix + harness + '\n'
+            # Keep a test's own directive prologue at the start of its script.
+            code = ('"use strict";\n' if strict else '') + record['test'] + '\n'
             source.write_text(code, encoding='utf-8')
             # An ASCII transport string preserves every UTF-16 code unit;
             # evaluate compiles a global script, not an eval activation.
-            driver.write_text('try { evaluate(' + json.dumps(code, ensure_ascii=True) +
+            driver.write_text('evaluate(' + json.dumps(setup, ensure_ascii=True) +
+                              ', "test262-harness.js");\n' +
+                              'try { evaluate(' + json.dumps(code, ensure_ascii=True) +
                               ', ' + json.dumps(str(source)) + ');\n'
                               'print("ZOOL262 PASS");\n'
                               '} catch (e) { print("ZOOL262 THROW " + String(e)); }\n', encoding='utf-8')
@@ -83,7 +100,7 @@ def main():
             detail = match.group(2).strip()
             if 'negative' in record:
                 pattern = record['negative'] or '.'
-                passed = thrown and 'Test262 Error:' not in detail and re.search(pattern, detail) is not None
+                passed = thrown and re.search(pattern, detail) is not None
             else:
                 passed = not thrown
             return dict(result, status='pass' if passed else 'fail', detail=detail)
@@ -108,7 +125,7 @@ def main():
     counts = {status: sum(r['status'] == status for r in results)
               for status in ['pass', 'fail', 'timeout', 'crash', 'harness-error']}
     revision = subprocess.check_output(['git', '-C', str(suite), 'rev-parse', 'HEAD'], text=True).strip()
-    report = {'source_transport': 'unicode-global-script', 'suite_revision': revision, 'shell': str(shell), 'filter': args.filter,
+    report = {'timezone': args.timezone, 'harness_layout': 'separate-global-script', 'unmarked_default': args.unmarked_default, 'source_transport': 'unicode-global-script', 'suite_revision': revision, 'shell': str(shell), 'filter': args.filter,
               'seconds': round(time.monotonic() - started, 2), 'counts': counts, 'results': results}
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + '\n')

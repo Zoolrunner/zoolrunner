@@ -197,6 +197,7 @@ struct JSTokenPos {
 
 struct JSToken {
     JSTokenType         type;           /* char value or above enumerator */
+    uintN               flags;          /* lexical facts retained by lookahead */
     JSTokenPos          pos;            /* token position in file */
     jschar              *ptr;           /* beginning of token in line buffer */
     union {
@@ -255,6 +256,11 @@ struct JSTokenStream {
 #define ON_CURRENT_LINE(ts,pos) ((uint16)(ts)->lineno == (pos).end.lineno)
 
 /* JSTokenStream flags */
+#define TOKF_OCTAL      0x01            /* legacy numeric literal or escape */
+#define TOKF_PAREN  0x04 /* parenthesized literal is not a directive */
+#define TOKF_ESCAPE 0x02 /* raw string contains an escape or continuation */
+#define TSF_STRICT_MODE 0x8000          /* ES5 strict lexical grammar */
+
 #define TSF_ERROR       0x01            /* fatal error while compiling */
 #define TSF_EOF         0x02            /* hit end of file */
 #define TSF_NEWLINES    0x04            /* tokenize newlines */

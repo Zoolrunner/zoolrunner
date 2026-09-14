@@ -506,7 +506,15 @@ extern JSBool
 js_NativeSet(JSContext *cx, JSObject *obj, JSScopeProperty *sprop, jsval *vp);
 
 extern JSBool
+js_GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
+                    jsid id, jsval *vp);
+
+extern JSBool
 js_GetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
+
+extern JSBool
+js_SetPrimitiveProperty(JSContext *cx, JSObject *obj, jsval receiver,
+                         jsid id, jsval *vp, JSBool strict);
 
 extern JSBool
 js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp);

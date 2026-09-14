@@ -337,21 +337,25 @@ changes assumptions that existing applications may depend on.
 
 ## ECMAScript Compatibility
 
-Full ECMAScript 5.1 is a required target for the existing SpiderMonkey engine.
-It is not yet implemented. Historical byte-loader Test262 runs reached
-**21,021 passes and 1,008 failures** among 22,029 test/mode cases, without
-crashes, timeouts, or harness errors. That loader did not faithfully decode
-Unicode source; complete runs through the corrected Unicode script compiler
-are in progress. Native Object reflection, descriptor writing, creation, and
-integrity controls are implemented, along with JSON, function binding, `trim`,
-receiver validation, and array/arguments/RegExp property corrections. Both macOS
-arm64 applications pass 290 focused JavaScript assertions, 13 embedding checks,
-and 169 layout assertions; the Suite also passes live HTTPS navigation.
-Strict mode and further parsing/built-in edge cases remain unfinished.
-The completion target is zero failures in the full suite, not just focused tests.
-See [ES5 testing](js/tests/es5/README.md) for the pinned suite, commands, known
-false positives, and validation scope. Historical embedding APIs and Mozilla
-application compatibility remain requirements.
+The pinned official ES5 Test262 suite passes **11,540 / 11,540 cases** on macOS
+arm64, with zero failures, crashes, timeouts, or harness errors. This includes
+the suite's earlier-edition coverage and every annotated strict-mode case.
+Unmarked cases use the upstream non-strict default. The existing SpiderMonkey
+engine implements strict execution, eval environments, arguments snapshots,
+property descriptors and integrity controls, JSON, function binding, and the
+associated parsing and built-in corrections. Test source and assertions are
+unchanged; Unicode transport, directive prologues, expected exceptions, and
+historical timezone requirements are preserved by the runner.
+
+Full specification correctness remains the project target; a passing finite
+suite is not an exhaustive proof. See [ES5 testing](js/tests/es5/README.md) for
+the pinned revision, reproducible commands, historical measurements, and the
+application/embedding validation record. Historical Mozilla embedding APIs and
+application compatibility remain requirements. Both the Suite and XULRunner
+builds pass the full suite, 394 focused JavaScript assertions, 15 embedding
+checks, and 169 layout assertions; Suite live HTTPS navigation also passes.
+These results are from macOS 15.7.1 arm64 and do not establish legacy Windows
+runtime compatibility.
 
 ## Web Compatibility
 
