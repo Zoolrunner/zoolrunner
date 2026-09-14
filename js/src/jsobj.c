@@ -1140,7 +1140,8 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     const char *clazz, *prefix;
     JSString *str;
 
-    clazz = OBJ_GET_CLASS(cx, obj)->name;
+    clazz = OBJ_GET_CLASS(cx, obj) == &js_ArgumentsClass
+            ? "Arguments" : OBJ_GET_CLASS(cx, obj)->name;
     nchars = 9 + strlen(clazz);         /* 9 for "[object ]" */
     chars = (jschar *) JS_malloc(cx, (nchars + 1) * sizeof(jschar));
     if (!chars)
@@ -3052,7 +3053,7 @@ js_DefineNativeProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
      * update the attributes and property ops.  A getter or setter is really
      * only half of a property.
      */
-    if (attrs & (JSPROP_GETTER | JSPROP_SETTER)) {
+    if (!(flags & JSDNP_REPLACE) && (attrs & (JSPROP_GETTER | JSPROP_SETTER))) {
         JSObject *pobj;
         JSProperty *prop;
 
@@ -3098,10 +3099,14 @@ js_DefineNativeProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
 
     /* Use the object's class getter and setter by default. */
     clasp = LOCKED_OBJ_GET_CLASS(obj);
-    if (!getter)
-        getter = clasp->getProperty;
-    if (!setter)
-        setter = clasp->setProperty;
+    if (!(flags & JSDNP_REPLACE) ||
+        !(attrs & (JSPROP_GETTER | JSPROP_SETTER))) {
+        if (!getter)
+            getter = clasp->getProperty;
+        if (!setter)
+            setter = clasp->setProperty;
+    }
+    flags &= ~JSDNP_REPLACE;
 
     /* Get obj's own scope if it has one, or create a new one for obj. */
     scope = js_GetMutableScope(cx, obj);
@@ -3746,8 +3751,7 @@ js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 
             /* Don't clone a shared prototype property. */
             if (attrs & JSPROP_SHARED) {
-                if (SPROP_HAS_STUB_SETTER(sprop) &&
-                    !(sprop->attrs & JSPROP_GETTER)) {
+                if (SPROP_HAS_STUB_SETTER(sprop)) {
                     return JS_TRUE;
                 }
                 return SPROP_SET(cx, sprop, obj, pobj, vp);
@@ -3783,6 +3787,21 @@ js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
     }
 
     if (!sprop) {
+        if (clasp == &js_ArrayClass) {
+            jsuint index, length;
+            uintN lengthAttrs;
+            JSBool found;
+            if (js_IdIsIndex(ID_TO_VALUE(id), &index)) {
+                if (!js_GetLengthProperty(cx, obj, &length) ||
+                    !JS_GetPropertyAttributes(cx, obj, "length", &lengthAttrs, &found))
+                    return JS_FALSE;
+                if (index >= length && found && (lengthAttrs & JSPROP_READONLY))
+                    return JS_TRUE;
+            }
+        }
+        if (OBJ_SCOPE(obj)->object == obj &&
+            (OBJ_SCOPE(obj)->flags & SCOPE_NONEXTENSIBLE))
+            return JS_TRUE;
         if (SCOPE_IS_SEALED(OBJ_SCOPE(obj)) && OBJ_SCOPE(obj)->object == obj) {
             flags = JSREPORT_ERROR;
             goto read_only_error;

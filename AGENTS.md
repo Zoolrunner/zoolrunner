@@ -345,6 +345,12 @@ Track progress with the pinned historical Test262 suite and focused native
 regressions in `js/tests/es5`; report failures honestly. Adding standard-library
 method names alone does not establish conformance: strict mode, descriptors,
 invocation semantics, parsing, and built-in behavior must also be correct.
+The completion target is zero failures in the complete pinned ES5.1 Test262
+suite, including inherited earlier-edition coverage. Do not exclude failing
+cases, weaken their assertions, or substitute focused test totals for a full
+run. Passing the suite is not a proof that every specification behavior has
+been tested. Keep any earlier-edition tests separate when ES5 intentionally
+changes their required semantics.
 
 Changes to bytecode must update the bytecode cache version and preserve
 function/script decompilation. Exercise engine changes in both XULRunner and

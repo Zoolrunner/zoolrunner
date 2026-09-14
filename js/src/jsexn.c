@@ -499,7 +499,7 @@ exn_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
     return JS_TRUE;
 
   define:
-    if (!JS_DefineProperty(cx, obj, prop, v, NULL, NULL, JSPROP_ENUMERATE))
+    if (!JS_DefineProperty(cx, obj, prop, v, NULL, NULL, 0))
         return JS_FALSE;
     *objp = obj;
     return JS_TRUE;
@@ -1077,7 +1077,7 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
         if (!JS_DefineProperty(cx, protos[i], js_name_str,
                                STRING_TO_JSVAL(nameString),
                                NULL, NULL,
-                               JSPROP_ENUMERATE)) {
+                               0)) {
             break;
         }
 
@@ -1097,17 +1097,17 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
      */
     if (!JS_DefineProperty(cx, protos[0], js_message_str,
                            STRING_TO_JSVAL(cx->runtime->emptyString),
-                           NULL, NULL, JSPROP_ENUMERATE)) {
+                           NULL, NULL, 0)) {
         return NULL;
     }
     if (!JS_DefineProperty(cx, protos[0], js_fileName_str,
                            STRING_TO_JSVAL(cx->runtime->emptyString),
-                           NULL, NULL, JSPROP_ENUMERATE)) {
+                           NULL, NULL, 0)) {
         return NULL;
     }
     if (!JS_DefineProperty(cx, protos[0], js_lineNumber_str,
                            INT_TO_JSVAL(0),
-                           NULL, NULL, JSPROP_ENUMERATE)) {
+                           NULL, NULL, 0)) {
         return NULL;
     }
 

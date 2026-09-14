@@ -3566,22 +3566,9 @@ regexp_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 static JSBool
 regexp_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
-    JSBool ok;
-    jsint slot;
-    jsdouble lastIndex;
-
-    ok = JS_TRUE;
-    if (!JSVAL_IS_INT(id))
-        return ok;
-    slot = JSVAL_TO_INT(id);
-    if (slot == REGEXP_LAST_INDEX) {
-        if (!js_ValueToNumber(cx, *vp, &lastIndex))
-            return JS_FALSE;
-        lastIndex = js_DoubleToInteger(lastIndex);
-        ok = js_NewNumberValue(cx, lastIndex, vp) &&
-             JS_SetReservedSlot(cx, obj, 0, *vp);
-    }
-    return ok;
+    /* ES5 stores lastIndex verbatim; exec performs ToInteger when using it. */
+    return !JSVAL_IS_INT(id) || JSVAL_TO_INT(id) != REGEXP_LAST_INDEX ||
+           JS_SetReservedSlot(cx, obj, 0, *vp);
 }
 
 /*
@@ -4223,16 +4210,30 @@ JSBool
 js_GetLastIndex(JSContext *cx, JSObject *obj, jsdouble *lastIndex)
 {
     jsval v;
-
-    return JS_GetReservedSlot(cx, obj, 0, &v) &&
-           js_ValueToNumber(cx, v, lastIndex);
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!JS_GetReservedSlot(cx, obj, 0, &v)) return JS_FALSE;
+    /* Conversion may replace lastIndex and run a second user method. */
+    JS_PUSH_TEMP_ROOT(cx, 1, &v, &root);
+    ok = js_ValueToNumber(cx, v, lastIndex);
+    JS_POP_TEMP_ROOT(cx, &root);
+    if (!ok) return JS_FALSE;
+    *lastIndex = js_DoubleToInteger(*lastIndex);
+    return JS_TRUE;
 }
 
 JSBool
 js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex)
 {
     jsval v;
-
+    uintN attrs;
+    JSBool found;
+    if (!JS_GetPropertyAttributes(cx, obj, "lastIndex", &attrs, &found))
+        return JS_FALSE;
+    if (found && (attrs & JSPROP_READONLY)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+        return JS_FALSE;
+    }
     return js_NewNumberValue(cx, lastIndex, &v) &&
            JS_SetReservedSlot(cx, obj, 0, v);
 }

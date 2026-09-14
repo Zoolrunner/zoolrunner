@@ -143,16 +143,9 @@ ValueIsLength(JSContext *cx, jsval v, jsuint *lengthp)
         return JS_TRUE;
     }
 
-    if (!js_ValueToNumber(cx, v, &d)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
-                             JSMSG_BAD_ARRAY_LENGTH);
+    if (!js_ValueToECMAUint32(cx, v, (uint32 *)lengthp) ||
+        !js_ValueToNumber(cx, v, &d))
         return JS_FALSE;
-    }
-    if (!js_DoubleToECMAUint32(cx, d, (uint32 *)lengthp)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
-                             JSMSG_BAD_ARRAY_LENGTH);
-        return JS_FALSE;
-    }
     if (JSDOUBLE_IS_NaN(d) || d != *lengthp) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                              JSMSG_BAD_ARRAY_LENGTH);
@@ -392,69 +385,35 @@ array_length_getter(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 static JSBool
 array_length_setter(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
-    jsuint newlen, oldlen, gap, index;
-    jsid id2;
-    jsval junk;
-    JSObject *iter;
-    JSTempValueRooter tvr;
-    JSBool ok;
-
-    if (!ValueIsLength(cx, *vp, &newlen))
+    jsuint newlen, oldlen;
+    JSBool blocked;
+    if (!ValueIsLength(cx, *vp, &newlen) ||
+        !js_GetLengthProperty(cx, obj, &oldlen) ||
+        !IndexToValue(cx, newlen, vp))
         return JS_FALSE;
-    if (!js_GetLengthProperty(cx, obj, &oldlen))
-        return JS_FALSE;
-    if (oldlen > newlen) {
-        if (oldlen - newlen < (1 << 24)) {
-            do {
-                --oldlen;
-                if (!DeleteArrayElement(cx, obj, oldlen))
-                    return JS_FALSE;
-            } while (oldlen != newlen);
-        } else {
-            /*
-             * We are going to remove a lot of indexes in a presumably sparse
-             * array. So instead of looping through indexes between newlen and
-             * oldlen, we iterate through all properties and remove those that
-             * correspond to indexes from the [newlen, oldlen) range.
-             * See bug 322135.
-             */
-            iter = JS_NewPropertyIterator(cx, obj);
-            if (!iter)
-                return JS_FALSE;
-
-            /* Protect iter against GC in OBJ_DELETE_PROPERTY. */
-            JS_PUSH_TEMP_ROOT_OBJECT(cx, iter, &tvr);
-            gap = oldlen - newlen;
-            for (;;) {
-                ok = JS_NextProperty(cx, iter, &id2);
-                if (!ok)
-                    break;
-                if (id2 == JSVAL_VOID)
-                    break;
-                if (js_IdIsIndex(id2, &index) && index - newlen < gap) {
-                    ok = OBJ_DELETE_PROPERTY(cx, obj, id2, &junk);
-                    if (!ok)
-                        break;
-                }
-            }
-            JS_POP_TEMP_ROOT(cx, &tvr);
-            if (!ok)
-                return JS_FALSE;
-        }
-    }
-    return IndexToValue(cx, newlen, vp);
+    /* A failed non-strict assignment stops at the first undeletable index.
+     * js_ShrinkArray returns the resulting length in vp for NativeSet. */
+    return newlen >= oldlen || js_ShrinkArray(cx, obj, newlen, vp, &blocked);
 }
 
 static JSBool
 array_addProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
     jsuint index, length;
+    uintN attrs;
+    JSBool found;
 
     if (!js_IdIsIndex(id, &index))
         return JS_TRUE;
     if (!js_GetLengthProperty(cx, obj, &length))
         return JS_FALSE;
     if (index >= length) {
+        if (!JS_GetPropertyAttributes(cx, obj, "length", &attrs, &found))
+            return JS_FALSE;
+        if (found && (attrs & JSPROP_READONLY)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            return JS_FALSE;
+        }
         length = index + 1;
         return js_SetLengthProperty(cx, obj, length);
     }

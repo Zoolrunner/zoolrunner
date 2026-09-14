@@ -446,6 +446,9 @@ js_DefineProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
                   JSPropertyOp getter, JSPropertyOp setter, uintN attrs,
                   JSProperty **propp);
 
+/* Replace a complete ES5 descriptor, without legacy accessor merging. */
+#define JSDNP_REPLACE 0x100
+
 extern JSBool
 js_DefineNativeProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
                         JSPropertyOp getter, JSPropertyOp setter, uintN attrs,

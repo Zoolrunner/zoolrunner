@@ -428,6 +428,32 @@ args_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
     return JS_TRUE;
 }
 
+/* Synchronize the ES5 parameter map after a successful descriptor change. */
+JSBool
+js_UpdateArgumentsProperty(JSContext *cx, JSObject *obj, jsid id,
+                           jsval *value, JSBool hasValue, JSBool detach)
+{
+    JSStackFrame *fp = (JSStackFrame *) JS_GetPrivate(cx, obj);
+    uintN slot;
+    jsval userid;
+    if (!fp) return JS_TRUE;
+    if (JSID_IS_INT(id)) {
+        slot = (uintN) JSID_TO_INT(id);
+        if (slot >= fp->argc || ArgWasDeleted(cx, fp, slot)) return JS_TRUE;
+        if (detach && !MarkArgDeleted(cx, fp, slot)) return JS_FALSE;
+        if (hasValue) fp->argv[slot] = *value;
+    } else {
+        if (id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom))
+            userid = INT_TO_JSVAL(ARGS_LENGTH);
+        else if (id == ATOM_TO_JSID(cx->runtime->atomState.calleeAtom))
+            userid = INT_TO_JSVAL(ARGS_CALLEE);
+        else
+            return JS_TRUE;
+        if (hasValue || detach) SET_OVERRIDE_BIT(fp, JSVAL_TO_INT(userid));
+    }
+    return JS_TRUE;
+}
+
 static JSBool
 args_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
              JSObject **objp)

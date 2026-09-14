@@ -339,14 +339,15 @@ changes assumptions that existing applications may depend on.
 
 Full ECMAScript 5.1 is a required target for the existing SpiderMonkey engine.
 It is not yet implemented. The 2026-09-13 Test262 baseline passed 13,548 of
-22,029 test/mode cases. After the array/date and object-query changes, the full
-rerun passes 14,397 and fails 7,632, without crashes or timeouts. Major gaps
-include descriptor writing, object extensibility, strict mode, JSON, function
-binding, and built-in edge cases. Native prototype, key, and descriptor queries
-are implemented; sparse array literals and several property attributes are
-corrected. See [ES5 testing](js/tests/es5/README.md) for the pinned suite,
-commands, known false positives, and validation scope. Historical embedding
-APIs and Mozilla application compatibility remain requirements.
+22,029 test/mode cases. The latest completed full run passes **20,010** and
+fails **2,019**, without crashes, timeouts, or harness errors. Native Object
+reflection, descriptor writing, creation, and integrity controls are implemented,
+along with array-length, mapped-arguments, and RegExp property corrections.
+Strict mode, JSON, function binding, and built-in edge cases remain unfinished.
+The completion target is zero failures in the full suite, not just focused tests.
+See [ES5 testing](js/tests/es5/README.md) for the pinned suite, commands, known
+false positives, and validation scope. Historical embedding APIs and Mozilla
+application compatibility remain requirements.
 
 ## Web Compatibility
 

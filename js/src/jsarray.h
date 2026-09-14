@@ -55,6 +55,10 @@ js_IdIsIndex(jsval id, jsuint *indexp);
 
 extern JSClass js_ArrayClass;
 
+extern JSBool
+js_ShrinkArray(JSContext *cx, JSObject *target, jsuint length,
+               jsval *value, JSBool *blocked);
+
 extern JSObject *
 js_InitArrayClass(JSContext *cx, JSObject *obj);
 

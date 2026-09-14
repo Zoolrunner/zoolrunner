@@ -157,6 +157,10 @@ extern JSBool
 js_GetArgsValue(JSContext *cx, JSStackFrame *fp, jsval *vp);
 
 extern JSBool
+js_UpdateArgumentsProperty(JSContext *cx, JSObject *obj, jsid id,
+                           jsval *value, JSBool hasValue, JSBool detach);
+
+extern JSBool
 js_GetArgsProperty(JSContext *cx, JSStackFrame *fp, jsid id,
                    JSObject **objp, jsval *vp);
 

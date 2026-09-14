@@ -41,7 +41,7 @@ proof of specification compliance. Browser, Suite, and embedding regressions
 must also be checked after engine changes. Windows 95/NT 4.0 runtime validation
 remains separate from the macOS results.
 
-Current focused changes add native `Array.isArray` and
+Initial focused changes add native `Array.isArray` and
 `Date.prototype.toISOString` (including invalid dates and expanded years), and
 fix sparse initial accumulators and full-width callback indices in
 `reduce`/`reduceRight`. The focused native regression can be run with:
@@ -68,7 +68,7 @@ in XULRunner and Suite; the 720 Function chapter cases retain the same 440
 passes and 280 failures. The full-suite counts above precede that final flag
 correction; the focused Array and Date Test262 results remain unchanged.
 
-The next implementation adds native `Object.getPrototypeOf`, `Object.keys`, and
+The object-query milestone adds native `Object.getPrototypeOf`, `Object.keys`, and
 `Object.getOwnPropertyDescriptor`. Descriptor queries preserve accessor identity
 without invoking getters. Prototype queries hide the engine's internal shared
 closure objects and retain embedding access checks. Argument indices are now
@@ -87,8 +87,8 @@ preserves decompilation; the bytecode cache version changes with it.
 Run `object-reflection.js` with the same xpcshell command above, substituting
 its filename. Require `ES5-OBJECT-REFLECTION checks=101 failures=0`. These 101
 assertions and the 50 array/date assertions pass in the macOS arm64 XULRunner
-and Suite builds. Descriptor-writing methods, extensibility controls, and
-strict semantics remain unfinished; these read-only queries do not substitute
+and Suite builds. At that milestone, descriptor-writing methods, extensibility controls, and
+strict semantics remained unfinished; these read-only queries do not substitute
 for those implementations.
 
 `TestObjectEmbedding.c` exercises the classic JSAPI access-control callback and
@@ -124,3 +124,48 @@ and pass again in this rerun.
 This full rerun precedes the final two legacy compatibility adjustments for
 unflagged embedding globals and destructuring `const`; both are covered by the
 seven native embedding checks. It does not establish complete ES5 conformance.
+
+Descriptor-writing work adds native `Object.defineProperty`, `defineProperties`,
+`create`, `getOwnPropertyNames`, `preventExtensions`, `seal`, `freeze`, and their
+integrity queries. Non-extensibility has a separate scope flag from the legacy
+`JS_SealObject` behavior. Descriptor conversion roots values across user getters
+and completes before `defineProperties` starts writing. Replacing an accessor
+uses a complete descriptor rather than the legacy half-accessor merge. Native
+access checks remain in the property-definition path.
+
+The first full descriptor run passes **19,924 of 22,029**, with **2,105 failures**
+and no crashes, timeouts, or harness errors. It precedes subsequent corrections
+for array indices, mapped arguments, inherited accessor ownership, and descriptor
+enumeration. Four prior passes disappear because strict-caller negative tests
+previously accepted the TypeError from a missing `defineProperty`; those tests
+still require strict-mode implementation. This is not complete conformance.
+
+`object-descriptors.js` exercises descriptor defaults, SameValue, accessor
+replacement, conversion order with garbage collection, inherited properties,
+two-phase definition, integrity controls, sparse array shrinking and failed
+shrinks, mapped arguments, and RegExp `lastIndex` storage and read-only writes.
+Require `ES5-OBJECT-DESCRIPTORS checks=68 failures=0`.
+The embedding check also verifies that descriptor writes respect the access
+callback and preserves the legacy `JS_SealObject` boundary; its expected count
+is now nine. All 68 descriptor assertions, 151 existing JavaScript assertions,
+and nine embedding checks pass in both macOS
+arm64 XULRunner and Suite builds. Both applications pass the 169 layout
+assertions; the Suite also passes live HTTPS navigation. Windows runtime
+validation is separate and has not been performed for these changes.
+
+The final XULRunner full run passes **20,010 of 22,029** cases and fails **2,019**,
+without crashes, timeouts, or harness errors. Compared with the previous object-query
+baseline, 5,617 cases newly pass and four accidental strict-caller passes disappear
+(as explained above). This full run precedes property-name allocation growth,
+temporary-root, and scope-lock review changes. The complete Suite rerun after
+those changes produces the same **20,010 passes and 2,019 failures**, with no
+crashes, timeouts, or harness errors. Subsequent guards for RegExp conversion
+roots and already-sealed legacy scopes pass the focused JavaScript and embedding
+checks. The full conformance target remains unfinished.
+
+The focused final Object chapter passes 5,535 of 5,711 cases; Array passes
+4,397 of 4,555; RegExp passes 1,040 of 1,088 with no new failures against the
+preceding full run. The allocation review also checks 50,000 own property names
+and shrinking 20,000 sparse non-enumerable array indices. Clang's static analyzer
+reports no diagnostics in `jsobjes5.c`; this is not a security audit or proof of
+conformance. No failing Test262 cases or strict-mode runs have been excluded.

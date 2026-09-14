@@ -231,6 +231,7 @@ struct JSScope {
 /* Scope flags and some macros to hide them from other files than jsscope.c. */
 #define SCOPE_MIDDLE_DELETE             0x0001
 #define SCOPE_SEALED                    0x0002
+#define SCOPE_NONEXTENSIBLE             0x0004
 
 #define SCOPE_HAD_MIDDLE_DELETE(scope)  ((scope)->flags & SCOPE_MIDDLE_DELETE)
 #define SCOPE_SET_MIDDLE_DELETE(scope)  ((scope)->flags |= SCOPE_MIDDLE_DELETE)
@@ -338,7 +339,8 @@ struct JSScopeProperty {
 
 /* Macro for common expression to test for shared permanent attributes. */
 #define SPROP_IS_SHARED_PERMANENT(sprop)                                      \
-    ((~(sprop)->attrs & (JSPROP_SHARED | JSPROP_PERMANENT)) == 0)
+    ((~(sprop)->attrs & (JSPROP_SHARED | JSPROP_PERMANENT)) == 0 && \
+     !((sprop)->attrs & (JSPROP_GETTER | JSPROP_SETTER)))
 
 extern JSScope *
 js_GetMutableScope(JSContext *cx, JSObject *obj);

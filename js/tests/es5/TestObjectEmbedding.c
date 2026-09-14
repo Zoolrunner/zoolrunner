@@ -75,9 +75,17 @@ int main(void)
         "var denied=false; try { Object.getOwnPropertyDescriptor(protectedObject,'x'); }"
         "catch(e) { denied=String(e).indexOf('embedding denied access')>=0; } denied"))
         goto out;
+    if (!Evaluate(cx, global,
+        "var denied=false; try { Object.defineProperty(protectedObject,'x',{value:2}); }"
+        "catch(e) { denied=String(e).indexOf('embedding denied access')>=0; } denied"))
+        goto out;
     JS_SetCheckObjectAccessCallback(rt, NULL);
     if (!Evaluate(cx, global, "Object.getPrototypeOf(protectedObject)===Object.prototype"))
         goto out;
+    if (!JS_SealObject(cx, protectedObject, JS_FALSE) ||
+        !Evaluate(cx, global,
+        "!Object.isExtensible(protectedObject) && "
+        "Object.preventExtensions(protectedObject)===protectedObject")) goto out;
     if (!Evaluate(cx, global,
         "var undefined=7; var Infinity=9; var NaN=11;"
         "undefined===void 0 && Infinity===1/0 && NaN!==NaN")) goto out;

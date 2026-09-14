@@ -906,6 +906,10 @@ js_AddScopeProperty(JSContext *cx, JSScope *scope, jsid id,
     spp = js_SearchScope(scope, id, JS_TRUE);
     sprop = overwriting = SPROP_FETCH(spp);
     if (!sprop) {
+        if (scope->flags & SCOPE_NONEXTENSIBLE) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            return NULL;
+        }
         /* Check whether we need to grow, if the load factor is >= .75. */
         size = SCOPE_CAPACITY(scope);
         if (scope->entryCount + scope->removedCount >= size - (size >> 2)) {
