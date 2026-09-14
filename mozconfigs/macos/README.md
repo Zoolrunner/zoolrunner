@@ -132,3 +132,59 @@ Native packages also pass the five debugger lifecycle checks. The desktop Suite
 lifecycle regression passes 24 checks covering repeated Composer edit/undo/close
 cycles and Address Book, Inspector, and Venkman startup/close, without script
 console errors. See `editor/composer/tests/README.md` for reproduction.
+
+## Local GitHub Actions testing with act
+
+On a Mac with the build dependencies installed, run the workflow with act's
+native host runner and a local artifact server:
+
+```sh
+act push -W .github/workflows/macos.yml \
+  -P macos-15=-self-hosted --concurrent-jobs 1 \
+  --matrix arch:arm64 --matrix app:suite \
+  --env "DEVELOPER_DIR=$(xcode-select -p)" \
+  --artifact-server-addr 127.0.0.1 \
+  --artifact-server-path /tmp/zool-act-artifacts
+```
+
+Omit the two `--matrix` filters to exercise all eight jobs. The native runner
+uses the host's tools; it does not emulate GitHub's macOS image. Checkout,
+dependency setup, SDK download/checksum, configure/build, package checks, and
+artifact uploads execute inside act. No GitHub token is needed for the local
+artifact server. Use a different `--artifact-server-port` for simultaneous act
+invocations. The workflow keeps installed Homebrew packages and makes any
+required installation noninteractive, without upgrading unrelated dependents.
+
+A local act pass is separate from a successful run on GitHub-hosted runners.
+
+### act artifact-server limitation
+
+act 0.2.87 rejects the `mime_type` field sent by the pinned
+`actions/upload-artifact@v7.0.1`, so both upload steps fail against its local
+artifact server even when build and packaging succeed. This is an upstream act
+compatibility issue, also reported for 0.2.89:
+<https://github.com/nektos/act/issues/6114>. Keep the production action pinned;
+do not interpret these local upload failures as successful end-to-end jobs.
+Generated archives and package logs remain in the failed job's host workspace
+under act's cache. GitHub-hosted artifact uploads still require verification.
+
+### Recorded act validation (2026-09-14)
+
+The actual workflow ran under act 0.2.87's native host runner on macOS 15.7.1
+with Xcode 16.4 and SDK 11.3, using isolated checkouts for each matrix entry.
+The local Xcode path was supplied through `DEVELOPER_DIR` as shown above.
+
+| Application | arm64 build/package | x86_64 build/package |
+| --- | --- | --- |
+| Suite | Passed | Passed |
+| Browser | Passed | Passed |
+| Calendar | Passed | Passed |
+| XULRunner | Passed | Passed |
+
+Each arm64 package passed 101 reflection, 58 legacy-language, five debugger
+lifecycle, and 18 embedding assertions. Calendar also passed all eight existing
+unit tests. Intel packages passed architecture and packaging checks; runtime
+checks were limited to the native arm64 packages. All eight jobs failed their
+artifact uploads with the act limitation above, so this is **not** a passing
+end-to-end CI run. The workflow also passes Actionlint 1.7.12. Testing found and
+fixed a Homebrew confirmation prompt that prevented unattended dependency setup.
