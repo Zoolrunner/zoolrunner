@@ -1039,7 +1039,7 @@ NS_NewNotificationCallbacksAggregation(nsIInterfaceRequestor  *aCallbacks,
 #define NSID_LENGTH 39
 
 inline nsresult
-GenerateUUIDInPlace(nsID* id)
+GenerateUUIDInPlace(nsID* aId)
 {
     static PRLock* mLock = NULL;
     if(!mLock) {
@@ -1073,7 +1073,7 @@ GenerateUUIDInPlace(nsID* id)
 #ifdef IS_BIG_ENDIAN
         src += sizeof(rval) - mRBytes;
 #endif
-        PRUint8 *dst = ((PRUint8*) id) + (sizeof(nsID) - bytesLeft);
+        PRUint8 *dst = ((PRUint8*) aId) + (sizeof(nsID) - bytesLeft);
         PRSize toWrite = (bytesLeft < mRBytes ? bytesLeft : mRBytes);
         for (PRSize i = 0; i < toWrite; i++)
             dst[i] = src[i];
@@ -1082,12 +1082,12 @@ GenerateUUIDInPlace(nsID* id)
     }
 
     /* Put in the version */
-    id->m2 &= 0x0fff;
-    id->m2 |= 0x4000;
+    aId->m2 &= 0x0fff;
+    aId->m2 |= 0x4000;
 
     /* Put in the variant */
-    id->m3[0] &= 0x3f;
-    id->m3[0] |= 0x80;
+    aId->m3[0] &= 0x3f;
+    aId->m3[0] |= 0x80;
 
     return NS_OK;
 }

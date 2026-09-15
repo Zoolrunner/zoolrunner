@@ -40,6 +40,8 @@
 #ifndef AECoercionHandlers_h_
 #define AECoercionHandlers_h_
 
+#include "nsAEDefs.h"
+
 #ifdef __cplusplus
 
 class AECoercionHandlers

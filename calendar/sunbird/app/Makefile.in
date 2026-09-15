@@ -375,7 +375,9 @@ libs repackage:: $(PROGRAM)
 	rsync -aL $(PROGRAM) $(DIST)/$(APP_NAME).app/Contents/MacOS
 	mkdir -p $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
 ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+ifndef MOZ_COCOA_NATIVE_PRINTING
 	rsync -a --copy-unsafe-links $(DIST)/package/PrintPDE.plugin $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
+endif
 endif
 	-cp -L $(DIST)/bin/mangle $(DIST)/bin/shlibsign $(DIST)/$(APP_NAME).app/Contents/MacOS
 	cp -RL $(DIST)/branding/sunbird.icns $(DIST)/$(APP_NAME).app/Contents/Resources/sunbird.icns

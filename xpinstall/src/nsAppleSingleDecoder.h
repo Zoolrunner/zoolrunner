@@ -50,6 +50,10 @@
 #include <string.h>
 #include <Carbon/Carbon.h>
 
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1050
+typedef SInt16 FSIORefNum;
+#endif
+
 #ifdef __LP64__
 #pragma pack(push, 2)
 #else

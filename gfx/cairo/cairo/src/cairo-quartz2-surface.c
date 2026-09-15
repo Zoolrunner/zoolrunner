@@ -36,6 +36,11 @@
 
 #include <Carbon/Carbon.h>
 
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1050
+/* Before the LP64 SDKs, Core Graphics declared these arguments as float. */
+typedef float CGFloat;
+#endif
+
 #if !defined(__LP64__)
 #define CAIRO_QUARTZGL_HAS_AGL 1
 #include <AGL/agl.h>
@@ -49,6 +54,52 @@
 
 #include "cairo-quartz-private.h"
 #include "ATSUICompat.h"
+#include "QuartzCompat.h"
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1040
+static void
+_cairo_quartz_release_image_data (void *info, const void *data, size_t size)
+{
+    free ((void *) data);
+}
+
+/* Panther lacks CGBitmapContextCreateImage. Preserve its snapshot semantics:
+ * the image must remain valid after the context is changed or destroyed. */
+static CGImageRef
+_cairo_quartz_bitmap_context_create_image (CGContextRef context)
+{
+    size_t width = CGBitmapContextGetWidth (context);
+    size_t height = CGBitmapContextGetHeight (context);
+    size_t stride = CGBitmapContextGetBytesPerRow (context);
+    const void *source = CGBitmapContextGetData (context);
+    void *copy;
+    CGDataProviderRef provider;
+    CGImageRef image;
+
+    if (!width || !height || !stride || !source || stride > (size_t)-1 / height)
+        return NULL;
+    copy = malloc (stride * height);
+    if (!copy)
+        return NULL;
+    memcpy (copy, source, stride * height);
+    provider = CGDataProviderCreateWithData (NULL, copy, stride * height,
+                                            _cairo_quartz_release_image_data);
+    if (!provider) {
+        free (copy);
+        return NULL;
+    }
+    image = CGImageCreate (width, height,
+                          CGBitmapContextGetBitsPerComponent (context),
+                          CGBitmapContextGetBitsPerPixel (context), stride,
+                          CGBitmapContextGetColorSpace (context),
+                          CGBitmapContextGetAlphaInfo (context), provider,
+                          NULL, false, kCGRenderingIntentDefault);
+    CGDataProviderRelease (provider);
+    return image;
+}
+#else
+#define _cairo_quartz_bitmap_context_create_image CGBitmapContextCreateImage
+#endif
 
 /* This method is private, but it exists.  Its params are are exposed
  * as args to the NS* method, but not as CG.
@@ -504,7 +555,7 @@ SurfacePatternDrawFunc (void *info, CGContextRef context)
     }
 
     /* this is a 10.4 API */
-    img = CGBitmapContextCreateImage (quartz_surf->cgContext);
+    img = _cairo_quartz_bitmap_context_create_image (quartz_surf->cgContext);
     if (!img)
 	//fprintf (stderr, "CGBitmapContextCreateImage failed\n");
 
@@ -644,9 +695,10 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
     {
 	CGShadingRef shading = _cairo_quartzgl_cairo_gradient_pattern_to_quartz (source);
 	if (!shading)
-	    return CAIRO_INT_STATUS_UNSUPPORTED;
+	    return DO_UNSUPPORTED;
 
 	surface->sourceShading = shading;
+	return DO_SHADING;
     } else if (source->type == CAIRO_PATTERN_SURFACE) {
 	cairo_surface_pattern_t *spat = (cairo_surface_pattern_t *) source;
 	cairo_rectangle_t extents;
@@ -684,7 +736,7 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 
 	    CGContextFlush (quartzSource->cgContext);
 	    surface->sourceImage =
-		CGBitmapContextCreateImage (quartzSource->cgContext);
+		_cairo_quartz_bitmap_context_create_image (quartzSource->cgContext);
 	    cairo_surface_destroy ((cairo_surface_t *) quartzSource);
 	    if (!surface->sourceImage)
 		return DO_UNSUPPORTED;
@@ -725,12 +777,14 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 
 	pattern = _cairo_quartzgl_cairo_repeating_surface_pattern_to_quartz (surface, source);
 	if (!pattern)
-	    return CAIRO_INT_STATUS_UNSUPPORTED;
+	    return DO_UNSUPPORTED;
 
 	CGFloat patternAlpha = 1.0;
         CGColorSpaceRef patternSpace = CGColorSpaceCreatePattern(NULL);
         CGContextSetFillColorSpace (surface->cgContext, patternSpace);
 	CGContextSetFillPattern (surface->cgContext, pattern, &patternAlpha);
+        CGContextSetStrokeColorSpace (surface->cgContext, patternSpace);
+	CGContextSetStrokePattern (surface->cgContext, pattern, &patternAlpha);
 	CGColorSpaceRelease (patternSpace);
 
 	/* Quartz likes to munge the pattern phase (as yet unexplained why); force
@@ -738,11 +792,12 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 
 	CGContextSetPatternPhase (surface->cgContext, CGSizeMake(0,0));
 	surface->sourcePattern = pattern;
+	return DO_PATTERN;
     } else {
-	return CAIRO_INT_STATUS_UNSUPPORTED;
+	return DO_UNSUPPORTED;
     }
 
-    return CAIRO_STATUS_SUCCESS;
+    return DO_SOLID;
 }
 
 static void
@@ -1091,7 +1146,7 @@ _cairo_quartzgl_surface_clone_similar (void *abstract_surface,
 
     if (cairo_surface_is_quartzgl (src)) {
 	cairo_quartzgl_surface_t *qsurf = (cairo_quartzgl_surface_t *) src;
-	quartz_image = CGBitmapContextCreateImage (qsurf->cgContext);
+	quartz_image = _cairo_quartz_bitmap_context_create_image (qsurf->cgContext);
 	new_format = CAIRO_FORMAT_ARGB32;  /* XXX bogus; recover a real format from the image */
     } else if (_cairo_surface_is_image (src)) {
 	cairo_image_surface_t *isurf = (cairo_image_surface_t *) src;
@@ -1340,6 +1395,7 @@ _cairo_quartzgl_surface_stroke (void *abstract_surface,
 
     if (action == DO_SOLID || action == DO_PATTERN) {
 	CGContextStrokePath (surface->cgContext);
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1040
     } else if (action == DO_IMAGE) {
 	CGContextReplacePathWithStrokedPath (surface->cgContext);
 	CGContextClip (surface->cgContext);
@@ -1354,10 +1410,14 @@ _cairo_quartzgl_surface_stroke (void *abstract_surface,
 	CGContextClip (surface->cgContext);
 
 	CGContextDrawShading (surface->cgContext, surface->sourceShading);
+#endif
     } else {
+	/* Panther cannot turn a stroke into a clipping path. Let Cairo's
+	 * software fallback render image/gradient strokes instead. */
 	rv = CAIRO_INT_STATUS_UNSUPPORTED;
     }
 
+    _cairo_quartzgl_teardown_source (surface, source);
     CGContextRestoreGState (surface->cgContext);
     return rv;
 }

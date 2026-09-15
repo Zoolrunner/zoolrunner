@@ -885,3 +885,5 @@ JAVAC_FLAGS += -source 1.4
 ifdef MOZ_DEBUG
 JAVAC_FLAGS += -g
 endif
+
+include $(topsrcdir)/config/macos/printing.mk

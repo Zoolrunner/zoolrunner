@@ -1,0 +1,3 @@
+ZR_MACOS_ARCH=i386
+ZR_MACOS_APP=calendar
+. "${MOZCONFIG%/*}/../common.mozconfig"

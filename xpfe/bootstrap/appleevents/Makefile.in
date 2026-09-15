@@ -116,7 +116,7 @@ include $(topsrcdir)/config/rules.mk
 
 # convert AppleScript dictionary .sdef file into .r format, and thence to .rsrc
 SDP_TOOL = $(SDP)
-REZ_TOOL = /Developer/Tools/Rez
+REZ_TOOL = $(shell xcrun --find Rez 2>/dev/null || echo /Developer/Tools/Rez)
 SDEF_SRC = $(srcdir)/mozilla.sdef
 RES_DEST = mozillaSuite.r
 RSRC_DEST = mozillaSuite.rsrc
@@ -124,8 +124,15 @@ PACKAGE_DIR = $(DIST)/package
 
 ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 $(RSRC_DEST): $(SDEF_SRC) $(PACKAGE_DIR)
+ifeq ($(HOST_OS_ARCH),Darwin)
 	NEXT_ROOT= $(SDP_TOOL) -fa -o $(RES_DEST) $(SDEF_SRC) 
 	$(REZ_TOOL) -useDF -o $(RSRC_DEST) $(RES_DEST) 
+else
+$(RSRC_DEST): $(topsrcdir)/config/macos/resources/mozillaSuite.rsrc \
+              $(topsrcdir)/config/macos/resources/manifest.json \
+              $(topsrcdir)/build/macosx/copy-resource.py
+	python3 $(topsrcdir)/build/macosx/copy-resource.py mozillaSuite.rsrc $(RSRC_DEST)
+endif
 	cp $(RSRC_DEST) $(PACKAGE_DIR)
 	rm -f $(RES_DEST)
 

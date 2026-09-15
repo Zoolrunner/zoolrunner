@@ -4,6 +4,7 @@ import argparse
 import os
 import platform
 import plistlib
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,14 +12,25 @@ import tarfile
 import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("arch", choices=("arm64", "x86_64"))
+parser.add_argument("arch", choices=("arm64", "x86_64", "i386", "powerpc"))
 parser.add_argument("app", choices=("suite", "browser", "calendar", "xulrunner"))
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[2]
-dist = root / ("obj-zoolrunner-macos-%s-%s" % (args.arch, args.app)) / "dist"
+obj = Path(os.environ.get("ZR_OBJDIR", str(root / (
+    "obj-zoolrunner-macos-%s-%s" % (args.arch, args.app)))))
+dist = obj / "dist"
 out = root / "artifacts"
 out.mkdir(exist_ok=True)
-name = "zoolrunner-macos-%s-%s-sdk11.3" % (args.arch, args.app)
+configuration = (obj / "config/autoconf.mk").read_text()
+minimum = re.search(r"^MACOSX_DEPLOYMENT_TARGET\s*=\s*(\S+)", configuration,
+                    re.MULTILINE).group(1)
+sdk_version = "11.3"
+if args.arch == "i386":
+    sdk_version = {"10.4": "10.4u", "10.8": "10.6"}[minimum]
+elif args.arch == "powerpc":
+    sdk_version = {"10.3.9": "10.3.9"}[minimum]
+legacy = args.arch in ("i386", "powerpc")
+name = "zoolrunner-macos-%s-%s-sdk%s" % (args.arch, args.app, sdk_version)
 
 with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
     stage = Path(temporary) / name
@@ -51,6 +63,16 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
     # Match the legacy packager: generated registration caches belong to the
     # build tree and can contain stale locations/factories after relocation.
     runtime = executable.parent
+    if legacy:
+        # nsinstall is a build-host utility, never a runtime dependency.
+        (runtime / "nsinstall").unlink(missing_ok=True)
+        if args.app != "xulrunner":
+            info_path = runtime.parent / "Info.plist"
+            with info_path.open("rb") as info:
+                metadata = plistlib.load(info)
+            metadata["LSMinimumSystemVersion"] = minimum
+            with info_path.open("wb") as info:
+                plistlib.dump(metadata, info)
     def remove_registration_caches():
         for relative in ("components/compreg.dat", "components/xpti.dat",
                          "chrome/chrome.rdf", "chrome/app-chrome.manifest",
@@ -62,7 +84,32 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 cached.unlink()
     remove_registration_caches()
     # Check the artifact itself, not a potentially different dist/bin executable.
-    subprocess.run(["lipo", str(executable), "-verify_arch", args.arch], check=True)
+    if args.arch != "powerpc":
+        subprocess.run(["lipo", str(executable), "-verify_arch", args.arch], check=True)
+    # Compile target ABI assertions without trying to execute cross-built code.
+    sdk = Path(os.environ.get("ZR_MACOS_SDK",
+                              str(Path.home() / ("dev/macos-sdk/MacOSX%s.sdk" % sdk_version))))
+    if args.arch == "powerpc":
+        abi_compiler = [str(root / "mozconfigs/macos/powerpc/gcc")]
+    else:
+        abi_compiler = ["xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk)]
+    subprocess.run(abi_compiler + [
+        "-I" + str(dist / "include/nspr"),
+        "-I" + str(dist.parent / "js/src"), "-c",
+        str(root / "build/macosx/check-target-abi.c"),
+        "-o", str(Path(temporary) / "target-abi.o")], check=True)
+    print("Target ABI assertions passed for " + args.arch)
+    if legacy:
+        audit_options = []
+        if args.arch == "powerpc":
+            audit_options = ["--arch", "ppc", "--tool-prefix",
+                             "/opt/mac/bin/powerpc-apple-darwin8-"]
+        subprocess.run([
+            "python3", str(root / "build/macosx/check-legacy-binaries.py"),
+            str(runtime), "--minimum", minimum, "--sdk", str(sdk),
+            "--root", str(stage),
+            "--report", str(stage / "deployment-checks.json")] + audit_options,
+            check=True)
     # Copies need fresh ad-hoc signatures on Apple Silicon. Sign individual
     # Mach-O files after dereferencing source-tree links. No release credentials.
     for directory, _, files in os.walk(stage):
@@ -70,7 +117,12 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             path = Path(directory) / filename
             with path.open("rb") as binary:
                 magic = binary.read(4)
-            if magic in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe",
+            if args.arch == "i386" and magic in (
+                    b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe",
+                    b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca"):
+                subprocess.run(["lipo", str(path), "-verify_arch", "i386"],
+                               check=True)
+            if not legacy and magic in (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe",
                          b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca"):
                 # Classic Mozilla keeps resources under Contents/MacOS. Modern
                 # codesign misclassifies those as nested code when signing the
@@ -124,6 +176,12 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 env=environment, check=True)
         remove_registration_caches()
     shutil.copy2(root / "LICENSE", stage / "LICENSE")
+    if legacy:
+        tests = stage / "runtime-tests"
+        tests.mkdir()
+        shutil.copy2(root / "build/macosx/verify-legacy-runtime.sh", tests / "run.sh")
+        for test in ("object-reflection", "legacy-application", "debugger-lifecycle"):
+            shutil.copy2(root / "js/tests/es5" / (test + ".js"), tests / (test + ".js"))
     with tarfile.open(out / (name + ".tar.gz"), "w:gz") as archive:
         archive.add(stage, arcname=name)
     print(out / (name + ".tar.gz"))

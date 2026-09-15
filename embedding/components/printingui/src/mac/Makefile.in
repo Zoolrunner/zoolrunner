@@ -41,6 +41,7 @@ srcdir		= @srcdir@
 VPATH		= @srcdir@
 
 include $(DEPTH)/config/autoconf.mk
+include $(topsrcdir)/config/macos/printing.mk
 
 MODULE		= embedcomponents
 LIBRARY_NAME	= printingui_s
@@ -59,8 +60,8 @@ REQUIRES	= xpcom \
 
 # Print dialog extensions use the retired Carbon PDE ABI. Keep building the
 # historical plug-in everywhere it was supported, but use Cocoa's native
-# print panel without that extension on LP64 macOS.
-ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+# print panel without that extension on newer Cocoa targets.
+ifndef MOZ_COCOA_NATIVE_PRINTING
 DIRS      = printpde
 endif
 
@@ -70,11 +71,9 @@ CPPSRCS		= \
       nsPrintProgress.cpp \
       $(NULL)
 
-# The 64-bit Printing Manager no longer provides the Carbon dialog entry
-# points.  Compile the prompt service as Objective-C++ on LP64 macOS so it
-# can use the Cocoa print panels while leaving historical Mac targets alone.
-ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
-nsPrintingPromptServiceX.o: CXXFLAGS += -x objective-c++
+# Compile the native Cocoa print-panel implementation as Objective-C++.
+ifdef MOZ_COCOA_NATIVE_PRINTING
+nsPrintingPromptServiceX.o: CXXFLAGS += -x objective-c++ -DMOZ_COCOA_NATIVE_PRINTING
 endif
 
 LOCAL_INCLUDES	= \

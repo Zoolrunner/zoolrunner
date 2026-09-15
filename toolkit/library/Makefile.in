@@ -352,6 +352,11 @@ EXTRA_DSO_LDOPTS += \
 	$(NULL)
 ifndef HAVE_64BIT_OS
 EXTRA_DSO_LDOPTS += -framework QuickTime
+ifdef MOZ_ENABLE_CAIRO_GFX
+# The static Cairo objects include the 32-bit QuartzGL backend, just as
+# libthebes does in non-libxul application builds.
+EXTRA_DSO_LDOPTS += -framework OpenGL -framework AGL
+endif
 else
 EXTRA_DSO_LDOPTS += -framework Carbon
 endif

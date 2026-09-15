@@ -1,0 +1,23 @@
+#!/bin/sh
+# Apple GCC 4.0.1 defaults to Tiger libraries even with a Panther sysroot.
+set -eu
+: "${ZR_MACOS_SDK:?Set ZR_MACOS_SDK to MacOSX10.3.9.sdk}"
+zr_compiler=gcc
+if test "${ZR_PPC_CXX:-no}" = yes; then zr_compiler=g++; fi
+zr_link=yes
+for zr_argument in "$@"; do
+  case "$zr_argument" in
+    -c|-E|-S|-M|-MM|-fsyntax-only|--version|-dump*|-print*) zr_link=no ;;
+  esac
+done
+if test "$zr_link" = yes; then
+  set -- "$@" -nodefaultlibs /opt/mac/lib/zoolrunner-fpsave.o \
+    -L/opt/mac/lib/zoolrunner-panther \
+    "-L$ZR_MACOS_SDK/usr/lib" "-Wl,-syslibroot,$ZR_MACOS_SDK"
+  if test "$zr_compiler" = g++; then set -- "$@" -lstdc++.6; fi
+  set -- "$@" -lgcc_s.1 -lSystem -lmx
+fi
+exec "/opt/mac/bin/powerpc-apple-darwin8-$zr_compiler" \
+  -isystem /opt/mac/lib/gcc/powerpc-apple-darwin8/4.0.1/include \
+  -isysroot "$ZR_MACOS_SDK" -mmacosx-version-min=10.3.9 \
+  -mlong-double-64 -mcpu=G3 -mno-altivec "$@"

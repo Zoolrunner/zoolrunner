@@ -1,0 +1,66 @@
+# Experimental Panther target using the pinned 32-bit Linux Apple toolchain.
+ZR_TOPSRCDIR=`cd "${MOZCONFIG%/*}/../../.." && pwd`
+ZR_OBJDIR=${ZR_OBJDIR:-$ZR_TOPSRCDIR/obj-zoolrunner-macos-powerpc-$ZR_MACOS_APP}
+case "$ZR_OBJDIR" in
+  /*) ;;
+  *) echo "ZR_OBJDIR must be an absolute path" >&2; exit 1 ;;
+esac
+: "${ZR_MACOS_SDK:?Set ZR_MACOS_SDK to MacOSX10.3.9.sdk}"
+if test "`uname -s`" != Linux || test "`getconf LONG_BIT`" != 32; then
+  echo "The experimental PowerPC profile requires a 32-bit Linux environment" >&2
+  exit 1
+fi
+python3 - "$ZR_MACOS_SDK/SDKSettings.plist" <<'PY'
+import plistlib, sys
+with open(sys.argv[1], 'rb') as source:
+    if plistlib.load(source).get('Version') != '10.3.9':
+        raise SystemExit('PowerPC builds require SDK 10.3.9')
+PY
+if test "$?" != 0; then exit 1; fi
+mk_add_options MOZ_OBJDIR="$ZR_OBJDIR"
+mk_add_options MOZ_MAKE_FLAGS="-j${ZR_BUILD_JOBS:-2}"
+mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
+CC="$ZR_TOPSRCDIR/mozconfigs/macos/powerpc/gcc"
+CXX="$ZR_TOPSRCDIR/mozconfigs/macos/powerpc/g++"
+HOST_CC=gcc
+HOST_CXX=g++
+AR=/opt/mac/bin/powerpc-apple-darwin8-ar
+RANLIB=/opt/mac/bin/powerpc-apple-darwin8-ranlib
+LD=/opt/mac/bin/powerpc-apple-darwin8-ld
+HOST_AR=ar
+HOST_RANLIB=ranlib
+CROSS_COMPILE=1
+ac_cv_va_copy=yes
+ac_cv_va_val_copy=no
+LIBIDL_CONFIG="$ZR_OBJDIR/build/unix/libIDL-prefix/bin/libIDL-config-2"
+HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
+PATH="$ZR_OBJDIR/build/unix/libIDL-prefix/bin:/opt/mac/bin:$PATH"
+PKG_CONFIG_PATH="$ZR_OBJDIR/build/unix/libIDL-prefix/lib/pkgconfig"
+LD_LIBRARY_PATH="$ZR_OBJDIR/build/unix/libIDL-prefix/lib"
+export CC CXX HOST_CC HOST_CXX AR RANLIB LD HOST_AR HOST_RANLIB CROSS_COMPILE
+export ac_cv_va_copy ac_cv_va_val_copy LIBIDL_CONFIG HOST_LIBIDL_CONFIG
+export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH ZR_MACOS_SDK ZR_OBJDIR
+ac_add_options --target=powerpc-apple-darwin7
+ac_add_options --enable-application="$ZR_MACOS_APP"
+ac_add_options --enable-default-toolkit=cairo-cocoa
+ac_add_options --with-macos-sdk="$ZR_MACOS_SDK"
+ac_add_options --enable-macos-target=10.3.9
+ac_add_options --enable-optimize=-O2
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+ac_add_options --disable-installer
+ac_add_options --disable-updater
+ac_add_options --without-system-jpg
+ac_add_options --without-system-zlib
+ac_add_options --enable-crypto
+ac_add_options --enable-svg
+ac_add_options --enable-canvas
+if test "$ZR_MACOS_APP" = xulrunner; then
+  ac_add_options --disable-javaxpcom
+  ac_add_options --enable-extensions=default,layout-debug
+fi
+CFLAGS='-std=gnu89 -fcommon'
+CXXFLAGS='-std=gnu++98 -fcommon'
+HOST_CFLAGS='-std=gnu89 -fcommon'
+HOST_CXXFLAGS='-std=gnu++98 -fcommon'
+export CFLAGS CXXFLAGS HOST_CFLAGS HOST_CXXFLAGS

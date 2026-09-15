@@ -44,6 +44,7 @@
 #ifdef __cplusplus
 
 
+#include "nsAEDefs.h"
 #include <AEDataModel.h>
 #include <AppleEvents.h>
 #include <AEObjects.h>

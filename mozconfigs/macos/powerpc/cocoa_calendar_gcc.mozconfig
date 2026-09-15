@@ -1,0 +1,2 @@
+ZR_MACOS_APP=calendar
+. "${MOZCONFIG%/*}/common.mozconfig"

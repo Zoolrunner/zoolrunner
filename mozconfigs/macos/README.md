@@ -1,9 +1,14 @@
 # macOS application builds
 
-All maintained macOS profiles use **macOS SDK 11.3**, Cocoa/Cairo and Clang.
+The arm64 and x86_64 macOS profiles use **macOS SDK 11.3**, Cocoa/Cairo and Clang.
 Do not substitute the SDK bundled with the host's current Xcode. The SDK's
 `SDKSettings.plist` version is checked before configuration. Xcode 16.4 supplies
 the compiler in CI; its bundled SDK is not used for the target build.
+
+Experimental [i386 cross-build instructions and PowerPC research](i386/README.md)
+are separate: i386 target code uses SDK 10.4u with a 10.4 deployment target,
+while build-host utilities still use SDK 11.3. Do not infer runtime support
+from a successful cross-build.
 
 ## Applications and configurations
 

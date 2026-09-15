@@ -41,6 +41,7 @@
 #define __AEGENERICCLASS__
 
 
+#include "nsAEDefs.h"
 #include "nsAEClassIterator.h"
 
 // pure virtual base class that provides stubs for much objecct functionality.

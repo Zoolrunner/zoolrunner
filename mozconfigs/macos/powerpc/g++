@@ -1,0 +1,4 @@
+#!/bin/sh
+ZR_PPC_CXX=yes
+export ZR_PPC_CXX
+exec "$(dirname "$0")/gcc" "$@"

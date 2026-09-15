@@ -2642,7 +2642,11 @@ NSEvent *gCocoaLastDragEvent = nil;
   ConvertCocoaToGeckoRect(aRect, fullRect);
 
   const NSRect *rects;
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1050
+  int count, i;
+#else
   NSInteger count, i;
+#endif
   [self getRectsBeingDrawn:&rects count:&count];
   if (count < MAX_RECTS_IN_REGION) {
     for (i = 0; i < count; ++i) {

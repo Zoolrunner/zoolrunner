@@ -40,6 +40,7 @@
 #include "cairo.h"
 #include "cairo-quartz-private.h"
 #include "ATSUICompat.h"
+#include "QuartzCompat.h"
 
 /*
  * FixedToFloat/FloatToFixed are 10.3+ SDK items - include definitions

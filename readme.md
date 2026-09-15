@@ -337,12 +337,29 @@ compatibility tokens where changing them could break existing applications.
 
 macOS mozconfigs cover Suite, Browser, Calendar/Sunbird, and XULRunner for both
 Apple Silicon and x86_64. The XULRunner profiles also build the Simple example
-and standalone Layout Debugger. All profiles require **macOS SDK 11.3**.
+and standalone Layout Debugger. These profiles require **macOS SDK 11.3**.
 See [macOS build instructions](mozconfigs/macos/README.md) for configuration
 paths, dependencies, packaging, and the eight-job GitHub Actions workflow.
-All eight configurations build locally. Calendar GUI startup still has a
-JavaScript compatibility failure; a successful build is not a full application
-runtime validation. GitHub-hosted execution awaits the first workflow run.
+All eight configurations build and package under local act testing. Native
+compatibility checks and Calendar's existing unit tests pass; local uploads
+encounter act's documented artifact-server limitation. GitHub-hosted execution
+awaits the first workflow run.
+
+Experimental [i386 profiles and PowerPC research](mozconfigs/macos/i386/README.md)
+use SDK 10.4u for i386 target code and SDK 11.3 for native host utilities. The
+explicit i386 deployment target is 10.4; actual runtime compatibility remains
+unverified. All four i386 applications pass local `act` build and packaging
+checks in [macos-i386.yml](.github/workflows/macos-i386.yml); artifact upload
+hits the same local server limitation. A Linux-hosted PowerPC cross-toolchain
+has built and packaged Suite against SDK 10.3.9, with target ABI assertions and
+static dependency-location checks passing for 110 packaged binaries. This is an
+intermediate milestone toward the required PowerPC minimum of Mac OS X 10.0.
+Foundation/C++, shared-library template coalescing and C++ ABI runtime probes
+now execute successfully on original 10.0 under PowerPC emulation. The runtime
+probe covers allocation, RTTI, exception unwinding and threaded initialization.
+Full 10.0 application builds, application runtime validation and a PowerPC CI
+job remain outstanding.
+See the [10.0 progress and constraints](mozconfigs/macos/powerpc/10.0-status.md).
 
 ## XULRunner Application Compatibility
 

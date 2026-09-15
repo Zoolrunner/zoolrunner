@@ -504,7 +504,9 @@ ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
 # Bug 297227: the next line only exists to repair broken depend builds, it can
 # go away once that bug has been closed for a while.
 	rm -rf $(DIST)/$(APP_NAME).app/Contents/Plug-Ins/PrintPDE.plugin
+ifndef MOZ_COCOA_NATIVE_PRINTING
 	rsync -a --copy-unsafe-links $(DIST)/package/PrintPDE.plugin $(DIST)/$(APP_NAME).app/Contents/Plug-Ins
+endif
 	cp -RL $(DIST)/package/mozillaSuite.rsrc $(DIST)/$(APP_NAME).app/Contents/Resources/$(PROGRAM).rsrc
 endif
 	echo -n APPLMOZZ > $(DIST)/$(APP_NAME).app/Contents/PkgInfo

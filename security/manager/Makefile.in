@@ -162,10 +162,10 @@ DEFAULT_GMAKE_FLAGS += NO_MDUPDATE=1
 DEFAULT_GMAKE_FLAGS += NSS_ENABLE_ECC=1
 DEFAULT_GMAKE_FLAGS += NSS_ENABLE_TLS_1_3=1
 ifeq ($(OS_ARCH),Darwin)
-ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH))$(findstring clang,$(CC)))
 # The bundled NSS contains generated HACL and private SQLite sources which
 # trigger new Apple Clang warnings. Keep the diagnostics, but do not make all
-# of them fatal during LP64 macOS platform builds.
+# of them fatal during modern Clang macOS platform builds.
 DEFAULT_GMAKE_FLAGS += NSS_ENABLE_WERROR=0
 endif
 endif

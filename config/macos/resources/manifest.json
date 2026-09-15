@@ -1,0 +1,12 @@
+{
+  "libwidget.rsrc": {
+    "source": "widget/src/mac/nsMacWidget.r",
+    "source_sha256": "43887cc2d1ab5cdb60d2894e75c4a1a96dea8f2fb230f9ac041c766bd38f229b",
+    "resource_sha256": "e3d9b715f04f0c674347b915438dfc921189392c5ae2b69d405a7da1a81ee230"
+  },
+  "mozillaSuite.rsrc": {
+    "source": "xpfe/bootstrap/appleevents/mozilla.sdef",
+    "source_sha256": "e19972e3c0495e472e4dba2ff477fa097014a1ca97e937ae93d2d0689471bcd2",
+    "resource_sha256": "c4bf5ccbb536c217a1437f020951b198f5bcfb5446f4b34812bb1cb7b59c09aa"
+  }
+}

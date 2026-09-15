@@ -5,6 +5,15 @@
 
 #define HAVE_USLEEP 1
 
+#if defined(__APPLE__)
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1040
+/* Panther has no uuid_t/gethostuuid interface for Apple's proxy locking.
+ * Use SQLite's ordinary POSIX file locking on these systems. */
+#define SQLITE_ENABLE_LOCKING_STYLE 0
+#endif
+#endif
+
 #if defined(_MSC_VER) && _MSC_VER < 1600
 #undef HAVE_STDINT_H
 #ifndef UINT64_C

@@ -60,6 +60,10 @@
 #include <fcntl.h>
 #include <mach-o/loader.h>
 #include <mach-o/fat.h>
+#ifndef FAT_MAGIC_64
+// The file-format constant is absent from older SDK headers.
+#define FAT_MAGIC_64 0xcafebabf
+#endif
 
 #include <CFURL.h>
 #include <CFBundle.h>

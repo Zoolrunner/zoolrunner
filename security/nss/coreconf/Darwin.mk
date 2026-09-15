@@ -144,6 +144,9 @@ ZLIB_LIBS	= -lz
 # the NSS libsqlite3.dylib is used instead of the system one. So just use the
 # system sqlite library on Mac, if it's sufficiently new.
 
+# A host executable cannot establish the SQLite version in a target SDK.
+# SDK builds keep NSS's bundled copy unless explicitly configured otherwise.
+ifeq (,$(MACOS_SDK_DIR))
 SYS_SQLITE3_VERSION_FULL := $(shell /usr/bin/sqlite3 -version | awk '{print $$1}')
 SYS_SQLITE3_VERSION_MAJOR := $(shell echo $(SYS_SQLITE3_VERSION_FULL) | awk -F. '{ print $$1 }')
 SYS_SQLITE3_VERSION_MINOR := $(shell echo $(SYS_SQLITE3_VERSION_FULL) | awk -F. '{ print $$2 }')
@@ -155,3 +158,4 @@ ifeq (3,$(SYS_SQLITE3_VERSION_MAJOR))
         NSS_USE_SYSTEM_SQLITE = 1
     endif
 endif
+endif # no target SDK

@@ -43,6 +43,18 @@
 #include "utilpars.h"
 
 #define SQLITE_THREADSAFE 1
+#if defined(__APPLE__)
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1040
+/* Pre-Tiger headers have no UUID interface for Apple's proxy locking. */
+#define SQLITE_ENABLE_LOCKING_STYLE 0
+#endif
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1050
+/* This SQLite copy's zone allocator needs Leopard's pointer CAS API.
+ * Use its ordinary thread-safe malloc allocator on older deployment targets. */
+#define SQLITE_WITHOUT_ZONEMALLOC 1
+#endif
+#endif
 #include "../sqlite/sqlite3.c"
 
 #ifdef SQLITE_UNSAFE_THREADS

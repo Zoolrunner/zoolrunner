@@ -173,8 +173,18 @@ export::
 endif
 
 ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+REZ_TOOL = $(shell xcrun --find Rez 2>/dev/null || echo /Developer/Tools/Rez)
+REZ_HEADERS = $(if $(MACOS_SDK_DIR),$(MACOS_SDK_DIR)/Developer/Headers/FlatCarbon,/Developer/Headers/FlatCarbon)
 $(RES_DEST): $(RES_SRC)
-	/Developer/Tools/Rez -i /Developer/Headers/FlatCarbon -useDF $(RES_SRC) -o $(RES_DEST)
+ifeq ($(HOST_OS_ARCH),Darwin)
+	$(REZ_TOOL) -i $(REZ_HEADERS) -useDF $(RES_SRC) -o $(RES_DEST)
+else
+
+$(RES_DEST): $(topsrcdir)/config/macos/resources/libwidget.rsrc \
+             $(topsrcdir)/config/macos/resources/manifest.json \
+             $(topsrcdir)/build/macosx/copy-resource.py
+	python3 $(topsrcdir)/build/macosx/copy-resource.py libwidget.rsrc $(RES_DEST)
+endif
 
 libs:: $(RES_DEST)
 endif

@@ -1397,8 +1397,6 @@ case "$host" in
     HOST_CFLAGS="$HOST_CFLAGS -DXP_UNIX -DXP_MACOSX -DNO_X11"
     HOST_NSPR_MDCPUCFG='\"md/_darwin.cfg\"'
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O3}"
-    MOZ_FIX_LINK_PATHS='-Wl,-executable_path,$(DIST)/bin'
-    LIBXUL_LIBS='$(XPCOM_FROZEN_LDOPTS) $(DIST)/bin/XUL -lobjc'
     ;;
 
 *-linux*)
@@ -1539,6 +1537,8 @@ case "$target" in
     ;;
 
 *-darwin*) 
+    MOZ_FIX_LINK_PATHS='-Wl,-executable_path,$(DIST)/bin'
+    LIBXUL_LIBS='$(XPCOM_FROZEN_LDOPTS) $(DIST)/bin/XUL -lobjc'
     AC_DEFINE(STDC_HEADERS)
     MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
     MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
@@ -4103,8 +4103,14 @@ cairo-cocoa)
     AC_DEFINE(TARGET_API_MAC_CARBON)
     AC_DEFINE(MOZ_WIDGET_COCOA)
     TK_LIBS='-framework Cocoa -framework ApplicationServices -framework CoreServices'
+    case "$target_cpu" in
+      i?86 | powerpc*)
+        dnl The 32-bit Cocoa backend still uses HIToolbox (e.g. AESend).
+        TK_LIBS="$TK_LIBS -framework Carbon"
+        ;;
+    esac
     if test -d "${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"; then
-        TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
+        TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon -I${srcdir}/config/macos"
     else
         TK_CFLAGS="-include ${srcdir}/config/macos/CarbonCompat.h -I${srcdir}/config/macos -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework/Frameworks/HIToolbox.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreFoundation.framework/Headers"
     fi

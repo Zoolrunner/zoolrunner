@@ -617,6 +617,48 @@ CI artifacts must resolve links into the build checkout and retain executable
 permissions. Distinguish local build checks from actual GitHub-hosted runs and
 from runtime validation on the minimum deployment OS.
 
+Check available disk space before local matrix builds. Run local `act` jobs
+one at a time, preserve their archives and diagnostic logs, then remove the
+completed job's temporary checkout, object directories, and copied SDKs before
+starting the next job. Do not delete existing developer builds or shared SDKs
+as part of this cleanup.
+
+---
+
+# macOS Cross-Builds
+
+Keep the validated arm64/x86_64 profiles pinned to SDK 11.3. Experimental i386
+profiles use SDK 10.4u for target code and SDK 11.3 for native host tools, with
+an explicit 10.4 deployment target. See `mozconfigs/macos/i386/README.md` for
+SDK preparation and current limitations. Do not silently raise a deployment
+target to satisfy the linker. Host-built configuration generators must use the
+target's ABI sizes and alignments; run `build/macosx/check-target-abi.c` with the
+target compiler. Cross-build success is not runtime validation: current macOS
+cannot execute i386 applications. PowerPC is not a validated CI target.
+The legacy deployment goals are Intel 10.4 onward and PowerPC Mac OS X 10.0
+through the later PowerPC releases. The 10.3.9 cross-build is an intermediate
+milestone, not the final minimum. Preserve 10.0-compatible API paths and audit
+the C/C++ runtime, startup objects, loader behavior and graphics APIs against
+the actual oldest target; newer SDK compilation is not proof of 10.0 support.
+For the 10.0 experiment, use the separately rebuilt classic linker and original
+10.0 Csu startup object described in `mozconfigs/macos/powerpc/10.0-status.md`.
+Keep original-library overlay provenance and distinguish host pixel tests,
+static import checks, successful links and actual target-OS execution.
+The early C++ ABI runtime probe passes on original 10.0 under emulation, but
+does not establish full libstdc++ or application compatibility. Retain the
+GCC unwind-registration bridge and thread-safe initialization when extending
+this port; see `mozconfigs/macos/powerpc/early-cxx-runtime.md` for its scope.
+The initial i386 10.8 build is an intermediate result, not the desired final
+minimum. Linux-hosted cross-toolchain workflows are acceptable. Validate
+startup objects, target SDK APIs, linked dependencies and target runtime
+behavior before lowering a claimed supported OS version.
+Preserve the historical 32-bit Cocoa/Carbon APIs and resources when fixing
+modern-host build problems.
+Linux cross-builds may use the small generated classic resources in
+`config/macos/resources`, but must verify the source and resource hashes.
+Regenerate them with Apple's tools when their authoritative sources change;
+do not silently use stale resources or drop cursors and AppleScript metadata.
+
 ---
 
 # Shell Portability

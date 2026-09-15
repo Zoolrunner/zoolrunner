@@ -68,6 +68,7 @@ PACKAGE_FILE = printpde.pkg
 
 unexport CC CXX
 
+ifndef CROSS_COMPILE
 ABS_topsrcdir   := $(shell cd $(topsrcdir); pwd)
 ifneq ($(ABS_topsrcdir),$(MOZ_BUILD_ROOT))
 export::
@@ -77,7 +78,25 @@ export::
 	ln -fs $(srcdir)/public
 	ln -fs $(srcdir)/Info-*.plist .
 endif
+endif
 
+ifdef CROSS_COMPILE
+# Modern hosts cannot open the Project Builder/Xcode project. Build the
+# original Carbon PDE and copy its original Carbon nib and plug-in metadata.
+libs::
+	mkdir -p build/PrintPDE.plugin/Contents/MacOS build/PrintPDE.plugin/Contents/Resources
+	$(CC) $(CFLAGS) -fpascal-strings -I$(srcdir)/public -I$(srcdir)/src \
+	  -F$(MACOS_SDK_DIR)/System/Library/Frameworks/Carbon.framework/Frameworks \
+	  -F$(MACOS_SDK_DIR)/System/Library/Frameworks/ApplicationServices.framework/Frameworks \
+	  -bundle $(LDFLAGS) -framework Carbon \
+	  $(srcdir)/src/PDECore.c $(srcdir)/src/PDECustom.c $(srcdir)/src/PDEUtilities.c \
+	  -o build/PrintPDE.plugin/Contents/MacOS/PrintPDE
+	cp $(srcdir)/Info-PrintPDE.plist build/PrintPDE.plugin/Contents/Info.plist
+	cp -R $(srcdir)/res/English.lproj build/PrintPDE.plugin/Contents/Resources/
+	printf BNDLMOZZ > build/PrintPDE.plugin/Contents/PkgInfo
+	mkdir -p $(DIST)/package
+	$(INSTALL) build/PrintPDE.plugin $(DIST)/package
+else
 libs::
 # Bug 297227: The next line doesn't need to stay around forever, only
 # long enough to clean up existing depend builds from when xcodebuild
@@ -87,6 +106,7 @@ libs::
 	$(PBBUILD) $(PROJECT_ARG) -target PrintPDE -buildstyle $(BUILDSTYLE) $(PBBUILD_ARG)
 	mkdir -p $(DIST)/package
 	$(INSTALL) $(XCODE_PRODUCT_DIR)/PrintPDE.plugin $(DIST)/package
+endif
 
 clean clobber::
 	rm -rf build

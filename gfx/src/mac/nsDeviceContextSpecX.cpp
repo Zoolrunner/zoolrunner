@@ -137,9 +137,23 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(PRUnichar*  aTitle,
     status = ::PMSetLastPage(mPrintSettings, aEndPage, false);
     NS_ASSERTION(status == noErr, "PMSetLastPage failed");
 
-#ifdef __LP64__
+#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1040
     status = ::PMSessionBeginCGDocumentNoDialog(mPrintSession, mPrintSettings,
                                                 mPageFormat);
+#else
+    const void *contextType = kPMGraphicsContextCoreGraphics;
+    CFArrayRef contextTypes = ::CFArrayCreate(NULL, &contextType, 1,
+                                              &kCFTypeArrayCallBacks);
+    if (!contextTypes)
+      return NS_ERROR_OUT_OF_MEMORY;
+    status = ::PMSessionSetDocumentFormatGeneration(mPrintSession,
+                 kPMDocumentFormatPDF, contextTypes, NULL);
+    ::CFRelease(contextTypes);
+    if (status == noErr)
+      status = ::PMSessionBeginDocumentNoDialog(mPrintSession, mPrintSettings,
+                                                 mPageFormat);
+#endif
 #else
     status = ::PMSessionBeginDocument(mPrintSession, mPrintSettings, mPageFormat);
 #endif
@@ -151,7 +165,7 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(PRUnichar*  aTitle,
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndDocument()
 {
-#ifdef __LP64__
+#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
     OSStatus status = ::PMSessionEndDocumentNoDialog(mPrintSession);
 #else
     OSStatus status = ::PMSessionEndDocument(mPrintSession);
@@ -167,14 +181,14 @@ NS_IMETHODIMP nsDeviceContextSpecX::AbortDocument()
 
 NS_IMETHODIMP nsDeviceContextSpecX::BeginPage()
 {
-#ifdef __LP64__
+#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
     OSStatus status = ::PMSessionBeginPageNoDialog(mPrintSession, mPageFormat, NULL);
 #else
     OSStatus status = ::PMSessionBeginPage(mPrintSession, mPageFormat, NULL);
 #endif
     if (status != noErr) return NS_ERROR_ABORT;
 
-#ifndef __LP64__
+#if !defined(__LP64__) && !defined(MOZ_ENABLE_CAIRO_GFX)
     ::GetPort(&mSavedPort);
     void *graphicsContext;
     status = ::PMSessionGetGraphicsContext(mPrintSession, kPMGraphicsContextQuickdraw, &graphicsContext);
@@ -187,12 +201,12 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginPage()
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndPage()
 {
-#ifdef __LP64__
+#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
     OSStatus status = ::PMSessionEndPageNoDialog(mPrintSession);
 #else
     OSStatus status = ::PMSessionEndPage(mPrintSession);
 #endif
-#ifndef __LP64__
+#if !defined(__LP64__) && !defined(MOZ_ENABLE_CAIRO_GFX)
     if (mSavedPort)
     {
         ::SetPort(mSavedPort);
@@ -204,13 +218,21 @@ NS_IMETHODIMP nsDeviceContextSpecX::EndPage()
     return NS_OK;
 }
 
-#ifdef __LP64__
+#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
 CGContextRef nsDeviceContextSpecX::GetCGContext()
 {
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= 1040
     CGContextRef context = NULL;
     if (::PMSessionGetCGGraphicsContext(mPrintSession, &context) != noErr)
       return NULL;
     return context;
+#else
+    void *context = NULL;
+    if (::PMSessionGetGraphicsContext(mPrintSession,
+           kPMGraphicsContextCoreGraphics, &context) != noErr)
+      return NULL;
+    return static_cast<CGContextRef>(context);
+#endif
 }
 #endif
 

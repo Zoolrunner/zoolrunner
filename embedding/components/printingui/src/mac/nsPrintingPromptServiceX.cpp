@@ -63,7 +63,7 @@
 #include "nsIWebProgressListener.h"
 
 // OS includes
-#ifdef __LP64__
+#ifdef MOZ_COCOA_NATIVE_PRINTING
 #include <ApplicationServices/ApplicationServices.h>
 #import <Cocoa/Cocoa.h>
 #else
@@ -75,7 +75,7 @@
 // Static Helpers
 //-----------------------------------------------------------------------------
 
-#ifndef __LP64__
+#ifndef MOZ_COCOA_NATIVE_PRINTING
 static nsresult LoadPDEPlugIn()
 {
     static CFPlugInRef gPDEPlugIn = nsnull;
@@ -259,7 +259,7 @@ nsPrintingPromptService::ShowPrintDialog(nsIDOMWindow *parent, nsIWebBrowserPrin
     if (NS_FAILED(rv))
         return rv;
 
-#ifdef __LP64__
+#ifdef MOZ_COCOA_NATIVE_PRINTING
     NSPrintInfo* printInfo = CreatePrintInfo(pageFormat, nativePrintSettings);
     if (!printInfo)
         return NS_ERROR_FAILURE;
@@ -293,10 +293,10 @@ nsPrintingPromptService::ShowPrintDialog(nsIDOMWindow *parent, nsIWebBrowserPrin
                       NSPrintPanelShowsScaling];
     NSInteger button = [panel runModal];
     NSPrintInfo* resultInfo = [[NSPrintOperation currentOperation] printInfo];
-    if (button == NSModalResponseOK && resultInfo)
+    if (button == NSOKButton && resultInfo)
         status = CopyPrintInfo(resultInfo, pageFormat, nativePrintSettings);
     else
-        status = (button == NSModalResponseOK) ? paramErr : userCanceledErr;
+        status = (button == NSOKButton) ? paramErr : userCanceledErr;
     [NSPrintOperation setCurrentOperation:nil];
     [printView release];
     [printInfo release];
@@ -537,7 +537,7 @@ nsPrintingPromptService::ShowPageSetup(nsIDOMWindow *parent, nsIPrintSettings *p
   if (!printSettingsX)
     return NS_ERROR_NO_INTERFACE;
 
-#ifdef __LP64__
+#ifdef MOZ_COCOA_NATIVE_PRINTING
   PMPageFormat pageFormat = kPMNoPageFormat;
   PMPrintSettings nativePrintSettings = kPMNoPrintSettings;
   nsresult rv = printSettingsX->GetPMPageFormat(&pageFormat);
@@ -552,10 +552,10 @@ nsPrintingPromptService::ShowPageSetup(nsIDOMWindow *parent, nsIPrintSettings *p
     return NS_ERROR_FAILURE;
   NSInteger button = [[NSPageLayout pageLayout] runModalWithPrintInfo:printInfo];
   OSStatus status = noErr;
-  if (button == NSModalResponseOK)
+  if (button == NSOKButton)
     status = CopyPrintInfo(printInfo, pageFormat, nativePrintSettings);
   [printInfo release];
-  if (button != NSModalResponseOK)
+  if (button != NSOKButton)
     return NS_ERROR_ABORT;
   return status == noErr ? NS_OK : NS_ERROR_FAILURE;
 #else

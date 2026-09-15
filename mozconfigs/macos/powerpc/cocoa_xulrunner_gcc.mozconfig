@@ -1,0 +1,2 @@
+ZR_MACOS_APP=xulrunner
+. "${MOZCONFIG%/*}/common.mozconfig"

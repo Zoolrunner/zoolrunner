@@ -74,7 +74,8 @@ OS_REL_CFLAGS	= -Dppc
 endif
 
 ifneq (,$(MACOS_SDK_DIR))
-  ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+  DARWIN_CLANG := $(findstring clang,$(shell $(CC) --version 2>/dev/null))
+  ifneq (,$(filter x86_64 aarch64,$(CPU_ARCH))$(DARWIN_CLANG))
     # Current Apple Clang supplies compiler headers such as stdarg.h from its
     # resource directory.  Modern SDKs no longer contain the GCC header tree
     # used by the historical -nostdinc configuration below.  Keep that old

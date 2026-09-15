@@ -3,20 +3,34 @@
 ZR_TOPSRCDIR=`cd "${MOZCONFIG%/*}/../../.." && pwd`
 ZR_OBJDIR=${ZR_OBJDIR:-$ZR_TOPSRCDIR/obj-zoolrunner-macos-$ZR_MACOS_ARCH-$ZR_MACOS_APP}
 ZR_BUILD_JOBS=${ZR_BUILD_JOBS:-8}
-ZR_MACOS_SDK=${ZR_MACOS_SDK:-$HOME/dev/macos-sdk/MacOSX11.3.sdk}
+ZR_SDK_VERSION_REQUIRED=11.3
+ZR_SDK_NAME=11.3
+if test "$ZR_MACOS_ARCH" = i386; then
+  ZR_SDK_VERSION_REQUIRED=10.4
+  ZR_SDK_NAME=10.4u
+fi
+ZR_MACOS_SDK=${ZR_MACOS_SDK:-$HOME/dev/macos-sdk/MacOSX$ZR_SDK_NAME.sdk}
+ZR_HOST_SDK=${ZR_HOST_SDK:-$HOME/dev/macos-sdk/MacOSX11.3.sdk}
 ZR_HOST_ARCH=`uname -m`
 case "$ZR_OBJDIR" in
   /*) ;;
   *) echo "ZR_OBJDIR must be an absolute path" >&2; exit 1 ;;
 esac
 case "$ZR_MACOS_ARCH:$ZR_HOST_ARCH" in
-  arm64:arm64|x86_64:arm64|x86_64:x86_64) ;;
+  arm64:arm64|x86_64:arm64|x86_64:x86_64|i386:arm64|i386:x86_64) ;;
   *) echo "Unsupported macOS target/host: $ZR_MACOS_ARCH/$ZR_HOST_ARCH" >&2; exit 1 ;;
 esac
 ZR_SDK_VERSION=`/usr/libexec/PlistBuddy -c 'Print :Version' "$ZR_MACOS_SDK/SDKSettings.plist" 2>/dev/null`
-if test "$ZR_SDK_VERSION" != 11.3; then
-  echo "Set ZR_MACOS_SDK to a macOS 11.3 SDK (found '$ZR_SDK_VERSION' at $ZR_MACOS_SDK)" >&2
+if test "$ZR_SDK_VERSION" != "$ZR_SDK_VERSION_REQUIRED"; then
+  echo "Set ZR_MACOS_SDK to a macOS $ZR_SDK_VERSION_REQUIRED SDK (found '$ZR_SDK_VERSION' at $ZR_MACOS_SDK)" >&2
   exit 1
+fi
+
+if test "$ZR_MACOS_ARCH" = i386; then
+  if test "`/usr/libexec/PlistBuddy -c 'Print :Version' "$ZR_HOST_SDK/SDKSettings.plist" 2>/dev/null`" != 11.3; then
+    echo "Set ZR_HOST_SDK to macOS SDK 11.3 for native host utilities" >&2
+    exit 1
+  fi
 fi
 
 mk_add_options MOZ_OBJDIR="$ZR_OBJDIR"
@@ -43,15 +57,16 @@ MOZ_PKG_SPECIAL=$ZR_MACOS_ARCH
 ZR_MACOS_TARGET=11.0
 ZR_HOST_TARGET=11.0
 if test "$ZR_MACOS_ARCH" = x86_64; then ZR_MACOS_TARGET=10.6; fi
+if test "$ZR_MACOS_ARCH" = i386; then ZR_MACOS_TARGET=10.4; fi
 if test "$ZR_HOST_ARCH" = x86_64; then ZR_HOST_TARGET=10.6; fi
 if test "$ZR_MACOS_ARCH" != "$ZR_HOST_ARCH"; then
-  CC="$ZR_TOPSRCDIR/mozconfigs/macos/x86_64/clang"
-  CXX="$ZR_TOPSRCDIR/mozconfigs/macos/x86_64/clang++"
+  CC="$ZR_TOPSRCDIR/mozconfigs/macos/$ZR_MACOS_ARCH/clang"
+  CXX="$ZR_TOPSRCDIR/mozconfigs/macos/$ZR_MACOS_ARCH/clang++"
   CROSS_COMPILE=1
   ac_cv_va_copy=yes
   ac_cv_va_val_copy=no
   export CROSS_COMPILE ac_cv_va_copy ac_cv_va_val_copy
-  ac_add_options --target=x86_64-apple-darwin`uname -r`
+  ac_add_options --target=$ZR_MACOS_ARCH-apple-darwin`uname -r`
 fi
 export CC CXX HOST_CC HOST_CXX AR RANLIB LD HOST_AR HOST_RANLIB MOZ_PKG_SPECIAL
 
@@ -79,5 +94,13 @@ CXXFLAGS="-arch $ZR_MACOS_ARCH -std=gnu++98 -fcommon"
 HOST_CFLAGS="-arch $ZR_HOST_ARCH -std=gnu89 -fcommon"
 HOST_CXXFLAGS="-arch $ZR_HOST_ARCH -std=gnu++98 -fcommon"
 LDFLAGS="-arch $ZR_MACOS_ARCH -isysroot $ZR_MACOS_SDK -mmacosx-version-min=$ZR_MACOS_TARGET"
-HOST_LDFLAGS="-arch $ZR_HOST_ARCH -isysroot $ZR_MACOS_SDK -mmacosx-version-min=$ZR_HOST_TARGET"
+# Host utilities must use a SDK containing the host architecture.
+if test "$ZR_MACOS_ARCH" != i386; then ZR_HOST_SDK=$ZR_MACOS_SDK; fi
+HOST_LDFLAGS="-arch $ZR_HOST_ARCH -isysroot $ZR_HOST_SDK -mmacosx-version-min=$ZR_HOST_TARGET"
 export CFLAGS CXXFLAGS HOST_CFLAGS HOST_CXXFLAGS LDFLAGS HOST_LDFLAGS
+
+if test "$ZR_MACOS_ARCH" = i386; then
+  CXXFLAGS="-stdlib=libstdc++ $CXXFLAGS"
+  HOST_CFLAGS="$HOST_CFLAGS -isysroot $ZR_HOST_SDK -mmacosx-version-min=$ZR_HOST_TARGET"
+  HOST_CXXFLAGS="$HOST_CXXFLAGS -isysroot $ZR_HOST_SDK -mmacosx-version-min=$ZR_HOST_TARGET"
+fi

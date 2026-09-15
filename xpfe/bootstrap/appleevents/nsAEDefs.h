@@ -42,6 +42,12 @@
 
 
 #include <MacTypes.h>
+#include <AvailabilityMacros.h>
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1050
+// Older AppleEvent callbacks use long; SRefCon was added with the LP64 APIs.
+typedef long SRefCon;
+#endif
 
 
 typedef char	CStr255[256];		/* like Str255, except for C-format strings. */

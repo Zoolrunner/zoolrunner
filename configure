@@ -5755,8 +5755,6 @@ case "$host" in
     HOST_CFLAGS="$HOST_CFLAGS -DXP_UNIX -DXP_MACOSX -DNO_X11"
     HOST_NSPR_MDCPUCFG='\"md/_darwin.cfg\"'
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O3}"
-    MOZ_FIX_LINK_PATHS='-Wl,-executable_path,$(DIST)/bin'
-    LIBXUL_LIBS='$(XPCOM_FROZEN_LDOPTS) $(DIST)/bin/XUL -lobjc'
     ;;
 
 *-linux*)
@@ -6040,6 +6038,8 @@ fi
     ;;
 
 *-darwin*) 
+    MOZ_FIX_LINK_PATHS='-Wl,-executable_path,$(DIST)/bin'
+    LIBXUL_LIBS='$(XPCOM_FROZEN_LDOPTS) $(DIST)/bin/XUL -lobjc'
     cat >> confdefs.h <<\EOF
 #define STDC_HEADERS 1
 EOF
@@ -12445,8 +12445,13 @@ EOF
 #define MOZ_WIDGET_COCOA 1
 EOF
     TK_LIBS='-framework Cocoa -framework ApplicationServices -framework CoreServices'
+    case "$target_cpu" in
+      i?86 | powerpc*)
+        TK_LIBS="$TK_LIBS -framework Carbon"
+        ;;
+    esac
     if test -d "${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"; then
-        TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon"
+        TK_CFLAGS="-I${MACOS_SDK_DIR}/Developer/Headers/FlatCarbon -I${srcdir}/config/macos"
     else
         TK_CFLAGS="-include ${srcdir}/config/macos/CarbonCompat.h -I${srcdir}/config/macos -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreServices.framework/Frameworks/CarbonCore.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/ApplicationServices.framework/Frameworks/QD.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/Carbon.framework/Frameworks/HIToolbox.framework/Headers -I${MACOS_SDK_DIR}/System/Library/Frameworks/CoreFoundation.framework/Headers"
     fi

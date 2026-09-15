@@ -855,7 +855,12 @@ NS_IMETHODIMP nsLocalFile::SetFileSize(PRInt64 aFileSize)
   if (NS_FAILED(rv))
     return rv;
   
+#ifdef __LP64__
   FSIORefNum refNum;
+#else
+  // The 32-bit API uses SInt16, including SDKs predating FSIORefNum.
+  SInt16 refNum;
+#endif
   OSErr err = ::FSOpenFork(&fsRef, 0, nsnull, fsWrPerm, &refNum);
   if (err != noErr)
     return MacErrorMapper(err);

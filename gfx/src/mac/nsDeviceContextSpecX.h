@@ -99,7 +99,7 @@ public:
     
     NS_IMETHOD GetPageRect(double* aTop, double* aLeft, double* aBottom, double* aRight);
 
-#ifdef __LP64__
+#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
     CGContextRef GetCGContext();
 #endif
 protected:

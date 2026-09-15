@@ -38,6 +38,9 @@
 
 #include "nsPrintSettingsX.h"
 #include "nsIPrintSessionX.h"
+#ifndef __LP64__
+#include "nsGfxUtils.h"
+#endif
 
 #include "nsIPrefService.h"
 #include "nsIPrefBranch.h"

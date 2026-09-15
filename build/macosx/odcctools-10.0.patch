@@ -1,0 +1,46 @@
+--- a/libstuff/macosx_deployment_target.c
++++ b/libstuff/macosx_deployment_target.c
+@@ -26,7 +26,9 @@
+ #include <string.h>
+ #include <mach/mach.h>
+ #include <sys/types.h>
++#ifdef __APPLE__
+ #include <sys/sysctl.h>
++#endif
+ #include "stuff/errors.h"
+ #include "stuff/allocate.h"
+ #include "stuff/macosx_deployment_target.h"
+@@ -74,7 +76,7 @@
+ 	 * Pick up the Mac OS X deployment target set by the command line
+ 	 * or the environment variable if any.  If that does not parse out
+ 	 * use the default and generate a warning.  We accept "10.x" or "10.x.y"
+-	 * where x and y are unsigned numbers. And x is non-zero.
++	 * where x and y are unsigned numbers. 10.0 is a valid legacy target.
+ 	 */
+ 	if(command_line_macosx_deployment_target != NULL)
+ 	    p = command_line_macosx_deployment_target;
+@@ -88,7 +90,7 @@
+ 		goto use_default;
+ 	    q = endp + 1;
+ 	    major = strtoul(q, &endp, 10);
+-	    if(major == 0)
++	    if(endp == q)
+ 		goto use_default;
+ 	    if(*endp != '.' && *endp != '\0')
+ 		goto use_default;
+@@ -112,11 +114,15 @@
+ 	/*
+ 	 * The default value is the version of the running OS.
+ 	 */
++#ifdef __APPLE__
+ 	osversion_name[0] = CTL_KERN;
+ 	osversion_name[1] = KERN_OSRELEASE;
+ 	osversion_len = sizeof(osversion) - 1;
+ 	if(sysctl(osversion_name, 2, osversion, &osversion_len, NULL, 0) == -1)
+ 	    system_error("sysctl for kern.osversion failed");
++#else
++	strcpy(osversion, "8.0.0");
++#endif
+ 
+ 	/*
+ 	 * Now parse this out.  It is expected to be of the form "x.y.z" where
