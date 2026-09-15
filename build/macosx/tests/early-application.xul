@@ -83,7 +83,8 @@ function startTest() {
                                   .createInstance(Components.interfaces.calIEvent);
             entry.title = "Platform test";
             requireValue(entry.title == "Platform test", "Calendar component failed");
-            report(true, "Calendar chrome and event component");
+            app.focus();
+            setTimeout(function() { report(true, "Calendar chrome and event component"); }, 20000);
           } else {
             var textbox = app.document.getElementById("textbox");
             requireValue(textbox && textbox.boxObject.width > 0, "Standalone XUL layout failed");
@@ -92,7 +93,8 @@ function startTest() {
             requireValue(textbox.value == "3", "Standalone JavaScript XPCOM component failed");
             app.onButtonClick();
             requireValue(textbox.value == "4", "Standalone C++ XPCOM component failed");
-            report(true, "Standalone XUL application, XPT, JavaScript and C++ components");
+            app.focus();
+            setTimeout(function() { report(true, "Standalone XUL application, XPT, JavaScript and C++ components"); }, 20000);
           }
         } catch (error) { report(false, String(error)); }
       }, 10000);

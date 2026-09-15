@@ -77,3 +77,8 @@ XPCOM component, registered ahead of that handler. `-zoolrunner-test` opens the
 test controller, which then opens and checks the real Calendar window. This
 component is included only in the disposable test payload, not application
 archives. It also exercises classic JavaScript component/category registration.
+
+Calendar and standalone XUL tests focus the application window and leave their
+successful state visible for 20 seconds before quitting. The guest captures a
+frame every 10 seconds; this pause preserves screenshots for visual review
+after the component assertions have passed.
