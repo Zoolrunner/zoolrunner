@@ -162,7 +162,10 @@ static PRBool IsLoadablePlugin(CFURLRef aURL)
       // we're compiling for. Fat headers are always big-endian, so swap
       // them to host before comparing to host representation of the magic
       if (read(f, &magic, sizeof(magic)) == sizeof(magic)) {
-        if ((magic == MH_MAGIC) || (magic == MH_MAGIC_64) ||
+        if ((magic == MH_MAGIC) ||
+#ifdef MH_MAGIC_64
+            (magic == MH_MAGIC_64) ||
+#endif
             (PR_ntohl(magic) == FAT_MAGIC) ||
             (PR_ntohl(magic) == FAT_MAGIC_64))
           isLoadable = PR_TRUE;

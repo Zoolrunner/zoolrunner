@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tarfile
+from legacy_tar import LegacyTarInfo
 import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -28,9 +29,13 @@ sdk_version = "11.3"
 if args.arch == "i386":
     sdk_version = {"10.4": "10.4u", "10.8": "10.6"}[minimum]
 elif args.arch == "powerpc":
-    sdk_version = {"10.3.9": "10.3.9"}[minimum]
+    sdk_version = {"10.3.9": "10.3.9", "10.0": "10.1.5"}[minimum]
+    os.environ["ZR_PPC_DEPLOYMENT_TARGET"] = minimum
 legacy = args.arch in ("i386", "powerpc")
 name = "zoolrunner-macos-%s-%s-sdk%s" % (args.arch, args.app, sdk_version)
+if args.arch == "powerpc" and minimum == "10.0":
+    # The original-library overlay has later headers; do not label it SDK 10.0.
+    name = "zoolrunner-macos-powerpc-%s-target10.0" % args.app
 
 with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
     stage = Path(temporary) / name
@@ -60,6 +65,13 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         with (stage / bundle / "Contents" / "Info.plist").open("rb") as info:
             program = plistlib.load(info)["CFBundleExecutable"]
         executable = stage / bundle / "Contents" / "MacOS" / program
+    if args.arch == "powerpc" and minimum == "10.0" and args.app != "suite":
+        with executable.open("rb") as binary:
+            header = binary.read(28)
+        if (len(header) != 28 or header[:4] != b"\xfe\xed\xfa\xce" or
+                not (int.from_bytes(header[24:28], "big") & 0x8)):
+            raise RuntimeError("Original-10.0 Toolkit launcher requires MH_BINDATLOAD")
+        print("Original-10.0 Toolkit executable binding flag verified")
     # Match the legacy packager: generated registration caches belong to the
     # build tree and can contain stale locations/factories after relocation.
     runtime = executable.parent
@@ -91,6 +103,12 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                               str(Path.home() / ("dev/macos-sdk/MacOSX%s.sdk" % sdk_version))))
     if args.arch == "powerpc":
         abi_compiler = [str(root / "mozconfigs/macos/powerpc/gcc")]
+        if minimum == "10.0":
+            shutil.copy2(sdk / "PROVENANCE.json", stage / "sdk-provenance.json")
+            if not (runtime / "libzoolcxx.dylib").is_file():
+                raise RuntimeError("The early C++ runtime was not installed")
+            if not (runtime / "COPYING.GCC").is_file():
+                raise RuntimeError("The early C++ runtime license was not installed")
     else:
         abi_compiler = ["xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk)]
     subprocess.run(abi_compiler + [
@@ -182,6 +200,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         shutil.copy2(root / "build/macosx/verify-legacy-runtime.sh", tests / "run.sh")
         for test in ("object-reflection", "legacy-application", "debugger-lifecycle"):
             shutil.copy2(root / "js/tests/es5" / (test + ".js"), tests / (test + ".js"))
-    with tarfile.open(out / (name + ".tar.gz"), "w:gz") as archive:
+    # Original Mac OS X tar predates POSIX.1-2001 extended (PAX) headers.
+    archive_format = tarfile.USTAR_FORMAT if legacy else tarfile.PAX_FORMAT
+    with tarfile.open(out / (name + ".tar.gz"), "w:gz", format=archive_format,
+                      tarinfo=LegacyTarInfo if legacy else tarfile.TarInfo) as archive:
         archive.add(stage, arcname=name)
     print(out / (name + ".tar.gz"))

@@ -62,6 +62,23 @@
 
 #include <Quickdraw.h>
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+// The corresponding ThemeBrush constants were introduced after Cheetah.
+nsresult ZRGetEarlySelectionColor(PRInt32 selection, nscolor *color)
+{
+  NSColor *native = selection == 2 ? [NSColor secondarySelectedControlColor] :
+                    selection == 1 ? [NSColor selectedControlColor] :
+                                     [NSColor selectedTextBackgroundColor];
+  native = [native colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
+  if (!native)
+    return NS_ERROR_FAILURE;
+  float r, g, b, a;
+  [native getRed:&r green:&g blue:&b alpha:&a];
+  *color = NS_RGB((PRUint8)(r * 255), (PRUint8)(g * 255), (PRUint8)(b * 255));
+  return NS_OK;
+}
+#endif
+
 // Define Class IDs -- i hate having to do this
 static NS_DEFINE_CID(kCDragServiceCID,  NS_DRAGSERVICE_CID);
 
@@ -1387,10 +1404,18 @@ NS_IMETHODIMP nsCocoaWindow::Resize(PRInt32 aWidth, PRInt32 aHeight, PRBool aRep
   if ( mWindow ) {
     NSRect newBounds = [mWindow frame];
 #ifdef MOZ_ENABLE_CAIRO_GFX
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1030
+    NSRect contentBounds = [NSWindow contentRectForFrameRect:newBounds styleMask:[mWindow styleMask]];
+#else
     NSRect contentBounds = [mWindow contentRectForFrameRect:newBounds];
+#endif
     contentBounds.size.width = aWidth;
     contentBounds.size.height = aHeight;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1030
+    newBounds = [NSWindow frameRectForContentRect:contentBounds styleMask:[mWindow styleMask]];
+#else
     newBounds = [mWindow frameRectForContentRect:contentBounds];
+#endif
 #else
     newBounds.size.width = aWidth;
     if ( mWindowType == eWindowType_popup )
@@ -1695,7 +1720,11 @@ nsCocoaWindow::ReportSizeEvent()
 {
 #ifdef MOZ_ENABLE_CAIRO_GFX
   if (mWindow) {
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1030
+    NSRect contentBounds = [NSWindow contentRectForFrameRect:[mWindow frame] styleMask:[mWindow styleMask]];
+#else
     NSRect contentBounds = [mWindow contentRectForFrameRect:[mWindow frame]];
+#endif
     mBounds.width = NS_STATIC_CAST(PRInt32, contentBounds.size.width);
     mBounds.height = NS_STATIC_CAST(PRInt32, contentBounds.size.height);
   }

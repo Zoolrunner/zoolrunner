@@ -274,12 +274,19 @@ NS_IMETHODIMP nsWebBrowserFind::FindNext(PRBool *outDidFind)
 }
 
 
+#if defined(XP_MACOSX) && MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+extern void ZRReadFindPasteboard(nsAString &value);
+extern void ZRWriteFindPasteboard(const nsAString &value);
+#endif
+
 /* attribute wstring searchString; */
 NS_IMETHODIMP nsWebBrowserFind::GetSearchString(PRUnichar * *aSearchString)
 {
     NS_ENSURE_ARG_POINTER(aSearchString);
 #ifdef XP_MACOSX
-#ifdef __LP64__
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+    ZRReadFindPasteboard(mSearchString);
+#elif defined(__LP64__)
     PasteboardRef pasteboard = nsnull;
     if (PasteboardCreate(kPasteboardFind, &pasteboard) == noErr) {
         PasteboardSynchronize(pasteboard);
@@ -331,7 +338,9 @@ NS_IMETHODIMP nsWebBrowserFind::SetSearchString(const PRUnichar * aSearchString)
 {
     mSearchString.Assign(aSearchString);
 #ifdef XP_MACOSX
-#ifdef __LP64__
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+    ZRWriteFindPasteboard(mSearchString);
+#elif defined(__LP64__)
     PasteboardRef pasteboard = nsnull;
     if (PasteboardCreate(kPasteboardFind, &pasteboard) == noErr) {
         static char sFindPasteboardItem = 0;

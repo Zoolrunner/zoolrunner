@@ -1,0 +1,108 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<!-- Run as chrome with a disposable profile on the target OS. -->
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="ZoolRunner application platform test" width="640" height="380"
+        onload="startTest()">
+<script><![CDATA[
+var finished = false;
+function report(ok, detail) {
+  if (finished) return;
+  finished = true;
+  dump("APPLICATION " + (ok ? "PASS" : "FAIL") + ": " + detail + "\n");
+  try {
+    var file = Components.classes["@mozilla.org/file/local;1"]
+                         .createInstance(Components.interfaces.nsILocalFile);
+    file.initWithPath("/tmp/application-result.txt");
+    var stream = Components.classes["@mozilla.org/network/file-output-stream;1"]
+                           .createInstance(Components.interfaces.nsIFileOutputStream);
+    stream.init(file, 0x02 | 0x08 | 0x20, 0600, 0);
+    var text = (ok ? "PASS" : "FAIL") + "\n" + detail + "\n";
+    stream.write(text, text.length);
+    stream.close();
+  } catch (error) { dump("Cannot write application result: " + error + "\n"); }
+  Components.classes["@mozilla.org/toolkit/app-startup;1"]
+            .getService(Components.interfaces.nsIAppStartup)
+            .quit(Components.interfaces.nsIAppStartup.eForceQuit);
+}
+function requireValue(condition, message) {
+  if (!condition) throw new Error(message);
+}
+function startTest() {
+  setTimeout(function() { report(false, "Application test timed out"); }, 90000);
+  try {
+    var field = document.getElementById("entry");
+    field.value = "Historical XUL applications";
+    field.select();
+    requireValue(field.boxObject.width > 0 && field.selectionStart == 0 &&
+                 field.selectionEnd == field.value.length, "Textbox layout or selection failed");
+    var prefs = Components.classes["@mozilla.org/preferences-service;1"]
+                          .getService(Components.interfaces.nsIPrefBranch);
+    prefs.setCharPref("zoolrunner.test.preference", "preserved");
+    requireValue(prefs.getCharPref("zoolrunner.test.preference") == "preserved",
+                 "Preference round trip failed");
+    var application = prefs.getCharPref("zoolrunner.test.application");
+    var profile = Components.classes["@mozilla.org/file/directory_service;1"]
+                            .getService(Components.interfaces.nsIProperties)
+                            .get("ProfD", Components.interfaces.nsIFile);
+    var expectedProfile = Components.classes["@mozilla.org/file/local;1"]
+                                    .createInstance(Components.interfaces.nsILocalFile);
+    expectedProfile.initWithPath(prefs.getCharPref("zoolrunner.test.profile"));
+    requireValue(profile.equals(expectedProfile), "Incorrect test profile selected");
+    var urls = {suite: "chrome://navigator/content/navigator.xul",
+                browser: "chrome://browser/content/browser.xul",
+                calendar: "chrome://calendar/content/calendar.xul",
+                xulrunner: "chrome://simple/content/simple.xul"};
+    requireValue(!!urls[application], "Unknown application");
+    var app = window.openDialog(urls[application], "platform-application",
+                                "chrome,all,dialog=no,width=710,height=550", "about:blank");
+    app.addEventListener("load", function(event) {
+      if (event.target != app.document) return;
+      dump("APPLICATION: " + application + " chrome loaded\n");
+      setTimeout(function() {
+        try {
+          if (application == "suite" || application == "browser") {
+            var tabs = app.document.getElementById("content");
+            requireValue(tabs && tabs.boxObject.width > 0, "Browser layout failed");
+            var browser = tabs.selectedBrowser || tabs;
+            browser.addEventListener("load", function(pageEvent) {
+              if (pageEvent.target != browser.contentDocument) return;
+              try {
+                var element = browser.contentDocument.getElementById("layout-check");
+                requireValue(element && element.offsetWidth == 122 &&
+                             element.firstChild.nodeValue == "Original Mac OS X 10.0",
+                             "Local HTML navigation, DOM or CSS layout failed");
+                setTimeout(function() { report(true, application + " chrome and HTML navigation"); }, 10000);
+              } catch (error) { report(false, String(error)); }
+            }, true);
+            browser.loadURI("file:///tmp/work/early-page.html");
+          } else if (application == "calendar") {
+            var content = app.document.getElementById("calendar-content-box");
+            requireValue(content && content.boxObject.width > 0, "Calendar layout failed");
+            var entry = Components.classes["@mozilla.org/calendar/event;1"]
+                                  .createInstance(Components.interfaces.calIEvent);
+            entry.title = "Platform test";
+            requireValue(entry.title == "Platform test", "Calendar component failed");
+            report(true, "Calendar chrome and event component");
+          } else {
+            var textbox = app.document.getElementById("textbox");
+            requireValue(textbox && textbox.boxObject.width > 0, "Standalone XUL layout failed");
+            textbox.value = "2";
+            app.onButtonClick();
+            requireValue(textbox.value == "3", "Standalone JavaScript XPCOM component failed");
+            app.onButtonClick();
+            requireValue(textbox.value == "4", "Standalone C++ XPCOM component failed");
+            report(true, "Standalone XUL application, XPT, JavaScript and C++ components");
+          }
+        } catch (error) { report(false, String(error)); }
+      }, 10000);
+    }, false);
+  } catch (error) { report(false, String(error)); }
+}
+]]></script>
+<vbox flex="1" style="padding: 24px">
+  <label value="Original Mac OS X 10.0 / PowerPC" style="font-size: 20px"/>
+  <description>Checking XUL widgets, application chrome, preferences and components.</description>
+  <textbox id="entry"/>
+</vbox>
+</window>

@@ -81,8 +81,20 @@ ordinary `isalnum` and `isalpha` functions, so that declaration problem must be
 distinguished from genuinely unavailable OS functions. The inspected original
 library does not export `mbrtowc`, `wcslen` or `iswalpha`.
 
-These are unresolved standard-library integration issues. Do not reuse the
-Tiger feature configuration unchanged or silently disable application-facing
-wide-character support to obtain a successful build. The exploratory build
-remains outside the application profiles and does not affect the passing ABI
-runtime archive.
+`build/macosx/build-early-stdlib.sh` now builds an explicit early-Darwin
+configuration from the same source archive and compiler headers, using the
+same three arguments as the ABI builder. It supplies `libzoolcxx.dylib` and a
+private GCC support archive whose assertion helper uses the old printf ABI.
+It preserves C++ exceptions, RTTI and thread-safe initialization. A shared-library
+probe ran on original 10.0 and passed strings, vectors, input/output streams,
+character classification and exceptions crossing the library boundary. The
+checked-in builder subsequently passed a clean build against the reproducible
+Linux-prepared SDK, and its library passed that runtime probe too.
+
+This configuration explicitly omits GCC's wide-character stream interfaces,
+which depend on C-library facilities absent from the original OS. It is not a
+claim of complete C++ standard-library support. ZoolRunner's Unicode strings,
+JavaScript, DOM and application-facing text APIs do not use those interfaces
+and remain enabled. Do not reuse Tiger's feature configuration unchanged or
+silently remove application-facing Unicode support. Full application validation
+remains necessary.

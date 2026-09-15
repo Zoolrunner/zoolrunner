@@ -42,6 +42,9 @@
 #include <Resources.h>
 #include <TextUtils.h>
 #include <ControlDefinitions.h>
+#ifdef __APPLE__
+#include <AvailabilityMacros.h>
+#endif
 
 #include "nsCOMPtr.h"
 #include "nsNativeAppSupportBase.h"
@@ -123,6 +126,7 @@ NS_IMETHODIMP nsNativeAppSupportMac::Start(PRBool *_retval)
   }
   
 #if TARGET_CARBON
+#if !defined(MAC_OS_X_VERSION_MIN_REQUIRED) || MAC_OS_X_VERSION_MIN_REQUIRED > 1000
   // If we're running under Mac OS X check for at least Mac OS X 10.1
   // If that fails display a StandardAlert giving the user the option
   // to continue running the app or quitting
@@ -157,6 +161,8 @@ NS_IMETHODIMP nsNativeAppSupportMac::Start(PRBool *_retval)
       return PR_FALSE;
   }
   
+#endif /* Builds explicitly targeting 10.0 accept that OS at startup. */
+
   // We also check for CarbonLib version >= 1.4 if OS vers < 10.0
   // which is always cause for the app to quit
   if (response < 0x00001000)

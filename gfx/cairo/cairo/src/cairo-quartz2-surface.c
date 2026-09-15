@@ -56,6 +56,12 @@ typedef float CGFloat;
 #include "ATSUICompat.h"
 #include "QuartzCompat.h"
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020 || defined(CAIRO_TEST_EARLY_QUARTZ)
+/* Cheetah has bitmap contexts but no bitmap accessors, shading objects, or
+ * mutable CGPaths. Keep rendering in Cairo's image backend on these systems. */
+#include "cairo-quartz-early.c"
+#else
+
 #if MAC_OS_X_VERSION_MAX_ALLOWED < 1040
 static void
 _cairo_quartz_release_image_data (void *info, const void *data, size_t size)
@@ -1745,6 +1751,7 @@ cairo_quartzgl_surface_create_for_agl_context (AGLContext aglContext,
 
     return (cairo_surface_t *) surf;
 }
+
 #endif
 
 cairo_surface_t *
@@ -1856,3 +1863,5 @@ cairo_quartzgl_surface_create (cairo_format_t format,
 
     return (cairo_surface_t *) surf;
 }
+
+#endif /* early Quartz / native Quartz */

@@ -87,6 +87,10 @@ NS_IMETHODIMP nsBidiKeyboard::IsLangRTL(PRBool *aIsRTL)
     }
     ::CFRelease(inputSource);
   }
+#elif MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+  ScriptCode script = (ScriptCode)::GetScriptManagerVariable(smKeyScript);
+  *aIsRTL = ::GetScriptVariable(script, smScriptRight) != 0;
+  rv = NS_OK;
 #else
   OSStatus err;
   KeyboardLayoutRef currentKeyboard;

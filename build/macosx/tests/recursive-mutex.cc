@@ -32,6 +32,14 @@ static void* cancel_waiter(void*) {
  return 0;
 }
 int main() {
+ zr_recursive_mutex dynamic;
+ assert(zr_recursive_init(&dynamic)==0);
+ assert(zr_recursive_lock(&dynamic,0)==0);
+ assert(zr_recursive_lock(&dynamic,1)==0);
+ assert(zr_recursive_destroy(&dynamic)==EBUSY);
+ assert(zr_recursive_unlock(&dynamic)==0);
+ assert(zr_recursive_unlock(&dynamic)==0);
+ assert(zr_recursive_destroy(&dynamic)==0);
  pthread_t threads[8];
  for(int i=0;i<8;i++) assert(pthread_create(&threads[i],0,increment,0)==0);
  for(int i=0;i<8;i++) assert(pthread_join(threads[i],0)==0);
@@ -55,7 +63,6 @@ int main() {
  assert(pthread_join(threads[0],&result)==0 && result==PTHREAD_CANCELED);
  assert(zr_recursive_lock(&mutex,1)==0);
  assert(zr_recursive_unlock(&mutex)==0);
- assert(pthread_mutex_destroy(&mutex.gate)==0);
- assert(pthread_mutex_destroy(&mutex.state)==0);
+ assert(zr_recursive_destroy(&mutex)==0);
  puts("recursive mutex: contention, recursion, ownership, overflow and cancellation passed");
 }

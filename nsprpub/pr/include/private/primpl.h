@@ -1592,6 +1592,13 @@ struct PRThread {
     PRBool okToDelete;              /* ok to delete the PRThread struct? */
     PRCondVar *waiting;             /* where the thread is waiting | NULL */
     void *sp;                       /* recorded sp for garbage collection */
+#ifdef _PR_DARWIN_MACH_GC
+    struct {
+        ppc_thread_state_t integer;
+        ppc_float_state_t floating;
+    } gcMachRegisters;
+    jmp_buf gcCurrentRegisters;
+#endif
     PRThread *next, *prev;          /* simple linked list of all threads */
     PRUint32 suspend;               /* used to store suspend and resume flags */
 #ifdef PT_NO_SIGTIMEDWAIT

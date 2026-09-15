@@ -1,6 +1,9 @@
 #!/bin/sh
 # Apple GCC 4.0.1 defaults to Tiger libraries even with a Panther sysroot.
 set -eu
+if test "${ZR_PPC_DEPLOYMENT_TARGET:-10.3.9}" = 10.0; then
+  exec "$(dirname "$0")/early-gcc" "$@"
+fi
 : "${ZR_MACOS_SDK:?Set ZR_MACOS_SDK to MacOSX10.3.9.sdk}"
 zr_compiler=gcc
 if test "${ZR_PPC_CXX:-no}" = yes; then zr_compiler=g++; fi

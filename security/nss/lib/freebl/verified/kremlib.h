@@ -188,6 +188,12 @@ typedef const char *Prims_string;
 
 /* ... for OSX */
 #elif defined(__APPLE__)
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1020
+/* The 10.1 SDK predates libkern/OSByteOrder.h. Keep these operations inline
+ * and independent of OS exports, including unaligned 64-bit inputs. */
+#include "early-darwin-byteorder.h"
+#else
 #include <libkern/OSByteOrder.h>
 #define htole64(x) OSSwapHostToLittleInt64(x)
 #define le64toh(x) OSSwapLittleToHostInt64(x)
@@ -203,6 +209,7 @@ typedef const char *Prims_string;
 #define le32toh(x) OSSwapLittleToHostInt32(x)
 #define htobe32(x) OSSwapHostToBigInt32(x)
 #define be32toh(x) OSSwapBigToHostInt32(x)
+#endif
 
 /* ... for Solaris */
 #elif defined(__sun__)

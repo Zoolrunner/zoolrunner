@@ -44,15 +44,46 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <AvailabilityMacros.h>
+#include <sys/stat.h>
+
+#ifndef NSADDIMAGE_OPTION_MATCH_FILENAME_BY_INSTALLNAME
+#define NSADDIMAGE_OPTION_MATCH_FILENAME_BY_INSTALLNAME 0
+#endif
 
 static const mach_header* sXULLibImage;
+
+static const mach_header*
+LoadImage(const char *path)
+{
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+    if (!NSAddLibraryWithSearching(path))
+        return nsnull;
+    struct stat requested;
+    if (stat(path, &requested) == 0) {
+        unsigned long count = _dyld_image_count();
+        for (unsigned long i = 0; i < count; ++i) {
+            struct stat candidate;
+            if (stat(_dyld_get_image_name(i), &candidate) == 0 &&
+                candidate.st_dev == requested.st_dev &&
+                candidate.st_ino == requested.st_ino)
+                return _dyld_get_image_header(i);
+        }
+    }
+    // The library is loaded. LookupSymbol can use the global table when the
+    // original dyld found it through its search path rather than this pathname.
+    return nsnull;
+#else
+    return NSAddImage(path, NSADDIMAGE_OPTION_RETURN_ON_ERROR |
+                           NSADDIMAGE_OPTION_WITH_SEARCHING |
+                           NSADDIMAGE_OPTION_MATCH_FILENAME_BY_INSTALLNAME);
+#endif
+}
 
 static void
 ReadDependentCB(const char *aDependentLib)
 {
-    (void) NSAddImage(aDependentLib,
-                      NSADDIMAGE_OPTION_RETURN_ON_ERROR |
-                      NSADDIMAGE_OPTION_MATCH_FILENAME_BY_INSTALLNAME);
+    (void) LoadImage(aDependentLib);
 }
 
 static void*
@@ -66,9 +97,21 @@ LookupSymbol(const mach_header* aLib, const char* aSymbolName)
     // already being loaded).
     NSSymbol sym = nsnull;
     if (aLib) {
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+        unsigned long count = _dyld_image_count();
+        for (unsigned long i = 0; i < count; ++i) {
+            if (_dyld_get_image_header(i) == aLib) {
+                const char *hint = _dyld_get_image_name(i);
+                if (NSIsSymbolNameDefinedWithHint(aSymbolName, hint))
+                    sym = NSLookupAndBindSymbolWithHint(aSymbolName, hint);
+                break;
+            }
+        }
+#else
         sym = NSLookupSymbolInImage(aLib, aSymbolName,
                                  NSLOOKUPSYMBOLINIMAGE_OPTION_BIND |
                                  NSLOOKUPSYMBOLINIMAGE_OPTION_RETURN_ON_ERROR);
+#endif
     } else {
         if (NSIsSymbolNameDefined(aSymbolName))
             sym = NSLookupAndBindSymbol(aSymbolName);
@@ -95,17 +138,11 @@ XPCOMGlueLoad(const char *xpcomFile)
 
                 snprintf(lastSlash, PATH_MAX - strlen(xpcomDir), "/" XUL_DLL);
 
-                sXULLibImage = NSAddImage(xpcomDir,
-                              NSADDIMAGE_OPTION_RETURN_ON_ERROR |
-                              NSADDIMAGE_OPTION_WITH_SEARCHING |
-                              NSADDIMAGE_OPTION_MATCH_FILENAME_BY_INSTALLNAME);
+                sXULLibImage = LoadImage(xpcomDir);
             }
         }
 
-        lib = NSAddImage(xpcomFile,
-                         NSADDIMAGE_OPTION_RETURN_ON_ERROR |
-                         NSADDIMAGE_OPTION_WITH_SEARCHING |
-                         NSADDIMAGE_OPTION_MATCH_FILENAME_BY_INSTALLNAME);
+        lib = LoadImage(xpcomFile);
     }
 
     return (GetFrozenFunctionsFunc) LookupSymbol(lib, "_NS_GetFrozenFunctions");

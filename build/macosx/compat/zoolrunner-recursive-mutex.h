@@ -14,6 +14,32 @@ typedef struct {
 } zr_recursive_mutex;
 #define ZR_RECURSIVE_MUTEX_INITIALIZER \
     { PTHREAD_MUTEX_INITIALIZER, PTHREAD_MUTEX_INITIALIZER, 0, 0 }
+static inline int zr_recursive_init(zr_recursive_mutex *mutex)
+{
+    int result = pthread_mutex_init(&mutex->state, 0);
+    if (result) return result;
+    result = pthread_mutex_init(&mutex->gate, 0);
+    if (result) {
+        pthread_mutex_destroy(&mutex->state);
+        return result;
+    }
+    mutex->owner = 0;
+    mutex->depth = 0;
+    return 0;
+}
+static inline int zr_recursive_destroy(zr_recursive_mutex *mutex)
+{
+    int result = pthread_mutex_lock(&mutex->state);
+    if (result) return result;
+    if (mutex->depth) {
+        pthread_mutex_unlock(&mutex->state);
+        return EBUSY;
+    }
+    pthread_mutex_unlock(&mutex->state);
+    result = pthread_mutex_destroy(&mutex->gate);
+    if (result) return result;
+    return pthread_mutex_destroy(&mutex->state);
+}
 static inline int zr_recursive_lock(zr_recursive_mutex *mutex, int try_only)
 {
     int result = pthread_mutex_lock(&mutex->state);

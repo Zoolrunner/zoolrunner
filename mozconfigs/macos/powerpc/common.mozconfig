@@ -1,22 +1,44 @@
-# Experimental Panther target using the pinned 32-bit Linux Apple toolchain.
+# Experimental targets using the pinned 32-bit Linux Apple toolchain.
 ZR_TOPSRCDIR=`cd "${MOZCONFIG%/*}/../../.." && pwd`
-ZR_OBJDIR=${ZR_OBJDIR:-$ZR_TOPSRCDIR/obj-zoolrunner-macos-powerpc-$ZR_MACOS_APP}
+ZR_PPC_DEPLOYMENT_TARGET=${ZR_PPC_DEPLOYMENT_TARGET:-10.3.9}
+zr_target_suffix=
+if test "$ZR_PPC_DEPLOYMENT_TARGET" = 10.0; then zr_target_suffix=-10.0; fi
+ZR_OBJDIR=${ZR_OBJDIR:-$ZR_TOPSRCDIR/obj-zoolrunner-macos-powerpc$zr_target_suffix-$ZR_MACOS_APP}
 case "$ZR_OBJDIR" in
   /*) ;;
   *) echo "ZR_OBJDIR must be an absolute path" >&2; exit 1 ;;
 esac
-: "${ZR_MACOS_SDK:?Set ZR_MACOS_SDK to MacOSX10.3.9.sdk}"
+: "${ZR_MACOS_SDK:?Set ZR_MACOS_SDK to the target SDK or original-library overlay}"
 if test "`uname -s`" != Linux || test "`getconf LONG_BIT`" != 32; then
   echo "The experimental PowerPC profile requires a 32-bit Linux environment" >&2
   exit 1
 fi
-python3 - "$ZR_MACOS_SDK/SDKSettings.plist" <<'PY'
-import plistlib, sys
-with open(sys.argv[1], 'rb') as source:
-    if plistlib.load(source).get('Version') != '10.3.9':
-        raise SystemExit('PowerPC builds require SDK 10.3.9')
+python3 - "$ZR_MACOS_SDK" "$ZR_PPC_DEPLOYMENT_TARGET" <<'PY'
+import json, pathlib, plistlib, sys
+sdk = pathlib.Path(sys.argv[1])
+if sys.argv[2] == '10.0':
+    provenance = json.loads((sdk / 'PROVENANCE.json').read_text())
+    if provenance.get('cd_sha256') != 'e6fbc5c9ae633637777b5f2a9b9be3d8e3779cde02e2c7a2bec5dcc453951dc3':
+        raise SystemExit('10.0 requires the reproducible original-library overlay')
+elif sys.argv[2] == '10.3.9':
+    with (sdk / 'SDKSettings.plist').open('rb') as source:
+        if plistlib.load(source).get('Version') != '10.3.9':
+            raise SystemExit('Panther builds require SDK 10.3.9')
+else:
+    raise SystemExit('Unsupported PowerPC deployment target')
 PY
 if test "$?" != 0; then exit 1; fi
+if test "$ZR_PPC_DEPLOYMENT_TARGET" = 10.0; then
+  : "${ZR_EARLY_CXX_RUNTIME:?Build the early C++ standard library first}"
+  : "${ZR_PPC_EARLY_LINKER:?Build and activate the classic 10.0 linker first}"
+  if ! cmp -s "$ZR_PPC_EARLY_LINKER" /opt/mac/bin/powerpc-apple-darwin8-ld; then
+    echo "Activate the early linker in the disposable container before building" >&2
+    exit 1
+  fi
+  if test ! -f "$ZR_EARLY_CXX_RUNTIME/libzoolcxx.dylib"; then
+    echo "Missing early C++ runtime library" >&2; exit 1
+  fi
+fi
 mk_add_options MOZ_OBJDIR="$ZR_OBJDIR"
 mk_add_options MOZ_MAKE_FLAGS="-j${ZR_BUILD_JOBS:-2}"
 mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
@@ -40,11 +62,16 @@ LD_LIBRARY_PATH="$ZR_OBJDIR/build/unix/libIDL-prefix/lib"
 export CC CXX HOST_CC HOST_CXX AR RANLIB LD HOST_AR HOST_RANLIB CROSS_COMPILE
 export ac_cv_va_copy ac_cv_va_val_copy LIBIDL_CONFIG HOST_LIBIDL_CONFIG
 export PATH PKG_CONFIG_PATH LD_LIBRARY_PATH ZR_MACOS_SDK ZR_OBJDIR
-ac_add_options --target=powerpc-apple-darwin7
+export ZR_PPC_DEPLOYMENT_TARGET ZR_EARLY_CXX_RUNTIME ZR_PPC_EARLY_LINKER
+if test "$ZR_PPC_DEPLOYMENT_TARGET" = 10.0; then
+  ac_add_options --target=powerpc-apple-darwin1
+else
+  ac_add_options --target=powerpc-apple-darwin7
+fi
 ac_add_options --enable-application="$ZR_MACOS_APP"
 ac_add_options --enable-default-toolkit=cairo-cocoa
 ac_add_options --with-macos-sdk="$ZR_MACOS_SDK"
-ac_add_options --enable-macos-target=10.3.9
+ac_add_options --enable-macos-target="$ZR_PPC_DEPLOYMENT_TARGET"
 ac_add_options --enable-optimize=-O2
 ac_add_options --disable-debug
 ac_add_options --disable-tests

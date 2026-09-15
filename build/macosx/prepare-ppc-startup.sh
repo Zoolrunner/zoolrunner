@@ -30,6 +30,9 @@ printf '%s  %s\n' "$zr_checksum" \
   "$zr_work/csu.tar.gz" | sha256sum -c -
 tar -xzf "$zr_work/csu.tar.gz" -C "$zr_work" --strip-components=1
 cd "$zr_work"
+if test "$zr_target" = 10.0; then
+  patch -p0 < "$zr_script_dir/csu-10.0-optional-hooks.patch"
+fi
 for zr_source in start dyld; do
   "${zr_prefix}gcc" -isysroot "$ZR_MACOS_SDK" -mmacosx-version-min="$zr_target" \
     -mcpu=G3 -mno-altivec -dynamic -DCRT1 -x assembler-with-cpp \

@@ -30624,6 +30624,10 @@ SQLITE_PRIVATE sqlite3_mutex_methods const *sqlite3DefaultMutex(void){
 */
 #ifdef SQLITE_MUTEX_PTHREADS
 
+#ifdef SQLITE_ZOOLRUNNER_EARLY_DARWIN
+#include "sqlite3_early_mutex.h"
+#else
+
 #include <pthread.h>
 
 /*
@@ -30993,6 +30997,7 @@ SQLITE_PRIVATE sqlite3_mutex_methods const *sqlite3DefaultMutex(void){
   return &sMutex;
 }
 
+#endif /* !SQLITE_ZOOLRUNNER_EARLY_DARWIN */
 #endif /* SQLITE_MUTEX_PTHREADS */
 
 /************** End of mutex_unix.c ******************************************/
@@ -40271,7 +40276,7 @@ SQLITE_PRIVATE int sqlite3KvvfsInit(void){
 #endif
 
 /* Use pread() and pwrite() if they are available */
-#if defined(__APPLE__) || defined(__linux__)
+#if (defined(__APPLE__) && !defined(SQLITE_ZOOLRUNNER_EARLY_DARWIN)) || defined(__linux__)
 # define HAVE_PREAD 1
 # define HAVE_PWRITE 1
 #endif
@@ -44693,7 +44698,7 @@ static int unixDeviceCharacteristics(sqlite3_file *id){
 static int unixGetpagesize(void){
 #if OS_VXWORKS
   return 1024;
-#elif defined(_BSD_SOURCE)
+#elif defined(_BSD_SOURCE) || defined(SQLITE_ZOOLRUNNER_EARLY_DARWIN)
   return getpagesize();
 #else
   return (int)sysconf(_SC_PAGESIZE);

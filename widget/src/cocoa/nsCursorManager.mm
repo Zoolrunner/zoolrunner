@@ -190,6 +190,26 @@ static BOOL isPantherOrLater()
     case eCursor_no_drop:
 #if defined(__LP64__)
       return [nsMacCursor cursorWithCursor: [NSCursor operationNotAllowedCursor]];
+#elif MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    {
+      // Cheetah has no not-allowed theme cursor. Draw the conventional symbol
+      // with AppKit APIs available there, retaining an unambiguous drop cue.
+      NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(18,18)] autorelease];
+      [image lockFocus];
+      NSBezierPath *path = [NSBezierPath bezierPathWithOvalInRect:NSMakeRect(3,3,12,12)];
+      [path moveToPoint:NSMakePoint(5,5)];
+      [path lineToPoint:NSMakePoint(13,13)];
+      [[NSColor whiteColor] set];
+      [path setLineWidth:4];
+      [path stroke];
+      [[NSColor blackColor] set];
+      [path setLineWidth:2];
+      [path stroke];
+      [image unlockFocus];
+      NSCursor *cursor = [[[NSCursor alloc] initWithImage:image
+                                          hotSpot:NSMakePoint(9,9)] autorelease];
+      return [nsMacCursor cursorWithCursor:cursor];
+    }
 #else
       return [nsMacCursor cursorWithThemeCursor: kThemeNotAllowedCursor];
 #endif

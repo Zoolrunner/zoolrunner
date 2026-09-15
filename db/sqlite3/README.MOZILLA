@@ -2,6 +2,16 @@ This directory contains the main SQLite copy used by Mozilla storage
 (mozStorage).
 
 Current version: SQLite 3.53.4
+
+The experimental PowerPC Mac OS X 10.0 port retains thread safety through a
+small mutex-method adapter using ZoolRunner's two-mutex recursive helper.
+Its private configuration uses the existing seek/read/write fallback because
+pread/pwrite are absent, getpagesize() instead of the unavailable sysconf
+selector, and an explicit PowerPC memory barrier. These are target-specific
+compatibility changes; the SQLite version and application API are unchanged.
+The early-platform test covers recursive connection entry and concurrent
+inserts. Original-OS and host sanitizer validation are tracked in the PowerPC
+port documentation.
 Source: sqlite-amalgamation-3530400.zip from https://www.sqlite.org/
 SQLite source id:
 2026-07-24 19:02:57 bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc

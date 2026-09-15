@@ -104,8 +104,13 @@ ifeq ($(OS_ARCH),Darwin)
 EXTRA_DSO_LDOPTS += \
     $(TK_LIBS) \
     -framework Cocoa \
-    -framework AddressBook \
     $(NULL)
+# The system AddressBook framework first shipped with Jaguar. Its optional
+# OS X integration sources are disabled above this layer; local/LDAP address
+# books remain available on the original OS without that framework.
+ifeq (,$(filter 10.0 10.1,$(MACOSX_DEPLOYMENT_TARGET)))
+EXTRA_DSO_LDOPTS += -framework AddressBook
+endif
 endif
 
 include $(topsrcdir)/config/rules.mk

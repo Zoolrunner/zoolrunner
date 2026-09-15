@@ -644,10 +644,53 @@ For the 10.0 experiment, use the separately rebuilt classic linker and original
 10.0 Csu startup object described in `mozconfigs/macos/powerpc/10.0-status.md`.
 Keep original-library overlay provenance and distinguish host pixel tests,
 static import checks, successful links and actual target-OS execution.
+Use `build/macosx/legacy_tar.py` when writing early-Mac USTAR packages. Original
+10.0 tar corrupts paths whose name field contains 100 bytes without a NUL;
+ordinary USTAR output alone is insufficient. Preserve the archive boundary
+tests on both the host and original target.
+
+Keep Darwin's rune-table ABI independent of Mozilla's `-fshort-wchar` setting.
+The early SDK adaptation preserves 32-bit `rune_t`; target C++ probes check
+both ctype-first and stdlib-first include orders alongside 16-bit `wchar_t`.
+Both early headers declare `rune_t`, so correcting only `runetype.h` leaves
+application startup broken. Original Csu's optional runtime hooks
+must also avoid common-symbol collisions when Objective-C components load
+after process startup. Preserve the deferred-Cocoa/eager-binding regression.
+Check actual GUI screenshots as well as layout assertions. Early ATSUI glyph
+outlines must exclude CTM translation from their cached transform, and Cairo
+ARGB word extraction must preserve channel order on big-endian machines.
+Keep the translated-baseline and image-optimization round-trip probes.
+Cairo image frames and GIF composition use top-down rows even on platforms
+whose legacy native image backend uses bottom-up rows. Keep that distinction
+in `MOZ_PLATFORM_IMAGES_BOTTOM_TO_TOP` and test RGB and alpha row order.
+Preserve the requested executable during Cocoa relaunch. Early `NSBundle`
+lookup can identify a different program beside the invoked executable;
+exercise the production helper with relative, absolute and PATH-based launch
+arguments as well as the full application's first-run restart.
+Toolkit executables targeting 10.0 require `-bind_at_load`: original dyld's
+lazy startup path reproduces a bus error before their first window. Preserve
+the executable flag check in packaging and test ordinary launches without
+`DYLD_BIND_AT_LAUNCH` or diagnostic instrumentation.
+
 The early C++ ABI runtime probe passes on original 10.0 under emulation, but
 does not establish full libstdc++ or application compatibility. Retain the
 GCC unwind-registration bridge and thread-safe initialization when extending
 this port; see `mozconfigs/macos/powerpc/early-cxx-runtime.md` for its scope.
+The 10.0 profiles use `prepare-10.0-sdk.py` to combine checksum-pinned 10.1.5
+headers with original 4K78 libraries, and `build-early-stdlib.sh` for their
+private C++ runtime. Do not call this an original 10.0 SDK. The early runtime
+omits wide-character C++ streams, not application Unicode support. Keep the
+original-OS NSPR/SQLite probes and host Quartz pixel comparisons as regression
+checks. The PowerPC workflow is under development; validate all four matrix
+applications and actual OS execution before claiming it ready.
+The 4K78 installation CD omits installed-system AppleCSP, QuickTime and AGL.
+Use `build/macosx/tests/prepare-10.0-system-files.py` for disposable guest
+images. It extracts the original files from Essentials and removes that
+installer archive only from the disposable copy to make space. Preserve
+runtime-file provenance. The guest reports `/tmp` mounts as `/private/tmp`;
+derive scratch devices from the mounted transfer volume. A guest PASS requires
+the payload to complete, since an early zsh EXIT trap alone can misreport an
+explicit exit's status.
 The initial i386 10.8 build is an intermediate result, not the desired final
 minimum. Linux-hosted cross-toolchain workflows are acceptable. Validate
 startup objects, target SDK APIs, linked dependencies and target runtime

@@ -543,61 +543,92 @@ _cairo_atsui_font_init_glyph_metrics (cairo_atsui_font_t *font,
 #endif
 }
 
-static OSStatus 
-_move_to (const Float32Point *point,
-	  void *callback_data)
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+typedef struct {
+    cairo_path_fixed_t *path;
+    cairo_matrix_t scale;
+    OSStatus callback_error;
+} early_atsui_outline_t;
+#endif
+
+static cairo_path_fixed_t *
+_outline_path (void *closure)
 {
-    cairo_path_fixed_t *path = callback_data;
-
-    _cairo_path_fixed_close_path (path);
-    _cairo_path_fixed_move_to (path,
-			       _cairo_fixed_from_double(point->x),
-			       _cairo_fixed_from_double(point->y));
-
-    return noErr;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    return ((early_atsui_outline_t *) closure)->path;
+#else
+    return closure;
+#endif
 }
 
-static OSStatus 
-_line_to (const Float32Point *point,
-	  void *callback_data)
+static cairo_point_t
+_outline_point (const Float32Point *point, void *closure)
 {
-    cairo_path_fixed_t *path = callback_data;
+    double x = point->x, y = point->y;
+    cairo_point_t result;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    /* ATSUI outlines already use QuickDraw's downward-positive coordinates,
+     * as does Cairo. Transform the unhinted unit outline into device space. */
+    x /= 1000.0;
+    y /= 1000.0;
+    cairo_matrix_transform_point (&((early_atsui_outline_t *) closure)->scale,
+                                   &x, &y);
+#endif
+    result.x = _cairo_fixed_from_double (x);
+    result.y = _cairo_fixed_from_double (y);
+    return result;
+}
 
-    _cairo_path_fixed_line_to (path,
-			       _cairo_fixed_from_double(point->x),
-			       _cairo_fixed_from_double(point->y));
-    
+static OSStatus
+_outline_result (void *closure, cairo_status_t status)
+{
+    OSStatus result = status ? memFullErr : noErr;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    /* 10.0 ATSUI writes an indeterminate oCallbackResult even when every
+     * callback succeeds. Keep our own error, including allocation failures. */
+    early_atsui_outline_t *outline = closure;
+    if (result != noErr)
+        outline->callback_error = result;
+#endif
+    return result;
+}
+
+static OSStatus
+_move_to (const Float32Point *point, void *closure)
+{
+    cairo_point_t p = _outline_point (point, closure);
+    cairo_path_fixed_t *path = _outline_path (closure);
+    if (_cairo_path_fixed_close_path (path) ||
+        _cairo_path_fixed_move_to (path, p.x, p.y))
+        return _outline_result (closure, CAIRO_STATUS_NO_MEMORY);
     return noErr;
 }
 
 static OSStatus
-_curve_to (const Float32Point *point1,
-	   const Float32Point *point2,
-	   const Float32Point *point3,
-	   void *callback_data)
+_line_to (const Float32Point *point, void *closure)
 {
-    cairo_path_fixed_t *path = callback_data;
-
-    _cairo_path_fixed_curve_to (path,
-				_cairo_fixed_from_double(point1->x),
-				_cairo_fixed_from_double(point1->y),
-				_cairo_fixed_from_double(point2->x),
-				_cairo_fixed_from_double(point2->y),
-				_cairo_fixed_from_double(point3->x),
-				_cairo_fixed_from_double(point3->y));
-    
-    return noErr;
+    cairo_point_t p = _outline_point (point, closure);
+    return _outline_result (closure,
+        _cairo_path_fixed_line_to (_outline_path (closure), p.x, p.y));
 }
 
 static OSStatus
-_close_path (void *callback_data)
-
+_curve_to (const Float32Point *point1, const Float32Point *point2,
+           const Float32Point *point3, void *closure)
 {
-    cairo_path_fixed_t *path = callback_data;
+    cairo_point_t a = _outline_point (point1, closure);
+    cairo_point_t b = _outline_point (point2, closure);
+    cairo_point_t c = _outline_point (point3, closure);
+    return _outline_result (closure,
+        _cairo_path_fixed_curve_to (_outline_path (closure), a.x, a.y,
+                                   b.x, b.y, c.x, c.y));
+}
 
-    _cairo_path_fixed_close_path (path);
-
-    return noErr;
+static OSStatus
+_close_path (void *closure)
+{
+    return _outline_result (closure,
+        _cairo_path_fixed_close_path (_outline_path (closure)));
 }
 
 static cairo_status_t 
@@ -612,8 +643,13 @@ _cairo_atsui_scaled_font_init_glyph_path (cairo_atsui_font_t *scaled_font,
     static ATSCubicLineToUPP lineProc = NULL;
     static ATSCubicCurveToUPP curveProc = NULL;
     static ATSCubicClosePathUPP closePathProc = NULL;
-    OSStatus err;
+    OSStatus err, callback_error = noErr;
     cairo_path_fixed_t *path;
+    void *closure;
+    ATSUStyle outline_style = scaled_font->style;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    early_atsui_outline_t outline;
+#endif
 
     path = _cairo_path_fixed_create ();
     if (!path)
@@ -626,12 +662,53 @@ _cairo_atsui_scaled_font_init_glyph_path (cairo_atsui_font_t *scaled_font,
         closePathProc = NewATSCubicClosePathUPP(_close_path);
     }
 
-    err = ATSUGlyphGetCubicPaths(scaled_font->style,
+    closure = path;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    {
+        /* ATSUI Programming Guide, "Retrieving and Drawing Glyph Outlines":
+         * request large outlines and scale down to avoid one-point hinting.
+         * The earliest ATSUI does not reliably disable it with options=0. */
+        Fixed size = FloatToFixed(1000);
+        ATSUAttributeTag tag = kATSUSizeTag;
+        ByteCount bytes = sizeof(size);
+        ATSUAttributeValuePtr value = &size;
+        outline_style = NULL;
+        err = ATSUCreateAndCopyStyle(scaled_font->unscaled_style, &outline_style);
+        if (err == noErr)
+            err = ATSUSetAttributes(outline_style, 1, &tag, &bytes, &value);
+        if (err != noErr) {
+            if (outline_style)
+                ATSUDisposeStyle(outline_style);
+            _cairo_path_fixed_destroy(path);
+            return err == memFullErr ? CAIRO_STATUS_NO_MEMORY :
+                CAIRO_INT_STATUS_UNSUPPORTED;
+        }
+    }
+    outline.path = path;
+    outline.scale = scaled_font->base.scale;
+    /* Positioned glyphs already include the CTM translation. The font cache
+     * deliberately ignores it, so it must not enter the cached outline.
+     * Retain any translation explicitly supplied by the font matrix. */
+    outline.scale.x0 -= scaled_font->base.ctm.x0;
+    outline.scale.y0 -= scaled_font->base.ctm.y0;
+    outline.callback_error = noErr;
+    closure = &outline;
+#endif
+    err = ATSUGlyphGetCubicPaths(outline_style,
 				 _cairo_scaled_glyph_index (scaled_glyph),
 				 moveProc,
 				 lineProc,
 				 curveProc,
-				 closePathProc, (void *)path, &err);
+				 closePathProc, closure, &callback_error);
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    ATSUDisposeStyle(outline_style);
+    callback_error = outline.callback_error;
+#endif
+    if (err != noErr || callback_error != noErr) {
+        _cairo_path_fixed_destroy(path);
+        return callback_error == memFullErr ? CAIRO_STATUS_NO_MEMORY :
+            CAIRO_INT_STATUS_UNSUPPORTED;
+    }
 
     _cairo_scaled_glyph_set_path (scaled_glyph, &scaled_font->base, path);
 
@@ -679,7 +756,11 @@ _cairo_atsui_font_text_to_glyphs (void		*abstract_font,
     int n16;
     OSStatus err;
     ATSUTextLayout textLayout;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    ATSUGlyphInfoArray *info;
+#else
     ATSLayoutRecord *layoutRecords;
+#endif
     cairo_atsui_font_t *font = abstract_font;
     ItemCount glyphCount;
     int i;
@@ -696,6 +777,34 @@ _cairo_atsui_font_text_to_glyphs (void		*abstract_font,
     err = ATSUSetRunStyle(textLayout,
 			  font->style, kATSUFromTextBeginning, kATSUToTextEnd);
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    info = zr_ATSUCopyGlyphInfo(textLayout, n16);
+    if (!info) {
+        free(utf16);
+        ATSUDisposeTextLayout(textLayout);
+        return CAIRO_STATUS_NO_MEMORY;
+    }
+    glyphCount = info->numGlyphs;
+    *num_glyphs = 0;
+    *glyphs = malloc((glyphCount ? glyphCount : 1) * sizeof(cairo_glyph_t));
+    if (!*glyphs) {
+        free(info);
+        free(utf16);
+        ATSUDisposeTextLayout(textLayout);
+        return CAIRO_STATUS_NO_MEMORY;
+    }
+    for (i = 0; i < glyphCount; ++i) {
+        /* ATSUI uses 0xffff for deleted glyphs/end-of-line markers. */
+        if (info->glyphs[i].glyphID == 0xffff)
+            continue;
+        (*glyphs)[*num_glyphs].index = info->glyphs[i].glyphID;
+        (*glyphs)[*num_glyphs].x = x + info->glyphs[i].idealX;
+        (*glyphs)[*num_glyphs].y = y - info->glyphs[i].deltaY;
+        ++*num_glyphs;
+    }
+    free(info);
+    free(utf16);
+#else
     err = ATSUDirectGetLayoutDataArrayPtrFromTextLayout(textLayout,
 							0,
 							kATSUDirectDataLayoutRecordATSLayoutRecordCurrent,
@@ -720,6 +829,7 @@ _cairo_atsui_font_text_to_glyphs (void		*abstract_font,
     ATSUDirectReleaseLayoutDataArrayPtr(NULL, 
 					kATSUDirectDataLayoutRecordATSLayoutRecordCurrent,
 					(void *) &layoutRecords);
+#endif
     ATSUDisposeTextLayout(textLayout);
     
     return CAIRO_STATUS_SUCCESS;

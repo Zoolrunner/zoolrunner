@@ -38,6 +38,11 @@ def check(runtime, minimum, sdk, tree=None, arch="i386", tool_prefix=""):
         output = subprocess.check_output([tool_prefix + "otool", "-arch", arch, "-l", str(path)],
                                          text=True)
         record = {"file": str(path.relative_to(tree)), "dependencies": []}
+        if version(minimum) < version("10.1"):
+            header = subprocess.check_output(
+                [tool_prefix + "otool", "-arch", arch, "-hv", str(path)], text=True)
+            if "TWOLEVEL" in header.split():
+                raise RuntimeError("Two-level namespaces require 10.1: " + str(path))
         for block in re.split(r"Load command \d+\n", output)[1:]:
             command = re.search(r"\bcmd (\S+)", block).group(1)
             if command == "LC_VERSION_MIN_MACOSX":
@@ -54,12 +59,18 @@ def check(runtime, minimum, sdk, tree=None, arch="i386", tool_prefix=""):
                 raise RuntimeError("Compressed dyld information requires 10.6: " + str(path))
             if command not in ("LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB"):
                 continue
+            if command == "LC_LOAD_WEAK_DYLIB" and version(minimum) < version("10.2"):
+                raise RuntimeError("Weak library loading requires 10.2: " + str(path))
+            if command == "LC_REEXPORT_DYLIB" and version(minimum) < version("10.5"):
+                raise RuntimeError("Library reexports require 10.5: " + str(path))
             dependency = re.search(r"\bname (.*?) \(offset", block).group(1)
             if dependency.startswith(("/System/Library/", "/usr/lib/")):
                 resolved = sdk / dependency.lstrip("/")
             elif dependency.startswith("@executable_path/"):
                 resolved = runtime / dependency[len("@executable_path/"):]
             elif dependency.startswith("@loader_path/"):
+                if version(minimum) < version("10.4"):
+                    raise RuntimeError("@loader_path requires 10.4: " + str(path))
                 resolved = path.parent / dependency[len("@loader_path/"):]
             else:
                 raise RuntimeError("Nonportable dependency %s in %s" % (dependency, path))

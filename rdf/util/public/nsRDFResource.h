@@ -46,11 +46,22 @@
 #include "rdf.h"
 class nsIRDFService;
 
+#if defined(__APPLE__)
+#include <AvailabilityMacros.h>
+#endif
+
 /**
  * This simple base class implements nsIRDFResource, and can be used as a
  * superclass for more sophisticated resource implementations.
  */
+#if defined(__APPLE__) && MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+/* rdfutil_s is linked separately into several components. On original dyld's
+ * flat namespace, keep its implementation (including constructors, vtable
+ * and service cache) local to each library, like its NS_IMETHOD methods. */
+class NS_HIDDEN nsRDFResource : public nsIRDFResource {
+#else
 class nsRDFResource : public nsIRDFResource {
+#endif
 public:
 
     NS_DECL_ISUPPORTS

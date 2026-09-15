@@ -28,6 +28,7 @@ int main(void) {
         cairo_move_to(cr,8,32);cairo_line_to(cr,56,32);cairo_stroke(cr);
         cairo_pattern_destroy(pattern);
         assert(cairo_status(cr)==CAIRO_STATUS_SUCCESS);
+        cairo_surface_flush(surface);
         CGContextFlush(cg);
         assert(((pixels[32*64+12]>>16)&255) > (pixels[32*64+12]&255));
         assert((pixels[32*64+52]&255) > ((pixels[32*64+52]>>16)&255));

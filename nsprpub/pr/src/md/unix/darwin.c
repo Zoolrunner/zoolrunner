@@ -49,6 +49,14 @@ PRWord *_MD_HomeGCRegisters(PRThread *t, int isCurrent, int *np)
     }
     *np = sizeof(CONTEXT(t)) / sizeof(PRWord);
     return (PRWord *) CONTEXT(t);
+#elif defined(_PR_DARWIN_MACH_GC)
+    if (isCurrent) {
+        (void) setjmp(t->gcCurrentRegisters);
+        *np = sizeof(t->gcCurrentRegisters) / sizeof(PRWord);
+        return (PRWord *)t->gcCurrentRegisters;
+    }
+    *np = sizeof(t->gcMachRegisters) / sizeof(PRWord);
+    return (PRWord *)&t->gcMachRegisters;
 #else
 	*np = 0;
 	return NULL;
@@ -107,4 +115,3 @@ _MD_CREATE_THREAD(
 #endif /* ! _PR_PTHREADS */
 
 /* darwin.c */
-

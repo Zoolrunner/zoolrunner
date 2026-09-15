@@ -1,0 +1,38 @@
+#!/bin/sh
+# Use only original-OS startup and the private early C++/GCC support libraries.
+set -eu
+: "${ZR_MACOS_SDK:?Set ZR_MACOS_SDK to the prepared 10.0 library overlay}"
+: "${ZR_EARLY_CXX_RUNTIME:?Build the early C++ standard library first}"
+zr_compiler=gcc
+if test "${ZR_PPC_CXX:-no}" = yes; then zr_compiler=g++; fi
+zr_link=yes
+zr_kind=executable
+for zr_argument in "$@"; do
+  case "$zr_argument" in
+    -c|-E|-S|-M|-MM|-fsyntax-only|--version|-dump*|-print*) zr_link=no ;;
+    -dynamiclib) zr_kind=dylib ;;
+    -bundle) zr_kind=bundle ;;
+  esac
+done
+if test "$zr_compiler" = g++; then
+  set -- -nostdinc++ -I"$ZR_EARLY_CXX_RUNTIME/include" \
+    -I"$ZR_EARLY_CXX_RUNTIME/include/powerpc-apple-darwin8" "$@"
+fi
+if test "$zr_link" = yes; then
+  case "$zr_kind" in
+    executable) zr_start=/opt/mac/lib/zoolrunner-cheetah/crt1.o ;;
+    # GCC invokes Apple's libtool here; that tool inserts -ldylib1.o itself.
+    dylib) zr_start=-L/opt/mac/lib/zoolrunner-cheetah ;;
+    bundle) zr_start=/opt/mac/lib/zoolrunner-cheetah/bundle1.o ;;
+  esac
+  set -- -nostartfiles -nodefaultlibs "$zr_start" "$@" \
+    -Wl,-flat_namespace "-Wl,-syslibroot,$ZR_MACOS_SDK" \
+    -L/opt/mac/lib/zoolrunner-cheetah -L"$ZR_EARLY_CXX_RUNTIME" -lzoolcxx \
+    /opt/mac/lib/gcc/powerpc-apple-darwin8/4.0.1/libgcc_eh.a \
+    "$ZR_EARLY_CXX_RUNTIME/libgcc-10.0.a" -L"$ZR_MACOS_SDK/usr/lib" -lSystem
+fi
+exec "/opt/mac/bin/powerpc-apple-darwin8-$zr_compiler" \
+  -isystem /opt/mac/lib/gcc/powerpc-apple-darwin8/4.0.1/include \
+  -isysroot "$ZR_MACOS_SDK" -mmacosx-version-min=10.0 -mlong-double-64 \
+  -mcpu=G3 -mno-altivec -fno-constant-cfstrings \
+  -F"$ZR_MACOS_SDK/System/Library/PrivateFrameworks" "$@"

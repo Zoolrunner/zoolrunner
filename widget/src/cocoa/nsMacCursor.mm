@@ -363,7 +363,13 @@
 
 - (void) setFrame: (int) aFrameIndex
 {
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+  // Cursor updates and the NSTimer animation run on the UI event thread.
+  // performSelectorOnMainThread: was introduced in Jaguar.
+  [[mFrames objectAtIndex: aFrameIndex] set];
+#else
   [[mFrames objectAtIndex: aFrameIndex] performSelectorOnMainThread: @selector(set)  withObject: nil waitUntilDone: NO];
+#endif
 }
 
 - (int) numFrames

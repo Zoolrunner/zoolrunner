@@ -21,6 +21,14 @@
 #include "prprf.h"
 #include "prenv.h"
 
+#ifdef __APPLE__
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+#include "early-darwin-rng.h"
+#define ZR_EARLY_DARWIN_RNG 1
+#endif
+#endif
+
 size_t RNG_FileUpdate(const char *fileName, size_t limit);
 
 /*
@@ -870,6 +878,10 @@ RNG_SystemRNG(void *dest, size_t maxLen)
 
     file = fopen("/dev/urandom", "r");
     if (file == NULL) {
+#ifdef ZR_EARLY_DARWIN_RNG
+        if (errno == ENOENT)
+            return EarlyDarwinSystemRNG(dest, maxLen);
+#endif
         PORT_SetError(SEC_ERROR_NEED_RANDOM);
         return 0;
     }

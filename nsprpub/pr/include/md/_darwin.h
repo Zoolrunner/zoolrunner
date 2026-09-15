@@ -46,6 +46,16 @@
 #include <AvailabilityMacros.h>
 #endif
 
+#if defined(XP_MACOSX) && MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+#define _PR_DARWIN_10_0
+#if defined(__ppc__)
+#define _PR_DARWIN_MACH_GC
+#include <mach/mach.h>
+#include <mach/ppc/thread_status.h>
+#include <setjmp.h>
+#endif
+#endif
+
 #define PR_LINKER_ARCH	"darwin"
 #define _PR_SI_SYSNAME  "DARWIN"
 #ifdef __i386__
@@ -74,7 +84,12 @@
 #define _PR_HAVE_SOCKADDR_LEN  
 #define _PR_STAT_HAS_ST_ATIMESPEC
 #define _PR_HAVE_LARGE_OFF_T
+#if defined(XP_MACOSX) && MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+/* The early SDK exposes POSIX named semaphores but has no sys/sem.h. */
+#define _PR_HAVE_POSIX_SEMAPHORES
+#else
 #define _PR_HAVE_SYSV_SEMAPHORES
+#endif
 #define PR_HAVE_SYSV_NAMED_SHARED_MEMORY
 
 #define _PR_INET6
@@ -84,7 +99,9 @@
  * thread-safe.  AI_V4MAPPED|AI_ADDRCONFIG doesn't work either.
  */
 #define _PR_HAVE_GETHOSTBYNAME2
+#if !defined(_PR_DARWIN_10_0)
 #define _PR_HAVE_GETADDRINFO
+#endif
 /*
  * On Mac OS X 10.2, gethostbyaddr fails with h_errno=NO_RECOVERY
  * if you pass an IPv4-mapped IPv6 address to it.

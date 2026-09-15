@@ -12,6 +12,16 @@
  * Use SQLite's ordinary POSIX file locking on these systems. */
 #define SQLITE_ENABLE_LOCKING_STYLE 0
 #endif
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+#define SQLITE_ZOOLRUNNER_EARLY_DARWIN 1
+/* The early SDK has no nanosleep declaration; select the supported API. */
+#define HAVE_NANOSLEEP 0
+#define SQLITE_WITHOUT_ZONEMALLOC 1
+#define SQLITE_MEMORY_BARRIER __asm__ __volatile__("sync" ::: "memory")
+#ifndef INFINITY
+#define INFINITY HUGE_VAL
+#endif
+#endif
 #endif
 
 #if defined(_MSC_VER) && _MSC_VER < 1600

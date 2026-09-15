@@ -65,7 +65,9 @@ EXTRA_DSO_LDOPTS += -framework CoreText
 endif
 
 ifeq (,$(filter x86_64 aarch64,$(CPU_ARCH)))
+ifeq (,$(filter 10.0 10.1%,$(MACOSX_DEPLOYMENT_TARGET)))
 EXTRA_DSO_LDOPTS += -framework OpenGL -framework AGL
+endif
 endif
 endif
 

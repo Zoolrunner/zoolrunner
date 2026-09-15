@@ -47,6 +47,69 @@
 
 #include "cairo-atsui.h"
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+#include "prinit.h"
+#include "prlock.h"
+
+/* 10.0 has process-wide fallback lists. Serialize their temporary use and
+ * restore the previous list before returning to other platform clients. */
+class EarlyFontFallbackScope {
+public:
+    EarlyFontFallbackScope(gfxAtsuiFontGroup *group)
+        : mSaved(NULL), mCount(0), mLocked(PR_FALSE), mValid(PR_FALSE)
+    {
+        if (PR_CallOnce(&sOnce, InitLock) != PR_SUCCESS)
+            return;
+        PR_Lock(sLock);
+        mLocked = PR_TRUE;
+        ATSUGetFontFallbacks(0, NULL, &mMethod, &mCount);
+        if (mCount > ((size_t)-1) / sizeof(ATSUFontID))
+            return;
+        mSaved = (ATSUFontID *) PR_Malloc((mCount ? mCount : 1) * sizeof(ATSUFontID));
+        if (!mSaved)
+            return;
+        ItemCount capacity = mCount;
+        if (ATSUGetFontFallbacks(capacity, mSaved, &mMethod, &mCount) != noErr ||
+            mCount > capacity)
+            return;
+        gfxFontVector &fonts = group->GetFontList();
+        ATSUFontID *ids = (ATSUFontID *) PR_Malloc(fonts.size() * sizeof(ATSUFontID));
+        if (!ids)
+            return;
+        for (unsigned int i = 0; i < fonts.size(); ++i)
+            ids[i] = ((gfxAtsuiFont *) fonts[i])->GetATSUFontID();
+        mValid = ATSUSetFontFallbacks(fonts.size(), ids,
+                                      kATSUSequentialFallbacksPreferred) == noErr;
+        PR_Free(ids);
+    }
+    ~EarlyFontFallbackScope()
+    {
+        if (mValid)
+            ATSUSetFontFallbacks(mCount, mSaved, mMethod);
+        PR_Free(mSaved);
+        if (mLocked)
+            PR_Unlock(sLock);
+    }
+    PRBool IsValid() const { return mValid; }
+private:
+    static PRStatus PR_CALLBACK InitLock()
+    {
+        sLock = PR_NewLock();
+        return sLock ? PR_SUCCESS : PR_FAILURE;
+    }
+    static PRCallOnceType sOnce;
+    static PRLock *sLock;
+    ATSUFontID *mSaved;
+    ItemCount mCount;
+    ATSUFontFallbackMethod mMethod;
+    PRBool mLocked, mValid;
+    EarlyFontFallbackScope(const EarlyFontFallbackScope&);
+    void operator=(const EarlyFontFallbackScope&);
+};
+PRCallOnceType EarlyFontFallbackScope::sOnce = { 0, 0, PR_SUCCESS };
+PRLock *EarlyFontFallbackScope::sLock = NULL;
+#endif
+
 #if defined(__LP64__)
 static gfxFloat
 GetCharAdvance(CTFontRef aFont, UniChar aChar, gfxFloat aFallback)
@@ -195,7 +258,7 @@ gfxAtsuiFontGroup::gfxAtsuiFontGroup(const nsAString& families,
 {
     ForEachFont(FindATSUFont, this);
 
-#if !defined(__LP64__)
+#if !defined(__LP64__) && MAC_OS_X_VERSION_MIN_REQUIRED >= 1010
     // Create the fallback structure
     ATSUCreateFontFallbacks(&mFallbacks);
 
@@ -324,7 +387,8 @@ gfxAtsuiFontGroup::FindATSUFont(const nsAString& aName,
         }
     }
 #else
-    status = ATSUFindFontFromName(NS_ConvertUTF16toUTF8(aName).get(), aName.Length(),
+    NS_ConvertUTF16toUTF8 familyName(aName);
+    status = ATSUFindFontFromName(const_cast<char *>(familyName.get()), familyName.Length(),
                                   /* nsPromiseFlatString(aName).get(),
                                      aName.Length() * 2,*/
                                   kFontFamilyName,
@@ -346,7 +410,7 @@ gfxAtsuiFontGroup::FindATSUFont(const nsAString& aName,
 
 gfxAtsuiFontGroup::~gfxAtsuiFontGroup()
 {
-#if !defined(__LP64__)
+#if !defined(__LP64__) && MAC_OS_X_VERSION_MIN_REQUIRED >= 1010
     ATSUDisposeFontFallbacks(mFallbacks);
 #endif
 }
@@ -465,6 +529,7 @@ gfxAtsuiTextRun::gfxAtsuiTextRun(const nsAString& aString, gfxAtsuiFontGroup *aG
          &mATSULayout);
 
     // Set up our font fallbacks
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1010
     ATSUAttributeTag lineTags[] = { kATSULineFontFallbacksTag };
     ByteCount lineArgSizes[] = { sizeof(ATSUFontFallbacks) };
     ATSUAttributeValuePtr lineArgs[] = { mGroup->GetATSUFontFallbacks() };
@@ -477,6 +542,7 @@ gfxAtsuiTextRun::gfxAtsuiTextRun(const nsAString& aString, gfxAtsuiFontGroup *aG
     if (status != noErr)
         fprintf(stderr, "ATSUSetLineControls gave error: %d\n", (int) status);
 
+#endif
     ATSUSetTransientFontMatching(mATSULayout, true);
 #endif
 }
@@ -555,6 +621,40 @@ gfxAtsuiTextRun::DrawString(gfxContext *aContext, gfxPoint pt)
     cairo_set_font_face(cr, ((gfxAtsuiFont*)(mGroup->GetFontList()[0]))->CairoFontFace());
     cairo_set_font_size(cr, mGroup->GetStyle()->size);
 
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+    EarlyFontFallbackScope fallback(mGroup);
+    if (!fallback.IsValid())
+        return;
+#endif
+    ATSUGlyphInfoArray *info = zr_ATSUCopyGlyphInfo(mATSULayout, mString.Length());
+    if (!info)
+        return;
+    ATSUFontID previousFont = kATSUInvalidFontID;
+    for (ItemCount i = 0; i < info->numGlyphs; ++i) {
+        ATSUGlyphInfo &g = info->glyphs[i];
+        if (g.glyphID == 0xffff)
+            continue;
+        ATSUFontID actualFont;
+        ByteCount actualSize;
+        if (ATSUGetAttribute(g.style, kATSUFontTag, sizeof(actualFont),
+                             &actualFont, &actualSize) != noErr)
+            continue;
+        if (actualFont != previousFont) {
+            cairo_font_face_t *face =
+                cairo_atsui_font_face_create_for_atsu_font_id(actualFont);
+            cairo_set_font_face(cr, face);
+            cairo_font_face_destroy(face);
+            previousFont = actualFont;
+        }
+        cairo_glyph_t glyph;
+        glyph.index = g.glyphID;
+        glyph.x = pt.x + g.idealX;
+        glyph.y = pt.y - g.deltaY;
+        cairo_show_glyphs(cr, &glyph, 1);
+    }
+    free(info);
+#else
     ItemCount cnt;
     ATSLayoutRecord *layoutRecords = nsnull;
     OSStatus status = ATSUDirectGetLayoutDataArrayPtrFromTextLayout
@@ -595,6 +695,7 @@ gfxAtsuiTextRun::DrawString(gfxContext *aContext, gfxPoint pt)
 
     PR_Free(cglyphs);
 #endif
+#endif
 }
 
 gfxFloat
@@ -605,6 +706,11 @@ gfxAtsuiTextRun::MeasureString(gfxContext *aContext)
         return 0.0;
     return CTLineGetTypographicBounds(mCTLine, NULL, NULL, NULL);
 #else
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+    EarlyFontFallbackScope fallback(mGroup);
+    if (!fallback.IsValid())
+        return 0.0;
+#endif
     OSStatus status;
     ATSTrapezoid trap;
     ItemCount numBounds;
@@ -618,8 +724,8 @@ gfxAtsuiTextRun::MeasureString(gfxContext *aContext)
                                 1,
                                 &trap,
                                 &numBounds);
-    if (status != noErr)
-        fprintf(stderr, "ATSUGetGlyphBounds returned error %d!\n", (int) status);
+    if (status != noErr || !numBounds)
+        return 0.0;
 
     float f = FixedToFloat(PR_MAX(trap.upperRight.x, trap.lowerRight.x)) - FixedToFloat(PR_MIN(trap.upperLeft.x, trap.lowerLeft.x));
 

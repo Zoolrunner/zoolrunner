@@ -1154,6 +1154,11 @@ static void init_pthread_gc_support(void)
 {
     PRIntn rv;
 
+#ifdef _PR_DARWIN_MACH_GC
+    /* 10.0 has Mach thread control but no pthread_kill. */
+    return;
+#endif
+
 #if defined(_PR_DCETHREADS)
 	rv = sigemptyset(&javagc_vtalarm_sigmask);
     PR_ASSERT(0 == rv);
@@ -1370,6 +1375,26 @@ static void pt_SuspendSet(PRThread *thred)
 {
     PRIntn rv;
 
+#ifdef _PR_DARWIN_MACH_GC
+    thread_t native = pthread_mach_thread_np(thred->id);
+    mach_msg_type_number_t count = PPC_THREAD_STATE_COUNT;
+    if (thread_suspend(native) != KERN_SUCCESS ||
+        thread_get_state(native, PPC_THREAD_STATE,
+                         (thread_state_t)&thred->gcMachRegisters.integer,
+                         &count) != KERN_SUCCESS)
+        PR_Abort();
+    count = PPC_FLOAT_STATE_COUNT;
+    if (thread_get_state(native, PPC_FLOAT_STATE,
+                         (thread_state_t)&thred->gcMachRegisters.floating,
+                         &count) != KERN_SUCCESS)
+        PR_Abort();
+    /* Include the PowerPC Darwin ABI red zone below the current stack pointer.
+     * PR_ScanStackPointers also scans the register snapshot through the MD hook. */
+    thred->sp = (char *)(PRUword)thred->gcMachRegisters.integer.r1 - 224;
+    thred->suspend |= PT_THREAD_SUSPENDED;
+    return;
+#else
+
     PR_LOG(_pr_gc_lm, PR_LOG_ALWAYS, 
 	   ("pt_SuspendSet thred %p thread id = %X\n", thred, thred->id));
 
@@ -1389,6 +1414,7 @@ static void pt_SuspendSet(PRThread *thred)
     rv = pthread_kill (thred->id, SIGUSR2);
 #endif
     PR_ASSERT(0 == rv);
+#endif
 }
 
 static void pt_SuspendTest(PRThread *thred)
@@ -1425,6 +1451,13 @@ static void pt_SuspendTest(PRThread *thred)
 
 static void pt_ResumeSet(PRThread *thred)
 {
+#ifdef _PR_DARWIN_MACH_GC
+    if (thread_resume(pthread_mach_thread_np(thred->id)) != KERN_SUCCESS)
+        PR_Abort();
+    thred->suspend &= ~PT_THREAD_SUSPENDED;
+    thred->suspend |= PT_THREAD_RESUMED;
+    return;
+#else
     PR_LOG(_pr_gc_lm, PR_LOG_ALWAYS, 
 	   ("pt_ResumeSet thred %p thread id = %X\n", thred, thred->id));
 
@@ -1446,6 +1479,7 @@ static void pt_ResumeSet(PRThread *thred)
 #endif
 #endif
 
+#endif /* _PR_DARWIN_MACH_GC */
 }  /* pt_ResumeSet */
 
 static void pt_ResumeTest(PRThread *thred)

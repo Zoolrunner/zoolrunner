@@ -151,8 +151,13 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(PRUnichar*  aTitle,
                  kPMDocumentFormatPDF, contextTypes, NULL);
     ::CFRelease(contextTypes);
     if (status == noErr)
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+      status = ::PMSessionBeginDocument(mPrintSession, mPrintSettings,
+                                         mPageFormat);
+#else
       status = ::PMSessionBeginDocumentNoDialog(mPrintSession, mPrintSettings,
                                                  mPageFormat);
+#endif
 #endif
 #else
     status = ::PMSessionBeginDocument(mPrintSession, mPrintSettings, mPageFormat);
@@ -165,7 +170,7 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginDocument(PRUnichar*  aTitle,
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndDocument()
 {
-#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1020 && (defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX))
     OSStatus status = ::PMSessionEndDocumentNoDialog(mPrintSession);
 #else
     OSStatus status = ::PMSessionEndDocument(mPrintSession);
@@ -181,7 +186,7 @@ NS_IMETHODIMP nsDeviceContextSpecX::AbortDocument()
 
 NS_IMETHODIMP nsDeviceContextSpecX::BeginPage()
 {
-#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1020 && (defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX))
     OSStatus status = ::PMSessionBeginPageNoDialog(mPrintSession, mPageFormat, NULL);
 #else
     OSStatus status = ::PMSessionBeginPage(mPrintSession, mPageFormat, NULL);
@@ -201,7 +206,7 @@ NS_IMETHODIMP nsDeviceContextSpecX::BeginPage()
 
 NS_IMETHODIMP nsDeviceContextSpecX::EndPage()
 {
-#if defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX)
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1020 && (defined(__LP64__) || defined(MOZ_ENABLE_CAIRO_GFX))
     OSStatus status = ::PMSessionEndPageNoDialog(mPrintSession);
 #else
     OSStatus status = ::PMSessionEndPage(mPrintSession);

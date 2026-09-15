@@ -43,6 +43,19 @@
 #include "nsCRT.h"
 
 #import <Cocoa/Cocoa.h>
+#include <AvailabilityMacros.h>
+
+// Objective-C language exceptions require the 10.3 runtime. Preserve Cocoa's
+// exception handling on earlier releases with its original setjmp API.
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1030
+#define ZR_SPELL_TRY NS_DURING
+#define ZR_SPELL_CATCH NS_HANDLER
+#define ZR_SPELL_END NS_ENDHANDLER
+#else
+#define ZR_SPELL_TRY @try {
+#define ZR_SPELL_CATCH } @catch (id exception) {
+#define ZR_SPELL_END }
+#endif
 
 // utility category we need for PRUnichar<->NSString conversion (taken from Camino)
 @interface NSString(PRUnicharUtils)
@@ -96,16 +109,15 @@ NS_IMETHODIMP mozOSXSpell::GetLanguage(PRUnichar **aLanguage)
   NS_ENSURE_ARG_POINTER(aLanguage);
 
   if (!mLanguage.Length()) {
-    @try {
+    ZR_SPELL_TRY
       NSString* lang = [[NSSpellChecker sharedSpellChecker] language];
       *aLanguage = [lang createNewUnicodeBuffer];
-    }
-    @catch (id exception) {
+    ZR_SPELL_CATCH
       // If we get here, the spelling system on the user's machine is almost
       // certainly damaged; do what the rest of the OS does, and silently
       // ignore it.
       *aLanguage = NULL;
-    }
+    ZR_SPELL_END
     mLanguage.Assign(*aLanguage);
   }
   else
@@ -216,16 +228,15 @@ NS_IMETHODIMP mozOSXSpell::Check(const PRUnichar *aWord, PRBool *aResult)
 
   NSString* wordStr = [NSString stringWithPRUnichars:aWord];
   NSRange misspelledRange;
-  @try {
+  ZR_SPELL_TRY
     misspelledRange = [[NSSpellChecker sharedSpellChecker] checkSpellingOfString:wordStr startingAt:0];
-  }
-  @catch (id exception) {
+  ZR_SPELL_CATCH
     // Silently return true; if something is seriously wrong with the
     // spelling system on a user's machine, the best thing to do is
     // to just treat everything as correct.
     *aResult = PR_TRUE;
     return NS_OK;
-  }
+  ZR_SPELL_END
   if (misspelledRange.location != NSNotFound && mPersonalDictionary)
     mPersonalDictionary->Check(aWord, mLanguage.get(), aResult);
   else

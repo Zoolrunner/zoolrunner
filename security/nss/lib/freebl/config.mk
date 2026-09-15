@@ -95,6 +95,9 @@ CFLAGS += -std=gnu99
 endif
 
 ifeq ($(OS_ARCH), Darwin)
+ifneq (,$(filter 10.0 10.0.% 10.1 10.1.%,$(MACOSX_DEPLOYMENT_TARGET)))
+EXTRA_SHARED_LIBS += -framework Security
+endif
 CFLAGS += -std=gnu99
 EXTRA_SHARED_LIBS += -dylib_file @executable_path/libplc4.dylib:$(DIST)/lib/libplc4.dylib -dylib_file @executable_path/libplds4.dylib:$(DIST)/lib/libplds4.dylib
 endif

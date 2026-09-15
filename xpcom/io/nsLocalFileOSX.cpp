@@ -59,6 +59,7 @@
 
 // Mac Includes
 #include <Carbon/Carbon.h>
+#include "CoreFoundationCompat.h"
 
 // Unix Includes
 #include <unistd.h>

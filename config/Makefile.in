@@ -102,12 +102,25 @@ HEADERS = \
 	$(NULL)
 
 export:: $(TARGETS) $(HEADERS)
+
 	$(INSTALL) $(IFLAGS1) $(HEADERS) $(DIST)/include
 	-rm -f $(FINAL_LINK_COMPS) $(FINAL_LINK_LIBS) $(FINAL_LINK_COMP_NAMES)
 	-rm -f $(DIST)/bin/chrome/chromelist.txt
 	$(NSINSTALL) -t $(IFLAGS1) $(HEADERS) $(DIST)/sdk/include
 ifdef HOST_PROGRAM
 	$(INSTALL) $(HOST_PROGRAM) $(DIST)/bin
+endif
+
+
+ifeq ($(OS_ARCH),Darwin)
+ifeq ($(MACOSX_DEPLOYMENT_TARGET),10.0)
+ifndef ZR_EARLY_CXX_RUNTIME
+$(error ZR_EARLY_CXX_RUNTIME is required for the early Darwin application build)
+endif
+export::
+	$(INSTALL) -m 755 $(ZR_EARLY_CXX_RUNTIME)/libzoolcxx.dylib $(DIST)/bin
+	$(INSTALL) -m 644 $(ZR_EARLY_CXX_RUNTIME)/COPYING.GCC $(DIST)/bin
+endif
 endif
 
 
@@ -192,5 +205,3 @@ ifdef MKDEPEND_DIR
 clean clobber realclean clobber_all::
 	cd $(MKDEPEND_DIR); $(MAKE) $@
 endif
-
-

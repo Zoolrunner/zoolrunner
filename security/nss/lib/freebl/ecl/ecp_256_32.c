@@ -1273,6 +1273,9 @@ scalar_mult(felem nx, felem ny, felem nz,
  */
 #ifdef IS_BIG_ENDIAN
 #ifdef __APPLE__
+#include <AvailabilityMacros.h>
+#endif
+#if defined(__APPLE__) && MAC_OS_X_VERSION_MAX_ALLOWED >= 1020
 #include <libkern/OSByteOrder.h>
 #define BYTESWAP32(x) OSSwapInt32(x)
 #define BYTESWAP64(x) OSSwapInt64(x)

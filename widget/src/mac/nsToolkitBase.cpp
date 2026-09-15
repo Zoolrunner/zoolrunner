@@ -129,8 +129,8 @@ int nsToolkitBase::QuartzChangedCallback(const char* pref, void* data)
 //
 void nsToolkitBase::SetupQuartzRendering()
 {
-#if defined(__APPLE__) && defined(__LP64__)
-  // QuickDraw text flags do not exist in the 64-bit Cocoa environment.
+#if defined(__APPLE__) && (defined(__LP64__) || MAC_OS_X_VERSION_MIN_REQUIRED < 1020)
+  // QuickDraw's Quartz text switch was added in 10.2 and is absent on LP64.
   return;
 #else
   // from Apple's technote at http://developer.apple.com/qa/qa2001/qa1193.html

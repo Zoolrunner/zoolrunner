@@ -62,3 +62,18 @@ invocation. The helper also preserves an application stub's deliberate
 substitution of `argv[0]`; bundle lookup remains the fallback for an unavailable
 argument. The corrected relative-path regression passes on original Mac OS X
 10.0; native arm64 passes all three invocation forms.
+
+The complete Toolkit GUI test also catches an original-dyld startup bus error.
+The clean Browser fails with lazy binding and passes with `MH_BINDATLOAD` set
+on its executable, without tracing or environment overrides. Target-10.0
+Toolkit programs therefore link with `-bind_at_load`; packaging checks the
+main executable's flag. Keep the profile/first-run restart and GUI tests after
+the smaller relaunch probe, since successful child creation alone misses this
+later initialization failure.
+
+Calendar's historical command-line handler opens its own window and ignores
+`-chrome`. Its test payload adds `early-calendar-commandline.js` as a temporary
+XPCOM component, registered ahead of that handler. `-zoolrunner-test` opens the
+test controller, which then opens and checks the real Calendar window. This
+component is included only in the disposable test payload, not application
+archives. It also exercises classic JavaScript component/category registration.

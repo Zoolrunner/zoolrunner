@@ -2,6 +2,11 @@ These directories contain the browser plugins to enable Java 1.4.x support on
 Mac OS X from a non-Cocoa app. The project has a MPL-compatible license and the
 source is hosted on SourceForge.
 
+ZoolRunner's Mac OS X 10.0 target does not package these prebuilt plugins:
+their PowerPC binaries use two-level Mach-O namespaces, unavailable in 10.0,
+and depend on the later Java runtime. The platform's OJI/NPAPI interfaces and
+the bundled plugins for other applicable targets remain available.
+
 For more information on the Java Embedding Plugin project, visit:
   
   http://javaplugin.sourceforget.net/

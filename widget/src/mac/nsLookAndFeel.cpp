@@ -50,10 +50,14 @@ extern UInt32 GetCaretTime(void);
 }
 #endif
 
-#if MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_3
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1030
 // This theme brush is available in 10.2 and later, but was not
 // formally documented in the SDK until 10.3.
 #define kThemeBrushAlternatePrimaryHighlightColor -5
+#endif
+
+#if defined(MOZ_WIDGET_COCOA) && MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+extern nsresult ZRGetEarlySelectionColor(PRInt32 selection, nscolor *color);
 #endif
  
 //-------------------------------------------------------------------------
@@ -131,7 +135,11 @@ nsresult nsLookAndFeel::NativeGetColor(const nsColorID aID, nscolor &aColor)
     case eColor__moz_menuhover:
         // XXX can probably just always use GetMacBrushColor here
 #ifdef MOZ_WIDGET_COCOA
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+        res = ZRGetEarlySelectionColor(0, &aColor);
+#else
         res = GetMacBrushColor(kThemeBrushPrimaryHighlightColor, aColor, NS_RGB(0x00,0x00,0x00));
+#endif
 #else
         RGBColor macColor;
         CGrafPtr thePort;
@@ -351,15 +359,23 @@ nsresult nsLookAndFeel::NativeGetColor(const nsColorID aID, nscolor &aColor)
         res = GetMacBrushColor(kThemeBrushButtonActiveDarkShadow, aColor, NS_RGB(0x77,0x77,0x77));
         break;
     case eColor__moz_mac_alternateprimaryhighlight:
+#if defined(MOZ_WIDGET_COCOA) && MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+        res = ZRGetEarlySelectionColor(1, &aColor);
+#else
         // For proper styling of lists when active, on 10.2+
         // On older OSs may have to fall back to primary highlight color
         nscolor fallbackColor;
         GetMacBrushColor(kThemeBrushPrimaryHighlightColor, fallbackColor, NS_RGB(0x00,0x00,0x00));
         res = GetMacBrushColor(kThemeBrushAlternatePrimaryHighlightColor, aColor, fallbackColor);
+#endif
         break;
     case eColor__moz_mac_secondaryhighlight:
+#if defined(MOZ_WIDGET_COCOA) && MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+        res = ZRGetEarlySelectionColor(2, &aColor);
+#else
     	// For inactive list selection
         res = GetMacBrushColor(kThemeBrushSecondaryHighlightColor, aColor, NS_RGB(0x00,0x00,0x00));
+#endif
         break;
     default:
         NS_WARNING("Someone asked nsILookAndFeel for a color I don't know about");

@@ -357,8 +357,30 @@ intermediate milestone toward the required PowerPC minimum of Mac OS X 10.0.
 Foundation/C++, shared-library template coalescing and C++ ABI runtime probes
 now execute successfully on original 10.0 under PowerPC emulation. The runtime
 probe covers allocation, RTTI, exception unwinding and threaded initialization.
-Full 10.0 application builds, application runtime validation and a PowerPC CI
-job remain outstanding.
+The shared C++ library, NSPR threading/loading/semaphore probe, and SQLite
+concurrency tests also pass on original 10.0. A Linux workflow now exists in
+[macos-powerpc.yml](.github/workflows/macos-powerpc.yml). All four applications
+compile and package on Linux, with ABI and deployment audits passing. Suite
+passes the full local `act` workflow, including original-OS GUI navigation and
+both artifact uploads. The other three matrix jobs remain in progress. The early
+Quartz software path passes pixel comparisons on both the host and original
+10.0, and original-OS ATSUI text placement now passes as well. The Linux guest
+runner also completes automated C++ runtime checks. NSS initialization,
+cryptographic known answers, authenticated-decryption rejection, and SQL database
+creation now pass on original 10.0, as does a Cocoa window/event-loop probe.
+All four packaged application GUI tests pass on original 10.0. Toolkit
+launchers bind imports at load to avoid the original-dyld startup bus error;
+Browser navigation, Calendar's event component and standalone XULRunner
+JavaScript/C++ components pass. Packaging also accounts for an
+original-tar bug that corrupts exactly full 100-byte archive filename fields;
+both host and target tests cover that boundary.
+All four complete packages now pass the original-OS platform probes and 167
+targeted JavaScript checks. The early SDK preserves Darwin's 32-bit locale-table
+ABI alongside Mozilla's 16-bit `wchar_t`, and corrected startup hooks allow
+Cocoa components to load after process startup under eager binding.
+Cairo image-frame row order and ARGB readback now have passing component tests
+on native arm64 and original-10.0 PowerPC; Suite screenshot checks also verify
+toolbar orientation and translated text placement.
 See the [10.0 progress and constraints](mozconfigs/macos/powerpc/10.0-status.md).
 
 ## XULRunner Application Compatibility

@@ -97,6 +97,7 @@ extern "C" int statvfs(const char *, struct statvfs *);
 #endif
 
 #ifdef XP_MACOSX
+#include "CoreFoundationCompat.h"
 static void  CopyUTF8toUTF16NFC(const nsACString& aSrc, nsAString& aResult);
 #endif
 

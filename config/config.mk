@@ -668,6 +668,14 @@ endif
 endif
 
 ifeq ($(OS_ARCH),Darwin)
+ifeq ($(MACOSX_DEPLOYMENT_TARGET),10.0)
+ifdef MOZ_XUL_APP
+# Original dyld's lazy startup path crashes Toolkit applications before their
+# first window. Bind executable imports at load, before Cocoa components start.
+# BIN_FLAGS affects target programs, not host tools or component bundles.
+BIN_FLAGS += -Wl,-bind_at_load
+endif
+endif
 ifdef USE_PREBINDING
 export LD_PREBIND=1
 export LD_SEG_ADDR_TABLE=$(shell cd $(topsrcdir); pwd)/config/prebind-address-table

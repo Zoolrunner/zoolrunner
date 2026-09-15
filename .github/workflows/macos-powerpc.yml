@@ -1,0 +1,89 @@
+name: macOS 10.0 PowerPC applications
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-powerpc-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.app }} / PowerPC G3 / Mac OS X 10.0
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [suite, browser, calendar, xulrunner]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check original-tar archive headers
+        run: python3 build/macosx/tests/test-legacy-tar.py
+      - name: Build Linux cross compiler environment
+        run: |
+          docker build --platform linux/386 -f build/macosx/powerpc.Dockerfile \
+            -t zoolrunner-powerpc-toolchain build/macosx
+      - name: Build original-OS libraries and application
+        env:
+          ZR_APP: ${{ matrix.app }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/zoolrunner-powerpc"
+          docker run --rm --platform linux/386 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-powerpc,target=/work" \
+            -e ZR_BUILD_JOBS=3 zoolrunner-powerpc-toolchain \
+            sh /source/build/macosx/build-10.0-ci.sh "$ZR_APP" /work/build
+      - name: Build native Linux PowerPC emulator environment
+        run: |
+          docker build -f build/macosx/powerpc-runtime.Dockerfile \
+            -t zoolrunner-powerpc-runtime build/macosx
+      - name: Prepare original installed-OS services
+        run: |
+          docker run --rm \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-powerpc,target=/work" \
+            zoolrunner-powerpc-runtime python3 /source/build/macosx/tests/run-10.0-guest.py \
+            --cd /work/build/runtime-cd.img \
+            --payload /work/build/runtime-system-files.tar.gz \
+            --work /work/build/system-preparation \
+            --prepare-system /work/build/runtime-system.img --scratch-mb 64
+      - name: Test packaged runtime on original Mac OS X 10.0
+        run: |
+          docker run --rm \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-powerpc,target=/work" \
+            zoolrunner-powerpc-runtime python3 /source/build/macosx/tests/run-10.0-guest.py \
+            --cd /work/build/runtime-system.img \
+            --payload /work/build/runtime-tests.tar.gz \
+            --work /work/build/runtime-results --graphical
+      - name: Upload application
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zoolrunner-macos-powerpc-${{ matrix.app }}-10.0
+          path: ${{ runner.temp }}/zoolrunner-powerpc/build/artifacts/*.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: logs-macos-powerpc-${{ matrix.app }}-10.0
+          path: |
+            ${{ runner.temp }}/zoolrunner-powerpc/build/logs
+            ${{ runner.temp }}/zoolrunner-powerpc/build/obj-${{ matrix.app }}/config.log
+            ${{ runner.temp }}/zoolrunner-powerpc/build/system-preparation/*.log
+            ${{ runner.temp }}/zoolrunner-powerpc/build/system-preparation/*.txt
+            ${{ runner.temp }}/zoolrunner-powerpc/build/runtime-results/*.log
+            ${{ runner.temp }}/zoolrunner-powerpc/build/runtime-results/*.txt
+            ${{ runner.temp }}/zoolrunner-powerpc/build/runtime-results/*.ppm
+          if-no-files-found: warn
+          retention-days: 7

@@ -5,6 +5,91 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <Carbon/Carbon.h>
 
+#ifndef FloatToFixed
+#define FloatToFixed(value) X2Fix(value)
+#define FixedToFloat(value) ((float) Fix2X(value))
+#endif
+#ifndef FloatToFract
+#define FloatToFract(value) X2Frac(value)
+#endif
+
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1020
+/* The older SDK used these names for the same wildcard values. */
+#define kFontNoPlatformCode ((FontPlatformCode) kFontNoPlatform)
+#define kFontNoScriptCode ((FontScriptCode) kFontNoScript)
+#define kFontNoLanguageCode ((FontLanguageCode) kFontNoLanguage)
+#endif
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+#include <stdlib.h>
+#include <stddef.h>
+/* ATSUGetGlyphInfo is the original 10.0 shaped-glyph API. Unlike ATSUDirect,
+ * it returns a caller-owned array with positions and the actual fallback
+ * style for every glyph. Check the returned size before consuming it. */
+static ATSUGlyphInfoArray *
+zr_ATSUCopyGlyphInfo(ATSUTextLayout layout, UniCharCount length)
+{
+    ByteCount bytes = 0, capacity;
+    ATSUGlyphInfoArray *info;
+    OSStatus status = ATSUGetGlyphInfo(layout, 0, length, &bytes, NULL);
+    if (bytes < offsetof(ATSUGlyphInfoArray, glyphs))
+        return NULL;
+    capacity = bytes;
+    info = (ATSUGlyphInfoArray *) malloc(capacity);
+    if (!info)
+        return NULL;
+    status = ATSUGetGlyphInfo(layout, 0, length, &bytes, info);
+    if (status != noErr || bytes > capacity ||
+        info->numGlyphs > (capacity - offsetof(ATSUGlyphInfoArray, glyphs)) /
+                          sizeof(ATSUGlyphInfo)) {
+        free(info);
+        return NULL;
+    }
+    return info;
+}
+#endif
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1010
+/* The direct FMFont-to-ATSFontRef conversion was added in 10.1. Resolve the
+ * font's PostScript name using the two public APIs present in 10.0. */
+static ATSFontRef
+zr_ATSFontFromATSUFont(ATSUFontID font)
+{
+    ByteCount length = 0, capacity;
+    ItemCount index;
+    char *name;
+    CFStringRef string;
+    ATSFontRef result;
+    OSStatus status;
+    status = ATSUFindFontName(font, kFontPostscriptName,
+                              kFontMacintoshPlatform, kFontRomanScript,
+                              kFontNoLanguageCode, 0, NULL, &length, &index);
+    if (!length)
+        return 0;
+    capacity = length;
+    name = (char *) malloc(capacity);
+    if (!name)
+        return 0;
+    status = ATSUFindFontName(font, kFontPostscriptName,
+                              kFontMacintoshPlatform, kFontRomanScript,
+                              kFontNoLanguageCode, capacity, name, &length, &index);
+    if (status != noErr || length > capacity) {
+        free(name);
+        return 0;
+    }
+    string = CFStringCreateWithBytes(kCFAllocatorDefault,
+                                     (const UInt8 *) name, length,
+                                     kCFStringEncodingMacRoman, false);
+    free(name);
+    if (!string)
+        return 0;
+    result = ATSFontFindFromPostScriptName(string, kATSOptionFlagsDefault);
+    CFRelease(string);
+    return result;
+}
+#define FMGetATSFontRefFromFont zr_ATSFontFromATSUFont
+#endif
+
 #if defined(__LP64__)
 #ifdef __cplusplus
 extern "C" {

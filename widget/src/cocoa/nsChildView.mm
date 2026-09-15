@@ -88,7 +88,7 @@ static NS_DEFINE_CID(kRegionCID, NS_REGION_CID);
 // category of NSView methods to quiet warnings
 @interface NSView(ChildViewExtensions)
 
-#if MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_3
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1030
 - (void)getRectsBeingDrawn:(const NSRect **)rects count:(int *)count;
 - (BOOL)needsToDrawRect:(NSRect)aRect;
 - (BOOL)wantsDefaultClipping;
@@ -97,7 +97,7 @@ static NS_DEFINE_CID(kRegionCID, NS_REGION_CID);
 @end
 
 // This mask is only defined on 10.4 and up.
-#if MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_4
+#if MAC_OS_X_VERSION_MAX_ALLOWED < 1040
 enum {
   NSDeviceIndependentModifierFlagsMask	= 0xffff0000U
 };
@@ -2647,7 +2647,12 @@ NSEvent *gCocoaLastDragEvent = nil;
 #else
   NSInteger count, i;
 #endif
-  [self getRectsBeingDrawn:&rects count:&count];
+  if ([self respondsToSelector:@selector(getRectsBeingDrawn:count:)]) {
+    [self getRectsBeingDrawn:&rects count:&count];
+  } else {
+    rects = &aRect;
+    count = 1;
+  }
   if (count < MAX_RECTS_IN_REGION) {
     for (i = 0; i < count; ++i) {
       region->Union((PRInt32)rects[i].origin.x,
@@ -2670,7 +2675,8 @@ NSEvent *gCocoaLastDragEvent = nil;
   for (unsigned int subviewIndex = 0;
        subviewIndex < subviewCount; ++subviewIndex) {
     NSView* view = [subviews objectAtIndex:subviewIndex];
-    if (![view isKindOfClass:[ChildView class]] || [view isHidden])
+    if (![view isKindOfClass:[ChildView class]] ||
+        ([view respondsToSelector:@selector(isHidden)] && [view isHidden]))
       continue;
     NSRect frame = [view frame];
     region->Subtract((PRInt32)frame.origin.x, (PRInt32)frame.origin.y,
@@ -2681,12 +2687,25 @@ NSEvent *gCocoaLastDragEvent = nil;
   region->GetRects(&regionRects);
   if (!regionRects)
     return;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+  // The early Quartz bridge presents a software canvas. Keep the native
+  // presentation clipped to the same damage region, including child holes.
+  CGContextSaveGState(cgContext);
+  CGContextBeginPath(cgContext);
+#endif
   for (PRUint32 rectIndex = 0;
        rectIndex < regionRects->mNumRects; ++rectIndex) {
     const nsRegionRect& rect = regionRects->mRects[rectIndex];
     targetContext->Rectangle(gfxRect(rect.x, rect.y,
                                      rect.width, rect.height));
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+    CGContextAddRect(cgContext, CGRectMake(rect.x, rect.y,
+                                          rect.width, rect.height));
+#endif
   }
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+  CGContextClip(cgContext);
+#endif
   region->FreeRects(regionRects);
   targetContext->Clip();
 
@@ -2701,6 +2720,10 @@ NSEvent *gCocoaLastDragEvent = nil;
   mGeckoChild->DispatchWindowEvent(paintEvent);
   paintEvent.renderingContext = nsnull;
   paintEvent.region = nsnull;
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+  targetSurface->Flush();
+  CGContextRestoreGState(cgContext);
+#endif
 #else
   // tell gecko to paint.
   // If < 10.3, just paint the rect
@@ -3077,9 +3100,9 @@ NSEvent *gCocoaLastDragEvent = nil;
   // and ceil is better than truncating the fraction, especially when
   // |delta| < 1.
   if (scrollDelta < 0)
-    geckoEvent.delta = (PRInt32)floorf(scrollDelta);
+    geckoEvent.delta = (PRInt32)floor(scrollDelta);
   else
-    geckoEvent.delta = (PRInt32)ceilf(scrollDelta);
+    geckoEvent.delta = (PRInt32)ceil(scrollDelta);
 
   mGeckoChild->DispatchWindowEvent(geckoEvent);
 

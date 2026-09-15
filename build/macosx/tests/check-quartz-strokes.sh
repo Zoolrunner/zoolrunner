@@ -13,7 +13,8 @@ zr_src=`CDPATH= cd -- "$zr_tests/../../.." && pwd`
 zr_work=`mktemp -d`
 trap 'rm -rf "$zr_work"' 0
 trap 'exit 1' HUP INT TERM
-for zr_mode in native panther-fallback; do
+for zr_mode in native panther-fallback cheetah-software; do
+  zr_extra=
   cp "$zr_src/gfx/cairo/cairo/src/cairo-quartz2-surface.c" "$zr_work/source.c"
   if test "$zr_mode" = panther-fallback; then
     python3 - "$zr_work/source.c" <<'PY'
@@ -27,7 +28,11 @@ if source.count(guard) != 1:
 path.write_text(source.replace(guard, '#if 0 /* Exercise pre-Tiger stroke fallback */'))
 PY
   fi
+  if test "$zr_mode" = cheetah-software; then
+    zr_extra=-DCAIRO_TEST_EARLY_QUARTZ
+  fi
   xcrun clang -std=gnu89 -fPIC -isysroot "$zr_sdk" \
+    $zr_extra \
     -I"$zr_src/config/macos" -I"$zr_src/gfx/cairo/cairo/src" \
     -I"$zr_obj/gfx/cairo/cairo/src" -I"$zr_obj/dist/include" \
     -I"$zr_obj/dist/include/png" -I"$zr_obj/dist/include/zlib" \
@@ -43,4 +48,14 @@ PY
     -o "$zr_work/check-strokes"
   echo "Checking $zr_mode"
   "$zr_work/check-strokes"
+  if test "$zr_mode" = cheetah-software; then
+    xcrun clang -isysroot "$zr_sdk" -I"$zr_src/gfx/cairo/cairo/src" \
+      -I"$zr_src/config/macos" \
+      -I"$zr_obj/gfx/cairo/cairo/src" -I"$zr_obj/dist/include/cairo" \
+      "$zr_tests/quartz-early.c" "$zr_work/libmozcairo.a" \
+      "$zr_obj/gfx/cairo/libpixman/src/libmozlibpixman.a" \
+      -framework ApplicationServices -framework Carbon -framework Cocoa \
+      -o "$zr_work/check-early"
+    "$zr_work/check-early"
+  fi
 done

@@ -1,5 +1,26 @@
 # Network Security Services
 
+ZoolRunner's original Mac OS X 10.0 port retains this NSS implementation and
+its private SQLite 3.7.15 copy. Early SDK builds use portable byte swaps where
+`libkern/OSByteOrder.h` is absent. The private SQLite uses the same checked
+recursive mutex-method adapter as the platform SQLite, disables the newer
+zone allocator and uses ordinary POSIX file locking instead of Darwin's later
+locking-style APIs. SQL loadable extensions are omitted for this private
+database on the early target, which lacks `dlopen`; NSPR/XPCOM native module
+loading is unaffected. These are portability changes, not a consolidation or
+upgrade of NSS's private database. The private SQLite passes recursive connection locking, 800
+concurrent inserts and integrity checks on original 10.0 build 4K78 for both
+memory and disk databases.
+
+On 10.0/10.1 targets, NSS uses the original AppleCSP CSSM random-generation
+API when `/dev/urandom` is absent. Each call releases its CSSM registrations
+and returns failure if the OS provider fails. On original 10.0 build 4K78,
+Linux QEMU tests pass NSS initialization, SHA-256 and ChaCha20-Poly1305 known
+answers, authenticated-decryption tamper rejection, shutdown/reinitialization,
+and private SQL database creation. The boot CD omits AppleCSP; the test harness
+obtains the unchanged provider from that same CD's Essentials installation
+package. These bounded tests are not a security audit or FIPS certification.
+
 Network Security Services (NSS) is a set of libraries designed to support
 cross-platform development of security-enabled client and server
 applications. NSS supports SSL v3-TLS 1.2 (experimental TLS 1.3), PKCS #5, PKCS#7,

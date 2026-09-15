@@ -78,6 +78,24 @@
 #include "config.h"
 #endif
 
+#if defined(__APPLE__)
+#include <AvailabilityMacros.h>
+#if MAC_OS_X_VERSION_MIN_REQUIRED < 1020
+/* Original Darwin has neither recursive pthread attributes nor pread/pwrite.
+** Retain serialized access using the shared ZoolRunner mutex-method adapter.
+** Select from the compiler target, not the build host's uname release. */
+#define SQLITE_ZR_EARLY_MUTEX 1
+#ifndef SQLITE_WITHOUT_ZONEMALLOC
+#define SQLITE_WITHOUT_ZONEMALLOC 1
+#endif
+#define SQLITE_ENABLE_LOCKING_STYLE 0
+/* This private certificate/key database does not use SQL loadable modules;
+** the original OS has no dlopen interface. Application XPCOM loading remains
+** supported through NSPR's dyld implementation. */
+#define SQLITE_OMIT_LOAD_EXTENSION 1
+#endif
+#endif
+
 /************** Include sqliteLimit.h in the middle of sqliteInt.h ***********/
 /************** Begin file sqliteLimit.h *************************************/
 /*
@@ -9731,7 +9749,9 @@ SQLITE_PRIVATE int sqlite3OsCloseFree(sqlite3_file *);
 # define SQLITE_MUTEX_OMIT
 #endif
 #if SQLITE_THREADSAFE && !defined(SQLITE_MUTEX_NOOP)
-#  if SQLITE_OS_UNIX
+#  if defined(SQLITE_ZR_EARLY_MUTEX)
+     /* sqlite3DefaultMutex is supplied by the early Darwin adapter below. */
+#  elif SQLITE_OS_UNIX
 #    define SQLITE_MUTEX_PTHREADS
 #  elif SQLITE_OS_WIN
 #    define SQLITE_MUTEX_W32
@@ -17873,6 +17893,9 @@ SQLITE_PRIVATE sqlite3_mutex_methods const *sqlite3DefaultMutex(void){
 #endif /* !defined(SQLITE_MUTEX_OMIT) */
 
 /************** End of mutex_noop.c ******************************************/
+#ifdef SQLITE_ZR_EARLY_MUTEX
+#include "../../../../db/sqlite3/src/sqlite3_early_mutex.h"
+#endif
 /************** Begin file mutex_unix.c **************************************/
 /*
 ** 2007 August 28

@@ -83,6 +83,10 @@
 #include <dl.h>
 #elif defined(USE_MACH_DYLD)
 #include <mach-o/dyld.h>
+#ifdef _PR_DARWIN_10_0
+#include <mach-o/fat.h>
+#include <limits.h>
+#endif
 #endif
 #endif /* XP_UNIX */
 
@@ -185,6 +189,9 @@ struct PRLibrary {
     Ptr                         main;
     CFMutableDictionaryRef      wrappers;
     const struct mach_header*   image;
+#ifdef _PR_DARWIN_10_0
+    PRBool                     legacyDyldLibrary;
+#endif
 #endif
 
 #ifdef XP_UNIX
@@ -773,9 +780,55 @@ pr_LoadViaDyld(const char *name, PRLibrary *lm)
 {
     lm->dlh = pr_LoadMachDyldModule(name);
     if (lm->dlh == NULL) {
+#ifdef _PR_DARWIN_10_0
+        /* NSAddLibrary has no RETURN_ON_ERROR option in original dyld. In
+         * particular, passing a bundle whose NSLinkModule just failed turns
+         * a recoverable missing dependency into a fatal "bad filetype" error.
+         * Only use the library API for a native Mach-O dylib. Bundles and
+         * malformed/foreign images must retain the failed-load result. */
+        {
+            struct mach_header header;
+            FILE *file = fopen(name, "rb");
+            PRBool isDylib = PR_FALSE;
+            if (file) {
+                if (fread(&header, sizeof(header), 1, file) == 1) {
+                    if (header.magic == FAT_MAGIC) {
+                        struct fat_header fat;
+                        struct fat_arch arch;
+                        unsigned long i;
+                        rewind(file);
+                        if (fread(&fat, sizeof(fat), 1, file) == 1) {
+                            /* Fat headers are big-endian, like this target. */
+                            for (i = 0; i < fat.nfat_arch; ++i) {
+                                if (fread(&arch, sizeof(arch), 1, file) != 1)
+                                    break;
+                                if (arch.cputype == CPU_TYPE_POWERPC &&
+                                    arch.offset <= LONG_MAX &&
+                                    arch.size >= sizeof(header)) {
+                                    if (fseek(file, arch.offset, SEEK_SET) != 0 ||
+                                        fread(&header, sizeof(header), 1, file) != 1)
+                                        memset(&header, 0, sizeof(header));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    isDylib = header.magic == MH_MAGIC &&
+                              header.cputype == CPU_TYPE_POWERPC &&
+                              header.filetype == MH_DYLIB;
+                }
+                fclose(file);
+            }
+            if (!isDylib)
+                return PR_FAILURE;
+        }
+        lm->legacyDyldLibrary = NSAddLibraryWithSearching(name) ? PR_TRUE : PR_FALSE;
+        if (!lm->legacyDyldLibrary) {
+#else
         lm->image = NSAddImage(name, NSADDIMAGE_OPTION_RETURN_ON_ERROR
                                | NSADDIMAGE_OPTION_WITH_SEARCHING);
         if (lm->image == NULL) {
+#endif
             NSLinkEditErrors linkEditError;
             int errorNum;
             const char *errorString;
@@ -786,7 +839,11 @@ pr_LoadViaDyld(const char *name, PRLibrary *lm)
                     linkEditError, errorNum, fileName, errorString));
         }
     }
+#ifdef _PR_DARWIN_10_0
+    return (lm->dlh != NULL || lm->legacyDyldLibrary) ? PR_SUCCESS : PR_FAILURE;
+#else
     return (lm->dlh != NULL || lm->image != NULL) ? PR_SUCCESS : PR_FAILURE;
+#endif
 }
 
 #endif /* XP_MACOSX && USE_MACH_DYLD */
@@ -943,6 +1000,31 @@ pr_LoadLibraryByPathname(const char *name, PRIntn flags)
     for (i = 0; i < sizeof(loadProcs) / sizeof(loadProcs[0]); i++) {
         if ((status = loadProcs[i](name, lm)) == PR_SUCCESS)
             break;
+#ifdef _PR_DARWIN_10_0
+        if (i == 0) {
+            PRUint32 magic;
+            PRBool nativeImage = PR_FALSE;
+            FILE *file = fopen(name, "rb");
+            if (file) {
+                if (fread(&magic, sizeof(magic), 1, file) == 1)
+                    nativeImage = magic == MH_MAGIC || magic == MH_CIGAM ||
+                                  magic == FAT_MAGIC || magic == FAT_CIGAM;
+                fclose(file);
+            }
+            if (nativeImage) {
+                NSLinkEditErrors errorClass;
+                int errorNumber;
+                const char *fileName, *errorString;
+                /* Original dyld can report a missing bundle dependency, but
+                 * retrying the same native image through CFM can crash. Keep
+                 * CFM fallback for genuine CFM files and bundle directories. */
+                NSLinkEditError(&errorClass, &errorNumber, &fileName, &errorString);
+                oserr = errorNumber;
+                PR_DELETE(lm);
+                goto unlock;
+            }
+        }
+#endif
     }
     if (status != PR_SUCCESS) {
         oserr = cfragNoLibraryErr;
@@ -1429,6 +1511,16 @@ pr_FindSymbolInLib(PRLibrary *lm, const char *name)
         
         if (f == NULL && strcmp(name + SYM_OFFSET, "main") == 0) f = lm->main;
     }
+#ifdef _PR_DARWIN_10_0
+    if (lm->legacyDyldLibrary) {
+        NSSymbol symbol = NULL;
+        /* Original dyld supplies library-hinted lookup, before the image API.
+         * Check first so an absent symbol cannot terminate the application. */
+        if (NSIsSymbolNameDefinedWithHint(name, lm->name))
+            symbol = NSLookupAndBindSymbolWithHint(name, lm->name);
+        f = symbol ? NSAddressOfSymbol(symbol) : NULL;
+    }
+#else
     if (lm->image) {
         NSSymbol symbol;
         symbol = NSLookupSymbolInImage(lm->image, name,
@@ -1439,6 +1531,7 @@ pr_FindSymbolInLib(PRLibrary *lm, const char *name)
         else
             f = NULL;
     }
+#endif
 #undef SYM_OFFSET
 #endif /* XP_MACOSX && USE_MACH_DYLD */
 

@@ -1,0 +1,60 @@
+--- crt.c
++++ crt.c
+@@ -105,12 +105,26 @@
+  */
+ int (*mach_init_routine)(void);
+ int (*_cthread_init_routine)(void);
++#ifdef CRT1
++#include <mach-o/dyld.h>
++/* An allocated common placeholder conflicts with the real entry point when
++ * an Objective-C/Carbon component is loaded after main, especially with
++ * DYLD_BIND_AT_LAUNCH. Resolve optional hooks without exporting placeholders. */
++static void *
++zr_startup_hook(const char *name)
++{
++    if (NSIsSymbolNameDefined(name))
++        return NSAddressOfSymbol(NSLookupAndBindSymbol(name));
++    return 0;
++}
++#else
+ asm(".comm __objcInit, 4");
+ asm(".comm __cplus_init, 4");
+ asm(".comm __carbon_init, 4");
+ extern void _objcInit(void);
+ extern void _cplus_init(void);
+ extern void _carbon_init(int argc, char **argv);
++#endif
+ 
+ #define CARBON	1
+ 
+@@ -203,13 +217,30 @@
+ #endif
+ 
+ #ifndef	POSTSCRIPT
++#ifdef CRT1
++        {
++            void (*hook)(void) = (void (*)(void))zr_startup_hook("__objcInit");
++            if (hook != 0)
++                hook();
++        }
++#else
+         if(*((int *)_objcInit) != 0)
+             _objcInit();
+ #endif
++#endif
+ 
+ #ifdef CARBON
++#ifdef CRT1
++        {
++            void (*hook)(int, char **) =
++                (void (*)(int, char **))zr_startup_hook("__carbon_init");
++            if (hook != 0)
++                hook(argc, argv);
++        }
++#else
+         if(*((int *)_carbon_init) != 0)
+             _carbon_init(argc, argv);
++#endif
+ #endif
+ 
+ #ifdef GCRT
