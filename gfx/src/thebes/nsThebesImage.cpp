@@ -563,17 +563,12 @@ static PRUint8 Unpremultiply(PRUint8 aVal, PRUint8 aAlpha) {
 }
 
 static void ARGBToThreeChannel(PRUint32* aARGB, PRUint8* aData) {
-#ifdef IS_LITTLE_ENDIAN
+    // Cairo stores native-endian words with alpha in bits 24..31 on every
+    // architecture. Word shifts do not depend on the byte order in memory.
     PRUint8 a = (PRUint8)(*aARGB >> 24);
     PRUint8 r = (PRUint8)(*aARGB >> 16);
     PRUint8 g = (PRUint8)(*aARGB >> 8);
     PRUint8 b = (PRUint8)(*aARGB >> 0);
-#else
-    PRUint8 a = (PRUint8)(*aARGB >> 0);
-    PRUint8 r = (PRUint8)(*aARGB >> 8);
-    PRUint8 g = (PRUint8)(*aARGB >> 16);
-    PRUint8 b = (PRUint8)(*aARGB >> 24);
-#endif
 
     if (a != 0xFF) {
         if (a == 0) {

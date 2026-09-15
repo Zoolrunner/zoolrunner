@@ -70,8 +70,10 @@ typedef enum {
 #define  nsImageUpdateFlags_kColorMapChanged 0x1
 #define  nsImageUpdateFlags_kBitsChanged     0x2
 
-// The following platforms store image data rows bottom-up.
-#if defined(XP_WIN) || defined(XP_OS2) || defined(XP_MACOSX)
+// Native platform images use bottom-up rows; Cairo images use top-down rows
+// on every host, including the Thebes implementation.
+#if !defined(MOZ_ENABLE_CAIRO_GFX) && \
+    (defined(XP_WIN) || defined(XP_OS2) || defined(XP_MACOSX))
 #define MOZ_PLATFORM_IMAGES_BOTTOM_TO_TOP
 #endif
 
