@@ -41,6 +41,8 @@
 #include <Cocoa/Cocoa.h>
 #include <mach-o/dyld.h>
 #include <sys/utsname.h>
+#include <stdlib.h>
+#include <string.h>
 
 #ifdef __ppc__
 #include <sys/types.h>
@@ -103,6 +105,39 @@ UpdatePrebinding()
 #endif
 }
 
+static NSString *ExecutableFromArgument(const char *aArgument)
+{
+  if (!aArgument || !*aArgument)
+    return nil;
+  NSFileManager *files = [NSFileManager defaultManager];
+  NSString *path = [files stringWithFileSystemRepresentation:aArgument
+                                                     length:strlen(aArgument)];
+  if (!path)
+    return nil;
+  NSString *directory = [files currentDirectoryPath];
+  if (![path isAbsolutePath]) {
+    if ([path rangeOfString:@"/"].location == NSNotFound) {
+      const char *search = getenv("PATH");
+      if (!search)
+        return nil;
+      NSString *searchPath = [files stringWithFileSystemRepresentation:search
+                                                               length:strlen(search)];
+      NSEnumerator *entries = [[searchPath componentsSeparatedByString:@":"] objectEnumerator];
+      NSString *entry;
+      while ((entry = [entries nextObject])) {
+        if (![entry isAbsolutePath])
+          entry = [directory stringByAppendingPathComponent:entry];
+        NSString *candidate = [entry stringByAppendingPathComponent:path];
+        if ([files isExecutableFileAtPath:candidate])
+          return [candidate stringByStandardizingPath];
+      }
+      return nil;
+    }
+    path = [directory stringByAppendingPathComponent:path];
+  }
+  return [files isExecutableFileAtPath:path] ? [path stringByStandardizingPath] : nil;
+}
+
 void LaunchChildMac(int aArgc, char** aArgv)
 {
   int i;
@@ -138,10 +173,15 @@ void LaunchChildMac(int aArgc, char** aArgv)
   for (i = 1; i < aArgc; ++i) 
     [args addObject: [NSString stringWithCString: aArgv[i]]];
   
-  [child setCurrentDirectoryPath:[[[NSBundle mainBundle] executablePath] stringByDeletingLastPathComponent]];
-  [child setLaunchPath:[[NSBundle mainBundle] executablePath]];
+  // Early Cocoa can identify a sibling launcher as the bundle executable
+  // when a standalone runtime's -bin program was actually invoked. Preserve
+  // argv[0], including an application stub's deliberate argv[0] substitution.
+  NSString *executable = ExecutableFromArgument(aArgc ? aArgv[0] : NULL);
+  if (!executable)
+    executable = [[NSBundle mainBundle] executablePath];
+  [child setCurrentDirectoryPath:[executable stringByDeletingLastPathComponent]];
+  [child setLaunchPath:executable];
   [child setArguments:args];
   [child launch];
   [pool release];
 }
-
