@@ -1,21 +1,26 @@
-# Experimental PowerPC Mac OS X builds
+# PowerPC Mac OS X builds
 
 The required deployment goal is Mac OS X **10.0 onward** on PowerPC.
-See [10.0-status.md](10.0-status.md) for the early-target probes and remaining
-compiler, runtime and API constraints.
+The `cocoa_*_10.0_gcc.mozconfig` profiles build Suite, Browser, Calendar and
+XULRunner from Linux. All four pass fresh local `act` builds, package audits,
+original Mac OS X 10.0 runtime/GUI tests under PowerPC emulation, and artifact
+uploads. See [10.0-status.md](10.0-status.md) for the reproducible workflow,
+runtime probes and API constraints. GitHub-hosted and physical hardware runs
+remain untested.
 
-These profiles currently reproduce the intermediate SDK 10.3.9 port. They are **not yet
-validated deployment builds**. The Linux cross-build has produced and packaged
-the Suite with the current source fixes. All eight target executables were
+The profiles without `_10.0` reproduce the intermediate SDK 10.3.9 port. These
+Panther profiles are **not validated deployment builds**. Their Linux cross-build
+produced and packaged the Suite. All eight target executables were
 relinked using original Panther startup code, and all 110 packaged Mach-O
 binaries passed the SDK dependency-location audit. Target ABI assertions also
-passed. This was an incremental build; fresh-container application builds and
-target execution remain outstanding. Full applications have not run on PowerPC;
-bounded 10.0 compiler/runtime probes now pass under emulation.
-SDK 10.3.9 does not establish
-support for earlier Panther releases, Jaguar (10.2), Puma (10.1), or
-Cheetah (10.0). The minimum has not simply been relabeled: the older SDK,
-C/C++ runtime, startup code and API fallbacks are still being investigated.
+passed. This was an incremental Panther build; its fresh-container application
+builds and Panther runtime execution remain outstanding. SDK 10.3.9 does not
+establish support for earlier Panther releases, Jaguar (10.2), Puma (10.1), or
+Cheetah (10.0). The separate 10.0 profiles use adapted headers, original 10.0
+libraries, a private C++ runtime, rebuilt startup code and tested API fallbacks.
+
+The following commands describe the intermediate Panther profiles. For the
+validated 10.0 path, use the workflow linked in the deployment-status document.
 
 Use a disposable 32-bit Linux container, including when the physical host is
 a modern Mac. The tested environment is Debian bookworm-slim, linux/386, with

@@ -634,13 +634,16 @@ SDK preparation and current limitations. Do not silently raise a deployment
 target to satisfy the linker. Host-built configuration generators must use the
 target's ABI sizes and alignments; run `build/macosx/check-target-abi.c` with the
 target compiler. Cross-build success is not runtime validation: current macOS
-cannot execute i386 applications. PowerPC is not a validated CI target.
+cannot execute i386 applications. All four PowerPC 10.0 applications pass the
+local `act` build/package/runtime/upload matrix using Linux containers and
+original-OS PowerPC emulation. GitHub-hosted and physical hardware runs remain
+untested; do not confuse those with the completed local validation.
 The legacy deployment goals are Intel 10.4 onward and PowerPC Mac OS X 10.0
 through the later PowerPC releases. The 10.3.9 cross-build is an intermediate
 milestone, not the final minimum. Preserve 10.0-compatible API paths and audit
 the C/C++ runtime, startup objects, loader behavior and graphics APIs against
 the actual oldest target; newer SDK compilation is not proof of 10.0 support.
-For the 10.0 experiment, use the separately rebuilt classic linker and original
+For the 10.0 target, use the separately rebuilt classic linker and original
 10.0 Csu startup object described in `mozconfigs/macos/powerpc/10.0-status.md`.
 Keep original-library overlay provenance and distinguish host pixel tests,
 static import checks, successful links and actual target-OS execution.
@@ -681,8 +684,9 @@ headers with original 4K78 libraries, and `build-early-stdlib.sh` for their
 private C++ runtime. Do not call this an original 10.0 SDK. The early runtime
 omits wide-character C++ streams, not application Unicode support. Keep the
 original-OS NSPR/SQLite probes and host Quartz pixel comparisons as regression
-checks. The PowerPC workflow is under development; validate all four matrix
-applications and actual OS execution before claiming it ready.
+checks. Preserve the completed four-application PowerPC workflow validation:
+fresh compilation, package audits, original-OS execution and artifact uploads.
+Revalidate the affected applications when changing this deployment path.
 The 4K78 installation CD omits installed-system AppleCSP, QuickTime and AGL.
 Use `build/macosx/tests/prepare-10.0-system-files.py` for disposable guest
 images. It extracts the original files from Essentials and removes that

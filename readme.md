@@ -360,11 +360,13 @@ probe covers allocation, RTTI, exception unwinding and threaded initialization.
 The shared C++ library, NSPR threading/loading/semaphore probe, and SQLite
 concurrency tests also pass on original 10.0. A Linux workflow now exists in
 [macos-powerpc.yml](.github/workflows/macos-powerpc.yml). All four applications
-compile and package on Linux, with ABI and deployment audits passing. Suite
-passes the full local `act` workflow, including original-OS GUI navigation and
-both artifact uploads. The other three matrix jobs remain in progress. The early
-Quartz software path passes pixel comparisons on both the host and original
-10.0, and original-OS ATSUI text placement now passes as well. The Linux guest
+compile and package on Linux, with ABI and deployment audits passing. Suite,
+Browser, Calendar and XULRunner pass the full local `act` workflow, including
+original-OS GUI checks and both artifact uploads. Uploaded packages and logs
+pass integrity checks. GitHub-hosted runs and physical PowerPC hardware remain
+untested; the completed runtime checks use original Mac OS X 10.0 under emulation.
+The early Quartz software path passes pixel comparisons on both the host and
+original 10.0, and original-OS ATSUI text placement now passes as well. The Linux guest
 runner also completes automated C++ runtime checks. NSS initialization,
 cryptographic known answers, authenticated-decryption rejection, and SQL database
 creation now pass on original 10.0, as does a Cocoa window/event-loop probe.
