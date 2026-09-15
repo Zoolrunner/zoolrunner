@@ -92,6 +92,14 @@ and Suite builds. At that milestone, descriptor-writing methods, extensibility c
 strict semantics remained unfinished; these read-only queries do not substitute
 for those implementations.
 
+`TestRegExpAbort.c` separately interrupts a backtracking regexp through the
+classic branch callback, then verifies that the context can execute another
+regexp. Build it with the same JSAPI include/link flags below and require
+`REGEXP-ABORT checks=3 failures=0`. Error cleanup now initializes its regexp
+statics pointer before allocation or matching can fail. The cancellation test
+and the 164 reflection, legacy-application, and debugger checks pass against
+the rebuilt native arm64 library; the PowerPC payload also includes this test.
+
 `TestObjectEmbedding.c` exercises the classic JSAPI access-control callback and
 an XDR encode/decode/execute round trip containing sparse array literals. It
 also checks a global class without the optional global flags, and preserves

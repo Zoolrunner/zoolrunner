@@ -3313,7 +3313,7 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
     size_t i, length, start;
     JSSubString *morepar;
     JSBool ok;
-    JSRegExpStatics *res;
+    JSRegExpStatics *res = &cx->regExpStatics;
     ptrdiff_t matchlen;
     uintN num, morenum;
     JSString *parstr, *matchstr;
@@ -3406,7 +3406,6 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
         DEFVAL(STRING_TO_JSVAL(matchstr), INT_TO_JSID(0));
     }
 
-    res = &cx->regExpStatics;
     res->pendingInput = res->input = str;
     res->parenCount = re->parenCount;
     if (re->parenCount == 0) {
