@@ -166,6 +166,18 @@
     MODULE(nsMorkModule)
 #endif    
 
+#ifdef MOZ_PLUGINS
+#define PLUGIN_MODULE MODULE(nsPluginModule)
+#else
+#define PLUGIN_MODULE
+#endif
+
+#ifdef MOZ_HTML_COMPOSER
+#define COMPOSER_MODULE MODULE(nsComposerModule)
+#else
+#define COMPOSER_MODULE
+#endif
+
 #define XUL_MODULES                          \
     MODULE(xpcomObsoleteModule)              \
     MODULE(xpconnect)                        \
@@ -186,7 +198,7 @@
     WIDGET_MODULES                           \
     MODULE(nsImageLib2Module)                \
     ICON_MODULE                              \
-    MODULE(nsPluginModule)                   \
+    PLUGIN_MODULE                            \
     MODULE(nsLayoutModule)                   \
     MODULE(docshell_provider)                \
     MODULE(embedcomponents)                  \
@@ -196,7 +208,7 @@
     ACCESS_MODULES                           \
     MODULE(appshell)                         \
     MODULE(nsTransactionManagerModule)       \
-    MODULE(nsComposerModule)                 \
+    COMPOSER_MODULE                          \
     MODULE(nsChromeModule)                   \
     MODULE(nsFindComponent)                  \
     MODULE(application)                      \

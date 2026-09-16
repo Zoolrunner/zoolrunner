@@ -240,6 +240,13 @@ point. Building it as a separate `appcomps.dll` instead fails during compilation
 with a missing `dist/lib/xpcom.lib` prerequisite, before libxul is linked.
 All profiles use the static CRT and process-heap allocation support.
 
+Calendar disables plugins and uses the plaintext-only editor. Libxul's library
+list and static module table must honor both settings: linking `gkplugin.lib`
+or `composer.lib` unconditionally requires archives that Calendar does not
+build. The matching module entries must also be omitted to avoid unresolved
+entry points. This correction still requires a complete Calendar CI rerun to
+establish build, package and runtime results.
+
 If a build stops immediately after `Building deps for ...`, check the dependency
 scanner diagnostics before investigating the target compiler. Failed scans now
 print their diagnostics and retain an adjacent `.deps/*.pp.log`; they remove
