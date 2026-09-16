@@ -1,4 +1,4 @@
-name: Windows applications from Linux
+name: Windows applications (cross compile from Linux)
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: macOS applications
+name: MacOS x86_64 and ARM64 applications (native compilation)
 
 on:
   push:

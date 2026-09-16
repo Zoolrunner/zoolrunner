@@ -1,4 +1,4 @@
-name: Experimental macOS i386 applications
+name: Mac OS X i386 applications (Cross compile from modern MacOS)
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Linux applications (Oracle Linux 8)
+name: Linux applications (Oracle Linux 8) (Native Compilation)
 
 on:
   push:
