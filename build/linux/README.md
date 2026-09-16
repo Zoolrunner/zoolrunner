@@ -47,9 +47,23 @@ in the Oracle Linux 8 container on Apple Silicon. It reproduced the component
 lookup failure without `MOZILLA_FIVE_HOME`. With the runner fixes, shell
 regressions, native JSAPI and Expat probes, application navigation and window
 bootstrap passed. The Suite lifecycle test subsequently exited with code 11
-during Venkman startup. This was not a fresh build or a GitHub-hosted matrix
-run; i686, Xlib and the other application packages remain unverified by this
-recheck.
+during Venkman startup. An isolated rebuild identified two GCC optimization
+assumptions that conflict with the classic implementation. The x86 profiles
+now use `-flifetime-dse=1` to preserve arena zeroing before frame constructors
+(including the empty frames used by HTML `wbr`), and `-fno-strict-aliasing` to
+preserve `nsCOMPtr` typed output-pointer writes. Without the latter, interface
+enumeration appended null entries and window globals lacked `NodeFilter`.
+With both settings, the isolated x86_64 GTK2 Suite package passes all packaged
+checks, including all 24 lifecycle checks and ChatZilla. This is not yet a
+fresh complete matrix or a GitHub-hosted run.
+
+The first fresh x86_64 Xlib Suite `act` run compiled, passed the target ABI
+check, and packaged successfully, but timed out during lifecycle testing.
+The runtime runner now retains partial subprocess logs on timeout. Full
+matrix validation remains in progress. For local artifact uploads, use an
+`act` build with the v7 artifact-server compatibility fix described in the
+[macOS guide](../../mozconfigs/macos/README.md#act-artifact-server-limitation);
+stock act 0.2.87 rejects the production upload action's `mime_type` field.
 
 Bring-up has exposed and addressed host/target libIDL metadata selection,
 missing multilib development packages, Perl 5.26 literal-brace handling in

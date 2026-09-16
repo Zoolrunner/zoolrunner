@@ -28,7 +28,10 @@ HOST_RANLIB="$RANLIB"
 HOST_CFLAGS="-std=gnu89 -fcommon"
 HOST_CXXFLAGS="-std=gnu++98 -fcommon"
 CFLAGS="-std=gnu89 -fcommon"
-CXXFLAGS="-std=gnu++98 -fcommon -fpermissive"
+# Frames rely on operator new clearing arena storage before construction.
+# GCC's default lifetime DSE can discard those stores when it inlines new.
+# nsCOMPtr's typed out-parameters also alias its nsISupports pointer storage.
+CXXFLAGS="-std=gnu++98 -fcommon -fpermissive -flifetime-dse=1 -fno-strict-aliasing"
 LDFLAGS=
 if test "$ZR_LINUX_ARCH" = i686; then
   CC="$ZR_TOPSRCDIR/mozconfigs/linux/i686/gcc"

@@ -614,7 +614,11 @@ A checkout should contain enough of its obscure or obsolete build dependencies t
 Every OS and architecture must have mozconfigs for at least Suite, Browser,
 Calendar and XULRunner. Every OS build pipeline must build these four apps.
 Linux i686 and x86_64 bring-up and CI must run inside `oraclelinux:8` with
-GCC Toolset 14. Both GTK2 and Xlib must have mozconfigs and CI jobs for all
+GCC Toolset 14. Preserve the x86 C++ profiles' `-flifetime-dse=1` and
+`-fno-strict-aliasing`: frame arena zeroing precedes constructors, and
+`nsCOMPtr` typed output parameters alias its stored interface pointer.
+Exercise Suite's Venkman lifecycle and DOM interface globals when changing
+these compiler settings. Both GTK2 and Xlib must have mozconfigs and CI jobs for all
 four applications on both x86 architectures, with packaged runtime testing
 for both backends. Use matching target multilib dependencies and keep host
 tools native to the container. Record

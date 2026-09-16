@@ -35,13 +35,16 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                HOME=str(home), MOZ_NO_REMOTE='1')
 
     def run(command, label, marker=None, expected=0, data=None):
-        r = subprocess.run([str(x) for x in command], env=env, input=data,
-                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                           universal_newlines=True, timeout=180)
-        (logs / (label + '.log')).write_text(r.stdout)
-        if r.returncode != expected or (marker and marker not in r.stdout):
-            raise RuntimeError(label + ': exit=' + str(r.returncode) + '\n' + r.stdout[-3000:])
-        return r.stdout
+        log = logs / (label + '.log')
+        # Keep partial output when an application hangs and hits the timeout.
+        with log.open('w') as output:
+            r = subprocess.run([str(x) for x in command], env=env, input=data,
+                               stdout=output, stderr=subprocess.STDOUT,
+                               universal_newlines=True, timeout=180)
+        output = log.read_text(errors='replace')
+        if r.returncode != expected or (marker and marker not in output):
+            raise RuntimeError(label + ': exit=' + str(r.returncode) + '\n' + output[-3000:])
+        return output
 
     imports = []
     for relative in metadata['elfs']:
