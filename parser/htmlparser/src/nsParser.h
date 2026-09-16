@@ -353,7 +353,7 @@ class nsParser : public nsIParser,
      *  @update  kmcclusk 5/18/98
      */
 
-    NS_IMETHODIMP CancelParsingEvents();
+    NS_IMETHOD CancelParsingEvents();
 
     /**  
      *  Indicates whether the parser is in a state where it

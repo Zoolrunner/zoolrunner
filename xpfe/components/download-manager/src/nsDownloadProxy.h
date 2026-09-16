@@ -59,7 +59,7 @@ public:
   NS_FORWARD_SAFE_NSIWEBPROGRESSLISTENER(mInner)
   NS_FORWARD_SAFE_NSIWEBPROGRESSLISTENER2(mInner)
 
-  NS_IMETHODIMP Init(nsIURI* aSource,
+  NS_IMETHOD Init(nsIURI* aSource,
                      nsIURI* aTarget,
                      const nsAString& aDisplayName,
                      nsIMIMEInfo *aMIMEInfo,

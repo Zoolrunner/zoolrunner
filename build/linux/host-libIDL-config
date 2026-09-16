@@ -1,0 +1,6 @@
+#!/bin/sh
+# libIDL belongs to native XPIDL tools, not to the 32-bit application.
+set -eu
+PKG_CONFIG_LIBDIR=/usr/lib64/pkgconfig:/usr/share/pkgconfig
+export PKG_CONFIG_LIBDIR
+exec "${ZR_HOST_LIBIDL_CONFIG:?Native libIDL config is required}" "$@"

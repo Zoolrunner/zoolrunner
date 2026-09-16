@@ -50,6 +50,14 @@ jobs:
         run: |
           export MOZCONFIG="$GITHUB_WORKSPACE/mozconfigs/macos/$ZR_ARCH/cocoa_${ZR_APP}_clang.mozconfig"
           make -f client.mk build 2>&1 | tee build.log
+      - name: Check Quartz image and sprite pixels
+        env:
+          ZR_ARCH: ${{ matrix.arch }}
+          ZR_APP: ${{ matrix.app }}
+        run: |
+          sh build/macosx/tests/check-quartz-images.sh \
+            "obj-zoolrunner-macos-$ZR_ARCH-$ZR_APP" "$ZR_MACOS_SDK" "$ZR_ARCH" \
+            2>&1 | tee quartz-images.log
       - name: Package relocatable development artifacts
         env:
           ZR_ARCH: ${{ matrix.arch }}
@@ -71,6 +79,7 @@ jobs:
           path: |
             build.log
             package.log
+            quartz-images.log
             artifacts/*-calendar-tests/*.log
             obj-zoolrunner-macos-${{ matrix.arch }}-${{ matrix.app }}/config.log
             obj-zoolrunner-macos-${{ matrix.arch }}-${{ matrix.app }}/config/autoconf.mk

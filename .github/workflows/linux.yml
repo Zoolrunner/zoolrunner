@@ -1,0 +1,63 @@
+name: Linux applications (Oracle Linux 8)
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.app }} / Linux ${{ matrix.arch }} / ${{ matrix.toolkit }} / GCC 14
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [i686, x86_64]
+        app: [suite, browser, calendar, xulrunner]
+        toolkit: [gtk2, xlib]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build Oracle Linux 8 environment
+        run: |
+          docker build --platform linux/amd64 -f build/linux/oraclelinux8.Dockerfile \
+            -t zoolrunner-oraclelinux8-gcc14 build/linux
+      - name: Build and test application
+        env:
+          ZR_ARCH: ${{ matrix.arch }}
+          ZR_APP: ${{ matrix.app }}
+          ZR_TOOLKIT: ${{ matrix.toolkit }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/zoolrunner-linux-$ZR_ARCH-$ZR_APP-$ZR_TOOLKIT"
+          docker run --rm --platform linux/amd64 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-linux-$ZR_ARCH-$ZR_APP-$ZR_TOOLKIT,target=/work" \
+            -e ZR_BUILD_JOBS=3 zoolrunner-oraclelinux8-gcc14 \
+            sh /source/build/linux/build-ci.sh "$ZR_ARCH" "$ZR_APP" "$ZR_TOOLKIT"
+      - name: Upload application
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zoolrunner-linux-${{ matrix.arch }}-${{ matrix.app }}-${{ matrix.toolkit }}
+          path: ${{ runner.temp }}/zoolrunner-linux-${{ matrix.arch }}-${{ matrix.app }}-${{ matrix.toolkit }}/artifacts/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: logs-linux-${{ matrix.arch }}-${{ matrix.app }}-${{ matrix.toolkit }}
+          path: |
+            ${{ runner.temp }}/zoolrunner-linux-${{ matrix.arch }}-${{ matrix.app }}-${{ matrix.toolkit }}/logs
+            ${{ runner.temp }}/zoolrunner-linux-${{ matrix.arch }}-${{ matrix.app }}-${{ matrix.toolkit }}/source/obj-*/config.log
+          if-no-files-found: warn
+          retention-days: 7

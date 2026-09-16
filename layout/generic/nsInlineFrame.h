@@ -92,7 +92,7 @@ public:
   NS_IMETHOD ReflowDirtyChild(nsIPresShell* aPresShell, nsIFrame* aChild);
 
 #ifdef ACCESSIBILITY
-  NS_IMETHODIMP GetAccessible(nsIAccessible** aAccessible);
+  NS_IMETHOD GetAccessible(nsIAccessible** aAccessible);
 #endif
 
 #ifdef DEBUG

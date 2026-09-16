@@ -92,7 +92,7 @@ public:
     virtual PRInt32 HandleLine(char *line, PRUint32 line_size);
 
     // override to clear all passwords associated with server
-    NS_IMETHODIMP ForgetPassword();
+    NS_IMETHOD ForgetPassword();
     NS_IMETHOD GetCanSearchMessages(PRBool *canSearchMessages);
     NS_IMETHOD GetOfflineSupportLevel(PRInt32 *aSupportLevel);
     NS_IMETHOD GetDefaultCopiesAndFoldersPrefsToServer(PRBool *aCopiesAndFoldersOnServer);

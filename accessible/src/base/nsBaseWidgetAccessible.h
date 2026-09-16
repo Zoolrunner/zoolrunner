@@ -109,7 +109,7 @@ public:
   nsEnumRoleAccessible(nsIDOMNode* aNode, nsIWeakReference* aShell, PRUint32 aRole);
   virtual ~nsEnumRoleAccessible() { }
   NS_DECL_ISUPPORTS_INHERITED
-  NS_IMETHODIMP GetRole(PRUint32 *aRole) { *aRole = mRole; return NS_OK; }
+  NS_IMETHOD GetRole(PRUint32 *aRole) { *aRole = mRole; return NS_OK; }
 
 protected:
   PRUint32 mRole;

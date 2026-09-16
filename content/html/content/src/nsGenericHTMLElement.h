@@ -108,16 +108,16 @@ public:
   nsresult CopyInnerTo(nsGenericElement* aDest, PRBool aDeep);
 
   // Implementation for nsIDOMNode
-  NS_METHOD GetNodeName(nsAString& aNodeName);
-  NS_METHOD GetLocalName(nsAString& aLocalName);
+  NS_IMETHOD GetNodeName(nsAString& aNodeName);
+  NS_IMETHOD GetLocalName(nsAString& aLocalName);
 
   // Implementation for nsIDOMElement
-  NS_METHOD SetAttribute(const nsAString& aName,
+  NS_IMETHOD SetAttribute(const nsAString& aName,
                          const nsAString& aValue);
-  NS_METHOD GetTagName(nsAString& aTagName);
-  NS_METHOD GetElementsByTagName(const nsAString& aTagname,
+  NS_IMETHOD GetTagName(nsAString& aTagName);
+  NS_IMETHOD GetElementsByTagName(const nsAString& aTagname,
                                  nsIDOMNodeList** aReturn);
-  NS_METHOD GetElementsByTagNameNS(const nsAString& aNamespaceURI,
+  NS_IMETHOD GetElementsByTagNameNS(const nsAString& aNamespaceURI,
                                    const nsAString& aLocalName,
                                    nsIDOMNodeList** aReturn);
 

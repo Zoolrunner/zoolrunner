@@ -101,17 +101,17 @@ public:
 
   NS_IMETHOD CopyCharPref(const char *pref, char ** return_buf);
 
-  NS_IMETHODIMP GetDefaultBoolPref(const char *pref, PRBool *_retval)
+  NS_IMETHOD GetDefaultBoolPref(const char *pref, PRBool *_retval)
                   { return mDefaultBranch->GetBoolPref(pref, _retval); }
-  NS_IMETHODIMP CopyDefaultCharPref(const char *pref, char **_retval)
+  NS_IMETHOD CopyDefaultCharPref(const char *pref, char **_retval)
                   { return mDefaultBranch->GetCharPref(pref, _retval); }
-  NS_IMETHODIMP GetDefaultIntPref(const char *pref, PRInt32 *_retval)
+  NS_IMETHOD GetDefaultIntPref(const char *pref, PRInt32 *_retval)
                   { return mDefaultBranch->GetIntPref(pref, _retval); }
-  NS_IMETHODIMP SetDefaultBoolPref(const char *pref, PRBool value)
+  NS_IMETHOD SetDefaultBoolPref(const char *pref, PRBool value)
                   { return mDefaultBranch->SetBoolPref(pref, value); }
-  NS_IMETHODIMP SetDefaultCharPref(const char *pref, const char *value)
+  NS_IMETHOD SetDefaultCharPref(const char *pref, const char *value)
                   { return mDefaultBranch->SetCharPref(pref, value); }
-  NS_IMETHODIMP SetDefaultIntPref(const char *pref, PRInt32 value)
+  NS_IMETHOD SetDefaultIntPref(const char *pref, PRInt32 value)
                   { return mDefaultBranch->SetIntPref(pref, value); }
 
   NS_IMETHOD CopyUnicharPref(const char *pref, PRUnichar **_retval);

@@ -74,7 +74,7 @@ public:
 
   NS_IMETHOD Convert(const PRUnichar *inString, char **_retval);
 
-  NS_IMETHODIMP GetCharset(char * *aCharset);
+  NS_IMETHOD GetCharset(char * *aCharset);
 
 protected:
 
@@ -103,4 +103,3 @@ protected:
 
 
 nsresult NS_NewSaveAsCharset(nsISupports **inst);
-

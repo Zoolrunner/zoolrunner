@@ -128,3 +128,17 @@ Calendar and standalone XUL tests focus the application window and leave their
 successful state visible for 20 seconds before quitting. The guest captures a
 frame every 10 seconds; this pause preserves screenshots for visual review
 after the component assertions have passed.
+
+## Quartz image drawing and toolbar sprites
+
+`check-quartz-images.sh OBJDIR SDK ARCH` runs 24 pixel comparisons against
+Cairo's software renderer, plus the nine opacity regressions. It covers decoded
+image surfaces, both Quartz source orientations, flipped and unflipped native
+contexts, scaling, sprite cropping, and repeated hover-state style repaints.
+The modern macOS workflow runs it for every application and architecture.
+
+The decoded-image drawing path previously chose its vertical flip before
+converting the image to a Quartz surface. That left converted images upside
+down and selected the wrong rows from toolbar sprites. Determine orientation
+from the actual Quartz source, including converted images. Buffer row tests
+alone do not exercise this presentation step.

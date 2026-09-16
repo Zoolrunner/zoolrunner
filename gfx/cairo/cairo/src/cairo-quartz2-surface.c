@@ -717,9 +717,6 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 	if (spat->base.extend == CAIRO_EXTEND_NONE) {
 	    quartzSource = NULL;
 	    clone = NULL;
-	    surface->sourceImageNeedsFlip =
-		cairo_surface_is_quartzgl (spat->surface) &&
-		((cairo_quartzgl_surface_t *) spat->surface)->y_grows_down;
 
 	    if (cairo_surface_is_quartzgl (spat->surface)) {
 		cairo_surface_reference (spat->surface);
@@ -740,6 +737,9 @@ _cairo_quartzgl_setup_source (cairo_quartzgl_surface_t *surface,
 		quartzSource = (cairo_quartzgl_surface_t *) clone;
 	    }
 
+	    /* The snapshot uses the Quartz source's row orientation, including
+	     * when that source was cloned from a decoded image surface. */
+	    surface->sourceImageNeedsFlip = quartzSource->y_grows_down;
 	    CGContextFlush (quartzSource->cgContext);
 	    surface->sourceImage =
 		_cairo_quartz_bitmap_context_create_image (quartzSource->cgContext);

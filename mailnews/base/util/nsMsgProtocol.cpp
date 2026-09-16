@@ -1061,7 +1061,7 @@ public:
     //
     // nsIOutputStreamCallback implementation ...
     //
-    NS_IMETHODIMP OnOutputStreamReady(nsIAsyncOutputStream *aOutStream)
+    NS_IMETHOD OnOutputStreamReady(nsIAsyncOutputStream *aOutStream)
     { 
         NS_ASSERTION(mInStream, "not initialized");
 

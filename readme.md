@@ -287,6 +287,12 @@ Planned or desired platform work should be documented separately from verified
 support. Architecture portability is part of keeping ZoolRunner useful as an
 application runtime, not merely a browser-porting exercise.
 
+Linux i686 and x86_64 bring-up covers GTK2 and Xlib for all four applications,
+using Oracle Linux 8 containers and GCC Toolset 14. Each backend has profiles
+for Suite, Browser, Calendar and XULRunner.
+The [Linux build guide](build/linux/README.md) records the procedure and
+validation status; compilation and runtime verification are in progress.
+
 All OS build pipelines cover at least **Suite, Browser, Calendar and
 XULRunner**. The [Windows workflow](.github/workflows/windows.yml) cross-builds
 Windows x86 on Linux using MSVC 2005 and Wine, packages each application and

@@ -58,19 +58,19 @@ public:
   NS_DECL_ISUPPORTS
 
   // nsIFilePicker (less what's in nsBaseFilePicker)
-  NS_IMETHODIMP Init(nsIDOMWindow *aParent, const nsAString &aTitle, PRInt16 aMode);
-  NS_IMETHODIMP AppendFilters(PRInt32 aFilterMask);
-  NS_IMETHODIMP AppendFilter(const nsAString& aTitle, const nsAString& aFilter);
-  NS_IMETHODIMP SetDefaultString(const nsAString& aString);
-  NS_IMETHODIMP GetDefaultString(nsAString& aString);
-  NS_IMETHODIMP SetDefaultExtension(const nsAString& aExtension);
-  NS_IMETHODIMP GetDefaultExtension(nsAString& aExtension);
-  NS_IMETHODIMP GetFilterIndex(PRInt32 *aFilterIndex);
-  NS_IMETHODIMP SetFilterIndex(PRInt32 aFilterIndex);
-  NS_IMETHODIMP GetFile(nsILocalFile **aFile);
-  NS_IMETHODIMP GetFileURL(nsIFileURL **aFileURL);
-  NS_IMETHODIMP GetFiles(nsISimpleEnumerator **aFiles);
-  NS_IMETHODIMP Show(PRInt16 *aReturn);
+  NS_IMETHOD Init(nsIDOMWindow *aParent, const nsAString &aTitle, PRInt16 aMode);
+  NS_IMETHOD AppendFilters(PRInt32 aFilterMask);
+  NS_IMETHOD AppendFilter(const nsAString& aTitle, const nsAString& aFilter);
+  NS_IMETHOD SetDefaultString(const nsAString& aString);
+  NS_IMETHOD GetDefaultString(nsAString& aString);
+  NS_IMETHOD SetDefaultExtension(const nsAString& aExtension);
+  NS_IMETHOD GetDefaultExtension(nsAString& aExtension);
+  NS_IMETHOD GetFilterIndex(PRInt32 *aFilterIndex);
+  NS_IMETHOD SetFilterIndex(PRInt32 aFilterIndex);
+  NS_IMETHOD GetFile(nsILocalFile **aFile);
+  NS_IMETHOD GetFileURL(nsIFileURL **aFileURL);
+  NS_IMETHOD GetFiles(nsISimpleEnumerator **aFiles);
+  NS_IMETHOD Show(PRInt16 *aReturn);
 
   virtual void InitNative(nsIWidget *aParent, const nsAString& aTitle, PRInt16 aMode);
 

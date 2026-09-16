@@ -73,7 +73,7 @@ public:
   virtual void ParentChainChanged();
 
   // nsIStyledContent interface
-  NS_IMETHODIMP_(PRBool) IsAttributeMapped(const nsIAtom* name) const;
+  NS_IMETHOD_(PRBool) IsAttributeMapped(const nsIAtom* name) const;
 
 protected:
   

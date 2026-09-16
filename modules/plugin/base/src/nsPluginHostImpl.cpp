@@ -4294,26 +4294,26 @@ public:
   virtual ~DOMMimeTypeImpl() {
   }
 
-  NS_METHOD GetDescription(nsAString& aDescription)
+  NS_IMETHOD GetDescription(nsAString& aDescription)
   {
     aDescription.Assign(mDescription);
     return NS_OK;
   }
 
-  NS_METHOD GetEnabledPlugin(nsIDOMPlugin** aEnabledPlugin)
+  NS_IMETHOD GetEnabledPlugin(nsIDOMPlugin** aEnabledPlugin)
   {
     // this has to be implemented by the DOM version.
     *aEnabledPlugin = nsnull;
     return NS_OK;
   }
 
-  NS_METHOD GetSuffixes(nsAString& aSuffixes)
+  NS_IMETHOD GetSuffixes(nsAString& aSuffixes)
   {
     aSuffixes.Assign(mSuffixes);
     return NS_OK;
   }
 
-  NS_METHOD GetType(nsAString& aType)
+  NS_IMETHOD GetType(nsAString& aType)
   {
     aType.Assign(mType);
     return NS_OK;
@@ -4342,13 +4342,13 @@ public:
   virtual ~DOMPluginImpl() {
   }
 
-  NS_METHOD GetDescription(nsAString& aDescription)
+  NS_IMETHOD GetDescription(nsAString& aDescription)
   {
     DoCharsetConversion(mUnicodeDecoder, mPluginTag.mDescription, aDescription);
     return NS_OK;
   }
 
-  NS_METHOD GetFilename(nsAString& aFilename)
+  NS_IMETHOD GetFilename(nsAString& aFilename)
   {
     PRBool bShowPath;
     nsCOMPtr<nsIPrefBranch> prefService = do_GetService(NS_PREFSERVICE_CONTRACTID);
@@ -4389,19 +4389,19 @@ public:
     return rv;
   }
 
-  NS_METHOD GetName(nsAString& aName)
+  NS_IMETHOD GetName(nsAString& aName)
   {
     DoCharsetConversion(mUnicodeDecoder, mPluginTag.mName, aName);
     return NS_OK;
   }
 
-  NS_METHOD GetLength(PRUint32* aLength)
+  NS_IMETHOD GetLength(PRUint32* aLength)
   {
     *aLength = mPluginTag.mVariants;
     return NS_OK;
   }
 
-  NS_METHOD Item(PRUint32 aIndex, nsIDOMMimeType** aReturn)
+  NS_IMETHOD Item(PRUint32 aIndex, nsIDOMMimeType** aReturn)
   {
     nsIDOMMimeType* mimeType = new DOMMimeTypeImpl(&mPluginTag, aIndex);
     NS_IF_ADDREF(mimeType);
@@ -4409,7 +4409,7 @@ public:
     return NS_OK;
   }
 
-  NS_METHOD NamedItem(const nsAString& aName, nsIDOMMimeType** aReturn)
+  NS_IMETHOD NamedItem(const nsAString& aName, nsIDOMMimeType** aReturn)
   {
     for (int index = mPluginTag.mVariants - 1; index >= 0; --index) {
       if (aName.Equals(NS_ConvertASCIItoUCS2(mPluginTag.mMimeTypeArray[index])))

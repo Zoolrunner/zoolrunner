@@ -24,7 +24,7 @@ sub GenerateHeader ($$\%) {
     while(<TEMPLATE>) {
         my $line = $_;
         while(($orig, $replace) = each %$keywords) {
-            $line =~ s/{{$orig}}/$replace/g;
+            $line =~ s/\Q{{$orig}}\E/$replace/g;
         }
 	
 	# the first line is a comment specific to the template file, which we

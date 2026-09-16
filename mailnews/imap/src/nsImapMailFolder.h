@@ -218,7 +218,7 @@ public:
   NS_IMETHOD CreateSubfolder(const PRUnichar *folderName,nsIMsgWindow *msgWindow );
   NS_IMETHOD AddSubfolder(const nsAString& aName, nsIMsgFolder** aChild);
   NS_IMETHOD AddSubfolderWithPath(nsAString& name, nsIFileSpec *dbPath, nsIMsgFolder **child);
-  NS_IMETHODIMP CreateStorageIfMissing(nsIUrlListener* urlListener);
+  NS_IMETHOD CreateStorageIfMissing(nsIUrlListener* urlListener);
   
   NS_IMETHOD Compact(nsIUrlListener *aListener, nsIMsgWindow *aMsgWindow);
   NS_IMETHOD CompactAll(nsIUrlListener *aListener, nsIMsgWindow *aMsgWindow, nsISupportsArray *aFolderArray, PRBool aCompactOfflineAlso, nsISupportsArray *aOfflineFolderArray);

@@ -102,7 +102,7 @@ public:
      * constructor.) If an error is returned, the caller should <i>not</i>
      * continue to use the <b>ns4xPluginInstance</b> object.
      */
-    NS_METHOD Initialize(nsIPluginInstancePeer* peer);
+    NS_IMETHOD Initialize(nsIPluginInstancePeer* peer);
 
     NS_IMETHOD GetPeer(nsIPluginInstancePeer* *resultingPeer);
 

@@ -167,9 +167,9 @@ public:
 
     virtual ~nsSafeFileOutputStream() { nsSafeFileOutputStream::Close(); }
 
-    NS_IMETHODIMP Close();
-    NS_IMETHODIMP Write(const char *buf, PRUint32 count, PRUint32 *result);
-    NS_IMETHODIMP Init(nsIFile* file, PRInt32 ioFlags, PRInt32 perm, PRInt32 behaviorFlags);
+    NS_IMETHOD Close();
+    NS_IMETHOD Write(const char *buf, PRUint32 count, PRUint32 *result);
+    NS_IMETHOD Init(nsIFile* file, PRInt32 ioFlags, PRInt32 perm, PRInt32 behaviorFlags);
 
 protected:
     nsCOMPtr<nsIFile>         mTargetFile;

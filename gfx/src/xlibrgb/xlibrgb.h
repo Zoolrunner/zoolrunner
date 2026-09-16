@@ -82,7 +82,9 @@ _XFUNCPROTOBEGIN
  * you will need to set these defines.  It's pretty easy for Intel
  * but I'm not sure about other platforms.
  */
-#ifdef USE_MOZILLA_TYPES
+/* Mozilla consumers need the same exported declarations as the library,
+ * including components built with hidden symbol visibility. */
+#if defined(USE_MOZILLA_TYPES) || defined(MOZILLA_CLIENT)
 /* prtypes contains definitions for uint32/int32 and uint16/int16 */
 #include "prtypes.h"
 #include "prcpucfg.h"
@@ -277,4 +279,3 @@ xxlib_find_handle(const char *name);
 _XFUNCPROTOEND
 
 #endif /* !__XLIB_RGB_H__ */
-

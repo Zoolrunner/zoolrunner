@@ -145,9 +145,9 @@ public:
   virtual  ~nsHTMLEditor();
 
   /* ------------ nsPlaintextEditor overrides -------------- */
-  NS_IMETHODIMP HandleKeyPress(nsIDOMKeyEvent* aKeyEvent);
+  NS_IMETHOD HandleKeyPress(nsIDOMKeyEvent* aKeyEvent);
   NS_IMETHOD GetIsDocumentEditable(PRBool *aIsDocumentEditable);
-  NS_IMETHODIMP BeginningOfDocument();
+  NS_IMETHOD BeginningOfDocument();
 
   /* ------------ nsIHTMLEditor methods -------------- */
 
@@ -357,8 +357,8 @@ public:
 
   virtual PRBool NodesSameType(nsIDOMNode *aNode1, nsIDOMNode *aNode2);
 
-  NS_IMETHODIMP DeleteNode(nsIDOMNode * aNode);
-  NS_IMETHODIMP DeleteText(nsIDOMCharacterData *aTextNode,
+  NS_IMETHOD DeleteNode(nsIDOMNode * aNode);
+  NS_IMETHOD DeleteText(nsIDOMCharacterData *aTextNode,
                            PRUint32             aOffset,
                            PRUint32             aLength);
 

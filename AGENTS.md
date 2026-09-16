@@ -611,8 +611,15 @@ A checkout should contain enough of its obscure or obsolete build dependencies t
 
 # Application CI Coverage
 
-Every OS build pipeline must build at least Suite, Browser, Calendar and
-XULRunner. Keep all four applications in the modern macOS, i386 macOS,
+Every OS and architecture must have mozconfigs for at least Suite, Browser,
+Calendar and XULRunner. Every OS build pipeline must build these four apps.
+Linux i686 and x86_64 bring-up and CI must run inside `oraclelinux:8` with
+GCC Toolset 14. Both GTK2 and Xlib must have mozconfigs and CI jobs for all
+four applications on both x86 architectures, with packaged runtime testing
+for both backends. Use matching target multilib dependencies and keep host
+tools native to the container. Record
+compile, package, runtime and workflow results separately; a new mozconfig
+does not establish that an architecture or application has been tested. Keep all four applications in the modern macOS, i386 macOS,
 PowerPC macOS and Linux-to-Windows workflow matrices. Windows CI uses the
 MSVC 2005/Wine container in `build/win32/msvc8-cross`; keep its mozconfigs,
 packaging, runtime checks and build guide aligned. Do not equate Wine test

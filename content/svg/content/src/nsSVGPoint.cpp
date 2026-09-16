@@ -180,9 +180,9 @@ public:
   };
 
   // override setters to make the whole object readonly
-  NS_IMETHODIMP SetX(float) { return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR; }
-  NS_IMETHODIMP SetY(float) { return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR; }
-  NS_IMETHODIMP SetValueString(const nsAString&) { return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR; }
+  NS_IMETHOD SetX(float) { return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR; }
+  NS_IMETHOD SetY(float) { return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR; }
+  NS_IMETHOD SetValueString(const nsAString&) { return NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR; }
 };
 
 nsresult

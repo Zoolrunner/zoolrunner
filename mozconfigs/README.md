@@ -1,77 +1,36 @@
-# Mozconfig Examples
+# Application mozconfigs
 
-Mozconfig examples are organized by operating system and architecture, matching
-the layout used by related UXP-based trees:
+Every OS and architecture represented here has profiles for **Suite, Browser,
+Calendar and XULRunner**. Select a profile with an absolute `MOZCONFIG` path;
+shared profiles use that path to locate the checkout.
 
-```text
-mozconfigs/
-  cross/
-    win32-msvc8-suite-legacy.mozconfig
-    win32-msvc8-suite.mozconfig
-    win32-msvc8-xulrunner.mozconfig
-  macos/
-    arm64/
-      cocoa_suite_clang.mozconfig
-      cocoa_xulrunner_clang.mozconfig
-  linux/
-    loongarch64/
-      gtk2_browser_gcc.mozconfig
-      gtk2_suite_gcc.mozconfig
-      gtk2_xulrunner_gcc.mozconfig
-      xlib_browser_gcc.mozconfig
-      xlib_suite_gcc.mozconfig
-```
+| Target | Architectures | Profiles |
+| --- | --- | --- |
+| Linux / GTK2 and Xlib | i686, x86_64 | `<arch>/{gtk2,xlib}_<app>_gcc.mozconfig` under `linux/` |
+| Linux / GTK2 and experimental Xlib | loongarch64 | `linux/loongarch64/{gtk2,xlib}_<app>_gcc.mozconfig` |
+| macOS / Cocoa | arm64, x86_64, i386, powerpc | `macos/<arch>/cocoa_<app>_{clang,gcc}.mozconfig` |
+| Windows x86 | i586 | `cross/win32-msvc8-<app>.mozconfig`; use `suite-legacy` for Suite |
 
-The cross configurations build the complete Suite or XULRunner for Windows
-x86 from a Linux or macOS host with genuine Microsoft Visual C++ 2005
-(MSVC 8.0 / VC8) through Wine. CrossOver is a Wine provider on macOS.
-Windows 95 and Windows NT 4.0 are the minimum target operating systems;
-use the legacy aggregate Suite configuration for that compatibility work.
-See [the Windows build guide](../build/win32/msvc8-cross/README.md) for toolchain
-layout, runtime selection, validation, static-CRT policy, and PE auditing, and
-[compatibility status](../build/win32/msvc8-cross/COMPATIBILITY.md) for the
-remaining runtime blockers.
+Linux i686 and x86_64 builds use **Oracle Linux 8 containers and GCC Toolset
+14**, both locally and in CI. See [the Linux build guide](../build/linux/README.md).
+Build and runtime verification is in progress. Newly added LoongArch Calendar,
+Xlib Calendar and Xlib XULRunner profiles are unverified; existing profiles
+are retained independently of the x86 bring-up.
 
-The macOS arm64 Cocoa Suite and XULRunner configurations are active platform
-bring-up targets. They use the macOS 11.3 SDK at
-`~/dev/macos-sdk/MacOSX11.3.sdk` and are not yet verified release
-configurations. Only currently exercised Linux frontends are otherwise
-represented here. Do not add Qt 3
-or other historical frontend mozconfigs until those frontends are known to build
-and run in this tree.
+Modern macOS arm64 and x86_64 profiles require SDK **11.3**. The i386 and
+PowerPC profiles use their respective legacy SDKs and toolchains, documented
+in [the macOS guide](macos/README.md).
 
-Use a config by copying it to the source root as `mozconfig`, then run
-`client.mk`:
+Windows builds use genuine **MSVC 2005 through Wine on Linux or macOS**.
+The minimum targets remain **Windows 95 and NT 4.0**. See [the Windows build
+guide](../build/win32/msvc8-cross/README.md) for validation status.
+
+Example, from the appropriate Linux container:
 
 ```sh
-cp mozconfigs/linux/loongarch64/gtk2_browser_gcc.mozconfig mozconfig
+export MOZCONFIG="$PWD/mozconfigs/linux/x86_64/gtk2_suite_gcc.mozconfig"
 make -f client.mk build
 ```
 
-For the native Apple Silicon Cocoa Suite bring-up:
-
-```sh
-cp mozconfigs/macos/arm64/cocoa_suite_clang.mozconfig mozconfig
-make -f client.mk build
-```
-
-For the native Apple Silicon Cocoa XULRunner bring-up:
-
-```sh
-cp mozconfigs/macos/arm64/cocoa_xulrunner_clang.mozconfig mozconfig
-make -f client.mk build
-```
-
-For the Xlib browser build:
-
-```sh
-cp mozconfigs/linux/loongarch64/xlib_browser_gcc.mozconfig mozconfig
-make -f client.mk build
-```
-
-For the Xlib suite build:
-
-```sh
-cp mozconfigs/linux/loongarch64/xlib_suite_gcc.mozconfig mozconfig
-make -f client.mk build
-```
+Do not infer tested support solely from the presence of a profile. Preserve
+LoongArch and existing toolkit profiles when fixing other architectures.

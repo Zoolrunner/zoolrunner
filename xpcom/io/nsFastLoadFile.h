@@ -294,7 +294,7 @@ class nsFastLoadFileReader
     // Override ReadSegments too, as nsBinaryInputStream::ReadSegments does
     // not call through our overridden Read method -- it calls directly into
     // the underlying input stream.
-    NS_IMETHODIMP ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
+    NS_IMETHOD ReadSegments(nsWriteSegmentFun aWriter, void* aClosure,
                                PRUint32 aCount, PRUint32 *aResult);
 
     // Override SetInputStream so we can update mSeekableInput

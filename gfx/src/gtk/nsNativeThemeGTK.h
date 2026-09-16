@@ -81,11 +81,11 @@ public:
 
   NS_IMETHOD ThemeChanged();
 
-  NS_IMETHOD_(PRBool) ThemeSupportsWidget(nsPresContext* aPresContext,
+  virtual PRBool ThemeSupportsWidget(nsPresContext* aPresContext,
                                           nsIFrame* aFrame,
                                           PRUint8 aWidgetType);
 
-  NS_IMETHOD_(PRBool) WidgetIsContainer(PRUint8 aWidgetType);
+  virtual PRBool WidgetIsContainer(PRUint8 aWidgetType);
 
   nsNativeThemeGTK();
   virtual ~nsNativeThemeGTK();

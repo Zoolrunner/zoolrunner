@@ -205,7 +205,9 @@ fstream.h
 ft2build.h
 gconf/gconf-client.h
 Gdiplus.h
+gdk/gdkdrawable.h
 gdk/gdkevents.h
+gdk/gdkgc.h
 gdk/gdk.h
 gdk/gdkkeysyms.h
 gdk/gdkpango.h
@@ -649,6 +651,7 @@ shlguid.h
 shlobj.h
 sigcontext.h
 signal.h
+sqlite3.h
 SimpleGameSound.h
 SIOUX.h
 size_t.h

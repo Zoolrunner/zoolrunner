@@ -31,6 +31,7 @@ def run(cmd, name, cwd=None, environment=env):
     return r.stdout
 with tempfile.TemporaryDirectory(prefix='zool-modern-platform-') as tmp:
     base = Path(tmp)
+    run(['sh', root / 'build/macosx/tests/check-quartz-images.sh', obj, sdk, arch], 'quartz-images')
     with tarfile.open(args.archive.resolve()) as t:
         t.extractall(base)
     stage = next(base.glob('zoolrunner-*'))

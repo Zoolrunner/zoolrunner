@@ -1,0 +1,4 @@
+ZR_LINUX_ARCH=i686
+ZR_LINUX_APP=suite
+ZR_LINUX_TOOLKIT=gtk2
+. "${MOZCONFIG%/*}/../x86-common.mozconfig"

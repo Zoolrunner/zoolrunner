@@ -58,7 +58,7 @@ public:
 
   NS_DECL_ISUPPORTS
 
-  NS_IMETHODIMP Init(nsIURI* aSource,
+  NS_IMETHOD Init(nsIURI* aSource,
                      nsIURI* aTarget,
                      const nsAString& aDisplayName,
                      nsIMIMEInfo *aMIMEInfo,
@@ -104,57 +104,57 @@ public:
   }
 
  
-  NS_IMETHODIMP GetDisplayName(PRUnichar** aDisplayName)
+  NS_IMETHOD GetDisplayName(PRUnichar** aDisplayName)
   {
     return mInner->GetDisplayName(aDisplayName);
   }
   
-  NS_IMETHODIMP GetMIMEInfo(nsIMIMEInfo** aMIMEInfo)
+  NS_IMETHOD GetMIMEInfo(nsIMIMEInfo** aMIMEInfo)
   {
     return mInner->GetMIMEInfo(aMIMEInfo);
   }
   
-  NS_IMETHODIMP GetSource(nsIURI** aSource)
+  NS_IMETHOD GetSource(nsIURI** aSource)
   {
     return mInner->GetSource(aSource);
   }
   
-  NS_IMETHODIMP GetTarget(nsIURI** aTarget)
+  NS_IMETHOD GetTarget(nsIURI** aTarget)
   {
     return mInner->GetTarget(aTarget);
   }
   
-  NS_IMETHODIMP GetStartTime(PRInt64* aStartTime)
+  NS_IMETHOD GetStartTime(PRInt64* aStartTime)
   {
     return mInner->GetStartTime(aStartTime);
   }
 
-  NS_IMETHODIMP GetPercentComplete(PRInt32* aPercentComplete)
+  NS_IMETHOD GetPercentComplete(PRInt32* aPercentComplete)
   {
     return mInner->GetPercentComplete(aPercentComplete);
   }
 
-  NS_IMETHODIMP GetAmountTransferred(PRUint64* aAmountTransferred)
+  NS_IMETHOD GetAmountTransferred(PRUint64* aAmountTransferred)
   {
     return mInner->GetAmountTransferred(aAmountTransferred);
   }
   
-  NS_IMETHODIMP GetSize(PRUint64* aSize)
+  NS_IMETHOD GetSize(PRUint64* aSize)
   {
     return mInner->GetSize(aSize);
   }
 
-  NS_IMETHODIMP GetCancelable(nsICancelable** aCancelable)
+  NS_IMETHOD GetCancelable(nsICancelable** aCancelable)
   {
     return mInner->GetCancelable(aCancelable);
   }
 
-  NS_IMETHODIMP GetTargetFile(nsILocalFile** aTargetFile)
+  NS_IMETHOD GetTargetFile(nsILocalFile** aTargetFile)
   {
     return mInner->GetTargetFile(aTargetFile);
   }
 
-  NS_IMETHODIMP OnStateChange(nsIWebProgress* aWebProgress,
+  NS_IMETHOD OnStateChange(nsIWebProgress* aWebProgress,
                               nsIRequest* aRequest, PRUint32 aStateFlags,
                               PRUint32 aStatus)
   {
@@ -164,7 +164,7 @@ public:
     return NS_OK;
   }
   
-  NS_IMETHODIMP OnStatusChange(nsIWebProgress *aWebProgress,
+  NS_IMETHOD OnStatusChange(nsIWebProgress *aWebProgress,
                                nsIRequest *aRequest, nsresult aStatus,
                                const PRUnichar *aMessage)
   {
@@ -174,7 +174,7 @@ public:
     return NS_OK;
   }
 
-  NS_IMETHODIMP OnLocationChange(nsIWebProgress *aWebProgress,
+  NS_IMETHOD OnLocationChange(nsIWebProgress *aWebProgress,
                                  nsIRequest *aRequest, nsIURI *aLocation)
   {
     nsCOMPtr<nsIWebProgressListener> listener = do_QueryInterface(mInner);
@@ -183,7 +183,7 @@ public:
     return NS_OK;
   }
   
-  NS_IMETHODIMP OnProgressChange(nsIWebProgress *aWebProgress,
+  NS_IMETHOD OnProgressChange(nsIWebProgress *aWebProgress,
                                  nsIRequest *aRequest,
                                  PRInt32 aCurSelfProgress,
                                  PRInt32 aMaxSelfProgress,
@@ -200,7 +200,7 @@ public:
     return NS_OK;
   }
 
-  NS_IMETHODIMP OnProgressChange64(nsIWebProgress *aWebProgress,
+  NS_IMETHOD OnProgressChange64(nsIWebProgress *aWebProgress,
                                    nsIRequest *aRequest,
                                    PRInt64 aCurSelfProgress,
                                    PRInt64 aMaxSelfProgress,
@@ -219,7 +219,7 @@ public:
 
 
 
-  NS_IMETHODIMP OnSecurityChange(nsIWebProgress *aWebProgress,
+  NS_IMETHOD OnSecurityChange(nsIWebProgress *aWebProgress,
                                  nsIRequest *aRequest, PRUint32 aState)
   {
     nsCOMPtr<nsIWebProgressListener> listener = do_QueryInterface(mInner);

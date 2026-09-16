@@ -8,6 +8,9 @@ if test "$ZR_TOPSRCDIR" = "$MOZCONFIG"; then
 else
   ZR_TOPSRCDIR=`cd "$ZR_TOPSRCDIR" && pwd`
 fi
+while test ! -f "$ZR_TOPSRCDIR/client.mk" -a "$ZR_TOPSRCDIR" != /; do
+  ZR_TOPSRCDIR=${ZR_TOPSRCDIR%/*}
+done
 ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-linux/build/unix/libIDL-prefix"
 LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
 HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"

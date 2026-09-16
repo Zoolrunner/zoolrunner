@@ -183,7 +183,10 @@ int main(int argc, char **argv)
     printf("/* AUTOMATICALLY GENERATED - DO NOT EDIT */\n\n");
 
 #ifdef CROSS_COMPILE
-#if defined(XP_MACOSX)
+#if defined(JS_TARGET_LINUX_X86_BITS)
+    printf("#define IS_LITTLE_ENDIAN 1\n");
+    printf("#undef  IS_BIG_ENDIAN\n\n");
+#elif defined(XP_MACOSX)
     /*
      * Darwin NSPR uses the same MDCPUCFG (_darwin.cfg) for multiple
      * processors, and determines which target processor to configure for
@@ -229,6 +232,22 @@ int main(int argc, char **argv)
     align_of_double     = PR_ALIGN_OF_DOUBLE;
     align_of_pointer    = PR_ALIGN_OF_POINTER;
     align_of_word       = PR_ALIGN_OF_WORD;
+
+#ifdef JS_TARGET_LINUX_X86_BITS
+    /* _linux.cfg selects an ABI using compiler predefined macros.  This
+     * generator runs on the host, so its macros describe the wrong ABI
+     * when, for example, producing an i686 build on x86_64. */
+    sizeof_char = 1;
+    sizeof_short = 2;
+    sizeof_int = sizeof_float = 4;
+    sizeof_int64 = sizeof_double = sizeof_dword = 8;
+    sizeof_long = sizeof_word = JS_TARGET_LINUX_X86_BITS / 8;
+    bits_per_int64_log2 = 6;
+    align_of_short = 2;
+    align_of_int = align_of_float = 4;
+    align_of_long = align_of_int64 = align_of_double =
+        align_of_pointer = align_of_word = sizeof_word;
+#endif
 
 #else /* !CROSS_COMPILE */
 

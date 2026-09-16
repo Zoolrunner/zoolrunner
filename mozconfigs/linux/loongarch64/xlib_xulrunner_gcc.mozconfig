@@ -1,0 +1,43 @@
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-xulrunner-xlib
+mk_add_options MOZ_MAKE_FLAGS="-j8"
+mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
+
+ZR_TOPSRCDIR=${MOZCONFIG%/*}
+if test "$ZR_TOPSRCDIR" = "$MOZCONFIG"; then
+  ZR_TOPSRCDIR=`pwd`
+else
+  ZR_TOPSRCDIR=`cd "$ZR_TOPSRCDIR" && pwd`
+fi
+while test ! -f "$ZR_TOPSRCDIR/client.mk" -a "$ZR_TOPSRCDIR" != /; do
+  ZR_TOPSRCDIR=${ZR_TOPSRCDIR%/*}
+done
+ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-xulrunner-xlib/build/unix/libIDL-prefix"
+LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
+HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
+PATH="$ZR_LIBIDL_PREFIX/bin:$PATH"
+PKG_CONFIG_PATH="$ZR_LIBIDL_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+LD_LIBRARY_PATH="$ZR_LIBIDL_PREFIX/lib:$LD_LIBRARY_PATH"
+export LIBIDL_CONFIG HOST_LIBIDL_CONFIG PATH PKG_CONFIG_PATH LD_LIBRARY_PATH
+
+ac_add_options --enable-application=xulrunner
+ac_add_options --enable-default-toolkit=xlib
+ac_add_options --enable-optimize="-O2"
+ac_add_options --disable-debug
+ac_add_options --disable-tests
+ac_add_options --disable-installer
+ac_add_options --disable-updater
+ac_add_options --disable-gnomevfs
+ac_add_options --disable-dbus
+ac_add_options --disable-pango
+ac_add_options --disable-freetype2
+ac_add_options --without-system-jpg
+ac_add_options --without-system-zlib
+ac_add_options --enable-crypto
+ac_add_options --enable-svg
+ac_add_options --enable-canvas
+
+CFLAGS="-std=gnu89 -fcommon -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
+CXXFLAGS="-fcommon -fpermissive"
+export CFLAGS CXXFLAGS
+
+ac_add_options --disable-javaxpcom

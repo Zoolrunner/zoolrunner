@@ -1793,7 +1793,7 @@ public:
     
     NS_DECL_ISUPPORTS
     
-    NS_IMETHODIMP Observe(nsISupports*, const char *aTopic, const PRUnichar *someData) 
+    NS_IMETHOD Observe(nsISupports*, const char *aTopic, const PRUnichar *someData)
     {
         if (!strcmp(aTopic, "profile-before-change")) {
             SI_ClearUserData();

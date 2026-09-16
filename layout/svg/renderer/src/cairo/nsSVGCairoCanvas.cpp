@@ -94,10 +94,12 @@ extern "C" {
 #include <gdk/gdkvisual.h>
 #include <X11/Xlib.h>
 
+// Avoid gdkx.h: modern GTK pulls in pangocairo.h, whose Cairo API conflicts
+// with the bundled renderer. These functions are imported from system GDK.
 extern "C" {
-Display *gdk_x11_drawable_get_xdisplay(GdkDrawable *drawable);
-XID gdk_x11_drawable_get_xid(GdkDrawable *drawable);
-Visual *gdk_x11_visual_get_xvisual(GdkVisual *visual);
+NS_EXTERNAL_VIS Display *gdk_x11_drawable_get_xdisplay(GdkDrawable *drawable);
+NS_EXTERNAL_VIS XID gdk_x11_drawable_get_xid(GdkDrawable *drawable);
+NS_EXTERNAL_VIS Visual *gdk_x11_visual_get_xvisual(GdkVisual *visual);
 }
 #endif
 #endif

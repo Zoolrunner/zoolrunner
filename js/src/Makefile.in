@@ -347,6 +347,14 @@ endif
 ifdef CROSS_COMPILE
 # jscpucfg needs to know when it's supposed to produce a config for the target
 JSCPUCFG_DEFINES = $(ACDEFINES)
+ifeq ($(OS_ARCH),Linux)
+ifneq (,$(filter i386 i486 i586 i686 x86,$(OS_TEST)))
+JSCPUCFG_DEFINES += -DJS_TARGET_LINUX_X86_BITS=32
+endif
+ifeq ($(OS_TEST),x86_64)
+JSCPUCFG_DEFINES += -DJS_TARGET_LINUX_X86_BITS=64
+endif
+endif
 ifeq ($(OS_ARCH),Darwin)
 ifneq (,$(filter ppc powerpc ppc64 powerpc64,$(OS_TEST)))
 JSCPUCFG_DEFINES += -DNSPR_DARWIN_TARGET_BYTE_ORDER=4321

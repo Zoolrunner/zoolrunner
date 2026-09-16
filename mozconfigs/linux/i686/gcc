@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /opt/rh/gcc-toolset-14/root/usr/bin/gcc -m32 -march=i686 "$@"
