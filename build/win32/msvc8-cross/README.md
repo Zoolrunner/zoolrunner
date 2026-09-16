@@ -234,6 +234,10 @@ The build copies the source into the
 work directory, builds and packages the application, audits PE imports, and
 runs packaged native, JavaScript and application-window tests in Wine/Xvfb.
 Suite uses the aggregate component library; Toolkit applications use libxul.
+Calendar's `xpfe/components/build2` application component must declare
+`LIBXUL_LIBRARY` so it is archived into libxul with its translated module entry
+point. Building it as a separate `appcomps.dll` instead fails during compilation
+with a missing `dist/lib/xpcom.lib` prerequisite, before libxul is linked.
 All profiles use the static CRT and process-heap allocation support.
 
 Each job uploads its application ZIP and diagnostic logs. Wine regression
