@@ -33,6 +33,9 @@ MSVC8_REQUIRE_STATIC_RTL=1
 MSVC8_USE_PROCESS_HEAP=1
 export MOZCONFIG MSVC8_REQUIRE_STATIC_RTL MSVC8_USE_PROCESS_HEAP
 zr_obj="$zr_work/source/obj-zoolrunner-win32-msvc8-$zr_config"
+# The bind-mounted parent belongs to the host runner, not necessarily this user.
+# Wine requires an owned prefix, or an owned parent when creating the prefix.
+mkdir -p "${WINEPREFIX:?Set WINEPREFIX to the build container Wine directory}"
 zr_log wine wineboot -u
 wineserver -w
 zr_log toolchain sh "$zr_scripts/test-toolchain.sh"

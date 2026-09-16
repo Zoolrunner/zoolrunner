@@ -225,7 +225,12 @@ docker run --rm --platform linux/amd64 \
 ```
 
 Use a new work directory for each build. Replace `suite` with `browser`,
-`calendar` or `xulrunner` as appropriate. The build copies the source into the
+`calendar` or `xulrunner` as appropriate. Before starting Wine, the build script
+creates the configured `WINEPREFIX` (`/work/wine`) as the container user.
+GitHub's runner owns the bind-mounted `/work` directory; Wine refuses to create
+a missing prefix beneath that differently owned parent. Creating the prefix
+first leaves ownership of the host work directory unchanged.
+The build copies the source into the
 work directory, builds and packages the application, audits PE imports, and
 runs packaged native, JavaScript and application-window tests in Wine/Xvfb.
 Suite uses the aggregate component library; Toolkit applications use libxul.
@@ -240,8 +245,9 @@ application jobs are undergoing local `act` validation. The first Suite job
 identified an unnecessary X11-header dependency in the host `mkdepend` tool;
 Windows builds now select its existing no-X11 mode and compilation has
 progressed past that step. Full build/package/runtime validation remains
-pending; GitHub-hosted
-execution has not yet been performed. On this Apple Silicon host, Wine
+pending. A GitHub-hosted run failed at Wine prefix creation; the script now
+addresses that ownership mismatch, but a successful hosted rerun remains
+unverified. On this Apple Silicon host, Wine
 failed under container CPU emulation, so local validation uses a full x86
 Linux VM. This is a local testing requirement, not a requirement for native
 x86_64 Linux CI runners.
