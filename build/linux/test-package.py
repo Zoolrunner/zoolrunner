@@ -111,6 +111,9 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
              'browser.startup.homepage_override.mstone': 'ignore', 'nglayout.debug.disable_xul_cache': True,
              'nglayout.debug.disable_xul_fastload': True, 'zoolrunner.test.application': a.app,
              'zoolrunner.test.profile': str(profile)}
+    if a.app == 'xulrunner':
+        # nsDefaultCLH opens this preference; it has no Browser -chrome handler.
+        prefs['toolkit.defaultChromeURI'] = 'chrome://zooltest/content/early-application.xul'
     (profile / 'user.js').write_text(''.join('user_pref(' + json.dumps(k) + ',' + json.dumps(v) + ');\n' for k, v in prefs.items()))
     executable = runtime / (metadata['appname'] + '-bin')
     if not executable.exists():
@@ -126,7 +129,8 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         if a.app == 'xulrunner':
             command += [stage / 'applications/simple/application.ini']
         command += ['-P', 'linux-ci'] if a.app == 'suite' else ['-profile', str(profile)]
-        command += ['-zoolrunner-test'] if a.app == 'calendar' else ['-chrome', 'chrome://zooltest/content/early-application.xul']
+        if a.app != 'xulrunner':
+            command += ['-zoolrunner-test'] if a.app == 'calendar' else ['-chrome', 'chrome://zooltest/content/early-application.xul']
         run(command, label, marker)
 (logs / 'runtime-result.txt').write_text('PASS: ' + a.arch + ' ' + a.toolkit + ' ' + a.app + '\n')
 print(a.arch + ' ' + a.toolkit + ' ' + a.app + ': packaged runtime checks passed')

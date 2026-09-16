@@ -1,5 +1,15 @@
 # Legacy Windows Suite regression payload
 
+The Linux/Wine CI runner also checks Browser, Calendar and XULRunner packages.
+XULRunner launches the GUI fixture through `toolkit.defaultChromeURI` in its
+disposable profile: its default command-line handler does not implement
+Browser's `-chrome` option. The fixture still opens the unchanged Simple
+application and exercises its XPT, JavaScript and native C++ components.
+Subprocess output is retained even when a runtime check times out.
+GUI checks wait for the private Wine session to end before reading results,
+because first-run component registration can relaunch the application after
+the initial process exits. Both the launch and session wait have time limits.
+
 Stage the existing platform tests from a macOS or Linux build host:
 
 ```sh

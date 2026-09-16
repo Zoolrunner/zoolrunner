@@ -27,14 +27,22 @@ def windows(path):
 def uri(path):
     return 'file:///' + windows(path).replace('\\', '/')
 
-def run(exe, args, label, marker=None, expected=0, timeout=180, data=None):
-    r = subprocess.run([wine, '--', windows(exe)] + args, env=env,
-                       input=data, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                       text=True, errors='replace', timeout=timeout)
-    (logs / (label + '.log')).write_text(r.stdout)
-    if r.returncode != expected or (marker and marker not in r.stdout):
-        raise RuntimeError(label + ': exit=' + str(r.returncode) + '\n' + r.stdout[-3000:])
-    return r.stdout
+def run(exe, args, label, marker=None, expected=0, timeout=180, data=None,
+        wait_for_restart=False):
+    logfile = logs / (label + '.log')
+    with logfile.open('w') as output:
+        r = subprocess.run([wine, '--', windows(exe)] + args, env=env,
+                           input=data, stdout=output, stderr=subprocess.STDOUT,
+                           text=True, errors='replace', timeout=timeout)
+        if wait_for_restart:
+            # First-run registration can relaunch the GUI and let its original
+            # process exit before the fixture runs. This prefix is private to CI.
+            subprocess.run(['wineserver', '-w'], env=env, stdout=output,
+                           stderr=subprocess.STDOUT, timeout=timeout, check=True)
+    output = logfile.read_text(errors='replace')
+    if r.returncode != expected or (marker and marker not in output):
+        raise RuntimeError(label + ': exit=' + str(r.returncode) + '\n' + output[-3000:])
+    return output
 
 native = work / 'native-tests'
 subprocess.run(['python3', str(scripts / 'tests/build-native-tests.py'),
@@ -92,6 +100,9 @@ else:
              'browser.startup.homepage_override.mstone': 'ignore', 'nglayout.debug.disable_xul_cache': True,
              'nglayout.debug.disable_xul_fastload': True, 'zoolrunner.test.application': a.app,
              'zoolrunner.test.profile': windows(profile)}
+    if a.app == 'xulrunner':
+        # nsDefaultCLH opens this preference; it has no Browser -chrome handler.
+        prefs['toolkit.defaultChromeURI'] = 'chrome://zooltest/content/early-application.xul'
     (profile / 'user.js').write_text(''.join('user_pref(' + json.dumps(k) + ',' + json.dumps(v) + ');\n'
                                            for k, v in prefs.items()))
     appname = re.search(r'^MOZ_APP_NAME\s*=\s*(\S+)', (obj / 'config/autoconf.mk').read_text(), re.M).group(1)
@@ -105,8 +116,9 @@ else:
         if a.app == 'xulrunner':
             args.append(windows(work / 'applications/simple/application.ini'))
         args += ['-profile', windows(profile)]
-        args += ['-zoolrunner-test'] if a.app == 'calendar' else ['-chrome', 'chrome://zooltest/content/early-application.xul']
-        run(runtime / (appname + '.exe'), args, label)
+        if a.app != 'xulrunner':
+            args += ['-zoolrunner-test'] if a.app == 'calendar' else ['-chrome', 'chrome://zooltest/content/early-application.xul']
+        run(runtime / (appname + '.exe'), args, label, wait_for_restart=True)
         output = result.read_text()
         if marker not in output or 'FAIL' in output:
             raise RuntimeError(label + ': ' + output)

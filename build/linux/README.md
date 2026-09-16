@@ -70,6 +70,11 @@ packaged Xlib Suite checks, including the modal startup path, all 24 lifecycle
 checks, and ChatZilla. The runtime runner retains partial subprocess logs on
 timeout. Full fresh matrix validation remains in progress.
 
+XULRunner GUI tests select the fixture with `toolkit.defaultChromeURI` in the
+disposable profile. Its default command-line handler does not implement the
+Browser `-chrome` option. The fixture still opens the unchanged Simple app
+and verifies its XPT, JavaScript and native C++ components.
+
 For local artifact uploads, use an
 `act` build with the v7 artifact-server compatibility fix described in the
 [macOS guide](../../mozconfigs/macos/README.md#act-artifact-server-limitation);
