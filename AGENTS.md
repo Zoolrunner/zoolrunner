@@ -710,6 +710,14 @@ startup objects, target SDK APIs, linked dependencies and target runtime
 behavior before lowering a claimed supported OS version.
 Preserve the historical 32-bit Cocoa/Carbon APIs and resources when fixing
 modern-host build problems.
+Cocoa's `NS_NATIVE_DISPLAY` returns an `NSView`, not a Carbon `WindowRef`.
+Do not pass it to Carbon window-event APIs. Menu command callbacks must use
+live menu-bar state when windows change or close. Exercise both native File
+and application-name menus on the oldest target, including actual commands;
+a rendered menu bar alone does not validate native menu interaction. In the
+original-10.0 UTM guest, open bundles through Launch Services for interactive
+tests; a direct shell launch can display a window without correct native
+application-menu registration. See `mozconfigs/macos/powerpc/utm.md`.
 Linux cross-builds may use the small generated classic resources in
 `config/macos/resources`, but must verify the source and resource hashes.
 Regenerate them with Apple's tools when their authoritative sources change;

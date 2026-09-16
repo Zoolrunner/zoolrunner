@@ -162,6 +162,8 @@ protected:
     
     static MenuRef          sAppleMenu;         // AppleMenu shared by all menubars
  
+    static EventHandlerRef  sCommandEventHandlerRef;
+    static nsMenuBarX*       sActiveMenuBar;     // weak; cleared by destructor
     static EventHandlerUPP  sCommandEventHandler;   // carbon event handler for commands, shared
 };
 

@@ -83,6 +83,8 @@ NS_IMPL_ISUPPORTS6(nsMenuBarX, nsIMenuBar, nsIMenuListener, nsIDocumentObserver,
 
 MenuRef nsMenuBarX::sAppleMenu = nsnull;
 EventHandlerUPP nsMenuBarX::sCommandEventHandler = nsnull;
+EventHandlerRef nsMenuBarX::sCommandEventHandlerRef = nsnull;
+nsMenuBarX* nsMenuBarX::sActiveMenuBar = nsnull;
 
 
 //
@@ -108,6 +110,8 @@ nsMenuBarX::nsMenuBarX()
 //
 nsMenuBarX::~nsMenuBarX()
 {
+  if (sActiveMenuBar == this)
+    sActiveMenuBar = nsnull;
   mMenusArray.Clear();    // release all menus
 
   // make sure we unregister ourselves as a document observer
@@ -300,35 +304,25 @@ nsMenuBarX::ExecuteQuitCommand()
 //
 // InstallCommandEventHandler
 //
-// Grab our window and install an event handler to handle command events which are
-// used to drive the action when the user chooses an item from a menu. We have to install
-// it on the window because the menubar isn't in the event chain for a menu command event.
+// Carbon command events are application events in the Cocoa backend. Route
+// them through the active menu bar without retaining closed windows.
 //
 OSStatus
 nsMenuBarX :: InstallCommandEventHandler ( )
 {
-  OSStatus err = noErr;
-  
-  WindowRef myWindow = NS_REINTERPRET_CAST(WindowRef, mParent->GetNativeData(NS_NATIVE_DISPLAY));
-#if defined(__LP64__)
-  if (sCommandEventHandler) {
-    const EventTypeSpec commandEventList[] = { {kEventClassCommand, kEventCommandProcess},
-                                               {kEventClassCommand, kEventCommandUpdateStatus} };
-    err = ::InstallApplicationEventHandler(sCommandEventHandler, 2,
-                                            commandEventList, this, NULL);
-  }
-#else
-  NS_ASSERTION ( myWindow, "Can't get WindowRef to install command handler!" );
-  if ( myWindow && sCommandEventHandler ) {
-    const EventTypeSpec commandEventList[] = { {kEventClassCommand, kEventCommandProcess},
-                                               {kEventClassCommand, kEventCommandUpdateStatus} };
-    err = ::InstallWindowEventHandler ( myWindow, sCommandEventHandler, 2, commandEventList, this, NULL );
-    NS_ASSERTION ( err == noErr, "Uh oh, command handler not installed" );
-  }
-#endif
+  // Cocoa's NS_NATIVE_DISPLAY is an NSView, not a Carbon WindowRef.
+  // Route application menu commands to the currently painted menu bar.
+  // Keep a single handler with no per-window userData, so closing a window
+  // cannot leave a callback pointing to its destroyed menu bar.
+  if (sCommandEventHandlerRef)
+    return noErr;
+  const EventTypeSpec commands[] = {
+    {kEventClassCommand, kEventCommandProcess},
+    {kEventClassCommand, kEventCommandUpdateStatus}
+  };
+  return ::InstallApplicationEventHandler(sCommandEventHandler, 2, commands,
+                                         nsnull, &sCommandEventHandlerRef);
 
-  return err;
-  
 } // InstallCommandEventHandler
 
 
@@ -348,7 +342,9 @@ nsMenuBarX :: CommandEventHandler ( EventHandlerCallRef inHandlerChain, EventRef
   if ( err1 )
     return handled;
     
-  nsMenuBarX* self = NS_REINTERPRET_CAST(nsMenuBarX*, userData);
+  nsMenuBarX* self = sActiveMenuBar;
+  if (!self)
+    return handled;
   switch ( ::GetEventKind(inEvent) ) {
     // user selected a menu item. See if it's one we handle.
     case kEventCommandProcess:
@@ -729,6 +725,7 @@ NS_METHOD nsMenuBarX::SetNativeData(void* aData)
 //-------------------------------------------------------------------------
 NS_METHOD nsMenuBarX::Paint()
 {
+    sActiveMenuBar = this;
 #if defined(__LP64__)
     InstallAppKitMenuBar(this);
 #else

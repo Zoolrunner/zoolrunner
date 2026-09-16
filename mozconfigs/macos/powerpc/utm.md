@@ -61,6 +61,16 @@ The normal installer desktop appearing does not establish that these services
 are running. Omitting this step can produce the browser's component-initialization
 alert even with a writable profile. Use the same service sequence as the Linux
 QEMU tests. Its diagnostic log is `/tmp/zool-startup.log`.
+The interactive launcher uses [`utm-open.c`](../../../build/macosx/tests/utm-open.c)
+to open the application bundle through `LSOpenFSRef`. On original 10.0, running
+the Unix executable directly can display its window while leaving the native
+application-name menu unresponsive. Launch Services supplies the required
+application registration; this distinction is not covered by the direct-launch
+GUI fixture alone. The standalone example uses a small `XULRunner Test.app`
+launcher, built from [`utm-xulrunner.c`](../../../build/macosx/tests/utm-xulrunner.c),
+to supply its manifest and dedicated profile. Cross-compile these helpers with
+the target-10.0 toolchain; its `libzoolcxx.dylib` must be beside each helper.
+
 The VM remains running when the application quits or relaunches. Use UTM Stop
 to end a session; the next boot checks the transfer, application and home
 filesystems before mounting them.
@@ -90,18 +100,26 @@ search now displays the normal server-not-found page in this offline guest;
 The fixture also checks DNS, offline and missing-file error-page DOMs. See
 [Expat integration](../../../parser/expat/README.zoolrunner.md).
 
-## Observed interactive limitation
+## Interactive checks
 
-Suite and Browser display their windows and local HTML in UTM, and mouse input
-works. Their native menu bar is blank in the copied installer environment;
-automated Command-Q attempts did not quit Browser. Use UTM Stop if necessary;
-the startup script checks the persistent filesystems on the next boot. These
-GUI observations do not establish complete desktop/menu/keyboard compatibility.
+The Cocoa menu event installer previously cast an `NSView` to a Carbon
+`WindowRef`, preventing menu construction on PowerPC. Application-level event
+routing restores the native menu bar. Suite's File menu, Open Web Location command, application-name menu and native
+Quit command were exercised in UTM. Quit closed the window and ended the Suite
+process. Browser's application-name menu and native Quit were also checked. Use Launch Services as described above; a visible menu bar alone does
+not establish working native commands. UTM Stop ends the remaining OS session,
+and the next boot checks its writable filesystems.
 
 Suite's initial saved `Application Registry` could not enumerate its profile
 subtree. The damaged file was preserved as `Application Registry.before-repair`
 in both its original directory and `/tmp/work`, then rebuilt using Suite's
 `-CreateProfile` command. A separate process now finds `ZoolUTMDesktop`, and
 Suite launches into the local page. Existing profile directories were retained.
-The Calendar and XULRunner shortcuts have not yet been exercised in UTM; their
-Linux QEMU runtime/GUI results do not substitute for that emulator check.
+Command-key shortcuts remain broken in the copied original-10.0 guest, although
+ordinary text entry and search submission work. View/window key-equivalent
+forwarding experiments did not resolve this and were removed.
+Calendar's launcher, main window, application menu and native Quit passed in UTM.
+The XULRunner launcher opens the standalone Simple App, and its Increment
+button was checked in UTM. This minimal example has no XUL menu bar and does
+not establish XULRunner native-menu compatibility. Its window initially appears
+at the bottom left; click it to activate it.
