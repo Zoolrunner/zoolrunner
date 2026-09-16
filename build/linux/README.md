@@ -22,6 +22,9 @@ docker run --rm --platform linux/amd64 \
 ```
 
 Use a separate work volume for each architecture/application/toolkit combination.
+The workflow defaults to three compiler jobs. Local `act` runs can select a
+different count with `--env ZR_BUILD_JOBS=8`; choose a count that fits the
+host's CPU and memory capacity, including other running virtual machines.
 The source is copied to the Linux filesystem, where the object directory and logs remain
 available for incremental porting work. Replace both `x86_64` and `suite` in
 the example to select another configuration. The third argument selects

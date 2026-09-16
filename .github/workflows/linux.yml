@@ -41,7 +41,7 @@ jobs:
           docker run --rm --platform linux/amd64 \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-linux-$ZR_ARCH-$ZR_APP-$ZR_TOOLKIT,target=/work" \
-            -e ZR_BUILD_JOBS=3 zoolrunner-oraclelinux8-gcc14 \
+            -e "ZR_BUILD_JOBS=${ZR_BUILD_JOBS:-3}" zoolrunner-oraclelinux8-gcc14 \
             sh /source/build/linux/build-ci.sh "$ZR_ARCH" "$ZR_APP" "$ZR_TOOLKIT"
       - name: Upload application
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
