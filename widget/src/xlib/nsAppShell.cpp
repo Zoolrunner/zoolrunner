@@ -362,12 +362,10 @@ NS_METHOD nsAppShell::Spindown()
   return NS_OK;
 }
 
-#define NUMBER_HASH_KEY(_num) ((PLHashNumber) _num)
-
 static PLHashNumber
-IntHashKey(PRInt32 key)
+IntHashKey(const void* key)
 {
-  return NUMBER_HASH_KEY(key);
+  return (PLHashNumber)(PRUptrdiff)key;
 }
 // wrapper so we can call a macro
 PR_BEGIN_EXTERN_C
@@ -388,11 +386,11 @@ NS_IMETHODIMP nsAppShell::ListenToEventQueue(nsIEventQueue *aQueue,
   printf("ListenToEventQueue(%p, %d) this=%p\n", aQueue, aListen, this);
 #endif
   if (!sQueueHashTable) {
-    sQueueHashTable = PL_NewHashTable(3, (PLHashFunction)IntHashKey,
+    sQueueHashTable = PL_NewHashTable(3, IntHashKey,
                                       PL_CompareValues, PL_CompareValues, 0, 0);
   }
   if (!sCountHashTable) {
-    sCountHashTable = PL_NewHashTable(3, (PLHashFunction)IntHashKey,
+    sCountHashTable = PL_NewHashTable(3, IntHashKey,
                                       PL_CompareValues, PL_CompareValues, 0, 0);
   }    
 
@@ -402,14 +400,15 @@ NS_IMETHODIMP nsAppShell::ListenToEventQueue(nsIEventQueue *aQueue,
     /* Add listener -
      * but only if we arn't already in the table... */
     if (!PL_HashTableLookup(sQueueHashTable, key)) {
-      long tag;
+      XtInputId tag;
         
-      /* set up our fds callbacks */
-      tag = (long)XtAppAddInput(mAppContext,
+      /* Dispatch the queue whose descriptor is ready. It may be a nested
+       * modal queue rather than this shell's original mEventQueue. */
+      tag = XtAppAddInput(mAppContext,
                                 queue_fd,
                                 (XtPointer)(long)(XtInputReadMask),
                                 HandleQueueXtProc,
-                                (XtPointer)mEventQueue);
+                                (XtPointer)aQueue);
 
 /* This hack would not be neccesary if we would have a hashtable function
  * which returns success/failure in a separate var ...
@@ -434,7 +433,8 @@ NS_IMETHODIMP nsAppShell::ListenToEventQueue(nsIEventQueue *aQueue,
     PL_UnregisterEventIDFunc(plqueue);
     sEventQueueList->RemoveElement(plqueue);
 
-    int tag = long(PL_HashTableLookup(sQueueHashTable, key));
+    // Xt input IDs are pointer-sized; int truncates them on LP64 hosts.
+    XtInputId tag = (XtInputId)PL_HashTableLookup(sQueueHashTable, key);
     if (tag) {
       tag -= NEVER_BE_ZERO_MAGIC;
       XtRemoveInput((XtInputId)tag);
@@ -1244,4 +1244,3 @@ void nsAppShell::ForwardEvent(XEvent *event, nsWidget *aWidget)
 
   aWidget->DispatchWindowEvent(ev);
 }
-

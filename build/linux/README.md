@@ -59,8 +59,15 @@ fresh complete matrix or a GitHub-hosted run.
 
 The first fresh x86_64 Xlib Suite `act` run compiled, passed the target ABI
 check, and packaged successfully, but timed out during lifecycle testing.
-The runtime runner now retains partial subprocess logs on timeout. Full
-matrix validation remains in progress. For local artifact uploads, use an
+The Account Wizard opened by Address Book exposed an Xlib queue-dispatch bug:
+the Xt callback watched the nested queue's descriptor but drained the shell's
+original queue. It now dispatches the subscribed queue, and input IDs retain
+their `XtInputId` width during removal on LP64. An isolated rebuild passes all
+packaged Xlib Suite checks, including the modal startup path, all 24 lifecycle
+checks, and ChatZilla. The runtime runner retains partial subprocess logs on
+timeout. Full fresh matrix validation remains in progress.
+
+For local artifact uploads, use an
 `act` build with the v7 artifact-server compatibility fix described in the
 [macOS guide](../../mozconfigs/macos/README.md#act-artifact-server-limitation);
 stock act 0.2.87 rejects the production upload action's `mime_type` field.

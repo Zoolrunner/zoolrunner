@@ -958,6 +958,11 @@ Keep it as close as practical to ordinary X11/Xlib interfaces.
 
 The Xlib backend may contain significant historical bitrot. Fix root causes rather than replacing it with a new toolkit merely because restoration requires work.
 
+Xt input callbacks must dispatch their subscribed event queue, including nested
+modal queues. Keep input IDs pointer-sized through registration and removal.
+Exercise Suite's Address Book/Account Wizard and lifecycle checks when changing
+Xlib event dispatch.
+
 ## Qt 3
 
 The tree contains a historical Qt 3 backend.
