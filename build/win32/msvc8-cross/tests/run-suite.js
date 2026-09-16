@@ -59,7 +59,10 @@ try {
                                  '-e', 'print("INLINE-PASS")']);
     log = file(base + 'inline.log').exists() ? read(base + 'inline.log') : '';
     record(result == 0 && log.indexOf('INLINE-PASS') >= 0, 'inline evaluation');
-    original = profiles.currentProfile;
+    // A new Wine prefix or Windows installation has no current profile yet.
+    // Keep failures for an existing registry visible rather than catching all
+    // currentProfile errors and treating them as first-run state.
+    if (profiles.profileCount > 0) original = profiles.currentProfile;
     if (profiles.profileExists(name)) throw Error('Regression profile already exists');
     profiles.createNewProfile(name, base, null, false); created = true;
     var profile = profiles.QueryInterface(I.nsIProfileInternal).getProfileDir(name);
@@ -91,7 +94,11 @@ finally {
             var r = C['@mozilla.org/registry;1'].createInstance(I.nsIRegistry);
             r.open(C['@mozilla.org/file/directory_service;1'].getService(I.nsIProperties).get('AppRegF',I.nsIFile));
             var k = r.getKey(I.nsIRegistry.Common,'Profiles');
-            if (r.getString(k,'CurrentProfile') == name) { r.setString(k,'CurrentProfile',original); r.flush(); }
+            if (r.getString(k,'CurrentProfile') == name) {
+                if (original === null) r.deleteValue(k,'CurrentProfile');
+                else r.setString(k,'CurrentProfile',original);
+                r.flush();
+            }
             profiles.deleteProfile(name,false);
         } catch (error) { record(false,'Profile cleanup: ' + error); }
     }

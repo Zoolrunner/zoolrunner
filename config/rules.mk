@@ -1056,12 +1056,25 @@ ifndef COMPILER_DEPEND
 #
 _MDDEPFILE = $(MDDEPDIR)/$(@F).pp
 
+# Keep successful scans quiet, but preserve diagnostics when the scanner fails.
+# In particular, a host mkdepend failure must not look like a compiler failure.
+define RUN_MKDEPEND
+$(MKDEPEND) -o'.$(OBJ_SUFFIX)' -f$(_MDDEPFILE) $(DEFINES) $(ACDEFINES) $(INCLUDES) $< >$(_MDDEPFILE).log 2>&1 || { \
+	status=$$?; \
+	echo "ERROR: dependency generation failed for $< (exit $$status)" >&2; \
+	cat $(_MDDEPFILE).log >&2; \
+	rm -f $(_MDDEPFILE); \
+	exit $$status; \
+}; \
+rm -f $(_MDDEPFILE).log
+endef
+
 ifeq (,$(CROSS_COMPILE)$(filter-out WINCE WINNT,$(OS_ARCH)))
 define MAKE_DEPS_AUTO
 if test -d $(@D); then \
 	echo "Building deps for $<"; \
 	touch $(_MDDEPFILE) && \
-	$(MKDEPEND) -o'.$(OBJ_SUFFIX)' -f$(_MDDEPFILE) $(DEFINES) $(ACDEFINES) $(INCLUDES) $< >/dev/null 2>&1 && \
+	{ $(RUN_MKDEPEND); } && \
 	mv $(_MDDEPFILE) $(_MDDEPFILE).old && \
 	cat $(_MDDEPFILE).old | sed -e "s|^$(srcdir)/||" -e "s|^$(win_srcdir)/||" > $(_MDDEPFILE) && rm -f $(_MDDEPFILE).old ; \
 fi
@@ -1071,7 +1084,7 @@ define MAKE_DEPS_AUTO
 if test -d $(@D); then \
 	echo "Building deps for $<"; \
 	touch $(_MDDEPFILE) && \
-	$(MKDEPEND) -o'.$(OBJ_SUFFIX)' -f$(_MDDEPFILE) $(DEFINES) $(ACDEFINES) $(INCLUDES) $< >/dev/null 2>&1 && \
+	{ $(RUN_MKDEPEND); } && \
 	mv $(_MDDEPFILE) $(_MDDEPFILE).old && \
 	cat $(_MDDEPFILE).old | sed -e "s|^$(<D)/||g" > $(_MDDEPFILE) && rm -f $(_MDDEPFILE).old ; \
 fi

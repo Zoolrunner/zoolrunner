@@ -240,6 +240,18 @@ point. Building it as a separate `appcomps.dll` instead fails during compilation
 with a missing `dist/lib/xpcom.lib` prerequisite, before libxul is linked.
 All profiles use the static CRT and process-heap allocation support.
 
+If a build stops immediately after `Building deps for ...`, check the dependency
+scanner diagnostics before investigating the target compiler. Failed scans now
+print their diagnostics and retain an adjacent `.deps/*.pp.log`; they remove
+partial dependency files and stop the build. The host scanner's macro-expression
+diagnostics must track the expanded expression, not the original directive.
+The libpng chunk checks exposed this distinction during Linux XULRunner bring-up.
+Run `python3 config/mkdepend/test.py --sanitize` on a Linux or macOS host with
+ASan/UBSan support to check nested conditional-header selection and the bundled
+PNG dependency scan. `HOST_CC` selects the native compiler; omit `--sanitize`
+when those runtimes are unavailable. This tests dependency discovery, not PNG
+decoding or complete C-preprocessor conformance.
+
 Each job uploads its application ZIP and diagnostic logs. Wine regression
 results do not replace tests in Windows 95, NT 4.0 or other actual Windows
 installations. The Linux/Wine 11 toolchain has passed its compile/link/PE32/execution

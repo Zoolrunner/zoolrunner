@@ -45,6 +45,13 @@ fresh profiles can report XML errors while enumerating chrome packages.
 The driver creates a dedicated profile and restores the previous registry
 selection on completion, retaining test files for inspection. Do not rerun over
 old results. Preserve or move the entire test folder before another run.
+On a clean Wine prefix or Windows installation, no current profile exists yet.
+The driver checks the profile count before reading the current selection and
+removes its temporary selection during cleanup when there was no prior profile.
+Local Linux/Wine checks on 2026-09-16 passed all 17 groups with both an empty
+profile registry and a seeded existing profile; the latter retained its original
+selection. These fixture rechecks used an existing Suite package and do not
+constitute a fresh build or a complete `act` job.
 Record the exact OS/service pack and package hashes. Results on NT4, Me or 2000
 do not establish Windows 95 compatibility. The minimum targets remain Windows
 95 and NT4; builds use MSVC2005 through Wine on Linux or macOS.

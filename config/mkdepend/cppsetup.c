@@ -186,8 +186,10 @@ my_eval_defined (IfParser *ip, const char *var, int len)
 static long
 my_eval_variable (IfParser *ip, const char *var, int len)
 {
-    long val;
+    long val = 0;
     struct symtab **s;
+    struct _parse_data *pd = (struct _parse_data *) ip->data;
+    const char *saved_line;
 
     s = lookup_variable (ip, var, len);
     if (!s)
@@ -199,7 +201,17 @@ my_eval_variable (IfParser *ip, const char *var, int len)
 	s = lookup_variable (ip, var, strlen(var));
     } while (s);
 
+    /* Diagnostics must refer to the expression currently being parsed.
+     * A macro value is a separate allocation from the original #if line;
+     * using that line to compute the error column accesses unrelated memory.
+     * Restore the caller's expression after nested macro evaluation.
+     */
+    saved_line = pd->line;
+    pd->line = var;
     var = ParseIfExpression(ip, var, &val);
+    pd->line = saved_line;
+    if (!var)
+        return 0;
     if (var && *var) debug(4, ("extraneous: '%s'\n", var));
     return val;
 }

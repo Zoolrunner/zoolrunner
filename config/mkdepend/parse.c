@@ -238,7 +238,8 @@ deftype (char *line, struct filepointer *filep,
 		/*
 		 * copy the definition back to the beginning of the line.
 		 */
-		strcpy (line, p);
+		/* Remove the directive in place; the source and destination overlap. */
+		memmove (line, p, strlen(p) + 1);
 		break;
 	case ELSE:
 	case ENDIF:
