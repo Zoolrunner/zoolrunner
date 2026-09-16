@@ -49,7 +49,7 @@ public:
   NS_IMETHOD GetBorderAndPadding(nsMargin& aBorderAndPadding);
 
                                
-  NS_METHOD Paint(nsPresContext*      aPresContext,
+  NS_IMETHOD Paint(nsPresContext*      aPresContext,
                   nsIRenderingContext& aRenderingContext,
                   const nsRect&        aDirtyRect,
                   nsFramePaintLayer    aWhichLayer,
