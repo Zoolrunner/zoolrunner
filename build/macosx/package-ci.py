@@ -163,6 +163,15 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
     if runnable:
         environment = dict(os.environ)
         environment.pop("DYLD_LIBRARY_PATH", None)
+        blocking = Path(temporary) / "expat-blocking"
+        subprocess.run(abi_compiler + [
+            "-DXP_UNIX", "-DXP_MACOSX", "-I" + str(root / "parser/expat"),
+            "-I" + str(root / "parser/expat/lib"),
+            "-I" + str(dist / "include/nspr"),
+            str(root / "parser/expat/tests/blocking.c"),
+            str(obj / "parser/expat/lib/libexpat_s.a"),
+            "-o", str(blocking)], check=True)
+        subprocess.run([str(blocking)], env=environment, check=True, timeout=60)
         for test, marker in (
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
                 ("legacy-application.js", "LEGACY-APPLICATION checks=58 failures=0"),

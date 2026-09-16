@@ -28,6 +28,36 @@ function report(ok, detail) {
 function requireValue(condition, message) {
   if (!condition) throw new Error(message);
 }
+function checkErrorPages(browser, application) {
+  var errors = ["dnsNotFound", "netOffline", "fileNotFound"];
+  var index = 0;
+  function loadNext() {
+    browser.loadURI("about:neterror?e=" + errors[index] +
+                    "&u=http%3A%2F%2Fexample.invalid%2F&d=Expected%20failure");
+  }
+  function loaded(event) {
+    if (event.target != browser.contentDocument) return;
+    try {
+      var doc = browser.contentDocument;
+      requireValue(doc.documentElement.localName == "html" &&
+                   doc.getElementById("errorTitleText") &&
+                   doc.getElementById("errorLongDesc") &&
+                   doc.getElementById("errorShortDescText").textContent == "Expected failure",
+                   "Error page XML/script/layout failed: " + errors[index]);
+      dump("APPLICATION: error page " + errors[index] + " passed\n");
+      if (++index < errors.length) {
+        setTimeout(loadNext, 0);
+      } else {
+        browser.removeEventListener("load", loaded, true);
+        setTimeout(function() {
+          report(true, application + " chrome, HTML navigation and three error pages");
+        }, 10000);
+      }
+    } catch (error) { report(false, String(error)); }
+  }
+  browser.addEventListener("load", loaded, true);
+  loadNext();
+}
 function startTest() {
   setTimeout(function() { report(false, "Application test timed out"); }, 90000);
   try {
@@ -65,14 +95,15 @@ function startTest() {
             var tabs = app.document.getElementById("content");
             requireValue(tabs && tabs.boxObject.width > 0, "Browser layout failed");
             var browser = tabs.selectedBrowser || tabs;
-            browser.addEventListener("load", function(pageEvent) {
+            browser.addEventListener("load", function pageLoaded(pageEvent) {
               if (pageEvent.target != browser.contentDocument) return;
               try {
                 var element = browser.contentDocument.getElementById("layout-check");
                 requireValue(element && element.offsetWidth == 122 &&
                              element.firstChild.nodeValue == "Original Mac OS X 10.0",
                              "Local HTML navigation, DOM or CSS layout failed");
-                setTimeout(function() { report(true, application + " chrome and HTML navigation"); }, 10000);
+                browser.removeEventListener("load", pageLoaded, true);
+                checkErrorPages(browser, application);
               } catch (error) { report(false, String(error)); }
             }, true);
             browser.loadURI("file:///tmp/work/early-page.html");

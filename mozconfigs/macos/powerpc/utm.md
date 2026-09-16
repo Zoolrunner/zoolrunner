@@ -52,7 +52,15 @@ Choose `browser`, `calendar` or `xulrunner` instead of `suite` as needed. The
 startup script must ignore hangup (`trap '' 1`) before entering the background:
 otherwise leaving the boot console can terminate it before the GUI starts.
 It checks and mounts the application and home partitions, mounts volfs, and waits for the
-desktop before launching. Its diagnostic log is `/tmp/zool-startup.log`.
+desktop before launching. It must then run
+[`start-10.0-security.sh`](../../../build/macosx/tests/start-10.0-security.sh),
+copied to the transfer partition as `/tmp/start-services.sh`, before starting
+any application. The installer environment omits `lookupd` and `SecurityServer`;
+the latter is required by the original OS random-number provider used by NSS.
+The normal installer desktop appearing does not establish that these services
+are running. Omitting this step can produce the browser's component-initialization
+alert even with a writable profile. Use the same service sequence as the Linux
+QEMU tests. Its diagnostic log is `/tmp/zool-startup.log`.
 The VM remains running when the application quits or relaunches. Use UTM Stop
 to end a session; the next boot checks the transfer, application and home
 filesystems before mounting them.
@@ -66,6 +74,22 @@ does not require QMP.
 The VM images are local test assets, not repository files. For the original
 Linux QEMU build/runtime results, see [10.0 status](10.0-status.md).
 
+## Initialization and error-page checks
+
+The initial copy omitted the required services and left an empty `key3.db`
+in the Browser profile. A full profile backup was saved before moving the
+failed `key3.db`, `cert8.db` and `secmod.db` aside. NSS initialization, random
+bytes and shutdown subsequently passed against the persistent profile after
+a cold boot. Do not delete existing users' certificate databases as a general
+startup workaround.
+
+The search-time XML error was a separate Expat pause/replay defect, corrected
+in the platform parser. Thirty parser checks passed inside UTM. A toolbar
+search now displays the normal server-not-found page in this offline guest;
+`browser-search-fixed.png` in the local test folder records that check.
+The fixture also checks DNS, offline and missing-file error-page DOMs. See
+[Expat integration](../../../parser/expat/README.zoolrunner.md).
+
 ## Observed interactive limitation
 
 Suite and Browser display their windows and local HTML in UTM, and mouse input
@@ -74,8 +98,10 @@ automated Command-Q attempts did not quit Browser. Use UTM Stop if necessary;
 the startup script checks the persistent filesystems on the next boot. These
 GUI observations do not establish complete desktop/menu/keyboard compatibility.
 
-Browser cold-start rendering was verified. Suite rendered in the initial UTM
-session, but repeated startup still opens the profile wizard even after the
-profile API reports successful setup. This remains unresolved. The Calendar
-and XULRunner shortcuts were not exercised in UTM; their Linux QEMU runtime/GUI
-results do not substitute for that separate emulator check.
+Suite's initial saved `Application Registry` could not enumerate its profile
+subtree. The damaged file was preserved as `Application Registry.before-repair`
+in both its original directory and `/tmp/work`, then rebuilt using Suite's
+`-CreateProfile` command. A separate process now finds `ZoolUTMDesktop`, and
+Suite launches into the local page. Existing profile directories were retained.
+The Calendar and XULRunner shortcuts have not yet been exercised in UTM; their
+Linux QEMU runtime/GUI results do not substitute for that emulator check.

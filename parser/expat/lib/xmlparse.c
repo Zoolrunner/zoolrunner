@@ -3155,7 +3155,8 @@ contentProcessor(XML_Parser parser, const char *start, const char *end,
       parser, parser->m_parentParser ? 1 : 0, parser->m_encoding, start, end,
       endPtr, (XML_Bool)! parser->m_parsingStatus.finalBuffer,
       XML_ACCOUNT_DIRECT);
-  if (result == XML_ERROR_NONE) {
+  if (result == XML_ERROR_NONE
+      || (result == XML_ERROR_SUSPENDED && parser->m_blocked)) {
     if (! storeRawNames(parser))
       return XML_ERROR_NO_MEMORY;
   }
@@ -3276,7 +3277,8 @@ externalEntityContentProcessor(XML_Parser parser, const char *start,
       = doContent(parser, 1, parser->m_encoding, start, end, endPtr,
                   (XML_Bool)! parser->m_parsingStatus.finalBuffer,
                   XML_ACCOUNT_ENTITY_EXPANSION);
-  if (result == XML_ERROR_NONE) {
+  if (result == XML_ERROR_NONE
+      || (result == XML_ERROR_SUSPENDED && parser->m_blocked)) {
     if (! storeRawNames(parser))
       return XML_ERROR_NO_MEMORY;
   }
@@ -3561,7 +3563,8 @@ doContent(XML_Parser parser, int startTagLevel, const ENCODING *enc,
     }
       if ((parser->m_tagLevel == 0)
           && (parser->m_parsingStatus.parsing != XML_FINISHED)) {
-        if (parser->m_parsingStatus.parsing == XML_SUSPENDED
+        if (parser->m_blocked
+            || parser->m_parsingStatus.parsing == XML_SUSPENDED
             || (parser->m_parsingStatus.parsing == XML_PARSING
                 && parser->m_reenter))
           parser->m_processor = epilogProcessor;
@@ -3630,7 +3633,8 @@ doContent(XML_Parser parser, int startTagLevel, const ENCODING *enc,
         }
         if ((parser->m_tagLevel == 0)
             && (parser->m_parsingStatus.parsing != XML_FINISHED)) {
-          if (parser->m_parsingStatus.parsing == XML_SUSPENDED
+          if (parser->m_blocked
+              || parser->m_parsingStatus.parsing == XML_SUSPENDED
               || (parser->m_parsingStatus.parsing == XML_PARSING
                   && parser->m_reenter))
             parser->m_processor = epilogProcessor;
@@ -3787,6 +3791,15 @@ doContent(XML_Parser parser, int startTagLevel, const ENCODING *enc,
         reportDefault(parser, enc, s, next);
       break;
       /* LCOV_EXCL_STOP */
+    }
+    /* Gecko replays the unconsumed input after resuming. Stop at the
+     * callback's token boundary, before dispatching any following token.
+     * m_blocked intentionally does not use upstream's retained-buffer
+     * XML_SUSPENDED state (see XML_ParseBuffer and XML_ResumeParser). */
+    if (parser->m_blocked) {
+      *eventPP = next;
+      *nextPtr = next;
+      return XML_ERROR_SUSPENDED;
     }
     switch (parser->m_parsingStatus.parsing) {
     case XML_SUSPENDED:

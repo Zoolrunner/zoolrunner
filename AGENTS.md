@@ -509,6 +509,9 @@ Examples requiring special care include:
 * NSS private SQLite
 * DBM implementations
 * fdlibm
+* Expat and Gecko's caller-owned input replay on parser suspension
+
+For Expat changes, preserve the [adapter contract and regression coverage](parser/expat/README.zoolrunner.md), including stylesheet/script pauses and resumed tag-name storage.
 
 ---
 

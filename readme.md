@@ -387,6 +387,10 @@ See the [10.0 progress and constraints](mozconfigs/macos/powerpc/10.0-status.md)
 The same test environment can be copied into UTM for interactive testing; see
 the [UTM configuration and startup guide](mozconfigs/macos/powerpc/utm.md).
 
+XML parsing uses bundled Expat 2.8.4 with the classic Gecko pause/replay
+interface. Regression coverage includes stylesheet/script pauses and rendered
+network-error pages; see the [Expat integration notes](parser/expat/README.zoolrunner.md).
+
 ## XULRunner Application Compatibility
 
 XULRunner-style standalone applications are a first-class use case. ZoolRunner

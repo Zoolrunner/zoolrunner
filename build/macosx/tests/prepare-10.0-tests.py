@@ -70,6 +70,11 @@ def prepare(archive_path, obj, output):
                               "-lplc4", "-lplds4", "-lnspr4",
                               "-framework", "Carbon"]
             compile("early-runtime", "early-runtime.cc", cpp=True)
+            compile("early-expat", str(root / "parser/expat/tests/blocking.c"),
+                    ["-DXP_UNIX", "-DXP_MACOSX", "-I" + str(root / "parser/expat"),
+                     "-I" + str(root / "parser/expat/lib"),
+                     "-I" + str(dist / "include/nspr"),
+                     str(obj / "parser/expat/lib/libexpat_s.a")])
             compile("early-ctype", "early-ctype.cpp", ["-fshort-wchar"], cpp=True)
             compile("early-ctype-stdlib", "early-ctype.cpp",
                     ["-fshort-wchar", "-DZR_STDLIB_FIRST"], cpp=True)
@@ -125,6 +130,7 @@ set -eu
 cd %s
 sh ./start-security.sh
 ./early-runtime
+./early-expat
 ./early-ctype
 ./early-ctype-stdlib
 DYLD_BIND_AT_LAUNCH=1 ./early-late-cocoa

@@ -131,6 +131,14 @@ int main(int argc, char **argv)
     }
     if (NSS_Shutdown() != SECSuccess) return 8;
     puts("NSS: private SQL database initialization and shutdown passed");
+    if (mkdir("nss-dbm", 0700) || NSS_InitReadWrite("dbm:nss-dbm") != SECSuccess) {
+        printf("NSS DBM database initialization error: %d\n", PR_GetError());
+        return 10;
+    }
+    if (NSS_Shutdown() != SECSuccess) return 11;
+    if (NSS_InitReadWrite("dbm:nss-dbm") != SECSuccess) return 12;
+    if (NSS_Shutdown() != SECSuccess) return 13;
+    puts("NSS: DBM database creation, reopen and shutdown passed");
     puts("NSS: all early-platform checks passed");
     return 0;
 }
