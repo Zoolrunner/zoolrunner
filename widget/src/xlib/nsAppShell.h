@@ -57,7 +57,7 @@ public:
   // nsIAppShellInterface
   
   NS_IMETHOD            Create(int* argc, char ** argv);
-  virtual nsresult      Run(); 
+  NS_IMETHOD            Run();
   NS_IMETHOD            Spinup();
   NS_IMETHOD            Spindown();
   NS_IMETHOD            ListenToEventQueue(nsIEventQueue *aQueue, PRBool aListen);

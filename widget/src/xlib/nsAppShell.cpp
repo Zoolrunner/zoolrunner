@@ -320,7 +320,7 @@ void HandleQueueXtProc(XtPointer ptr, int *source_fd, XtInputId* id)
 }
 PR_END_EXTERN_C
 
-nsresult nsAppShell::Run()
+NS_IMETHODIMP nsAppShell::Run()
 {
   if (mEventQueue == nsnull)
     Spinup();

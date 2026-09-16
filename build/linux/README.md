@@ -59,3 +59,12 @@ host-word-size leak in SpiderMonkey's i686 CPU header generator. The generator
 now passes size/alignment checks against actual GCC 32-bit and 64-bit types.
 Full application validation is still pending; these fixes are not a claim
 that all sixteen jobs have passed.
+
+The Xlib app shell's `Run()` override uses `NS_IMETHOD` / `NS_IMETHODIMP`
+to preserve the interface calling convention on i686. On 2026-09-16, a
+targeted rebuild in the existing i686 Xlib Suite build volume with Oracle
+Linux 8 and GCC Toolset 14 reproduced the original conflicting-type-attributes
+error and compiled the corrected app-shell, widget and window objects as
+32-bit ELF. The widget-library link was blocked by a missing
+`libxpwidgets_s.a` in that volume; this check does not establish a complete
+application build, package or runtime result.
