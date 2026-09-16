@@ -617,6 +617,12 @@ CI artifacts must resolve links into the build checkout and retain executable
 permissions. Distinguish local build checks from actual GitHub-hosted runs and
 from runtime validation on the minimum deployment OS.
 
+On Apple Silicon with Rosetta available, run the x86_64 packaged runtime checks
+as well as arm64 checks. Compile embedding and platform probes for the package
+architecture, not the host default. Use the relocated-package desktop runners
+in `build/macosx/tests` for GUI regressions. Calendar omits `data:` URLs by design;
+use ordinary file content when sharing a browser-oriented fixture with Calendar.
+
 Check available disk space before local matrix builds. Run local `act` jobs
 one at a time, preserve their archives and diagnostic logs, then remove the
 completed job's temporary checkout, object directories, and copied SDKs before

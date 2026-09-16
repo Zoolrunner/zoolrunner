@@ -1,0 +1,13 @@
+<?xml version="1.0"?><window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" onload="run()"><script><![CDATA[
+function run(){
+var p=Components.classes['@mozilla.org/preferences-service;1'].getService(Components.interfaces.nsIPrefBranch);
+p.setCharPref('extensions.irc.initialURLs','');
+p.setBoolPref('extensions.irc.instrumentation.ceip',false);
+var w=window.openDialog('chrome://chatzilla/content/chatzilla.xul','czcheck','chrome,dialog=no');
+setTimeout(function(){
+var ok=w.client && w.client.initialized && w.document.getElementById('input') && typeof w.Object.keys==='function' && w.Object.hasOwnProperty.call({x:1},'x');
+dump('SUITE-CHATZILLA initialized='+!!ok+' host='+w.client.host+'\n');
+Components.classes['@mozilla.org/toolkit/app-startup;1'].getService(Components.interfaces.nsIAppStartup).quit(3);
+},5000);
+}
+]]></script></window>

@@ -152,7 +152,15 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 subprocess.run(["codesign", "--force", "--sign", "-", str(signed)],
                                check=True)
                 os.replace(signed, path)
-    if platform.machine() == args.arch:
+    runnable = platform.machine() == args.arch
+    if (platform.system() == "Darwin" and platform.machine() == "arm64"
+            and args.arch == "x86_64"):
+        runnable = subprocess.run(
+            ["/usr/bin/arch", "-x86_64", "/usr/bin/true"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+        if runnable:
+            print("Running Intel package regressions through Rosetta")
+    if runnable:
         environment = dict(os.environ)
         environment.pop("DYLD_LIBRARY_PATH", None)
         for test, marker in (
@@ -175,7 +183,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             if plistlib.load(info).get("Version") != "11.3":
                 raise RuntimeError("Embedding checks require macOS SDK 11.3")
         subprocess.run([
-            "xcrun", "clang", "-isysroot", str(sdk), "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
+            "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk), "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
             "-I" + str(dist / "include/js"), "-I" + str(dist / "include/nspr"),
             str(root / "js/tests/es5/TestObjectEmbedding.c"),
             "-L" + str(runtime), "-lmozjs", "-o", str(embedding)], check=True)

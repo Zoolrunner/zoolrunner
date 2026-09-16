@@ -340,10 +340,10 @@ Apple Silicon and x86_64. The XULRunner profiles also build the Simple example
 and standalone Layout Debugger. These profiles require **macOS SDK 11.3**.
 See [macOS build instructions](mozconfigs/macos/README.md) for configuration
 paths, dependencies, packaging, and the eight-job GitHub Actions workflow.
-All eight configurations build and package under local act testing. Native
-compatibility checks and Calendar's existing unit tests pass; local uploads
-encounter act's documented artifact-server limitation. GitHub-hosted execution
-awaits the first workflow run.
+All eight configurations pass local act build, package and artifact-upload
+jobs with the upstream act artifact-server fix. Package compatibility checks
+and Calendar's existing unit tests pass on arm64 natively and x86_64 through
+Rosetta. GitHub-hosted execution awaits the first workflow run.
 
 Experimental [i386 profiles and PowerPC research](mozconfigs/macos/i386/README.md)
 use SDK 10.4u for i386 target code and SDK 11.3 for native host utilities. The
@@ -384,6 +384,8 @@ Cairo image-frame row order and ARGB readback now have passing component tests
 on native arm64 and original-10.0 PowerPC; Suite screenshot checks also verify
 toolbar orientation and translated text placement.
 See the [10.0 progress and constraints](mozconfigs/macos/powerpc/10.0-status.md).
+The same test environment can be copied into UTM for interactive testing; see
+the [UTM configuration and startup guide](mozconfigs/macos/powerpc/utm.md).
 
 ## XULRunner Application Compatibility
 
@@ -398,8 +400,9 @@ changes assumptions that existing applications may depend on.
 
 ## ECMAScript Compatibility
 
-The pinned official ES5 Test262 suite passes **11,540 / 11,540 cases** on macOS
-arm64, with zero failures, crashes, timeouts, or harness errors. This includes
+The pinned official ES5 Test262 suite passes **11,540 / 11,540 cases** in all
+four macOS application packages on arm64 and x86_64 (through Rosetta), with
+zero failures, crashes, timeouts, or harness errors. This includes
 the suite's earlier-edition coverage and every annotated strict-mode case.
 Unmarked cases use the upstream non-strict default. The existing SpiderMonkey
 engine implements strict execution, eval environments, arguments snapshots,

@@ -193,3 +193,39 @@ checks were limited to the native arm64 packages. All eight jobs failed their
 artifact uploads with the act limitation above, so this is **not** a passing
 end-to-end CI run. The workflow also passes Actionlint 1.7.12. Testing found and
 fixed a Homebrew confirmation prompt that prevented unattended dependency setup.
+
+### Modern matrix rerun (2026-09-15)
+
+All eight jobs now pass end to end, including both artifact uploads, using act
+0.2.89 with the upstream PR 6115 artifact-server fix applied locally. This
+reruns the actual pinned workflow with SDK 11.3 and Xcode 16.4 on macOS 15.7.1.
+Jobs ran sequentially, and completed temporary checkouts, objects and SDK
+copies were removed after preserving their artifacts and logs. Uploaded ZIP
+integrity and the contained archive checksums were verified.
+
+Packaging now executes the Intel runtime checks through Rosetta on Apple
+Silicon and compiles the embedding probe for the package architecture. Both
+architectures pass the reflection, historical-language, debugger lifecycle and
+18 embedding assertions; both Calendar packages pass all eight unit tests.
+This supersedes the runtime and local-upload limitations of the September 14
+run above. It does not establish a GitHub-hosted pass or execution on physical
+Intel hardware or the minimum deployment OS.
+
+The relocated-package desktop regressions and their reproduction commands are
+documented in [macOS runtime tests](../../build/macosx/tests/README.md).
+All eight packages pass those GUI, focused JavaScript, regexp cancellation,
+image-buffer and relaunch checks. Suite passes 24 Composer/Address Book/
+Inspector/Venkman lifecycle checks and initializes ChatZilla on each architecture.
+Both Calendar builds open all four views, and both XULRunner builds pass the
+169 HTML/CSS layout assertions. Native and emulated early-Quartz stroke/pixel
+paths and all nine opacity cases pass for each architecture. These automated
+checks do not replace the manual keyboard-layout and IME checklist.
+
+Every relocated package also passes all **11,540 ES5 Test262 cases** at revision
+`7da91bceb9ce7613f87db47ddd1292a2dda58b42`, using the upstream default execution
+policy. Across all eight packages there are no failed cases, timeouts, crashes
+or harness errors. Fresh Intel runtimes were started once before the suite to
+allow initial Rosetta startup; actual cases retained the ten-second timeout.
+This is a result for the pinned suite, not proof of complete specification
+conformance. Local reports, logs and archive hashes are preserved under
+`artifacts/macos-modern-validation/`, with the summary in `results.json`.

@@ -4,6 +4,52 @@ These tests exercise the classic application platform and its deployment paths.
 Compile them for the target and run against the matching runtime. Compilation
 and static import audits do not replace execution on the target OS.
 
+## Modern macOS package regressions
+
+Run both architecture matrices with SDK 11.3. On Apple Silicon, Intel package
+checks run through Rosetta when it is available; this is distinct from testing
+on physical Intel hardware. Packaging compiles its embedding probe for the
+package's architecture, including when the host uses a different architecture.
+
+From a macOS desktop session, test a relocated package with:
+
+```sh
+python3 build/macosx/tests/run-modern-package.py arm64 suite \
+  --archive artifacts/zoolrunner-macos-arm64-suite-sdk11.3.tar.gz \
+  --report-dir /tmp/zool-suite-runtime
+python3 build/macosx/tests/run-modern-platform.py arm64 suite \
+  --archive artifacts/zoolrunner-macos-arm64-suite-sdk11.3.tar.gz \
+  --report-dir /tmp/zool-suite-platform
+```
+
+Repeat for `x86_64` and for Browser, Calendar and XULRunner. The matching default
+object directory supplies the generated JSAPI/XPCOM headers; `--objdir` accepts
+another matching directory. SDK 11.3 comes from `ZR_MACOS_SDK` or the existing
+`~/dev/macos-sdk/MacOSX11.3.sdk` installation; its version is checked.
+Run these GUI tests sequentially. They use disposable package copies/profiles
+and restore the Suite's selected profile after their checks.
+
+The package runner checks the focused JavaScript suites, regexp cancellation,
+application chrome and components, and the 17 window-global assertions. Suite
+also runs the 24 lifecycle checks and initializes ChatZilla without connecting.
+Calendar deliberately omits the `data:` protocol, so the disposable window
+fixture uses an ordinary local HTML file for its content global. The platform
+runner checks image rows/channels and absolute, relative and PATH-based relaunch.
+The full pinned Test262 suite remains a separate run through
+`js/tests/es5/run-test262.py`.
+When using a freshly extracted Intel package under Rosetta, launch its
+`xpcshell -e 'print("Runtime ready");'` once before starting Test262. Initial
+translation/registration can exceed Test262's ten-second per-process timeout.
+Keep the normal timeout for the actual conformance cases.
+
+The Quartz runner accepts an optional third architecture argument, for example
+`check-quartz-strokes.sh OBJDIR SDK x86_64`, to exercise Intel rendering through
+Rosetta using the matching static libraries. It recompiles the tested Quartz
+implementation in a temporary directory and leaves developer objects unchanged.
+Also run the [nine Quartz opacity cases](../../../gfx/tests/README-quartz-opacity.md)
+with `-arch arm64` or `-arch x86_64`, the matching object directory, and
+`-isysroot` pointing to SDK 11.3.
+
 ## Image buffers and frames
 
 `early-image.cpp` exercises the real XPCOM image and image-frame components:
