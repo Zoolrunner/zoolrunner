@@ -195,3 +195,53 @@ Static packaging must retain the application-facing typelibs separately from
 other enabled platform interfaces; their omission can leave a browser window
 working while breaking shutdown or other Suite applications. The payload
 checks required interfaces before running the GUI regressions.
+
+## Linux GitHub Actions builds
+
+`.github/workflows/windows.yml` builds **Suite, Browser, Calendar and
+XULRunner** as separate Windows x86 jobs on Ubuntu. The container uses genuine
+MSVC 2005 through Wine 11 WoW64; host tools use the native Linux compiler.
+The minimum target requirements remain **Windows 95 and Windows NT 4.0**.
+
+`fetch-toolchain.sh` downloads a pinned, SHA-256-checked snapshot of
+[widberg/msvc8.0](https://github.com/widberg/msvc8.0), plus the missing MIDL
+compiler from Microsoft's Windows Server 2003 SP1 Platform SDK. The image
+also pins WineHQ binary packages and verifies their hashes. No separately
+installed Visual Studio or GitHub toolchain action is required.
+
+To reproduce a job from the checkout root:
+
+```sh
+docker build --platform linux/amd64 \
+  -f build/win32/msvc8-cross/Dockerfile \
+  -t zoolrunner-msvc8-linux build/win32/msvc8-cross
+mkdir -p /tmp/zoolrunner-windows-suite
+docker run --rm --platform linux/amd64 \
+  --mount "type=bind,source=$PWD,target=/source,readonly" \
+  --mount "type=bind,source=/tmp/zoolrunner-windows-suite,target=/work" \
+  -e ZR_BUILD_JOBS=3 zoolrunner-msvc8-linux \
+  sh /source/build/win32/msvc8-cross/with-display.sh \
+  sh /source/build/win32/msvc8-cross/build-ci.sh suite /work/build
+```
+
+Use a new work directory for each build. Replace `suite` with `browser`,
+`calendar` or `xulrunner` as appropriate. The build copies the source into the
+work directory, builds and packages the application, audits PE imports, and
+runs packaged native, JavaScript and application-window tests in Wine/Xvfb.
+Suite uses the aggregate component library; Toolkit applications use libxul.
+All profiles use the static CRT and process-heap allocation support.
+
+Each job uploads its application ZIP and diagnostic logs. Wine regression
+results do not replace tests in Windows 95, NT 4.0 or other actual Windows
+installations. The Linux/Wine 11 toolchain has passed its compile/link/PE32/execution
+smoke test in an x86_64 Debian VM, including process-heap support. The GNU
+PE auditor also passes on the previously validated Suite package. Full
+application jobs are undergoing local `act` validation. The first Suite job
+identified an unnecessary X11-header dependency in the host `mkdepend` tool;
+Windows builds now select its existing no-X11 mode and compilation has
+progressed past that step. Full build/package/runtime validation remains
+pending; GitHub-hosted
+execution has not yet been performed. On this Apple Silicon host, Wine
+failed under container CPU emulation, so local validation uses a full x86
+Linux VM. This is a local testing requirement, not a requirement for native
+x86_64 Linux CI runners.

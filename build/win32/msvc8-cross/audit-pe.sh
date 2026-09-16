@@ -44,14 +44,14 @@ while IFS= read -r pe_file; do
         continue
     fi
 
-    if ! grep 'file format coff-i386' "$dump" >/dev/null 2>&1 ||
+    if ! grep -E 'file format (coff-i386|pei-i386)' "$dump" >/dev/null 2>&1 ||
        ! grep 'Magic[[:space:]]*010b[[:space:]]*(PE32)' "$dump" >/dev/null 2>&1; then
         echo "$pe_file: is not an x86 PE32 image" >> "$tmp_dir/failures"
     fi
 
     awk -v file="$pe_file" '
         /DLL Name:/ { dll=$3; print file "\t" dll "\t"; in_imports=0; next }
-        /Hint\/Ord[[:space:]]+Name/ { in_imports=1; next }
+        /Hint\/Ord[[:space:]]+(Member-)?Name/ { in_imports=1; next }
         in_imports && /^[[:space:]]*$/ { in_imports=0; next }
         in_imports && NF >= 2 { print file "\t" dll "\t" $NF }
     ' "$dump" >> "$tmp_dir/imports"

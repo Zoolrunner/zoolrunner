@@ -1,9 +1,9 @@
-mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-win32-msvc8-xulrunner
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/obj-zoolrunner-win32-msvc8-calendar
 mk_add_options MOZ_MAKE_FLAGS="-j4"
 mk_add_options BOOTSTRAP_IN_TREE_LIBIDL=1
-mk_add_options 'export PATH := @TOPSRCDIR@/build/win32/msvc8-cross:@TOPSRCDIR@/obj-zoolrunner-win32-msvc8-xulrunner/build/unix/libIDL-prefix/bin:$(PATH)'
-mk_add_options 'export DYLD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-xulrunner/build/unix/libIDL-prefix/lib:$(DYLD_LIBRARY_PATH)'
-mk_add_options 'export LD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-xulrunner/build/unix/libIDL-prefix/lib:$(LD_LIBRARY_PATH)'
+mk_add_options 'export PATH := @TOPSRCDIR@/build/win32/msvc8-cross:@TOPSRCDIR@/obj-zoolrunner-win32-msvc8-calendar/build/unix/libIDL-prefix/bin:$(PATH)'
+mk_add_options 'export DYLD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-calendar/build/unix/libIDL-prefix/lib:$(DYLD_LIBRARY_PATH)'
+mk_add_options 'export LD_LIBRARY_PATH := @TOPSRCDIR@/obj-zoolrunner-win32-msvc8-calendar/build/unix/libIDL-prefix/lib:$(LD_LIBRARY_PATH)'
 mk_add_options 'export MSVC8_REQUIRE_STATIC_RTL=1'
 mk_add_options 'export MSVC8_USE_PROCESS_HEAP=1'
 
@@ -23,7 +23,7 @@ while test ! -f "$ZR_TOPSRCDIR/client.mk" -a "$ZR_TOPSRCDIR" != /; do
 done
 
 ZR_CROSS_TOOLS="$ZR_TOPSRCDIR/build/win32/msvc8-cross"
-ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-win32-msvc8-xulrunner/build/unix/libIDL-prefix"
+ZR_LIBIDL_PREFIX="$ZR_TOPSRCDIR/obj-zoolrunner-win32-msvc8-calendar/build/unix/libIDL-prefix"
 LIBIDL_CONFIG="$ZR_LIBIDL_PREFIX/bin/libIDL-config-2"
 HOST_LIBIDL_CONFIG="$LIBIDL_CONFIG"
 PATH="$ZR_CROSS_TOOLS:$ZR_LIBIDL_PREFIX/bin:$PATH"
@@ -74,7 +74,7 @@ LDFLAGS=${LDFLAGS-}
 export CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
 
 ac_add_options --target=i586-pc-mingw32
-ac_add_options --enable-application=xulrunner
+ac_add_options --enable-application=calendar
 ac_add_options --enable-default-toolkit=windows
 ac_add_options --enable-optimize="-O1"
 ac_add_options --disable-debug
@@ -91,3 +91,5 @@ ac_add_options --enable-crypto
 ac_add_options --enable-svg
 ac_add_options --enable-canvas
 ac_add_options --disable-javaxpcom
+
+ac_add_options --enable-libxul

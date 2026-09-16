@@ -1,0 +1,61 @@
+name: Windows applications from Linux
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.app }} / Windows x86 / MSVC2005
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [suite, browser, calendar, xulrunner]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build Linux Wine and MSVC2005 environment
+        run: |
+          docker build --platform linux/amd64 \
+            -f build/win32/msvc8-cross/Dockerfile \
+            -t zoolrunner-msvc8-linux build/win32/msvc8-cross
+      - name: Cross-build, package, audit and test
+        env:
+          ZR_APP: ${{ matrix.app }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/zoolrunner-windows-$ZR_APP"
+          docker run --rm --platform linux/amd64 \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-windows-$ZR_APP,target=/work" \
+            -e ZR_BUILD_JOBS=3 zoolrunner-msvc8-linux \
+            sh /source/build/win32/msvc8-cross/with-display.sh \
+            sh /source/build/win32/msvc8-cross/build-ci.sh "$ZR_APP" /work/build
+      - name: Upload application
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zoolrunner-win32-msvc8-${{ matrix.app }}
+          path: ${{ runner.temp }}/zoolrunner-windows-${{ matrix.app }}/build/artifacts/*.zip
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: logs-win32-msvc8-${{ matrix.app }}
+          path: |
+            ${{ runner.temp }}/zoolrunner-windows-${{ matrix.app }}/build/logs
+            ${{ runner.temp }}/zoolrunner-windows-${{ matrix.app }}/build/source/obj-*/config.log
+          if-no-files-found: warn
+          retention-days: 7

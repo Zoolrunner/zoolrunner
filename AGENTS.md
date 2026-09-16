@@ -609,6 +609,15 @@ A checkout should contain enough of its obscure or obsolete build dependencies t
 
 ---
 
+# Application CI Coverage
+
+Every OS build pipeline must build at least Suite, Browser, Calendar and
+XULRunner. Keep all four applications in the modern macOS, i386 macOS,
+PowerPC macOS and Linux-to-Windows workflow matrices. Windows CI uses the
+MSVC 2005/Wine container in `build/win32/msvc8-cross`; keep its mozconfigs,
+packaging, runtime checks and build guide aligned. Do not equate Wine test
+results with runtime validation on the minimum Windows versions.
+
 # macOS Build Matrix
 
 Keep `mozconfigs/macos/common.mozconfig`, the per-architecture application

@@ -287,6 +287,12 @@ Planned or desired platform work should be documented separately from verified
 support. Architecture portability is part of keeping ZoolRunner useful as an
 application runtime, not merely a browser-porting exercise.
 
+All OS build pipelines cover at least **Suite, Browser, Calendar and
+XULRunner**. The [Windows workflow](.github/workflows/windows.yml) cross-builds
+Windows x86 on Linux using MSVC 2005 and Wine, packages each application and
+runs import audits and Wine regressions. Local pipeline validation is in
+progress; see the [build guide](build/win32/msvc8-cross/README.md).
+
 ## Legacy Windows Compatibility
 
 The minimum Windows targets are **Windows 95** and **Windows NT 4.0**.
