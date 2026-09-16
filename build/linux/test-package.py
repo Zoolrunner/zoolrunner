@@ -29,7 +29,10 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     runtime = stage / 'runtime'
     home = base / 'home'
     home.mkdir()
-    env = dict(os.environ, LD_LIBRARY_PATH=str(runtime), HOME=str(home), MOZ_NO_REMOTE='1')
+    # Unix XPCOM uses MOZILLA_FIVE_HOME (or cwd) to locate components.
+    # LD_LIBRARY_PATH alone only lets the ELF loader find shared libraries.
+    env = dict(os.environ, LD_LIBRARY_PATH=str(runtime), MOZILLA_FIVE_HOME=str(runtime),
+               HOME=str(home), MOZ_NO_REMOTE='1')
 
     def run(command, label, marker=None, expected=0, data=None):
         r = subprocess.run([str(x) for x in command], env=env, input=data,
@@ -72,7 +75,8 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         run([base / case], case, marker)
     expat = base / 'expat'
     command = ['gcc'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
-    command += ['-I' + str(root / 'parser/expat'), '-I' + str(root / 'parser/expat/lib'),
+    command += ['-DXP_UNIX', '-I' + str(includes / 'nspr'),
+                '-I' + str(root / 'parser/expat'), '-I' + str(root / 'parser/expat/lib'),
                 str(root / 'parser/expat/tests/blocking.c'),
                 str(includes.parent.parent / 'parser/expat/lib/libexpat_s.a'), '-o', str(expat)]
     run(command, 'expat-build')

@@ -36,6 +36,21 @@ checks ELF class/machine, dynamic dependencies, generated SpiderMonkey ABI
 metadata, JavaScript regressions, native JSAPI/Expat probes, and GTK2/Xlib windows
 under Xvfb. Suite also exercises application lifecycle and ChatZilla fixtures.
 
+The relocated-package runner sets both `LD_LIBRARY_PATH` and
+`MOZILLA_FIVE_HOME` to the extracted runtime. Unix XPCOM uses the latter to
+find its components; without it, launching `xpcshell` from the source checkout
+fails with `failed to get nsJSRuntimeService!` even when all ELF dependencies
+resolve. The native Expat probe also needs the target build's NSPR headers.
+
+Local revalidation on 2026-09-16 used an existing x86_64 GTK2 Suite archive
+in the Oracle Linux 8 container on Apple Silicon. It reproduced the component
+lookup failure without `MOZILLA_FIVE_HOME`. With the runner fixes, shell
+regressions, native JSAPI and Expat probes, application navigation and window
+bootstrap passed. The Suite lifecycle test subsequently exited with code 11
+during Venkman startup. This was not a fresh build or a GitHub-hosted matrix
+run; i686, Xlib and the other application packages remain unverified by this
+recheck.
+
 Bring-up has exposed and addressed host/target libIDL metadata selection,
 missing multilib development packages, Perl 5.26 literal-brace handling in
 LDAP header generation, SQLite and GDK shared-library header visibility,

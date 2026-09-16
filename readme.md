@@ -292,6 +292,8 @@ using Oracle Linux 8 containers and GCC Toolset 14. Each backend has profiles
 for Suite, Browser, Calendar and XULRunner.
 The [Linux build guide](build/linux/README.md) records the procedure and
 validation status; compilation and runtime verification are in progress.
+The relocated Linux test runner supplies `MOZILLA_FIVE_HOME` as well as the
+library path so XPCOM discovers the packaged components outside the build tree.
 
 All OS build pipelines cover at least **Suite, Browser, Calendar and
 XULRunner**. The [Windows workflow](.github/workflows/windows.yml) cross-builds
