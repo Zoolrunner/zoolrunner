@@ -40,6 +40,7 @@ dedicated test disk. Subsequent boots check the filesystems and reuse the applic
 At the single-user `localhost#` prompt, the local VM's startup commands are:
 
 ```
+/sbin/fsck_hfs -y /dev/rdisk0s2
 /sbin/mount -t hfs /dev/disk0s2 /private/tmp
 sh /tmp/run.sh suite &
 exit
@@ -51,10 +52,10 @@ Choose `browser`, `calendar` or `xulrunner` instead of `suite` as needed. The
 startup script must ignore hangup (`trap '' 1`) before entering the background:
 otherwise leaving the boot console can terminate it before the GUI starts.
 It checks and mounts the application and home partitions, mounts volfs, and waits for the
-desktop before launching. Quitting the selected application syncs the disks and
-halts the guest cleanly. Its diagnostic log is `/tmp/zool-startup.log`.
-The shutdown wrapper waits for any replacement Toolkit process as well as the
-initial launcher, since first-run profile setup can relaunch asynchronously.
+desktop before launching. Its diagnostic log is `/tmp/zool-startup.log`.
+The VM remains running when the application quits or relaunches. Use UTM Stop
+to end a session; the next boot checks the transfer, application and home
+filesystems before mounting them.
 
 The local `.command` shortcuts automate these keystrokes through a QMP socket
 in UTM's shared application-group directory. They start only a stopped VM and
@@ -72,3 +73,9 @@ works. Their native menu bar is blank in the copied installer environment;
 automated Command-Q attempts did not quit Browser. Use UTM Stop if necessary;
 the startup script checks the persistent filesystems on the next boot. These
 GUI observations do not establish complete desktop/menu/keyboard compatibility.
+
+Browser cold-start rendering was verified. Suite rendered in the initial UTM
+session, but repeated startup still opens the profile wizard even after the
+profile API reports successful setup. This remains unresolved. The Calendar
+and XULRunner shortcuts were not exercised in UTM; their Linux QEMU runtime/GUI
+results do not substitute for that separate emulator check.
