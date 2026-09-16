@@ -35,6 +35,21 @@
  * ***** END LICENSE BLOCK ***** */
 
 #import <Cocoa/Cocoa.h>
+#include "../../widget/src/cocoa/nsCocoaKeyEvents.h"
+
+#if !defined(__LP64__)
+@interface ZoolBootstrapApplication : NSApplication
+@end
+
+@implementation ZoolBootstrapApplication
+- (void)sendEvent:(NSEvent*)event
+{
+  if (!ZRDispatchCommandKey(self, event))
+    [super sendEvent:event];
+}
+@end
+#endif
+
 
 #include "nsNativeAppSupport.h"
 #include "nsString.h"
@@ -215,7 +230,11 @@ PRBool NS_CanRun()
   // init Cocoa before anything else happens, like showing the 
   // splash screen.
   // XXX We leak the pool, but that's ok, it'll go away when the app quits
+#if defined(__LP64__)
   [NSApplication sharedApplication];
+#else
+  [ZoolBootstrapApplication sharedApplication];
+#endif
   NSAutoreleasePool * pool = [[NSAutoreleasePool alloc] init];
 
 #if defined(MAC_OS_X_VERSION_10_6) && \

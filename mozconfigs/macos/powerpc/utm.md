@@ -68,7 +68,11 @@ application-name menu unresponsive. Launch Services supplies the required
 application registration; this distinction is not covered by the direct-launch
 GUI fixture alone. The standalone example uses a small `XULRunner Test.app`
 launcher, built from [`utm-xulrunner.c`](../../../build/macosx/tests/utm-xulrunner.c),
-to supply its manifest and dedicated profile. Cross-compile these helpers with
+to supply its manifest and dedicated profile. Like the existing macOS
+XULRunner stub, it must retain the bundle launcher's `argv[0]`, set
+`XRE_BINARY_PATH` to the actual runtime, and provide its library directory.
+Using the bare runtime path as `argv[0]` loses Cocoa's bundle identity and can
+leave a visible window without keyboard input. Cross-compile these helpers with
 the target-10.0 toolchain; its `libzoolcxx.dylib` must be beside each helper.
 
 The VM remains running when the application quits or relaunches. Use UTM Stop
@@ -115,9 +119,17 @@ subtree. The damaged file was preserved as `Application Registry.before-repair`
 in both its original directory and `/tmp/work`, then rebuilt using Suite's
 `-CreateProfile` command. A separate process now finds `ZoolUTMDesktop`, and
 Suite launches into the local page. Existing profile directories were retained.
-Command-key shortcuts remain broken in the copied original-10.0 guest, although
-ordinary text entry and search submission work. View/window key-equivalent
-forwarding experiments did not resolve this and were removed.
+The 32-bit application event loop now forwards Command shortcuts that original
+AppKit does not deliver to view/window key-equivalent handlers. Native Cocoa
+and Carbon menus get priority; the latter use `IsMenuKeyEvent`'s MenuRef because
+system menus cannot reliably be resolved from a numeric menu ID. Browser
+Command-A, copy/paste, Command-L and Command-Q have passed in the original OS.
+Suite's clean-package Command-A, copy/paste and Command-Q checks also pass;
+Quit closes the window and ends the process. Its Command-L address selection
+and Command-H were checked with temporary tracing before the clean-package
+run. Calendar's clean-package Command-A and Command-Q checks pass too. The
+standalone XULRunner input check passes: Command-A replaces the textbox value
+with 7, and Increment changes it to 8.
 Calendar's launcher, main window, application menu and native Quit passed in UTM.
 The XULRunner launcher opens the standalone Simple App, and its Increment
 button was checked in UTM. This minimal example has no XUL menu bar and does

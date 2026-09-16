@@ -717,7 +717,17 @@ and application-name menus on the oldest target, including actual commands;
 a rendered menu bar alone does not validate native menu interaction. In the
 original-10.0 UTM guest, open bundles through Launch Services for interactive
 tests; a direct shell launch can display a window without correct native
-application-menu registration. See `mozconfigs/macos/powerpc/utm.md`.
+application-menu registration. XULRunner wrapper bundles must preserve the
+stub launcher as `argv[0]` and set `XRE_BINARY_PATH` to the runtime, following
+`nsXULStubOSX.cpp`; using the runtime as `argv[0]` can lose keyboard input.
+See `mozconfigs/macos/powerpc/utm.md`.
+On 32-bit Cocoa, route Command keys at the application event loop: original
+AppKit does not forward unmatched shortcuts to view/window key equivalents.
+Match native Carbon commands using `IsMenuKeyEvent` and its returned MenuRef;
+system application menus cannot reliably be found by a numeric menu ID.
+Keep Suite's early Cocoa initialization and Toolkit's application shell using
+the same dispatch policy. Check editing, navigation and Quit in the original
+OS, while leaving the existing 64-bit AppKit event path intact.
 Linux cross-builds may use the small generated classic resources in
 `config/macos/resources`, but must verify the source and resource hashes.
 Regenerate them with Apple's tools when their authoritative sources change;

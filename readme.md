@@ -386,6 +386,11 @@ toolbar orientation and translated text placement.
 See the [10.0 progress and constraints](mozconfigs/macos/powerpc/10.0-status.md).
 The same test environment can be copied into UTM for interactive testing; see
 the [UTM configuration and startup guide](mozconfigs/macos/powerpc/utm.md).
+The 32-bit Cocoa application loop now routes Command shortcuts through native
+menus and Gecko. Original-10.0 Browser and Suite checks cover text selection,
+clipboard commands and Quit. Calendar selection/Quit and standalone XULRunner
+text entry also pass; see the UTM guide for the input results.
+The existing 64-bit AppKit event path remains in use on modern macOS.
 
 XML parsing uses bundled Expat 2.8.4 with the classic Gecko pause/replay
 interface. Regression coverage includes stylesheet/script pauses and rendered

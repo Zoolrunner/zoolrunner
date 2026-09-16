@@ -46,6 +46,21 @@
 
 #undef DARWIN
 #import <Cocoa/Cocoa.h>
+#include "nsCocoaKeyEvents.h"
+
+#if !defined(__LP64__)
+@interface ZoolApplication : NSApplication
+@end
+
+@implementation ZoolApplication
+- (void)sendEvent:(NSEvent*)event
+{
+  if (!ZRDispatchCommandKey(self, event))
+    [super sendEvent:event];
+}
+@end
+#endif
+
 
 #include "nsAppShellCocoa.h"
 
@@ -88,7 +103,11 @@ NS_IMETHODIMP
 nsAppShellCocoa::Create(int* argc, char ** argv)
 {
   // this call initializes NSApplication
+#if defined(__LP64__)
   [NSApplication sharedApplication];
+#else
+  [ZoolApplication sharedApplication];
+#endif
 	return NS_OK;
 }
 
