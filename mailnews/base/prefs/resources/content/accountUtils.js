@@ -243,6 +243,9 @@ function MsgAccountWizard()
 
 function msgOpenAccountWizard()
 {
+  // A modal wizard pumps events. Its owner can be closed while it is open,
+  // clearing the owner's globals before openDialog returns.
+  var ownerWindow = window;
   gNewAccountToLoad = null;
 
   // Check to see if the verify accounts function 
@@ -253,6 +256,9 @@ function msgOpenAccountWizard()
   else
       window.openDialog("chrome://messenger/content/AccountWizard.xul",
                         "AccountWizard", "chrome,modal,titlebar,centerscreen");
+
+  if (ownerWindow.closed)
+      return;
 
   loadInboxForNewAccount();
 

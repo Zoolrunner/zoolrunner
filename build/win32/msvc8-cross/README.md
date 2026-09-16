@@ -174,3 +174,24 @@ only in known path-bearing options and operands, including response files,
 instead of treating every slash as a path.  Wine's own `winepath` supplies the
 drive mapping, so the implementation does not assume that the host filesystem
 is mounted as `Z:`.
+
+## Guest regression payload
+
+The [Suite regression payload](tests/README.md) stages the existing JavaScript
+and GUI checks for legacy Windows VMs with a separate profile and saved logs.
+Run it against the audited aggregate package; host Wine execution alone does
+not establish NT4, Windows Me or Windows 2000 runtime compatibility.
+
+The aggregate build's `xpcshell` loads `mozcomps` at runtime and supplies its
+module table to XPCOM, matching Suite initialization without creating a clean
+build dependency cycle. In static MSVC CRT builds, the shell reads script files
+with its own CRT and passes source bytes to JSAPI; a `FILE*` cannot safely cross
+between the executable's and JavaScript DLL's independent CRTs. Both `-f` and
+`load()` follow this path. Inline `-e` scripts use the shell's script principal,
+as file scripts do, and evaluation failures return a failing exit status.
+
+Static packaging must retain the application-facing typelibs separately from
+`mozcomps.dll`. The Suite manifest includes startup, Composer, protocol and
+other enabled platform interfaces; their omission can leave a browser window
+working while breaking shutdown or other Suite applications. The payload
+checks required interfaces before running the GUI regressions.

@@ -310,8 +310,12 @@ Minimum targets are not a claim that every current binary has been verified on
 those systems. The [compatibility status](build/win32/msvc8-cross/COMPATIBILITY.md)
 records unresolved CRT/import blockers and the required Windows 95 and NT 4
 runtime checks. A successful build or Wine launch alone does not establish
-compatibility. Do not raise the OS or compiler requirements merely for
-convenience.
+compatibility. The [Suite VM regression payload](build/win32/msvc8-cross/tests/README.md)
+runs existing JavaScript and GUI checks with an isolated profile and saved logs.
+The 2026-09-16 Suite package passed all 17 regression groups on NT4 reporting
+SP6, Windows Me and Windows 2000 SP4; see the compatibility status for scope
+and remaining Windows 95 validation.
+Do not raise the OS or compiler requirements merely for convenience.
 
 ## Compatibility Philosophy
 

@@ -59,6 +59,10 @@
 #include "nsIGenericFactory.h"
 #include "nsIJSRuntimeService.h"
 #include "nsCOMPtr.h"
+#ifdef MOZ_XPCSHELL_META_LIBRARY
+#include "nsXPCOM.h"
+#include "prlink.h"
+#endif
 #include "nsIXPCSecurityManager.h"
 
 #ifndef XPCONNECT_STANDALONE
@@ -69,6 +73,7 @@
 // all this crap is needed to do the interactive shell stuff
 #include <stdlib.h>
 #include <errno.h>
+#include <limits.h>
 #if defined(XP_WIN) || defined(XP_OS2)
 #include <io.h>     /* for isatty() */
 #elif defined(XP_UNIX) || defined(XP_BEOS)
@@ -239,6 +244,48 @@ Evaluate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return ok;
 }
 
+#if defined(_MSC_VER) && !defined(_DLL)
+static JSScript*
+CompileLocalFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
+{
+    // With /MT, this executable and the JS DLL have separate CRT stream
+    // tables and locks. Read and close our FILE here; only bytes cross JSAPI.
+    char *source = NULL;
+    size_t length = 0, capacity = 0;
+    JSScript *script = NULL;
+    for (;;) {
+        if (length == capacity) {
+            if (capacity > (size_t)INT_MAX / 2) {
+                JS_ReportError(cx, "Script file is too large: %s",
+                               filename ? filename : "<stdin>");
+                break;
+            }
+            size_t next = capacity ? capacity * 2 : 8192;
+            char *buffer = (char*)JS_realloc(cx, source, next);
+            if (!buffer)
+                break;
+            source = buffer;
+            capacity = next;
+        }
+        size_t count = fread(source + length, 1, capacity - length, file);
+        length += count;
+        if (!count) {
+            if (ferror(file))
+                JS_ReportError(cx, "Cannot read script file: %s",
+                               filename ? filename : "<stdin>");
+            else
+                script = JS_CompileScriptForPrincipals(cx, obj, gJSPrincipals,
+                                                       source, length,
+                                                       filename, 1);
+            break;
+        }
+    }
+    JS_free(cx, source);
+    fclose(file);
+    return script;
+}
+#endif
+
 JS_STATIC_DLL_CALLBACK(JSBool)
 Load(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -256,9 +303,20 @@ Load(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             return JS_FALSE;
         argv[i] = STRING_TO_JSVAL(str);
         filename = JS_GetStringBytes(str);
+        if (!filename)
+            return JS_FALSE;
         file = fopen(filename, "r");
+        if (!file) {
+            JS_ReportError(cx, "Cannot open script file %s: %s",
+                           filename, strerror(errno));
+            return JS_FALSE;
+        }
+#if defined(_MSC_VER) && !defined(_DLL)
+        script = CompileLocalFile(cx, obj, filename, file);
+#else
         script = JS_CompileFileHandleForPrincipals(cx, obj, filename, file,
-                                                   gJSPrincipals);
+                                                  gJSPrincipals);
+#endif
         if (!script)
             ok = JS_FALSE;
         else {
@@ -614,8 +672,12 @@ ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
         ungetc(ch, file);
         DoBeginRequest(cx);
 
+#if defined(_MSC_VER) && !defined(_DLL)
+        script = CompileLocalFile(cx, obj, filename, file);
+#else
         script = JS_CompileFileHandleForPrincipals(cx, obj, filename, file,
-                                                   gJSPrincipals);
+                                                  gJSPrincipals);
+#endif
 
         if (script) {
             if (!compileOnly)
@@ -847,8 +909,12 @@ ProcessArgs(JSContext *cx, JSObject *obj, char **argv, int argc)
                 return usage();
             }
 
-            JS_EvaluateScript(cx, obj, argv[i], strlen(argv[i]), 
-                              "-e", 1, &rval);
+            DoBeginRequest(cx);
+            JSBool evaluated = JS_EvaluateScriptForPrincipals(
+                cx, obj, gJSPrincipals, argv[i], strlen(argv[i]), "-e", 1, &rval);
+            DoEndRequest(cx);
+            if (!evaluated && !gQuitting && !gExitCode)
+                gExitCode = EXITCODE_RUNTIME_ERROR;
 
             isInteractive = JS_FALSE;
             break;
@@ -1004,9 +1070,28 @@ main(int argc, char **argv, char **envp)
 
     gErrFile = stderr;
     gOutFile = stdout;
+#ifdef MOZ_XPCSHELL_META_LIBRARY
+    // Keep the aggregate loaded for the process lifetime, as when the Suite
+    // links it directly. xpcshell itself is built before this library exists.
+    PRLibrary* aggregate = PR_LoadLibrary(MOZ_XPCSHELL_META_LIBRARY);
+    nsStaticModuleInfo aggregateModule = { "mozcomps", nsnull };
+    if (aggregate)
+        aggregateModule.getModule = (nsGetModuleProc)
+            PR_FindFunctionSymbol(aggregate, "nsMetaModule_nsGetModule");
+    if (!aggregateModule.getModule) {
+        fprintf(gErrFile, "Cannot load the XPCOM component aggregate: %s\n",
+                MOZ_XPCSHELL_META_LIBRARY);
+        return 1;
+    }
+#endif
     {
         nsCOMPtr<nsIServiceManager> servMan;
+#ifdef MOZ_XPCSHELL_META_LIBRARY
+        rv = NS_InitXPCOM3(getter_AddRefs(servMan), nsnull, nsnull,
+                          &aggregateModule, 1);
+#else
         rv = NS_InitXPCOM2(getter_AddRefs(servMan), nsnull, nsnull);
+#endif
         if (NS_FAILED(rv)) {
             printf("NS_InitXPCOM failed!\n");
             return 1;

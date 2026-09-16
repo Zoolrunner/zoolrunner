@@ -786,6 +786,15 @@ tools run through Wine. Native Windows/VC6 builds are historical workflows,
 not the current Windows build procedure.
 
 Preserve MSVC 2005 source compatibility in code used by Windows targets.
+Static CRT DLL boundaries must not exchange CRT-owned `FILE*` streams. Read
+files in the owning module and pass bytes through the existing APIs. Aggregate
+component builds must initialize their module table in command-line utilities
+as well as GUI applications; exercise `xpcshell -e`, `-f`, stdin and `load()`
+when changing that initialization.
+Validate the packaged Suite, not only `dist/bin`: aggregate native components
+still require the complete application-facing XPT typelibs. Keep the static
+Windows package manifest synchronized with enabled platform components, and
+exercise Composer and scripted application shutdown from the package.
 Do not require a newer Microsoft compiler merely because it is newer.
 Modern compiler diagnostics, sanitizers, and architecture work may use current
 GCC/Clang on Linux or macOS.
