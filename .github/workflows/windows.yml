@@ -1,4 +1,4 @@
-name: Windows applications (MSVC 2005 In Wine) (Cross Compile From Linux)
+name: Windows Applications (MSVC 2005 In Wine) (Cross Compile From Linux)
 
 on:
   push:

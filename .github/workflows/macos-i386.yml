@@ -1,4 +1,4 @@
-name: Mac OS X i386 applications (Cross Compile From Modern MacOS)
+name: Mac OS X i386 Applications (Cross Compile From Modern MacOS)
 
 on:
   push:

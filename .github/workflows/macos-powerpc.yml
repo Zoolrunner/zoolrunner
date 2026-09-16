@@ -1,4 +1,4 @@
-name: Mac OS X 10.0 PowerPC applications (Cross Compile From Linux)
+name: Mac OS X 10.0 PowerPC Applications (Cross Compile From Linux)
 
 on:
   push:
