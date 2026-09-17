@@ -128,7 +128,6 @@ COMPONENT_LIBS += \
 	docshell \
 	embedcomponents \
 	webbrwsr \
-	editor \
 	nsappshell \
 	txmgr \
 	chrome \
@@ -145,9 +144,16 @@ DEFINES += -DMOZ_PLUGINS
 COMPONENT_LIBS += gkplugin
 endif
 
-ifndef MOZ_PLAINTEXT_EDITOR_ONLY
+ifdef MOZ_PLAINTEXT_EDITOR_ONLY
+# Match the Windows plaintext library name in editor/libeditor/build.
+ifeq (,$(filter-out WINNT WINCE,$(OS_ARCH)))
+COMPONENT_LIBS += texteditor
+else
+COMPONENT_LIBS += editor
+endif
+else
 DEFINES += -DMOZ_HTML_COMPOSER
-COMPONENT_LIBS += composer
+COMPONENT_LIBS += editor composer
 endif
 
 ifdef MOZ_STORAGE

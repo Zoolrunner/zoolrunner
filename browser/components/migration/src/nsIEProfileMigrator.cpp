@@ -45,6 +45,7 @@
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsBrowserProfileMigratorUtils.h"
 #include "nsCOMPtr.h"
+#include "nsAutoPtr.h"
 #include "nsNetCID.h"
 #include "nsDocShellCID.h"
 #include "nsDebug.h"
@@ -824,8 +825,8 @@ nsIEProfileMigrator::CopyPasswords(PRBool aReplace)
   }
 
   PStoreCreateInstancePtr PStoreCreateInstance = (PStoreCreateInstancePtr)::GetProcAddress(pstoreDLL, "PStoreCreateInstance");
-  IPStorePtr PStore;
-  hr = PStoreCreateInstance(&PStore, 0, 0, 0);
+  nsRefPtr<IPStore> PStore;
+  hr = PStoreCreateInstance(getter_AddRefs(PStore), 0, 0, 0);
 
   rv = GetSignonsListFromPStore(PStore, &signonsFound);
   if (NS_SUCCEEDED(rv))
@@ -860,8 +861,8 @@ nsIEProfileMigrator::MigrateSiteAuthSignons(IPStore* aPStore)
     return NS_OK;
 
   GUID mtGuid = {0};
-  IEnumPStoreItemsPtr enumItems = NULL;
-  hr = aPStore->EnumItems(0, &IEPStoreSiteAuthGUID, &mtGuid, 0, &enumItems);
+  nsRefPtr<IEnumPStoreItems> enumItems;
+  hr = aPStore->EnumItems(0, &IEPStoreSiteAuthGUID, &mtGuid, 0, getter_AddRefs(enumItems));
   if (SUCCEEDED(hr) && enumItems != NULL) {
     LPWSTR itemName = NULL;
     while ((enumItems->Next(1, &itemName, 0) == S_OK) && itemName) {
@@ -911,8 +912,8 @@ nsIEProfileMigrator::GetSignonsListFromPStore(IPStore* aPStore, nsVoidArray* aSi
 
   NS_ENSURE_ARG_POINTER(aPStore);
 
-  IEnumPStoreItemsPtr enumItems = NULL;
-  hr = aPStore->EnumItems(0, &IEPStoreAutocompGUID, &IEPStoreAutocompGUID, 0, &enumItems);
+  nsRefPtr<IEnumPStoreItems> enumItems;
+  hr = aPStore->EnumItems(0, &IEPStoreAutocompGUID, &IEPStoreAutocompGUID, 0, getter_AddRefs(enumItems));
   if (SUCCEEDED(hr) && enumItems != NULL) {
     LPWSTR itemName = NULL;
     while ((enumItems->Next(1, &itemName, 0) == S_OK) && itemName) {
@@ -993,8 +994,8 @@ nsIEProfileMigrator::ResolveAndMigrateSignons(IPStore* aPStore, nsVoidArray* aSi
 {
   HRESULT hr;
 
-  IEnumPStoreItemsPtr enumItems = NULL;
-  hr = aPStore->EnumItems(0, &IEPStoreAutocompGUID, &IEPStoreAutocompGUID, 0, &enumItems);
+  nsRefPtr<IEnumPStoreItems> enumItems;
+  hr = aPStore->EnumItems(0, &IEPStoreAutocompGUID, &IEPStoreAutocompGUID, 0, getter_AddRefs(enumItems));
   if (SUCCEEDED(hr) && enumItems != NULL) {
     LPWSTR itemName = NULL;
     while ((enumItems->Next(1, &itemName, 0) == S_OK) && itemName) {
@@ -1115,13 +1116,13 @@ nsIEProfileMigrator::CopyFormData(PRBool aReplace)
   }
 
   PStoreCreateInstancePtr PStoreCreateInstance = (PStoreCreateInstancePtr)::GetProcAddress(pstoreDLL, "PStoreCreateInstance");
-  IPStorePtr PStore = NULL;
-  hr = PStoreCreateInstance(&PStore, 0, 0, 0);
+  nsRefPtr<IPStore> PStore;
+  hr = PStoreCreateInstance(getter_AddRefs(PStore), 0, 0, 0);
   if (FAILED(hr) || PStore == NULL)
     return NS_OK;
 
-  IEnumPStoreItemsPtr enumItems = NULL;
-  hr = PStore->EnumItems(0, &IEPStoreAutocompGUID, &IEPStoreAutocompGUID, 0, &enumItems);
+  nsRefPtr<IEnumPStoreItems> enumItems;
+  hr = PStore->EnumItems(0, &IEPStoreAutocompGUID, &IEPStoreAutocompGUID, 0, getter_AddRefs(enumItems));
   if (SUCCEEDED(hr) && enumItems != NULL) {
     LPWSTR itemName = NULL;
     while ((enumItems->Next(1, &itemName, 0) == S_OK) && itemName) {

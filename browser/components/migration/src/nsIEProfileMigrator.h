@@ -57,8 +57,9 @@ class nsIBookmarksService;
 #endif
 class nsIPrefBranch;
 
-#import PSTOREC_DLL raw_interfaces_only
-using namespace PSTORECLib;
+// Use the Platform SDK declarations so cross-builds do not need a host DLL
+// containing the Protected Storage type library.
+#include <pstore.h>
 
 class nsIEProfileMigrator : public nsIBrowserProfileMigrator {
 public:
@@ -118,4 +119,3 @@ private:
 };
 
 #endif
-

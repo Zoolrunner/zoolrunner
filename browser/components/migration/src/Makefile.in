@@ -87,8 +87,6 @@ CPPSRCS += nsOperaProfileMigrator.cpp
 endif
 
 ifeq ($(OS_ARCH)_$(GNU_CXX),WINNT_)
-DEFINES += -DPSTOREC_DLL=\"$(subst \,\\,$(WINDIR))\\system32\\pstorec.dll\"
-
 CPPSRCS += nsIEProfileMigrator.cpp \
            $(NULL)
 endif
@@ -107,4 +105,3 @@ endif
 FORCE_STATIC_LIB = 1
 
 include $(topsrcdir)/config/rules.mk
-

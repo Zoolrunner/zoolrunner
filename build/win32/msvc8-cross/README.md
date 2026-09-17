@@ -244,8 +244,16 @@ Calendar disables plugins and uses the plaintext-only editor. Libxul's library
 list and static module table must honor both settings: linking `gkplugin.lib`
 or `composer.lib` unconditionally requires archives that Calendar does not
 build. The matching module entries must also be omitted to avoid unresolved
-entry points. This correction still requires a complete Calendar CI rerun to
-establish build, package and runtime results.
+entry points. Windows plaintext builds name the editor archive `texteditor.lib`;
+libxul must select that name instead of `editor.lib`. The corrected Calendar
+job still requires a complete rerun to establish build, package and runtime
+results.
+
+Browser uses the bundled Platform SDK's `pstore.h` interface declarations and
+Mozilla smart pointers for the IE profile importer. It must not use MSVC's
+`#import` on a build-host `pstorec.dll`: Linux cross-build hosts have no Windows
+system directory or original Protected Storage type library. Runtime loading
+of the optional Windows DLL remains unchanged.
 
 If a build stops immediately after `Building deps for ...`, check the dependency
 scanner diagnostics before investigating the target compiler. Failed scans now
@@ -275,17 +283,16 @@ artifact server uses the upload-v7 compatibility fixes; see the
 [act artifact-server note](../../../mozconfigs/macos/README.md#act-artifact-server-limitation).
 These Wine results do not validate this new package on original Windows releases.
 
-Validation was narrowed to Suite. XULRunner compiled, packaged and passed its
-audit; its isolated packaged runtime rerun passes after correcting the fixture
-launch and waiting for first-run GUI relaunches. Its complete workflow rerun
-and the Browser/Calendar jobs were cancelled, so the four-application matrix
-is not recorded as a complete pass. The production matrix still includes all
-four applications.
+[GitHub run 35222856488](https://github.com/Zoolrunner/zoolrunner/actions/runs/35222856488)
+on commit `0ff9397b` passed the complete Suite and XULRunner jobs. Browser
+failed importing the build-host Protected Storage type library, and Calendar
+failed linking the incorrectly named editor archive. Local validation now
+focuses on Browser and Calendar at the user's request; the full production
+matrix retains all four applications. Their corrected local workflow results
+are pending and must not be inferred from the two successful hosted jobs.
 
 Windows builds select the host `mkdepend` tool's existing no-X11 mode.
-A GitHub-hosted run failed at Wine prefix creation; the script now
-addresses that ownership mismatch, but a successful hosted rerun remains
-unverified. On this Apple Silicon host, Wine
-failed under container CPU emulation, so local validation uses a full x86
-Linux VM. This is a local testing requirement, not a requirement for native
-x86_64 Linux CI runners.
+The successful hosted Suite/XULRunner jobs also verify the Wine-prefix ownership
+correction. On this Apple Silicon host, Wine failed under container CPU
+emulation, so local validation uses a full x86 Linux VM. This is a local testing
+requirement, not a requirement for native x86_64 Linux CI runners.
