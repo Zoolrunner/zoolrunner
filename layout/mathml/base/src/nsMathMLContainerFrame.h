@@ -147,7 +147,7 @@ public:
                nsIFrame*       aOldFrame,
                nsIFrame*       aNewFrame);
 
-  NS_IMETHODIMP
+  NS_IMETHOD
   ReflowDirtyChild(nsIPresShell* aPresShell, 
                    nsIFrame*     aChild);
 

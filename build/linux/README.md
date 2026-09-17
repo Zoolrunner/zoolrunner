@@ -81,7 +81,7 @@ For local artifact uploads, use an
 stock act 0.2.87 rejects the production upload action's `mime_type` field.
 
 Bring-up has exposed and addressed host/target libIDL metadata selection,
-the group-box paint override's i686 interface calling convention,
+the group-box paint and MathML reflow overrides' i686 interface calling conventions,
 missing multilib development packages, Perl 5.26 literal-brace handling in
 LDAP header generation, SQLite and GDK shared-library header visibility,
 missing calling-convention annotations in interface overrides, and a
