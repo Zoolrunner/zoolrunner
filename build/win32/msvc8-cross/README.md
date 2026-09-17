@@ -288,8 +288,16 @@ on commit `0ff9397b` passed the complete Suite and XULRunner jobs. Browser
 failed importing the build-host Protected Storage type library, and Calendar
 failed linking the incorrectly named editor archive. Local validation now
 focuses on Browser and Calendar at the user's request; the full production
-matrix retains all four applications. Their corrected local workflow results
-are pending and must not be inferred from the two successful hosted jobs.
+matrix retains all four applications. Browser subsequently passed its complete local `act` workflow with the fixes
+from `cdd3f800`: compilation, package creation, PE audit, native and JavaScript
+regressions, browser chrome/navigation/error-page checks, all 17 window-bootstrap
+checks, and both artifact uploads. The fixes were applied to its running build
+before the affected directories compiled; a separate production-flags compile
+also checked the complete IE importer. Package SHA-256:
+`78a7c1b30aa3d459c2196eb0cd2e34790ba19a853c26bb31eda8f53a93c26a5f`.
+The package, logs and source-patch provenance are retained in
+`artifacts/windows-all-act-validation`. Calendar's corrected local workflow
+is still pending; its result must not be inferred from the other applications.
 
 Windows builds select the host `mkdepend` tool's existing no-X11 mode.
 The successful hosted Suite/XULRunner jobs also verify the Wine-prefix ownership
