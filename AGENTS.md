@@ -347,8 +347,9 @@ Improving SpiderMonkey is acceptable.
 
 Full ECMAScript 5 compatibility, using the corrected ECMAScript 5.1
 specification, is a required modernization target. The pinned historical
-Test262 suite now passes all 11,540 required-mode cases on macOS arm64; this is
-not an exhaustive proof of specification correctness. Preserve that result and
+Test262 suite now passes all 11,540 required-mode cases on macOS arm64 and every
+Linux aarch64 application/backend matrix entry; this is not an exhaustive
+proof of specification correctness. Preserve that result and
 track coverage with the pinned suite and focused native
 regressions in `js/tests/es5`; report failures honestly. Adding standard-library
 method names alone does not establish conformance: strict mode, descriptors,
@@ -624,7 +625,9 @@ for both backends. Linux aarch64 likewise has all four applications on both
 backends, using native Oracle Linux 8 / GCC Toolset 14 and the
 `ubuntu-24.04-arm` CI runner. Preserve the Linux AAPCS64 register/stack ABI
 probe, full pinned ES5.1 checks and Calendar unit/four-view coverage. Keep
-Darwin and Linux ARM64 stack argument layouts distinct. Use matching target multilib dependencies and keep host
+Darwin and Linux ARM64 stack argument layouts distinct. All eight ARM jobs
+pass local `act` build/package/runtime/upload validation; GitHub-hosted runs
+remain unverified. Use matching target multilib dependencies and keep host
 tools native to the container. Record
 compile, package, runtime and workflow results separately; a new mozconfig
 does not establish that an architecture or application has been tested. Keep all four applications in the modern macOS, i386 macOS,

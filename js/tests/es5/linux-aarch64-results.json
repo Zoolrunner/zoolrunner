@@ -1,0 +1,230 @@
+{
+  "platform": "Oracle Linux 8 aarch64, GCC Toolset 14, native ARM Docker containers on Apple Silicon",
+  "validation_date_utc": "2026-09-17",
+  "github_hosted_run": false,
+  "suite_revision": "7da91bceb9ce7613f87db47ddd1292a2dda58b42",
+  "mode_policy": "upstream non_strict default; every onlyStrict case included",
+  "timezone": "America/Los_Angeles",
+  "source_transport": "unicode-global-script",
+  "harness_layout": "separate-global-script",
+  "runner_sha256": "b2f6b965a19f7e85d97e27c555e55b352f024d02f7cd38f20f317579e3472321",
+  "targets": {
+    "aarch64-browser-gtk2": {
+      "validated_commit": "e18a2a22798838f59d3c87afa86b4458436ca438",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "4828ae77f48a507a1a729233ccd50b99d83f35c0e10c8a2a9fa05c98ad8d74ad",
+      "package_sha256": "5c2013af5ca169cf5e3607766ba378a0b1851703aab57d3d9e953cc3976426bd",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS"
+    },
+    "aarch64-browser-xlib": {
+      "validated_commit": "8f184387f6bf6f8765b75a038080ef004b4b9049",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "a1734ea6814274fb16b4e8e70f4e2db9f63f288a436a5bb03030c755fd4afd15",
+      "package_sha256": "25fbba002425e1e7d7537a70cecce9b3e824f9685e1d110795da45d73fe954a2",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS"
+    },
+    "aarch64-calendar-gtk2": {
+      "validated_commit": "e18a2a22798838f59d3c87afa86b4458436ca438",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "829b3e698905191049b88a97bdb44601c36ed756ce1c56ffaff7a00f93ca1c14",
+      "package_sha256": "9c7d0a3f3ccc14521b8c20e1cd65f4abf44a7ac67fa3e0ba2fc940de5d391da1",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS",
+      "calendar_unit_suites": 8,
+      "calendar_views": 4
+    },
+    "aarch64-calendar-xlib": {
+      "validated_commit": "8f184387f6bf6f8765b75a038080ef004b4b9049",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "98d82ca95dc8b7e1e44549e4ba63237aa8aa316fdfadfa250a6c4b888f859ab7",
+      "package_sha256": "c9424c87c6c5548edf732bce7b3afaf20f32161226256c69bfc6827e367dd938",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS",
+      "calendar_unit_suites": 8,
+      "calendar_views": 4
+    },
+    "aarch64-suite-gtk2": {
+      "validated_commit": "e18a2a22798838f59d3c87afa86b4458436ca438",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "d77fe740ba1e11a06023d8f0be274f6d06ea880b6cee8d415398fff5ca33500d",
+      "package_sha256": "a7b93427fd1949ac07a66d78b7bc046cda85a7b12dddfba3be2f24f428ea6500",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS",
+      "lifecycle_checks": 24,
+      "chatzilla_startup": true
+    },
+    "aarch64-suite-xlib": {
+      "validated_commit": "8f184387f6bf6f8765b75a038080ef004b4b9049",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "cf62e7faebcd36a5a11ef9dea55d8a08feebe7da2262ca5cc538553d4c637a1c",
+      "package_sha256": "07f95350c48511e8f6a05cf29c983a292e9e32962c68ef91bfefc5bee25556e8",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS",
+      "lifecycle_checks": 24,
+      "chatzilla_startup": true
+    },
+    "aarch64-xulrunner-gtk2": {
+      "validated_commit": "8f184387f6bf6f8765b75a038080ef004b4b9049",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "f7509ebd5a51d0548a684940fbd7818dfa4954a3f5e429cdee0bbd45f80c690c",
+      "package_sha256": "ef451f6acc5ca8af9ac51e924d4659083ea057862e82a2ef796bea3648342f7f",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS"
+    },
+    "aarch64-xulrunner-xlib": {
+      "validated_commit": "73953f5f073b2540f16b295ce7a0dd8e94f6f19d",
+      "compile": "PASS",
+      "generated_abi": "PASS",
+      "package_and_elf_audit": "PASS",
+      "relocated_runtime": "PASS",
+      "local_act_and_uploads": "PASS",
+      "test262_counts": {
+        "pass": 11540,
+        "fail": 0,
+        "timeout": 0,
+        "crash": 0,
+        "harness-error": 0
+      },
+      "case_modes": {
+        "non_strict": 10894,
+        "strict": 646
+      },
+      "full_report_sha256": "47ec1cc8de1d9b7b718cd921ee31b8afeda6dc7a4731192a6d1bad721b2bf997",
+      "package_sha256": "5e792ddfb3feb94d27daef3694b77b97f4dc1e7c4085bf197151ffd8f84393bc",
+      "xptcall_abi_checks": 2000,
+      "window_bootstrap_checks": 17,
+      "native_embedding_checks": 18,
+      "expat_checks": 30,
+      "additional_packaged_nss_and_sqlite_probes": "PASS"
+    }
+  },
+  "scope": "All eight ARM application/backend workflows compiled, packaged and ran locally. Test262 is the pinned historical required-mode suite, not exhaustive specification proof. GUI fixtures exercise startup, navigation, components and the listed regressions; universal application compatibility and other Linux distributions are not established."
+}

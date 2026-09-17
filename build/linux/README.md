@@ -8,7 +8,7 @@ metadata from `/usr/lib/pkgconfig`.
 
 Both architectures have GTK2 and Xlib mozconfigs for Suite, Browser, Calendar and
 XULRunner. All four x86 Suite configurations pass the complete local workflow;
-the full sixteen-entry application matrix remains unverified. The additional LoongArch Calendar and Xlib
+the full sixteen-entry x86 application matrix remains unverified. The additional LoongArch Calendar and Xlib
 application profiles have not been runtime-tested on this host.
 
 ```sh
@@ -144,6 +144,40 @@ exact upstream revision, preserves Unicode transport preflight, and retains the
 full JSON report. Calendar additionally runs its eight unit suites and all four
 views. These supplement the shared relocated-package application tests.
 
-Validation is in progress. The first GTK2 Suite compiles and passes the shared
-packaged runtime checks; full ARM matrix and extended regression results are
-not yet established. GitHub-hosted execution remains unverified.
+All eight AArch64 jobs pass fresh local `act` compilation, CPU-ABI checks,
+ELF/package audits, relocated-package runtime tests and both artifact uploads.
+These runs used native ARM containers on Apple Silicon with eight compiler jobs.
+GitHub-hosted execution and other Linux distributions remain unverified.
+
+| Application | GTK2 compile/package/runtime/`act` | Xlib compile/package/runtime/`act` |
+| --- | --- | --- |
+| Suite | PASS | PASS |
+| Browser | PASS | PASS |
+| Calendar | PASS | PASS |
+| XULRunner | PASS | PASS |
+
+Each job passed all 11,540 pinned ES5.1 cases (10,894 non-strict and 646 strict),
+2,000 native XPCOM ABI calls, 17 window-bootstrap checks, 18 native embedding
+checks and 30 Expat checks, alongside the focused JavaScript regressions and
+application fixtures. Both Suite jobs passed all 24 lifecycle checks and
+ChatZilla startup. Both Calendar jobs passed eight unit suites and all four
+views, including navigation and the script-console check. XULRunner exercised
+the unchanged Simple application and its JavaScript and native C++ components.
+
+Additional tests against each of the eight extracted packages passed the
+existing `build/macosx/tests/early-nss.c` and `early-sqlite.c` probes: SHA-256,
+ChaCha20-Poly1305, P-256 signing and verification, SQL/DBM database startup,
+SQLite recursive locking and 800 concurrent inserts. These are supplemental
+local checks; the workflow's automated regression coverage is listed above.
+
+The [ARM conformance record](../../js/tests/es5/linux-aarch64-results.json)
+records each validated commit, report/package hashes and separate workflow
+stages. Archives, uploaded ZIP files and complete diagnostic logs are retained
+locally under `artifacts/linux-aarch64-validation`; `results-final.json` gives
+the eight successful workflow exits. Earlier failures remain in the history.
+The XULRunner ABI-probe link failure was fixed by selecting its packaged
+`libxul`, and the conformance runners use Python 3.6-compatible subprocess
+arguments for Oracle Linux 8. No upstream ES5 tests or assertions were changed.
+
+This validates the listed application and component regressions, not every
+historical application's behavior or exhaustive ECMAScript conformance.

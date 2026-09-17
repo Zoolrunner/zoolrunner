@@ -447,3 +447,20 @@ native packages pass reflection, legacy-language, and embedding checks, with
 Calendar additionally passing its eight existing unit tests. Updated report
 hashes and application lifecycle results are recorded in
 `conformance-results.json`.
+
+## Linux AArch64 matrix
+
+All eight Linux aarch64 application/backend workflows pass the complete pinned
+required-mode suite: 11,540 cases each, comprising 10,894 non-strict and 646
+annotated strict cases, with zero failures, crashes, timeouts or harness errors.
+Suite, Browser, Calendar and XULRunner were each tested with GTK2 and Xlib in
+native Oracle Linux 8 / GCC Toolset 14 containers through local `act`.
+Unicode transport preflight and separate harness compilation remain enabled;
+the timezone is America/Los_Angeles. The Python runner also supports Oracle
+Linux 8's Python 3.6; this changes subprocess argument spelling, not test policy.
+
+[Linux ARM conformance results](linux-aarch64-results.json) records validated
+commits, full-report hashes, package hashes and accompanying ABI/application
+checks. The [Linux guide](../../../build/linux/README.md#aarch64-bring-up)
+separates workflow checks from supplemental NSS/SQLite probes. These are local
+container results, not GitHub-hosted execution or exhaustive specification proof.
