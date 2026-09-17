@@ -263,12 +263,27 @@ Each job uploads its application ZIP and diagnostic logs. Wine regression
 results do not replace tests in Windows 95, NT 4.0 or other actual Windows
 installations. The Linux/Wine 11 toolchain has passed its compile/link/PE32/execution
 smoke test in an x86_64 Debian VM, including process-heap support. The GNU
-PE auditor also passes on the previously validated Suite package. Full
-application jobs are undergoing local `act` validation. The first Suite job
-identified an unnecessary X11-header dependency in the host `mkdepend` tool;
-Windows builds now select its existing no-X11 mode and compilation has
-progressed past that step. Full build/package/runtime validation remains
-pending. A GitHub-hosted run failed at Wine prefix creation; the script now
+PE auditor also passes on the previously validated Suite package.
+
+The complete local Suite `act` workflow passed on 2026-09-17 using MSVC2005
+and Wine 11 inside the x86 Linux VM: compilation, package creation, PE audit,
+all 17 packaged regression groups and both artifact uploads passed. The GUI
+coverage includes application startup/navigation, 17 window-bootstrap checks,
+24 lifecycle checks and ChatZilla. The package, checksums and diagnostic logs
+are retained in `artifacts/windows-act-validation/suite-local-act`. The local
+artifact server uses the upload-v7 compatibility fixes; see the
+[act artifact-server note](../../../mozconfigs/macos/README.md#act-artifact-server-limitation).
+These Wine results do not validate this new package on original Windows releases.
+
+Validation was narrowed to Suite. XULRunner compiled, packaged and passed its
+audit; its isolated packaged runtime rerun passes after correcting the fixture
+launch and waiting for first-run GUI relaunches. Its complete workflow rerun
+and the Browser/Calendar jobs were cancelled, so the four-application matrix
+is not recorded as a complete pass. The production matrix still includes all
+four applications.
+
+Windows builds select the host `mkdepend` tool's existing no-X11 mode.
+A GitHub-hosted run failed at Wine prefix creation; the script now
 addresses that ownership mismatch, but a successful hosted rerun remains
 unverified. On this Apple Silicon host, Wine
 failed under container CPU emulation, so local validation uses a full x86
