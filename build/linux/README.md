@@ -7,8 +7,8 @@ x86_64; the i686 target compiler uses `-m32 -march=i686` and target pkg-config
 metadata from `/usr/lib/pkgconfig`.
 
 Both architectures have GTK2 and Xlib mozconfigs for Suite, Browser, Calendar and
-XULRunner. These are bring-up configurations: full build and runtime
-validation is in progress. The additional LoongArch Calendar and Xlib
+XULRunner. All four x86 Suite configurations pass the complete local workflow;
+the full sixteen-entry application matrix remains unverified. The additional LoongArch Calendar and Xlib
 application profiles have not been runtime-tested on this host.
 
 ```sh
@@ -45,30 +45,39 @@ find its components; without it, launching `xpcshell` from the source checkout
 fails with `failed to get nsJSRuntimeService!` even when all ELF dependencies
 resolve. The native Expat probe also needs the target build's NSPR headers.
 
-Local revalidation on 2026-09-16 used an existing x86_64 GTK2 Suite archive
-in the Oracle Linux 8 container on Apple Silicon. It reproduced the component
-lookup failure without `MOZILLA_FIVE_HOME`. With the runner fixes, shell
-regressions, native JSAPI and Expat probes, application navigation and window
-bootstrap passed. The Suite lifecycle test subsequently exited with code 11
-during Venkman startup. An isolated rebuild identified two GCC optimization
-assumptions that conflict with the classic implementation. The x86 profiles
+Local `act` validation on 2026-09-16–17 passed all four Suite jobs, including
+fresh compilation, packaging, relocated-package runtime checks and both
+artifact uploads. These runs used Oracle Linux 8 / GCC Toolset 14 containers
+on Apple Silicon, with three compiler jobs for x86_64 GTK2 and eight for the
+other Suite configurations. They are local results, not GitHub-hosted runs.
+
+| Suite target | Compile | Target ABI | Package | Runtime | `act` / uploads |
+| --- | --- | --- | --- | --- | --- |
+| x86_64 GTK2 | PASS | PASS | PASS | PASS | PASS |
+| i686 GTK2 | PASS | PASS | PASS | PASS | PASS |
+| x86_64 Xlib | PASS | PASS | PASS | PASS | PASS |
+| i686 Xlib | PASS | PASS | PASS | PASS | PASS |
+
+Each Suite runtime run passed the shell regressions, native JSAPI/Expat probes,
+application navigation, window bootstrap, all 24 lifecycle checks and ChatZilla.
+Local logs, uploaded archives and package checksums are retained under
+`artifacts/linux-act-validation`; `results-suites.json` records workflow exits.
+x86_64 GTK2 Browser and Calendar also passed complete local workflows before
+validation was narrowed to Suite. Other application combinations remain
+unverified; Suite success does not establish their results.
+
+The lifecycle checks exposed GCC optimization assumptions that conflict with
+the classic implementation. The x86 profiles
 now use `-flifetime-dse=1` to preserve arena zeroing before frame constructors
 (including the empty frames used by HTML `wbr`), and `-fno-strict-aliasing` to
 preserve `nsCOMPtr` typed output-pointer writes. Without the latter, interface
 enumeration appended null entries and window globals lacked `NodeFilter`.
-With both settings, the isolated x86_64 GTK2 Suite package passes all packaged
-checks, including all 24 lifecycle checks and ChatZilla. This is not yet a
-fresh complete matrix or a GitHub-hosted run.
-
-The first fresh x86_64 Xlib Suite `act` run compiled, passed the target ABI
-check, and packaged successfully, but timed out during lifecycle testing.
-The Account Wizard opened by Address Book exposed an Xlib queue-dispatch bug:
+The Account Wizard opened by Address Book also exposed an Xlib queue-dispatch bug:
 the Xt callback watched the nested queue's descriptor but drained the shell's
 original queue. It now dispatches the subscribed queue, and input IDs retain
-their `XtInputId` width during removal on LP64. An isolated rebuild passes all
-packaged Xlib Suite checks, including the modal startup path, all 24 lifecycle
-checks, and ChatZilla. The runtime runner retains partial subprocess logs on
-timeout. Full fresh matrix validation remains in progress.
+their `XtInputId` width during removal on LP64. Both Xlib Suite workflows pass
+the modal startup and lifecycle paths. The runtime runner retains partial
+subprocess logs on timeout.
 
 XULRunner GUI tests select the fixture with `toolkit.defaultChromeURI` in the
 disposable profile. Its default command-line handler does not implement the
@@ -79,6 +88,10 @@ For local artifact uploads, use an
 `act` build with the v7 artifact-server compatibility fix described in the
 [macOS guide](../../mozconfigs/macos/README.md#act-artifact-server-limitation);
 stock act 0.2.87 rejects the production upload action's `mime_type` field.
+The validated runs used the local `act` build with the upstream PR 6115
+artifact-server fixes. Commit source fixes before rerunning a native `act`
+job: reusing its cache at the same HEAD can retain the previous checkout.
+Verify the copied source when diagnosing a rerun.
 
 Bring-up has exposed and addressed host/target libIDL metadata selection,
 the group-box paint and MathML reflow overrides' i686 interface calling conventions,
@@ -87,14 +100,7 @@ LDAP header generation, SQLite and GDK shared-library header visibility,
 missing calling-convention annotations in interface overrides, and a
 host-word-size leak in SpiderMonkey's i686 CPU header generator. The generator
 now passes size/alignment checks against actual GCC 32-bit and 64-bit types.
-Full application validation is still pending; these fixes are not a claim
-that all sixteen jobs have passed.
-
 The Xlib app shell's `Run()` override uses `NS_IMETHOD` / `NS_IMETHODIMP`
-to preserve the interface calling convention on i686. On 2026-09-16, a
-targeted rebuild in the existing i686 Xlib Suite build volume with Oracle
-Linux 8 and GCC Toolset 14 reproduced the original conflicting-type-attributes
-error and compiled the corrected app-shell, widget and window objects as
-32-bit ELF. The widget-library link was blocked by a missing
-`libxpwidgets_s.a` in that volume; this check does not establish a complete
-application build, package or runtime result.
+to preserve the interface calling convention on i686. The group-box paint
+and MathML dirty-reflow declarations likewise use `NS_IMETHOD` to match their
+base interfaces. All are covered by the completed Suite workflows above.
