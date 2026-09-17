@@ -41,7 +41,7 @@ function do_check_false(value){if(value)do_throw('expected falsy value');}
             environment["DYLD_LIBRARY_PATH"] = str(args.library_path.absolute())
         try:
             result = subprocess.run(command, env=environment, stdout=subprocess.PIPE,
-                                    stderr=subprocess.STDOUT, text=True, timeout=60)
+                                    stderr=subprocess.STDOUT, universal_newlines=True, timeout=60)
             output = result.stdout
             ok = result.returncode == 0 and '*** PASS ***' in output and '*** FAIL ***' not in output
         except subprocess.TimeoutExpired as error:
