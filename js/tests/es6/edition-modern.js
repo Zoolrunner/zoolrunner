@@ -20,7 +20,10 @@ function modernWindowEdition() {
     var immutable = false;
     try { fixed++; } catch (error) { immutable = error instanceof TypeError; }
     return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
-           metadata && inferredMetadata && immutable && modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
+           metadata && inferredMetadata && immutable &&
+           Math.imul(4294967295, 5) === -5 && Math.clz32(1) === 31 &&
+           1 / Math.trunc(-0.25) === -Infinity && Math.sign(-7) === -1 &&
+           Math.round(0.49999999999999994) === 0 && modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
            eval("({value:1,value:2}).value") === 2 &&
            typeof /a/ === "object";
 }

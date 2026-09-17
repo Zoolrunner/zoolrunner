@@ -464,3 +464,32 @@ all four views; standalone ChatZilla initialized with working input in XULRunner
 These results cover this revision on macOS arm64 only. Other operating systems
 and architectures have not been revalidated for this batch. Full ES2015
 conformance and universal historical-application compatibility are not established.
+
+
+## Integer Math operations and rounding
+
+`Math.sign`, `Math.trunc`, `Math.clz32` and `Math.imul` are implemented through
+portable C89 code and existing engine conversion helpers. They are also
+available to legacy scripts, like the earlier Number additions. Conversion
+order, exceptions, signed zero and modulo-32-bit multiplication are covered by
+`math-integer.js` (169 checks), including callback-triggered GC. The new methods
+are nonconstructible and preserve the ordinary Math property descriptors.
+`Math.round` now avoids prematurely rounding `x + 0.5`, correcting values just
+below one half and large odd integers without changing tie direction.
+
+The diagnostic Math subset passes 376/468 test/mode cases, with all cases for
+these four methods and `round` passing. The remaining Math cases require the
+other ES2015 numeric methods and Symbol support.
+
+The complete ES2015 run records **22,938 passes, 5,628 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. This adds 38 passes
+with no previously passing case lost; runtime hashes stayed unchanged. The
+complete required-mode ES5 run passes all **11,540 cases**. Reports are
+`artifacts/es6/math-integer-full.json` and `artifacts/es6/math-integer-es5.json`.
+
+All four macOS arm64 engines rebuilt and passed packaging and relocated runtime
+checks. This includes Suite Composer lifecycle and ChatZilla checks, Browser's
+169 navigation/layout assertions, Calendar's eight unit suites and four views,
+and standalone ChatZilla startup/input in XULRunner. Other operating systems
+and architectures have not been revalidated for this batch; the ES6 goal remains
+incomplete.

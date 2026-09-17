@@ -427,8 +427,72 @@ math_round(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
     if (!js_ValueToNumber(cx, argv[0], &x))
         return JS_FALSE;
-    z = fd_copysign(fd_floor(x + 0.5), x);
+    /* Adding 0.5 first can round across a boundary before floor sees it.
+     * Values at least 2^52 are already integral. Preserve NaN and signed zero. */
+    if (!JSDOUBLE_IS_FINITE(x) || x == 0 || fd_fabs(x) >= 4503599627370496.0) {
+        z = x;
+    } else {
+        z = fd_floor(x);
+        if (x - z >= 0.5)
+            z += 1.0;
+        z = fd_copysign(z, x);
+    }
     return js_NewNumberValue(cx, z, rval);
+}
+
+static JSBool
+math_sign(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    if (x != 0 && !JSDOUBLE_IS_NaN(x))
+        x = x < 0 ? -1 : 1;
+    return js_NewNumberValue(cx, x, rval);
+}
+
+static JSBool
+math_trunc(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    return js_NewNumberValue(cx, fd_copysign(fd_floor(fd_fabs(x)), x), rval);
+}
+
+static JSBool
+math_clz32(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    uint32 x, bit;
+    jsint count;
+
+    if (!js_ValueToECMAUint32(cx, argv[0], &x))
+        return JS_FALSE;
+    count = 0;
+    for (bit = (uint32)0x80000000; bit && !(x & bit); bit >>= 1)
+        ++count;
+    *rval = INT_TO_JSVAL(count);
+    return JS_TRUE;
+}
+
+static JSBool
+math_imul(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    uint32 x, y, product;
+    jsdouble result;
+
+    if (!js_ValueToECMAUint32(cx, argv[0], &x) ||
+        !js_ValueToECMAUint32(cx, argv[1], &y))
+        return JS_FALSE;
+    /* Unsigned multiplication supplies the required modulo 2^32 result.
+     * Convert the sign without an implementation-defined unsigned cast. */
+    product = x * y;
+    result = (jsdouble)product;
+    if (product & (uint32)0x80000000)
+        result -= 4294967296.0;
+    return js_NewNumberValue(cx, result, rval);
 }
 
 static JSBool
@@ -484,18 +548,22 @@ static JSFunctionSpec math_static_methods[] = {
     {"atan",            math_atan,              1, 0, 0},
     {"atan2",           math_atan2,             2, 0, 0},
     {"ceil",            math_ceil,              1, 0, 0},
+    {"clz32",           math_clz32,             1, 0, 0},
     {"cos",             math_cos,               1, 0, 0},
     {"exp",             math_exp,               1, 0, 0},
     {"floor",           math_floor,             1, 0, 0},
+    {"imul",            math_imul,              2, 0, 0},
     {"log",             math_log,               1, 0, 0},
     {"max",             math_max,               2, 0, 0},
     {"min",             math_min,               2, 0, 0},
     {"pow",             math_pow,               2, 0, 0},
     {"random",          math_random,            0, 0, 0},
     {"round",           math_round,             1, 0, 0},
+    {"sign",            math_sign,              1, 0, 0},
     {"sin",             math_sin,               1, 0, 0},
     {"sqrt",            math_sqrt,              1, 0, 0},
     {"tan",             math_tan,               1, 0, 0},
+    {"trunc",           math_trunc,             1, 0, 0},
     {0,0,0,0,0}
 };
 

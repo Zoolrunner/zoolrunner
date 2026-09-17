@@ -171,7 +171,9 @@ grammar and conversion regressions. Modern global initialization is opt-in
 through `xpcshell -E` or selection of ES2015 before native standard-class
 initialization; script edition changes alone do not replace existing built-ins.
 Modern function metadata and restricted accessors have native, shell and
-window regressions. Anonymous ordinary functions infer names from variable
+window regressions. Portable `Math.sign`, `trunc`, `clz32` and `imul` additions
+and corrected `Math.round` boundaries have focused regression coverage.
+Anonymous ordinary functions infer names from variable
 initializers, identifier assignments and static object properties; modern
 accessors have prefixed names and cannot be constructed. Inferred names remain
 separate from lexical self-bindings. Computed property names, concise methods,
