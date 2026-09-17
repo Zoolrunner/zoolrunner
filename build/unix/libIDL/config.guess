@@ -851,6 +851,9 @@ EOF
     i*86:Minix:*:*)
 	echo ${UNAME_MACHINE}-pc-minix
 	exit ;;
+    aarch64:Linux:*:*)
+	echo aarch64-unknown-linux-gnu
+	exit 0 ;;
     arm*:Linux:*:*)
 	eval $set_cc_for_build
 	if echo __ARM_EABI__ | $CC_FOR_BUILD -E - 2>/dev/null \

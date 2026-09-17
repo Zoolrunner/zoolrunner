@@ -15,22 +15,35 @@ concurrency:
 jobs:
   build:
     name: ${{ matrix.app }} / Linux ${{ matrix.arch }} / ${{ matrix.toolkit }} / GCC 14
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
-        arch: [i686, x86_64]
+        arch: [i686, x86_64, aarch64]
         app: [suite, browser, calendar, xulrunner]
         toolkit: [gtk2, xlib]
+        include:
+          - arch: i686
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            dockerfile: oraclelinux8.Dockerfile
+          - arch: x86_64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            dockerfile: oraclelinux8.Dockerfile
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            dockerfile: oraclelinux8-aarch64.Dockerfile
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Build Oracle Linux 8 environment
         run: |
-          docker build --platform linux/amd64 -f build/linux/oraclelinux8.Dockerfile \
-            -t zoolrunner-oraclelinux8-gcc14 build/linux
+          docker build --platform ${{ matrix.platform }} -f build/linux/${{ matrix.dockerfile }} \
+            -t zoolrunner-oraclelinux8-gcc14-${{ matrix.arch }} build/linux
       - name: Build and test application
         env:
           ZR_ARCH: ${{ matrix.arch }}
@@ -38,10 +51,10 @@ jobs:
           ZR_TOOLKIT: ${{ matrix.toolkit }}
         run: |
           mkdir -p "$RUNNER_TEMP/zoolrunner-linux-$ZR_ARCH-$ZR_APP-$ZR_TOOLKIT"
-          docker run --rm --platform linux/amd64 \
+          docker run --rm --platform ${{ matrix.platform }} \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/zoolrunner-linux-$ZR_ARCH-$ZR_APP-$ZR_TOOLKIT,target=/work" \
-            -e "ZR_BUILD_JOBS=${ZR_BUILD_JOBS:-3}" zoolrunner-oraclelinux8-gcc14 \
+            -e "ZR_BUILD_JOBS=${ZR_BUILD_JOBS:-3}" zoolrunner-oraclelinux8-gcc14-${{ matrix.arch }} \
             sh /source/build/linux/build-ci.sh "$ZR_ARCH" "$ZR_APP" "$ZR_TOOLKIT"
       - name: Upload application
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

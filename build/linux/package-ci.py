@@ -8,7 +8,7 @@ import shutil
 import tarfile
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument('arch', choices=['i686', 'x86_64'])
+p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64'])
 p.add_argument('app', choices=['suite', 'browser', 'calendar', 'xulrunner'])
 p.add_argument('work', type=Path)
 p.add_argument('--toolkit', choices=['gtk2', 'xlib'], default='gtk2')
@@ -44,7 +44,7 @@ for f in runtime.rglob('*'):
         header = stream.read(20)
     if header[:4] != b'\x7fELF':
         continue
-    expected = (1, 3) if a.arch == 'i686' else (2, 62)
+    expected = {'i686': (1, 3), 'x86_64': (2, 62), 'aarch64': (2, 183)}[a.arch]
     if (header[4], int.from_bytes(header[18:20], 'little')) != expected or header[5] != 1:
         raise RuntimeError('Wrong ELF architecture: ' + str(f))
     elfs.append(str(f.relative_to(stage)))

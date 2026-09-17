@@ -40,6 +40,8 @@ if test "$ZR_LINUX_ARCH" = i686; then
   PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig:/usr/share/pkgconfig
   export CROSS_COMPILE PKG_CONFIG_LIBDIR
   ac_add_options --target=i686-pc-linux-gnu
+elif test "$ZR_LINUX_ARCH" = aarch64; then
+  ac_add_options --target=aarch64-unknown-linux-gnu
 else
   ac_add_options --target=x86_64-pc-linux-gnu
 fi

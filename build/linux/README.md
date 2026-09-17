@@ -1,4 +1,4 @@
-# Linux x86 builds
+# Linux builds
 
 The i686 and x86_64 bring-up uses **Oracle Linux 8** (`oraclelinux:8`) and
 **GCC Toolset 14** for both local builds and CI. The amd64 container includes
@@ -33,7 +33,7 @@ the example to select another configuration. The third argument selects
 tools run through OrbStack/Rosetta; 32-bit runtime execution requires working
 i386 emulation and must be checked separately from compilation.
 
-The Linux workflow has sixteen jobs (four applications × two x86 targets × two toolkits).
+The Linux workflow has 24 jobs (four applications × three targets × two toolkits).
 Packages dereference build-tree symlinks and omit host utilities. Validation
 checks ELF class/machine, dynamic dependencies, generated SpiderMonkey ABI
 metadata, JavaScript regressions, native JSAPI/Expat probes, and GTK2/Xlib windows
@@ -104,3 +104,42 @@ The Xlib app shell's `Run()` override uses `NS_IMETHOD` / `NS_IMETHODIMP`
 to preserve the interface calling convention on i686. The group-box paint
 and MathML dirty-reflow declarations likewise use `NS_IMETHOD` to match their
 base interfaces. All are covered by the completed Suite workflows above.
+
+## AArch64 bring-up
+
+The little-endian AArch64 LP64 port uses native Oracle Linux 8 and GCC Toolset
+14, with eight profiles in `mozconfigs/linux/aarch64`. GTK2 and Xlib each have
+Suite, Browser, Calendar and XULRunner profiles. The CI matrix uses GitHub's
+[native `ubuntu-24.04-arm` runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+and `build/linux/oraclelinux8-aarch64.Dockerfile`; x86 jobs retain their existing
+amd64/multilib environment. ARM host tools are native, with no x86 multilib flags.
+
+```sh
+docker build --platform linux/arm64 -f build/linux/oraclelinux8-aarch64.Dockerfile \
+  -t zoolrunner-oraclelinux8-gcc14-aarch64 build/linux
+docker volume create zoolrunner-linux-aarch64-suite-gtk2
+docker run --rm --platform linux/arm64 \
+  --mount "type=bind,source=$PWD,target=/source,readonly" \
+  --mount type=volume,source=zoolrunner-linux-aarch64-suite-gtk2,target=/work \
+  zoolrunner-oraclelinux8-gcc14-aarch64 \
+  sh /source/build/linux/build-ci.sh aarch64 suite gtk2
+```
+
+Linux XPCOM uses a separate
+[AAPCS64](https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst)
+implementation: integer and floating-point arguments use independent register
+banks, and spilled scalars occupy eight-byte slots. Darwin's compact stack
+layout is not applicable. ELF stubs declare their function type and size.
+`TestXPTCallABI.cpp` checks native invocation and incoming stubs with mixed
+register/stack arguments, narrow scalars, 64-bit values, pointers, out parameters
+and repeated calls. Big-endian AArch64 and ILP32 are outside this port's scope.
+
+Every ARM runtime job checks 2,000 ABI calls and runs the complete pinned ES5.1
+Test262 required-mode suite (11,540 cases, America/Los_Angeles). It fetches the
+exact upstream revision, preserves Unicode transport preflight, and retains the
+full JSON report. Calendar additionally runs its eight unit suites and all four
+views. These supplement the shared relocated-package application tests.
+
+Validation is in progress. The first GTK2 Suite compiles and passes the shared
+packaged runtime checks; full ARM matrix and extended regression results are
+not yet established. GitHub-hosted execution remains unverified.

@@ -62,6 +62,7 @@ up its compiler, SDK, and host dependencies:
 | Target | Build guide and requirements |
 | --- | --- |
 | Linux i686 / x86_64 | [Linux build guide](build/linux/README.md): Oracle Linux 8 containers, GCC Toolset 14, GTK2 or Xlib |
+| Linux aarch64 | [Linux build guide](build/linux/README.md#aarch64-bring-up): native Oracle Linux 8, GCC Toolset 14, GTK2 or Xlib |
 | Linux LoongArch64 | [Checked-in profiles](mozconfigs/linux/loongarch64): GCC, GTK2 or experimental Xlib |
 | macOS arm64 / x86_64 | [macOS build guide](mozconfigs/macos/README.md): Clang, Cocoa, and **SDK 11.3** |
 | Mac OS X i386 | [i386 cross-build guide](mozconfigs/macos/i386/README.md): SDK 10.4u for target code, SDK 11.3 for native host tools |
@@ -117,6 +118,7 @@ The linked guides retain the detailed test scope and reproduction procedures.
 | Mac OS X i386 | All four applications pass local `act` compilation and packaging checks with an explicit 10.4 deployment target. | Runtime compatibility is unverified; recorded artifact uploads encountered a local server limitation. |
 | Windows x86 | Suite passes the complete local MSVC2005/Wine `act` build, package, audit, runtime and upload workflow. A separate September 16 Suite package passes 17 regression groups in NT 4.0, Me, and 2000 guests. | The new Wine-tested package has not been revalidated on original Windows releases. Windows 95 blockers and the remaining application matrix remain open; see the [Windows build guide](build/win32/msvc8-cross/README.md). |
 | Linux LoongArch64 | GTK2 Browser and Suite builds are recorded; experimental Xlib Browser creates and paints windows. | Xlib remains less complete. Additional Calendar and Xlib application profiles have not been runtime-validated. |
+| Linux aarch64 | Native port, eight application/backend profiles and CI jobs are in bring-up. | Full matrix validation is in progress; see the [Linux guide](build/linux/README.md#aarch64-bring-up). |
 | Linux i686 / x86_64 | Suite passes all four local `act` build, ABI, package, runtime and upload jobs across GTK2/Xlib and both architectures. x86_64 GTK2 Browser and Calendar also pass complete local workflows. | Other application combinations and GitHub-hosted runs remain unverified. See the [Linux status](build/linux/README.md). |
 
 Modern macOS profiles currently target 11.0 for arm64 and 10.6 for x86_64. The

@@ -620,7 +620,11 @@ GCC Toolset 14. Preserve the x86 C++ profiles' `-flifetime-dse=1` and
 Exercise Suite's Venkman lifecycle and DOM interface globals when changing
 these compiler settings. Both GTK2 and Xlib must have mozconfigs and CI jobs for all
 four applications on both x86 architectures, with packaged runtime testing
-for both backends. Use matching target multilib dependencies and keep host
+for both backends. Linux aarch64 likewise has all four applications on both
+backends, using native Oracle Linux 8 / GCC Toolset 14 and the
+`ubuntu-24.04-arm` CI runner. Preserve the Linux AAPCS64 register/stack ABI
+probe, full pinned ES5.1 checks and Calendar unit/four-view coverage. Keep
+Darwin and Linux ARM64 stack argument layouts distinct. Use matching target multilib dependencies and keep host
 tools native to the container. Record
 compile, package, runtime and workflow results separately; a new mozconfig
 does not establish that an architecture or application has been tested. Keep all four applications in the modern macOS, i386 macOS,

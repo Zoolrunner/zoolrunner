@@ -1,0 +1,4 @@
+ZR_LINUX_ARCH=aarch64
+ZR_LINUX_APP=calendar
+ZR_LINUX_TOOLKIT=xlib
+. "${MOZCONFIG%/*}/../x86-common.mozconfig"

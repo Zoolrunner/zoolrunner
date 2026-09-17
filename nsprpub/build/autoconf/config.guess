@@ -820,6 +820,9 @@ EOF
     i*86:Minix:*:*)
 	echo ${UNAME_MACHINE}-pc-minix
 	exit ;;
+    aarch64:Linux:*:*)
+	echo aarch64-unknown-linux-gnu
+	exit 0 ;;
     arm*:Linux:*:*)
 	echo ${UNAME_MACHINE}-unknown-linux-gnu
 	exit ;;

@@ -96,6 +96,13 @@ endif
 endif
 endif
 endif
+# AArch64 Linux (AAPCS64, little-endian LP64)
+ifeq ($(OS_ARCH)$(OS_TEST),Linuxaarch64)
+CPPSRCS         := xptcinvoke_linux_aarch64.cpp xptcstubs_linux_aarch64.cpp
+ASFILES         := xptcinvoke_asm_linux_aarch64.s xptcstubs_asm_linux_aarch64.s
+ASFLAGS         += -x assembler-with-cpp
+endif
+
 # IA64 Linux
 ifneq (,$(filter Linux,$(OS_ARCH)))
 ifneq (,$(findstring ia64,$(OS_TEST)))

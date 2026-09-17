@@ -9,7 +9,7 @@ zr_toolkit=${3:-gtk2}
 case "$zr_toolkit" in gtk2|xlib) ;; *) exit 2 ;; esac
 zr_suffix=
 if test "$zr_toolkit" = xlib; then zr_suffix=-xlib; fi
-case "$zr_arch" in i686|x86_64) ;; *) exit 2 ;; esac
+case "$zr_arch" in i686|x86_64|aarch64) ;; *) exit 2 ;; esac
 case "$zr_app" in suite|browser|calendar|xulrunner) ;; *) exit 2 ;; esac
 mkdir -p /work/source /work/logs /work/artifacts
 rsync -a --exclude=.git --exclude='obj-*' --exclude=artifacts \

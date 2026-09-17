@@ -10,7 +10,7 @@ import tarfile
 import tempfile
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument('arch', choices=['i686', 'x86_64'])
+p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64'])
 p.add_argument('app', choices=['suite', 'browser', 'calendar', 'xulrunner'])
 p.add_argument('work', type=Path)
 p.add_argument('--toolkit', choices=['gtk2', 'xlib'], default='gtk2')
@@ -34,13 +34,13 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     env = dict(os.environ, LD_LIBRARY_PATH=str(runtime), MOZILLA_FIVE_HOME=str(runtime),
                HOME=str(home), MOZ_NO_REMOTE='1')
 
-    def run(command, label, marker=None, expected=0, data=None):
+    def run(command, label, marker=None, expected=0, data=None, timeout=180):
         log = logs / (label + '.log')
         # Keep partial output when an application hangs and hits the timeout.
         with log.open('w') as output:
             r = subprocess.run([str(x) for x in command], env=env, input=data,
                                stdout=output, stderr=subprocess.STDOUT,
-                               universal_newlines=True, timeout=180)
+                               universal_newlines=True, timeout=timeout)
         output = log.read_text(errors='replace')
         if r.returncode != expected or (marker and marker not in output):
             raise RuntimeError(label + ': exit=' + str(r.returncode) + '\n' + output[-3000:])
@@ -67,6 +67,24 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     run([shell, '-e', 'print("INLINE-PASS")'], 'inline', 'INLINE-PASS')
     run([shell, '-f', '-'], 'stdin', 'STDIN-PASS', data='print("STDIN-PASS");\n')
     run([shell, '-e', 'quit(7)'], 'exit-status', expected=7)
+    if a.arch == 'aarch64':
+        suite = base / 'test262'
+        revision = '7da91bceb9ce7613f87db47ddd1292a2dda58b42'
+        run(['git', 'init', suite], 'test262-init')
+        run(['git', '-C', suite, 'fetch', '--depth=1',
+             'https://github.com/tc39/test262.git', revision], 'test262-fetch', timeout=600)
+        run(['git', '-C', suite, 'checkout', '--detach', revision], 'test262-checkout')
+        report = logs / 'test262.json'
+        run(['python3', root / 'js/tests/es5/run-test262.py', '--suite', suite,
+             '--shell', shell, '--report', report, '--jobs', '4',
+             '--timezone', 'America/Los_Angeles'], 'test262', timeout=1800)
+        counts = json.loads(report.read_text())['counts']
+        if counts != {'pass': 11540, 'fail': 0, 'timeout': 0, 'crash': 0, 'harness-error': 0}:
+            raise RuntimeError('Incomplete pinned Test262 coverage: ' + str(counts))
+        if a.app == 'calendar':
+            run(['python3', root / 'calendar/test/run-compatibility.py', '--shell', shell,
+                 '--report-dir', logs / 'calendar-unit'], 'calendar-unit',
+                'CALENDAR-COMPATIBILITY tests=8 failures=0', timeout=600)
     includes = root / objname / 'dist/include'
     for case, source, marker in [('regexp', 'TestRegExpAbort.c', 'checks=3 failures=0'),
                                  ('embedding', 'TestObjectEmbedding.c', 'checks=18 failures=0')]:
@@ -76,6 +94,15 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                     str(root / 'js/tests/es5' / source), '-L' + str(runtime), '-lmozjs', '-o', str(base / case)]
         run(command, case + '-build')
         run([base / case], case, marker)
+    if a.arch == 'aarch64':
+        command = ['g++', '-std=gnu++98', '-fno-rtti', '-fno-exceptions',
+                   '-fshort-wchar', '-fno-strict-aliasing', '-O2', '-DXP_UNIX',
+                   '-I' + str(includes / 'xpcom'), '-I' + str(includes / 'nspr'),
+                   str(root / 'build/linux/TestXPTCallABI.cpp'),
+                   '-L' + str(runtime), '-lxpcom_core', '-lplds4', '-lplc4', '-lnspr4',
+                   '-o', str(base / 'xptcall-abi')]
+        run(command, 'xptcall-abi-build')
+        run([base / 'xptcall-abi'], 'xptcall-abi', 'XPTCALL-ABI checks=2000 failures=0')
     expat = base / 'expat'
     command = ['gcc'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
     command += ['-DXP_UNIX', '-I' + str(includes / 'nspr'),
@@ -132,5 +159,13 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         if a.app != 'xulrunner':
             command += ['-zoolrunner-test'] if a.app == 'calendar' else ['-chrome', 'chrome://zooltest/content/early-application.xul']
         run(command, label, marker)
+    if a.arch == 'aarch64' and a.app == 'calendar':
+        shutil.copy2(str(root / 'calendar/test/compatibility-overlay.xul'),
+                     str(fixture / 'compatibility-overlay.xul'))
+        with (runtime / 'chrome/chrome.manifest').open('a') as manifest:
+            manifest.write('\noverlay chrome://calendar/content/calendar.xul '
+                           'chrome://zooltest/content/compatibility-overlay.xul\n')
+        run([executable, '-profile', profile], 'calendar-window',
+            'CALENDAR-WINDOW views=4 failures=0')
 (logs / 'runtime-result.txt').write_text('PASS: ' + a.arch + ' ' + a.toolkit + ' ' + a.app + '\n')
 print(a.arch + ' ' + a.toolkit + ' ' + a.app + ': packaged runtime checks passed')

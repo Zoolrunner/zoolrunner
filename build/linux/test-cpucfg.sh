@@ -18,10 +18,17 @@ CHECK(pointer_align, JS_ALIGN_OF_POINTER == ALIGN(void *));
 CHECK(double_align, JS_ALIGN_OF_DOUBLE == ALIGN(double));
 CHECK(int64_align, JS_ALIGN_OF_INT64 == ALIGN(long long));
 #ifndef IS_LITTLE_ENDIAN
-#error Linux x86 must be little endian
+#error Supported Linux targets must be little endian
 #endif
 int main(void) { return 0; }
 C
+if test "`uname -m`" = aarch64; then
+  cp "$zr_obj/js/src/jsautocfg.h" "$zr_tmp/jsautocfg.h"
+  gcc "$zr_tmp/probe.c" -o "$zr_tmp/probe"
+  "$zr_tmp/probe"
+  echo "PASS: Linux aarch64 generated ABI"
+  exit 0
+fi
 for zr_bits in 32 64; do
   gcc -DCROSS_COMPILE -DXP_UNIX '-DMDCPUCFG="md/_linux.cfg"' \
     -DJS_TARGET_LINUX_X86_BITS="$zr_bits" -I"$zr_obj/dist/include/nspr" \
