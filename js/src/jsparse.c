@@ -1584,6 +1584,50 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     return result;
 }
 
+/* Infer only the metadata of a syntactically anonymous function.  Keeping
+ * this separate from fun->atom preserves free-name lookup and decompilation. */
+static JSBool
+InferFunctionName(JSContext *cx, JSParseNode *pn, JSAtom *name, JSOp prefix)
+{
+    JSFunction *fun;
+    JSString *str;
+    jschar *chars;
+    size_t length;
+
+    if (!JS_VERSION_IS_ES2015(cx))
+        return JS_TRUE;
+    while (pn && pn->pn_type == TOK_RP)
+        pn = pn->pn_kid;
+    if (!pn || pn->pn_type != TOK_FUNCTION || pn->pn_op != JSOP_ANONFUNOBJ)
+        return JS_TRUE;
+    fun = (JSFunction *) JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
+    if (fun->atom || fun->inferredName)
+        return JS_TRUE;
+    if (prefix == JSOP_GETTER || prefix == JSOP_SETTER) {
+        str = ATOM_TO_STRING(name);
+        length = JSSTRING_LENGTH(str);
+        if (length > ((size_t)-1 / sizeof(jschar)) - 4) {
+            JS_ReportOutOfMemory(cx);
+            return JS_FALSE;
+        }
+        chars = (jschar *) JS_malloc(cx, (length + 4) * sizeof(jschar));
+        if (!chars)
+            return JS_FALSE;
+        chars[0] = prefix == JSOP_GETTER ? 'g' : 's';
+        chars[1] = 'e';
+        chars[2] = 't';
+        chars[3] = ' ';
+        memcpy(chars + 4, JSSTRING_CHARS(str), length * sizeof(jschar));
+        name = js_AtomizeChars(cx, chars, length + 4, 0);
+        JS_free(cx, chars);
+        if (!name)
+            return JS_FALSE;
+        fun->flags |= JSFUN_NO_CONSTRUCT;
+    }
+    fun->inferredName = name;
+    return JS_TRUE;
+}
+
 static JSParseNode *
 FunctionStmt(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 {
@@ -4003,7 +4047,8 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                 goto bad_var_init;
 
             pn2->pn_expr = AssignExpr(cx, ts, tc);
-            if (!pn2->pn_expr)
+            if (!pn2->pn_expr ||
+                !InferFunctionName(cx, pn2->pn_expr, atom, JSOP_NOP))
                 return NULL;
             pn2->pn_op = (!let && data.op == JSOP_DEFCONST)
                          ? JSOP_SETCONST
@@ -4063,7 +4108,8 @@ Expr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 static JSParseNode *
 AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 {
-    JSParseNode *pn, *pn2;
+    JSParseNode *pn, *pn2, *left;
+    JSBool identifierRef;
     JSTokenType tt;
     JSOp op;
 
@@ -4096,6 +4142,8 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     }
 
     op = CURRENT_TOKEN(ts).t_op;
+    identifierRef = pn->pn_type == TOK_NAME;
+    left = pn;
     for (pn2 = pn; pn2->pn_type == TOK_RP; pn2 = pn2->pn_kid)
         continue;
     switch (pn2->pn_type) {
@@ -4149,7 +4197,15 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         return NULL;
     }
 
-    return NewBinary(cx, TOK_ASSIGN, op, pn2, AssignExpr(cx, ts, tc), tc);
+    /* ES2015 excludes parenthesized assignment targets from name inference.
+     * Retain those parentheses so decompilation preserves that distinction. */
+    if (!JS_VERSION_IS_ES2015(cx) || pn2->pn_type != TOK_NAME)
+        left = pn2;
+    pn = NewBinary(cx, TOK_ASSIGN, op, left, AssignExpr(cx, ts, tc), tc);
+    if (pn && op == JSOP_NOP && identifierRef &&
+        !InferFunctionName(cx, pn->pn_right, pn2->pn_atom, JSOP_NOP))
+        return NULL;
+    return pn;
 }
 
 static JSParseNode *
@@ -5897,6 +5953,11 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             }
             if (!propertyAtom)
                 return NULL;
+            /* Annex B's prototype setter precedes ordinary name inference. */
+            if ((propertyAtom != cx->runtime->atomState.protoAtom ||
+                 pn2->pn_op == JSOP_GETTER || pn2->pn_op == JSOP_SETTER) &&
+                !InferFunctionName(cx, pn2->pn_right, propertyAtom, pn2->pn_op))
+                return NULL;
             propertyKind = pn2->pn_op == JSOP_GETTER ? 2
                            : pn2->pn_op == JSOP_SETTER ? 4 : 1;
             ATOM_LIST_SEARCH(entry, &properties, propertyAtom);
@@ -5981,9 +6042,11 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_IN_PAREN);
         if (pn2->pn_type == TOK_STRING)
             pn2->pn_attrs |= TOKF_PAREN;
-        if (pn2->pn_type == TOK_RP ||
-            (js_CodeSpec[pn2->pn_op].prec >= js_CodeSpec[JSOP_GETPROP].prec &&
-             !afterDot)) {
+        if ((pn2->pn_type == TOK_RP ||
+             (js_CodeSpec[pn2->pn_op].prec >= js_CodeSpec[JSOP_GETPROP].prec &&
+              !afterDot)) &&
+            !(JS_VERSION_IS_ES2015(cx) && pn2->pn_type == TOK_NAME &&
+              js_PeekToken(cx, ts) == TOK_ASSIGN)) {
             /*
              * Avoid redundant JSOP_GROUP opcodes, for efficiency and mainly
              * to help the decompiler look ahead from a JSOP_ENDINIT to see a
@@ -6650,6 +6713,19 @@ js_FoldConstants(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
         }
 
         if (pn2) {
+            if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_HOOK) {
+                JSParseNode *value = pn2;
+                JSFunction *fun;
+                while (value->pn_type == TOK_RP)
+                    value = value->pn_kid;
+                if (value->pn_type == TOK_FUNCTION) {
+                    fun = (JSFunction *) JS_GetPrivate(cx, ATOM_TO_OBJECT(value->pn_funAtom));
+                    /* A conditional does not infer names. Folding it into an
+                     * anonymous function would change decompiled initializers. */
+                    if (!fun->atom && !fun->inferredName)
+                        return JS_TRUE;
+                }
+            }
             /*
              * pn2 is the then- or else-statement subtree to compile.  Take
              * care not to expose an object initialiser, which would be parsed

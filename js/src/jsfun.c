@@ -1077,9 +1077,11 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
         return JS_FALSE;
     /* Anonymous function expressions acquire a name only where the language
      * explicitly infers one. Function.prototype itself has the empty name. */
-    if (!fun->atom && FUN_INTERPRETED(fun) && !(fun->flags & JSFUN_NO_CONSTRUCT))
+    name = fun->atom ? fun->atom : fun->inferredName;
+    if (!name && FUN_INTERPRETED(fun) && !(fun->flags & JSFUN_NO_CONSTRUCT))
         return JS_TRUE;
-    name = fun->atom ? fun->atom : cx->runtime->atomState.emptyAtom;
+    if (!name)
+        name = cx->runtime->atomState.emptyAtom;
     return js_DefineNativeProperty(cx, obj,
                                    ATOM_TO_JSID(cx->runtime->atomState.nameAtom),
                                    ATOM_KEY(name), NULL, NULL,
@@ -1394,6 +1396,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
     JSContext *cx;
     JSFunction *fun;
     uint32 nullAtom;            /* flag to indicate if fun->atom is NULL */
+    uint32 nullInferredName;
     JSTempValueRooter tvr;
     uint32 flagsword;           /* originally only flags was JS_XDRUint8'd */
     JSAtom *propAtom;
@@ -1423,6 +1426,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
             return JS_FALSE;
         }
         nullAtom = !fun->atom;
+        nullInferredName = !fun->inferredName;
         flagsword = ((uint32)fun->u.i.nregexps << 16) | fun->flags;
     } else {
         fun = js_NewFunction(cx, NULL, NULL, 0, 0, NULL, NULL);
@@ -1437,6 +1441,9 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
     if (!JS_XDRUint32(xdr, &nullAtom))
         goto bad;
     if (!nullAtom && !js_XDRStringAtom(xdr, &fun->atom))
+        goto bad;
+    if (!JS_XDRUint32(xdr, &nullInferredName) ||
+        (!nullInferredName && !js_XDRStringAtom(xdr, &fun->inferredName)))
         goto bad;
 
     if (!JS_XDRUint16(xdr, &fun->nargs) ||
@@ -1627,6 +1634,8 @@ fun_mark(JSContext *cx, JSObject *obj, void *arg)
         GC_MARK(cx, fun, "private");
         if (fun->atom)
             GC_MARK_ATOM(cx, fun->atom);
+        if (fun->inferredName)
+            GC_MARK_ATOM(cx, fun->inferredName);
         if (FUN_INTERPRETED(fun) && fun->u.i.script)
             js_MarkScript(cx, fun->u.i.script);
     }
@@ -2553,6 +2562,7 @@ js_NewFunction(JSContext *cx, JSObject *funobj, JSNative native, uintN nargs,
     fun->u.n.extra = 0;
     fun->u.n.spare = 0;
     fun->atom = atom;
+    fun->inferredName = NULL;
     fun->clasp = NULL;
 
     /* Link fun to funobj and vice versa. */

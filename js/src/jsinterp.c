@@ -2774,14 +2774,18 @@ interrupt:
              * Handle JSOP_FORPROP first, so the cost of the goto do_forinloop
              * is not paid for the more common cases.
              */
+            atomIndex = GET_ATOM_INDEX(pc);
+          do_JSOP_FORPROP:
             lval = FETCH_OPND(-1);
-            atom = GET_ATOM(cx, script, pc);
+            atom = js_GetAtom(cx, &script->atomMap, atomIndex);
             id   = ATOM_TO_JSID(atom);
             i = -2;
             goto do_forinloop;
 
           BEGIN_CASE(JSOP_FORNAME)
-            atom = GET_ATOM(cx, script, pc);
+            atomIndex = GET_ATOM_INDEX(pc);
+          do_JSOP_FORNAME:
+            atom = js_GetAtom(cx, &script->atomMap, atomIndex);
             id   = ATOM_TO_JSID(atom);
 
             /*
@@ -4341,6 +4345,8 @@ interrupt:
               case JSOP_BINDNAME:     goto do_JSOP_BINDNAME;
               case JSOP_CLOSURE:      goto do_JSOP_CLOSURE;
               case JSOP_CONSTASSIGN:  goto do_JSOP_CONSTASSIGN;
+              case JSOP_FORNAME:      goto do_JSOP_FORNAME;
+              case JSOP_FORPROP:      goto do_JSOP_FORPROP;
               case JSOP_DEFCONST:     goto do_JSOP_DEFCONST;
               case JSOP_DEFFUN:       goto do_JSOP_DEFFUN;
               case JSOP_DEFLOCALFUN:  goto do_JSOP_DEFLOCALFUN;

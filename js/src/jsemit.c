@@ -1772,7 +1772,8 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
                         op == JSOP_GETMETHOD ||
                         op == JSOP_SETMETHOD ||
 #endif
-                        op == JSOP_SETCONST || op == JSOP_CONSTASSIGN)
+                        op == JSOP_SETCONST || op == JSOP_CONSTASSIGN ||
+                        op == JSOP_FORNAME || op == JSOP_FORPROP)
                        ? JSOP_LITOPX
                        : (mode == JOF_NAME)
                        ? JSOP_FINDNAME
@@ -1789,8 +1790,6 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
           case JSOP_DECPROP:    op = JSOP_DECELEM; break;
           case JSOP_DELNAME:    op = JSOP_DELELEM; break;
           case JSOP_DELPROP:    op = JSOP_DELELEM; break;
-          case JSOP_FORNAME:    op = JSOP_FORELEM; break;
-          case JSOP_FORPROP:    op = JSOP_FORELEM; break;
           case JSOP_GETPROP:    op = JSOP_GETELEM; break;
           case JSOP_GETXPROP:   op = JSOP_GETXELEM; break;
           case JSOP_IMPORTPROP: op = JSOP_IMPORTELEM; break;
@@ -1813,11 +1812,12 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
           default:
 #if JS_HAS_XML_SUPPORT
             JS_ASSERT(mode == 0 || op == JSOP_SETCONST ||
-                      op == JSOP_CONSTASSIGN ||
-                      op == JSOP_GETMETHOD || op == JSOP_SETMETHOD);
+                      op == JSOP_CONSTASSIGN || op == JSOP_FORNAME ||
+                      op == JSOP_FORPROP || op == JSOP_GETMETHOD || op == JSOP_SETMETHOD);
 #else
             JS_ASSERT(mode == 0 || op == JSOP_SETCONST ||
-                      op == JSOP_CONSTASSIGN);
+                      op == JSOP_CONSTASSIGN || op == JSOP_FORNAME ||
+                      op == JSOP_FORPROP);
 #endif
             break;
         }
@@ -5307,7 +5307,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * stack, which impose pervasive runtime "GetValue" costs.
          */
         pn2 = pn->pn_left;
-        JS_ASSERT(pn2->pn_type != TOK_RP);
+        while (pn2->pn_type == TOK_RP)
+            pn2 = pn2->pn_kid;
         atomIndex = (jsatomid) -1;
         switch (pn2->pn_type) {
           case TOK_NAME:
@@ -5400,6 +5401,13 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                                        atomIndex);
                     break;
                 }
+                if (atomIndex >= JS_BIT(16)) {
+                    /* Extended BINDNAME already pushed both object and id. */
+                    if (js_Emit1(cx, cg, JSOP_DUP2) < 0 ||
+                        js_Emit1(cx, cg, JSOP_GETXELEM) < 0)
+                        return JS_FALSE;
+                    break;
+                }
                 /* FALL THROUGH */
               case TOK_DOT:
                 if (js_Emit1(cx, cg, JSOP_DUP) < 0)
@@ -5460,6 +5468,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         }
 
         /* Finally, emit the specialized assignment bytecode. */
+        if (pn->pn_left->pn_type == TOK_RP && pn2->pn_type == TOK_NAME &&
+            js_NewSrcNote(cx, cg, SRC_PARENLEFT) < 0)
+            return JS_FALSE;
+
         switch (pn2->pn_type) {
           case TOK_NAME:
             if (pn2->pn_slot >= 0) {

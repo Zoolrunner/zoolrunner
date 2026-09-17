@@ -66,6 +66,7 @@ struct JSFunction {
     } u;
     JSAtom       *atom;         /* name for diagnostics and decompiling */
     JSClass      *clasp;        /* if non-null, constructor for this class */
+    JSAtom       *inferredName; /* modern metadata, never a lexical binding */
 };
 
 /* Internal function flag; it is not a property attribute or a public API flag. */

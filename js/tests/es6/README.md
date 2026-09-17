@@ -403,3 +403,64 @@ passes eight unit files and all four views. Standalone ChatZilla initializes
 its input widget and exits successfully in XULRunner. Runner unit and
 integration checks pass. Other operating systems and architectures have not
 been revalidated for this batch; full ES2015 conformance remains incomplete.
+
+
+## Inferred function names
+
+In explicit ES2015 mode, anonymous ordinary function expressions acquire names
+from `var`/`let`/`const` initializers, identifier assignments and static object
+property definitions. Parentheses around the function expression preserve
+eligibility; comma, conditional and logical expressions do not. Parenthesized
+assignment targets and property assignments do not infer names in ES2015.
+Annex B's `__proto__` prototype setters also do not infer names. Explicit
+function names retain precedence. This follows the edition's
+[SetFunctionName](https://262.ecma-international.org/6.0/#sec-setfunctionname)
+operation and its syntax-specific callers.
+
+Modern object accessors acquire `get ` / `set ` prefixes, have no automatic
+`prototype` property and reject construction. Legacy editions retain their
+historical anonymous accessor names and constructor behavior. Quoted, numeric
+and keyword accessor names decompile using modern accessor syntax in ES2015
+scripts. Inferred names are stored separately from the function's lexical name,
+traced by GC, retained through cloning and serialized through XDR version 35.
+They do not create a self-binding or rewrite anonymous function syntax during
+decompilation. The historical JSAPI diagnostic-name accessors remain based on
+the declared function name.
+
+`inferred-function-names.js` has 89 checks for inference and its exclusions,
+descriptors, Unicode names, closures, GC, regexp slots, cloning, decompilation
+and legacy behavior. Run it with `xpcshell -E`. `TestFunctionMetadata.c` now
+has 20 checks, retaining the prior named-function and bound-function cases and
+adding inferred names through XDR and JSAPI cloning. Both pass in the native
+macOS arm64 Browser shell; the existing 82 metadata checks also pass. The
+mixed-edition window payload includes inferred and accessor metadata.
+
+The diagnostic `fn-name` subset passes 22/104 test/mode cases. The remaining
+cases also require computed properties, concise methods, destructuring defaults,
+arrows, generators or classes. Those features remain unfinished.
+
+Parenthesized identifier assignment targets retain a bytecode source note, and
+conditional folding preserves anonymous-function branches whose decompilation
+would otherwise acquire a name. The earlier extended-operand fixture now has
+24 checks. It also covers legacy and modern global reads/writes, increments,
+compound assignment, deletion, for-in name/property targets and method calls.
+The new coverage corrected existing extended-operand stack/decompilation paths:
+`FINDNAME` decompiles as an identifier, compound assignment retains its object
+and id, for-in targets retain their literal operands, and source notes are read
+at the start of an extended instruction.
+
+The complete Suite ES2015 rerun records **22,900 passes, 5,666 failures,
+14 unsupported modules, zero timeouts, zero crashes and two harness errors**.
+Compared with the const batch, 16 additional cases pass and no passing case
+regresses. The runtime hash remained unchanged throughout the run. The full
+required-mode ES5 rerun passes all **11,540 cases**. Reports are
+`artifacts/es6/inferred-names-final-full.json` and
+`artifacts/es6/inferred-names-final-es5.json`.
+
+All four macOS arm64 applications rebuilt and passed packaging and relocated
+runtime checks. Suite passed Composer lifecycle and ChatZilla checks; Browser
+passed 169 navigation/layout assertions; Calendar passed eight unit suites and
+all four views; standalone ChatZilla initialized with working input in XULRunner.
+These results cover this revision on macOS arm64 only. Other operating systems
+and architectures have not been revalidated for this batch. Full ES2015
+conformance and universal historical-application compatibility are not established.

@@ -422,6 +422,10 @@ Use `xpcshell -E` to select ES2015 before global built-in initialization. Native
 embeddings select the edition before `JS_InitStandardClasses`. Keep unversioned
 application globals unchanged, and exercise `function-metadata.js` with `-E`
 and `TestFunctionMetadata.c` when changing function metadata or initialization.
+Keep inferred names separate from declared function names so inference cannot
+introduce lexical self-bindings or alter decompiled anonymous-function syntax.
+Exercise `inferred-function-names.js`, including legacy accessor construction,
+GC, quoted/numeric accessor decompilation and the native XDR/clone checks.
 Script selection is not yet a complete policy for global built-in semantics;
 do not claim that partial edition support establishes ES2015 compliance.
 Test real applications separately: a Test262 pass cannot establish that every

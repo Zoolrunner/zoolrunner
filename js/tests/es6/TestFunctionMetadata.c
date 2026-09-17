@@ -28,6 +28,14 @@ int main(void)
     void *data;
     int status = 1;
     const char *source = "function named(a,b){var r=/a/;return typeof r==='object'?a+b:-1;}"
+                         "var inferred=function(v){return /x/.test('x')?v:0;};"
+                         "var accessor={get value(){return 42;}};"
+                         "var parenFactory=function(){var target;(target)=function(){};return target;};"
+                         "!parenFactory().hasOwnProperty('name') && "
+                         "!eval('('+parenFactory.toString()+')')().hasOwnProperty('name') && "
+                         "inferred.name==='inferred' && "
+                         "Object.getOwnPropertyDescriptor(accessor,'value').get.name==='get value' && "
+                         "!Object.getOwnPropertyDescriptor(accessor,'value').get.hasOwnProperty('prototype') && "
                          "named.length===2 && named.name==='named' && "
                          "Object.getOwnPropertyDescriptor(named,'length').configurable";
     const char *metadata = "cloned.length===2 && cloned.name==='named' && "
@@ -60,6 +68,17 @@ int main(void)
     JS_GC(cx);
     CHECK(JS_EvaluateScript(cx, global, metadata, strlen(metadata), "clone", 1,
                             &result) && result == JSVAL_TRUE);
+    CHECK(JS_GetProperty(cx, global, "inferred", &result) && JSVAL_IS_OBJECT(result));
+    clone = JS_CloneFunctionObject(cx, JSVAL_TO_OBJECT(result), global);
+    CHECK(clone && JS_DefineProperty(cx, global, "inferredClone", OBJECT_TO_JSVAL(clone),
+                                    NULL, NULL, 0));
+    JS_GC(cx);
+    {
+        const char *checkInferred = "inferredClone.name==='inferred' && inferredClone(42)===42 && "
+                                    "Object.getOwnPropertyDescriptor(inferredClone,'name').configurable";
+        CHECK(JS_EvaluateScript(cx, global, checkInferred, strlen(checkInferred),
+                                "inferred-clone", 1, &result) && result == JSVAL_TRUE);
+    }
     JS_SetVersion(cx, JSVERSION_ECMA_2015);
     {
         const char *bind = "var bound=named.bind(null,20);bound";
