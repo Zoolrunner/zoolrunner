@@ -4609,6 +4609,15 @@ js_DecompileValueGenerator(JSContext *cx, intN spindex, jsval v,
     if (len <= 0)
         goto do_fallback;
 
+    /* A group assignment's temporary slots describe the complete assignment,
+     * not a standalone expression.  A diagnostic fence inside a nested
+     * destructuring pattern ends before its SETSP and cannot be decompiled as
+     * the whole group.  Use the value description without suppressing the
+     * exception that requested this diagnostic. */
+    sn = js_GetSrcNote(script, begin);
+    if (sn && SN_TYPE(sn) == SRC_GROUPASSIGN)
+        goto do_fallback;
+
     /*
      * Walk forward from script->main and compute starting stack depth.
      * FIXME: Code to compute oplen copied from js_Disassemble1 and reduced.

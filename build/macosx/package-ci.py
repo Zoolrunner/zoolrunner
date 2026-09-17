@@ -176,8 +176,15 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
                 ("legacy-application.js", "LEGACY-APPLICATION checks=58 failures=0"),
                 ("debugger-lifecycle.js", "DEBUGGER-LIFECYCLE checks=5 failures=0"),
+                ("destructuring-errors.js", "DESTRUCTURING-ERRORS checks=54 failures=0"),
+                ("strict-parameter-history.js", "STRICT-PARAMETER-HISTORY checks=30 failures=0"),
                 ("../es6/number.js", "ES6-NUMBER checks=156 failures=0"),
-                ("../es6/editions.js", "ES6-EDITIONS checks=36 failures=0")):
+                ("../es6/radix-literals.js", "ES6-RADIX-LITERALS checks=130 failures=0"),
+                ("../es6/editions.js", "ES6-EDITIONS checks=36 failures=0"),
+                ("../es6/contextual-keywords.js",
+                 "ES6-CONTEXTUAL-KEYWORDS checks=84 failures=0"),
+                ("../es6/lexical-parameters.js",
+                 "ES6-LEXICAL-PARAMETERS checks=36 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-f", str(root / "js/tests/es5" / test)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -196,7 +203,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         embedding_env = dict(environment, DYLD_LIBRARY_PATH=str(runtime))
         for source, marker in (
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
-                ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=11 failures=0")):
+                ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=13 failures=0")):
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",

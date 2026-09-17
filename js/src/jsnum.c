@@ -842,6 +842,35 @@ js_ValueToNumber(JSContext *cx, jsval v, jsdouble *dp)
         bp = js_UndependString(cx, str);
         if (!bp)
             return JS_FALSE;
+        if (JS_VERSION_IS_ES2015(cx)) {
+            const jschar *digits = js_SkipWhiteSpace(bp);
+            jsint radix = 0;
+
+            /* A sign is allowed for decimal strings, never radix prefixes. */
+            if ((digits[0] == '+' || digits[0] == '-') && digits[1] == '0' &&
+                (digits[2] == 'x' || digits[2] == 'X' ||
+                 digits[2] == 'b' || digits[2] == 'B' ||
+                 digits[2] == 'o' || digits[2] == 'O'))
+                goto badstr;
+            if (digits[0] == '0') {
+                if (digits[1] == 'b' || digits[1] == 'B')
+                    radix = 2;
+                else if (digits[1] == 'o' || digits[1] == 'O')
+                    radix = 8;
+            }
+            if (radix) {
+                digits += 2;
+                /* The prefix must be immediately followed by a radix digit.
+                 * strtointeger alone also accepts signs and whitespace. */
+                if (*digits < '0' || *digits >= '0' + radix)
+                    goto badstr;
+                if (!js_strtointeger(cx, digits, &ep, radix, dp))
+                    return JS_FALSE;
+                if (js_SkipWhiteSpace(ep) != bp + str->length)
+                    goto badstr;
+                return JS_TRUE;
+            }
+        }
         if ((!js_strtod(cx, bp, &ep, dp) ||
              js_SkipWhiteSpace(ep) != bp + str->length) &&
             (!js_strtointeger(cx, bp, &ep, 0, dp) ||

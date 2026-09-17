@@ -163,7 +163,11 @@ the baseline corpus, runner limitations and remaining implementation work.
 An explicit ES2015 mode now separates initial modern parser behavior from
 historical script modes; it remains incomplete. Existing application scripts
 keep their current defaults, with mixed-edition and embedding regressions
-covering the new boundary.
+covering the new boundary. Modern contextual `let`/`yield` parsing and
+scope-local declaration conflict checks have focused regressions; full lexical
+environments and temporal dead zones remain unfinished. Explicit ES2015 mode
+also accepts binary/octal literals and numeric strings, with separate legacy
+grammar and conversion regressions.
 
 Application compatibility is tested separately from language conformance:
 

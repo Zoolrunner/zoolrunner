@@ -1343,7 +1343,10 @@ retry:
                                                  JSMSG_RESERVED_ID, kw->chars);
                     goto error;
                 }
-            } else if (kw->version <= JSVERSION_NUMBER(cx)) {
+            } else if (kw->version <= JSVERSION_NUMBER(cx) &&
+                       !(JS_VERSION_IS_ES2015(cx) &&
+                         (kw->tokentype == TOK_LET ||
+                          kw->tokentype == TOK_YIELD))) {
                 if (hadUnicodeEscape) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                  JSMSG_RESERVED_ID, kw->chars);
@@ -1358,6 +1361,8 @@ retry:
         atom = TOKENBUF_TO_ATOM();
         if (!atom)
             goto error;
+        if (hadUnicodeEscape)
+            tp->flags |= TOKF_ESCAPE;
         tp->t_op = JSOP_NAME;
         tp->t_atom = atom;
         tt = TOK_NAME;
@@ -1368,7 +1373,9 @@ retry:
         jsint radix;
         const jschar *endptr;
         jsdouble dval;
+        JSBool explicitRadix;
 
+        explicitRadix = JS_FALSE;
         radix = 10;
         INIT_TOKENBUF();
 
@@ -1384,6 +1391,18 @@ retry:
                     goto error;
                 }
                 radix = 16;
+            } else if (JS_VERSION_IS_ES2015(cx) &&
+                       (JS_TOLOWER(c) == 'b' || JS_TOLOWER(c) == 'o')) {
+                radix = JS_TOLOWER(c) == 'b' ? 2 : 8;
+                explicitRadix = JS_TRUE;
+                ADD_TO_TOKENBUF(c);
+                c = GetChar(ts);
+                if (c < '0' || c >= '0' + radix) {
+                    js_ReportCompileErrorNumber(cx, ts,
+                                                JSREPORT_TS | JSREPORT_ERROR,
+                                                JSMSG_ILLEGAL_CHARACTER);
+                    goto error;
+                }
             } else if (JS7_ISDEC(c)) {
                 tp->flags |= TOKF_OCTAL;
                 radix = 8;
@@ -1391,6 +1410,8 @@ retry:
         }
 
         while (JS7_ISHEX(c)) {
+            if (explicitRadix && (c < '0' || c >= '0' + radix))
+                break;
             if (radix < 16) {
                 if (JS7_ISLET(c))
                     break;
@@ -1413,6 +1434,12 @@ retry:
             }
             ADD_TO_TOKENBUF(c);
             c = GetChar(ts);
+        }
+
+        if (explicitRadix && c != EOF && (JS_ISIDENT(c) || c == '\\')) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_ILLEGAL_CHARACTER);
+            goto error;
         }
 
         if (radix == 10 && (c == '.' || JS_TOLOWER(c) == 'e')) {
@@ -1456,7 +1483,8 @@ retry:
                 goto error;
             }
         } else {
-            if (!js_strtointeger(cx, TOKENBUF_BASE(), &endptr, radix, &dval)) {
+            if (!js_strtointeger(cx, TOKENBUF_BASE() + (explicitRadix ? 2 : 0),
+                                 &endptr, radix, &dval)) {
                 js_ReportCompileErrorNumber(cx, ts,
                                             JSREPORT_TS | JSREPORT_ERROR,
                                             JSMSG_OUT_OF_MEMORY);

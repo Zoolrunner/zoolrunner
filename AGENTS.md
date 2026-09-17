@@ -413,6 +413,11 @@ unversioned XUL's JS 1.7 selection and existing JSAPI version values stable.
 Exercise `js/tests/es6/editions.js`, `TestEditionEmbedding.c` and the mixed-edition
 window fixture when changing the boundary. Preserve saved editions through
 XDR, eval, decompilation, native callbacks and calls between language versions.
+Run the contextual-keyword, lexical-parameter and radix-literal regressions when
+changing modern grammar. Preserve the cross-edition destructuring-exception and
+strict-parameter-history checks in `js/tests/es5`: diagnostic decompilation must
+not suppress exceptions, and shared property-tree flags must not make one
+function's duplicate parameters invalidate unrelated strict functions.
 Script selection is not yet a complete policy for global built-in semantics;
 do not claim that partial edition support establishes ES2015 compliance.
 Test real applications separately: a Test262 pass cannot establish that every

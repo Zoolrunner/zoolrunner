@@ -63,7 +63,10 @@ int main(void)
         "function legacyEdition(){return edition()===170 && /a/('a')[0]==='a';}true";
     const char *modern =
         "'use strict';"
-        "function modernEdition(){return edition()===2015 && ({x:1,x:2}).x===2"
+        "function modernEdition(){let radixValue=0b101+0o17;var caught=false;"
+        "try{var nested;[[nested]]=[null];}catch(error){caught=error instanceof TypeError;}"
+        "return radixValue===20 && Number('0b101')===5 && caught && "
+        "edition()===2015 && ({x:1,x:2}).x===2"
         " && legacyEdition() && nativeNested() && edition()===2015;}"
         "modernEdition() && eval('modernEdition()') && "
         "Function('return edition()===2015')() && "
@@ -111,6 +114,22 @@ int main(void)
                                 &result) && result == JSVAL_TRUE && deniedWatch);
     }
     JS_SetCheckObjectAccessCallback(rt, NULL);
+    {
+        const char *names[] = {"parameter"};
+        const char *body = "let parameter=2;return parameter;";
+        JSFunction *function;
+        jsval argument = INT_TO_JSVAL(1);
+
+        CHECK(JS_CompileFunction(cx, global, "modernParameter", 1, names,
+                                 body, strlen(body), "modern-parameter", 1) == NULL);
+        JS_ClearPendingException(cx);
+        JS_SetVersion(cx, JSVERSION_1_7);
+        function = JS_CompileFunction(cx, global, "legacyParameter", 1, names,
+                                      body, strlen(body), "legacy-parameter", 1);
+        CHECK(function && JS_CallFunction(cx, global, function, 1, &argument,
+                                          &result) && result == INT_TO_JSVAL(2) &&
+              JS_GetVersion(cx) == JSVERSION_1_7);
+    }
     status = 0;
     printf("ES6-EDITION-EMBEDDING checks=%u failures=0\n", checks);
 out:

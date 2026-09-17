@@ -105,7 +105,8 @@ JSPrimaryParser(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 static JSParser FunctionStmt;
 static JSParser FunctionExpr;
 static JSParser Statements;
-static JSParser Statement;
+static JSParseNode *Statement(JSContext *cx, JSTokenStream *ts,
+                              JSTreeContext *tc, JSBool allowLexical);
 static JSParser Variables;
 static JSParser Expr;
 static JSParser AssignExpr;
@@ -727,6 +728,61 @@ StrictReserved(JSAtom *atom)
 }
 
 static JSBool
+LexicalSyntaxError(JSContext *cx, JSTokenStream *ts)
+{
+    return js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                       JSMSG_SYNTAX_ERROR);
+}
+
+/* Keep declaration conflicts local to their statement-list scope.  A var
+ * crosses enclosing blocks; a lexical declaration only belongs to one block.
+ * The older function-wide decls list cannot distinguish sibling scopes. */
+static JSBool
+RecordDeclaration(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+                  JSAtom *atom, JSOp kind)
+{
+    JSStmtInfo *stmt;
+    JSAtomList *lexicals, *vars;
+    JSAtomListElement *ale;
+    JSBool lexical;
+
+    if (!JS_VERSION_IS_ES2015(cx))
+        return JS_TRUE;
+    stmt = tc->topStmt;
+    while (stmt && !STMT_MAYBE_SCOPE(stmt))
+        stmt = stmt->down;
+    lexical = kind == JSOP_NOP ||
+              (kind == JSOP_CLOSURE && stmt &&
+               !(stmt->flags & SIF_BODY_BLOCK));
+    for (;;) {
+        lexicals = stmt ? &stmt->lexicalDecls : &tc->lexicalDecls;
+        vars = stmt ? &stmt->varDecls : &tc->varDecls;
+        ATOM_LIST_SEARCH(ale, lexicals, atom);
+        if (ale && !(lexical && kind == JSOP_CLOSURE &&
+                     ALE_JSOP(ale) == JSOP_CLOSURE &&
+                     !(tc->flags & TCF_STRICT_MODE)))
+            return LexicalSyntaxError(cx, ts);
+        if (lexical) {
+            ATOM_LIST_SEARCH(ale, vars, atom);
+            if (ale)
+                return LexicalSyntaxError(cx, ts);
+            ale = js_IndexAtom(cx, atom, lexicals);
+            if (!ale)
+                return JS_FALSE;
+            ALE_SET_JSOP(ale, kind);
+            return JS_TRUE;
+        }
+        if (!js_IndexAtom(cx, atom, vars))
+            return JS_FALSE;
+        if (!stmt)
+            return JS_TRUE;
+        do {
+            stmt = stmt->down;
+        } while (stmt && !STMT_MAYBE_SCOPE(stmt));
+    }
+}
+
+static JSBool
 RestrictedBinding(JSContext *cx, JSAtom *atom)
 {
     /* Parameter bindings use hidden atoms with the same string key. */
@@ -747,6 +803,7 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     uintN oldflags, firstLine, oldStrict;
     JSParseNode *pn;
     JSScopeProperty *sprop;
+    JSBool parametersOK;
 
     fp = cx->fp;
     funobj = fun->object;
@@ -783,8 +840,31 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
      * acquire a valid pn->pn_pos.begin from the current token.
      */
     firstLine = ts->lineno;
-    pn = Statements(cx, ts, tc);
+    parametersOK = JS_TRUE;
+    if (JS_VERSION_IS_ES2015(cx)) {
+        /* At body entry these local slots can only be destructured formal
+         * bindings; ordinary body variables have not been parsed yet. Keep
+         * the names in this body's scope so nested blocks may shadow them. */
+        for (sprop = SCOPE_LAST_PROP(OBJ_SCOPE(funobj)); sprop;
+             sprop = sprop->parent) {
+            if ((sprop->getter == js_GetArgument ||
+                 sprop->getter == js_GetLocalVariable) &&
+                JSID_IS_ATOM(sprop->id)) {
+                JSAtom *name = js_AtomizeString(cx,
+                    ATOM_TO_STRING(JSID_TO_ATOM(sprop->id)), 0);
+                if (!name || !js_IndexAtom(cx, name, &stmtInfo.varDecls)) {
+                    parametersOK = JS_FALSE;
+                    break;
+                }
+            }
+        }
+    }
+    pn = parametersOK ? Statements(cx, ts, tc) : NULL;
     if (tc->flags & TCF_STRICT_MODE) {
+        JSAtomList formals;
+        JSAtomListElement *formal;
+
+        ATOM_LIST_INIT(&formals);
         fun->flags |= JSFUN_STRICT;
         if (pn && fun->atom && RestrictedBinding(cx, fun->atom)) {
             StrictSyntaxError(cx, ts);
@@ -793,11 +873,20 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
         /* A body's directive applies to the parameters parsed before it. */
         for (sprop = SCOPE_LAST_PROP(OBJ_SCOPE(funobj)); pn && sprop;
              sprop = sprop->parent) {
-            if (sprop->getter == js_GetArgument &&
-                ((sprop->flags & SPROP_IS_DUPLICATE) ||
-                 RestrictedBinding(cx, JSID_TO_ATOM(sprop->id)))) {
-                StrictSyntaxError(cx, ts);
-                pn = NULL;
+            if (sprop->getter == js_GetArgument) {
+                JSAtom *name = JSID_TO_ATOM(sprop->id);
+
+                /* SPROP_IS_DUPLICATE is mutable on shared property-tree
+                 * nodes. Only repeated names in this function's own chain
+                 * establish duplicate formals, not another function's use
+                 * of the same shared node. */
+                ATOM_LIST_SEARCH(formal, &formals, name);
+                if (formal || RestrictedBinding(cx, name)) {
+                    StrictSyntaxError(cx, ts);
+                    pn = NULL;
+                } else if (!js_IndexAtom(cx, name, &formals)) {
+                    pn = NULL;
+                }
             }
         }
     }
@@ -914,6 +1003,7 @@ struct BindData {
     JSObject                *obj;               /* the variable object */
     JSOp                    op;                 /* prolog bytecode or nop */
     Binder                  binder;             /* binder, discriminates u */
+    JSBool                  lexicalDeclaration; /* modern let/const binding */
     union {
         struct {
             JSFunction      *fun;               /* must come first! see next */
@@ -1143,6 +1233,8 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
      * avoid optimizing variable references that might name a function.
      */
     if (!lambda && funAtom) {
+        if (!RecordDeclaration(cx, ts, tc, funAtom, JSOP_CLOSURE))
+            return NULL;
         ATOM_LIST_SEARCH(ale, &tc->decls, funAtom);
         if (ale) {
             prevop = ALE_JSOP(ale);
@@ -1264,6 +1356,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
         data.pn = NULL;
         data.ts = ts;
+        data.lexicalDeclaration = JS_FALSE;
         data.obj = fun->object;
         data.op = JSOP_NOP;
         data.binder = BindArg;
@@ -1529,7 +1622,7 @@ Statements(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     ts->flags |= TSF_OPERAND;
     while ((tt = js_PeekToken(cx, ts)) > TOK_EOF && tt != TOK_RC) {
         ts->flags &= ~TSF_OPERAND;
-        pn2 = Statement(cx, ts, tc);
+        pn2 = Statement(cx, ts, tc, JS_TRUE);
         if (!pn2) {
             if (ts->flags & TSF_EOF)
                 ts->flags |= TSF_UNEXPECTED_EOF;
@@ -1773,6 +1866,22 @@ ImportExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 #endif /* JS_HAS_EXPORT_IMPORT */
 
 static JSBool
+CheckLexicalBinding(JSContext *cx, BindData *data, JSAtom *atom)
+{
+    JSString *str;
+    const jschar *chars;
+
+    if (!data->lexicalDeclaration)
+        return JS_TRUE;
+    str = ATOM_TO_STRING(atom);
+    chars = JSSTRING_CHARS(str);
+    if (JSSTRING_LENGTH(str) == 3 && chars[0] == 'l' &&
+        chars[1] == 'e' && chars[2] == 't')
+        return LexicalSyntaxError(cx, data->ts);
+    return JS_TRUE;
+}
+
+static JSBool
 BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
 {
     JSObject *blockObj;
@@ -1781,8 +1890,15 @@ BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
 
     if ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, atom))
         return StrictSyntaxError(cx, data->ts);
+    if (!CheckLexicalBinding(cx, data, atom))
+        return JS_FALSE;
+    if (data->lexicalDeclaration &&
+        !RecordDeclaration(cx, data->ts, tc, atom, JSOP_NOP))
+        return JS_FALSE;
     blockObj = data->obj;
     sprop = SCOPE_GET_PROPERTY(OBJ_SCOPE(blockObj), ATOM_TO_JSID(atom));
+    if (sprop && data->lexicalDeclaration)
+        return LexicalSyntaxError(cx, data->ts);
     ATOM_LIST_SEARCH(ale, &tc->decls, atom);
     if (sprop || (ale && ALE_JSOP(ale) == JSOP_DEFCONST)) {
         const char *name;
@@ -1838,9 +1954,13 @@ BindVarOrConst(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
 
     if ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, atom))
         return StrictSyntaxError(cx, data->ts);
+    if (!CheckLexicalBinding(cx, data, atom))
+        return JS_FALSE;
+    if (!RecordDeclaration(cx, data->ts, tc, atom, data->op))
+        return JS_FALSE;
     stmt = js_LexicalLookup(tc, atom, NULL, JS_FALSE);
     ATOM_LIST_SEARCH(ale, &tc->decls, atom);
-    op = data->op;
+    op = data->op == JSOP_NOP ? JSOP_DEFVAR : data->op;
     if ((stmt && stmt->type != STMT_WITH) || ale) {
         prevop = ale ? ALE_JSOP(ale) : JSOP_DEFVAR;
         if (JS_HAS_STRICT_OPTION(cx)
@@ -2572,8 +2692,30 @@ LetBlock(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSBool statement)
 
 #endif /* JS_HAS_BLOCK_SCOPE */
 
+/* ES2015 let is contextual; legacy editions retain their keyword grammar. */
+static JSBool
+IsLexicalLet(JSContext *cx, JSTokenStream *ts)
+{
+    JSToken *token = &CURRENT_TOKEN(ts);
+    JSString *str;
+    const jschar *chars;
+    JSTokenType next;
+
+    if (!JS_VERSION_IS_ES2015(cx) || token->type != TOK_NAME ||
+        (token->flags & TOKF_ESCAPE))
+        return JS_FALSE;
+    str = ATOM_TO_STRING(token->t_atom);
+    chars = JSSTRING_CHARS(str);
+    if (JSSTRING_LENGTH(str) != 3 || chars[0] != 'l' ||
+        chars[1] != 'e' || chars[2] != 't')
+        return JS_FALSE;
+    next = js_PeekToken(cx, ts);
+    return next == TOK_NAME || next == TOK_LB || next == TOK_LC;
+}
+
 static JSParseNode *
-Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
+Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+          JSBool allowLexical)
 {
     JSTokenType tt;
     JSParseNode *pn, *pn1, *pn2, *pn3, *pn4;
@@ -2585,6 +2727,15 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     ts->flags |= TSF_OPERAND;
     tt = js_GetToken(cx, ts);
     ts->flags &= ~TSF_OPERAND;
+
+    if (IsLexicalLet(cx, ts)) {
+        if (!allowLexical) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
+        tt = CURRENT_TOKEN(ts).type = TOK_LET;
+        CURRENT_TOKEN(ts).t_op = JSOP_NOP;
+    }
 
 #if JS_HAS_GETTER_SETTER
     if (tt == TOK_NAME) {
@@ -2659,14 +2810,14 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         if (!pn1)
             return NULL;
         js_PushStatement(tc, &stmtInfo, STMT_IF, -1);
-        pn2 = Statement(cx, ts, tc);
+        pn2 = Statement(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
         ts->flags |= TSF_OPERAND;
         if (js_MatchToken(cx, ts, TOK_ELSE)) {
             ts->flags &= ~TSF_OPERAND;
             stmtInfo.type = STMT_ELSE;
-            pn3 = Statement(cx, ts, tc);
+            pn3 = Statement(cx, ts, tc, JS_FALSE);
             if (!pn3)
                 return NULL;
             pn->pn_pos.end = pn3->pn_pos.end;
@@ -2763,7 +2914,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                 ts->flags &= ~TSF_OPERAND;
                 if (tt == TOK_ERROR)
                     return NULL;
-                pn5 = Statement(cx, ts, tc);
+                pn5 = Statement(cx, ts, tc, JS_TRUE);
                 if (!pn5)
                     return NULL;
                 pn4->pn_pos.end = pn5->pn_pos.end;
@@ -2805,7 +2956,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         if (!pn2)
             return NULL;
         pn->pn_left = pn2;
-        pn2 = Statement(cx, ts, tc);
+        pn2 = Statement(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
         js_PopStatement(tc);
@@ -2818,7 +2969,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         if (!pn)
             return NULL;
         js_PushStatement(tc, &stmtInfo, STMT_DO_LOOP, -1);
-        pn2 = Statement(cx, ts, tc);
+        pn2 = Statement(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
         pn->pn_left = pn2;
@@ -2865,8 +3016,13 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 
         MUST_MATCH_TOKEN(TOK_LP, JSMSG_PAREN_AFTER_FOR);
         ts->flags |= TSF_OPERAND;
-        tt = js_PeekToken(cx, ts);
+        tt = js_GetToken(cx, ts);
         ts->flags &= ~TSF_OPERAND;
+        if (IsLexicalLet(cx, ts)) {
+            tt = CURRENT_TOKEN(ts).type = TOK_LET;
+            CURRENT_TOKEN(ts).t_op = JSOP_NOP;
+        }
+        js_UngetToken(ts);
         if (tt == TOK_SEMI) {
             if (pn->pn_op == JSOP_FOREACH)
                 goto bad_for_each;
@@ -2924,6 +3080,14 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
          */
         if (pn1 && js_MatchToken(cx, ts, TOK_IN)) {
             stmtInfo.type = STMT_FOR_IN_LOOP;
+
+            if (JS_VERSION_IS_ES2015(cx) && tt == TOK_LET &&
+                ((pn1->pn_head->pn_type == TOK_NAME &&
+                  pn1->pn_head->pn_expr) ||
+                 pn1->pn_head->pn_type == TOK_ASSIGN)) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
 
             /* Check that the left side of the 'in' is valid. */
             JS_ASSERT(!TOKEN_TYPE_IS_DECL(tt) || pn1->pn_type == tt);
@@ -3062,7 +3226,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_AFTER_FOR_CTRL);
 
         /* Parse the loop body into pn->pn_right. */
-        pn2 = Statement(cx, ts, tc);
+        pn2 = Statement(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
         pn->pn_right = pn2;
@@ -3171,6 +3335,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                  */
                 data.pn = NULL;
                 data.ts = ts;
+                data.lexicalDeclaration = JS_FALSE;
                 data.obj = tc->blockChain;
                 data.op = JSOP_NOP;
                 data.binder = BindLet;
@@ -3397,7 +3562,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn->pn_left = pn2;
 
         js_PushStatement(tc, &stmtInfo, STMT_WITH, -1);
-        pn2 = Statement(cx, ts, tc);
+        pn2 = Statement(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
         js_PopStatement(tc);
@@ -3468,7 +3633,8 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                  * and pretend this is a var declaration.
                  */
                 CURRENT_TOKEN(ts).type = TOK_VAR;
-                CURRENT_TOKEN(ts).t_op = JSOP_DEFVAR;
+                CURRENT_TOKEN(ts).t_op = JS_VERSION_IS_ES2015(cx)
+                                          ? JSOP_NOP : JSOP_DEFVAR;
 
                 pn = Variables(cx, ts, tc);
                 if (!pn)
@@ -3647,7 +3813,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
             /* Push a label struct and parse the statement. */
             js_PushStatement(tc, &stmtInfo, STMT_LABEL, -1);
             stmtInfo.atom = label;
-            pn = Statement(cx, ts, tc);
+            pn = Statement(cx, ts, tc, JS_FALSE);
             if (!pn)
                 return NULL;
 
@@ -3728,10 +3894,13 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     data.ts = ts;
     data.op = let ? JSOP_NOP : CURRENT_TOKEN(ts).t_op;
     data.binder = let ? BindLet : BindVarOrConst;
+    data.lexicalDeclaration = JS_VERSION_IS_ES2015(cx) &&
+                              (let || data.op == JSOP_NOP ||
+                               data.op == JSOP_DEFCONST);
     pn = NewParseNode(cx, ts, PN_LIST, tc);
     if (!pn)
         return NULL;
-    pn->pn_op = data.op;
+    pn->pn_op = (!let && data.op == JSOP_NOP) ? JSOP_DEFVAR : data.op;
     PN_INIT_LIST(pn);
 
     /*
@@ -5445,6 +5614,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
                 data.pn = NULL;
                 data.ts = ts;
+                data.lexicalDeclaration = JS_FALSE;
                 data.obj = tc->blockChain;
                 data.op = JSOP_NOP;
                 data.binder = BindLet;

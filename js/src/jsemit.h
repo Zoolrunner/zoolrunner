@@ -130,6 +130,8 @@ struct JSStmtInfo {
     JSAtom          *atom;          /* name of LABEL, or block scope object */
     JSStmtInfo      *down;          /* info for enclosing statement */
     JSStmtInfo      *downScope;     /* next enclosing lexical scope */
+    JSAtomList      lexicalDecls;  /* ES2015 declarations in this scope */
+    JSAtomList      varDecls;      /* var names crossing this scope */
 };
 
 #define SIF_SCOPE        0x0001     /* statement has its own lexical scope */
@@ -167,6 +169,8 @@ struct JSTreeContext {              /* tree context for semantic checks */
     JSParseNode     *blockNode;     /* parse node for a lexical scope.
                                        XXX combine with blockChain? */
     JSAtomList      decls;          /* function, const, and var declarations */
+    JSAtomList      lexicalDecls;  /* ES2015 script-level declarations */
+    JSAtomList      varDecls;      /* script-level var declarations */
     JSParseNode     *nodeList;      /* list of recyclable parse-node structs */
 };
 
@@ -191,6 +195,8 @@ struct JSTreeContext {              /* tree context for semantic checks */
      (tc)->tryCount = (tc)->globalUses = (tc)->loopyGlobalUses = 0,           \
      (tc)->topStmt = (tc)->topScopeStmt = NULL,                               \
      (tc)->blockChain = NULL,                                                 \
+     ATOM_LIST_INIT(&(tc)->lexicalDecls),                                     \
+     ATOM_LIST_INIT(&(tc)->varDecls),                                         \
      ATOM_LIST_INIT(&(tc)->decls),                                            \
      (tc)->nodeList = NULL, (tc)->blockNode = NULL)
 

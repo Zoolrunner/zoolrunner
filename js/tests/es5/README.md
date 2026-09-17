@@ -464,3 +464,18 @@ commits, full-report hashes, package hashes and accompanying ABI/application
 checks. The [Linux guide](../../../build/linux/README.md#aarch64-bring-up)
 separates workflow checks from supplemental NSS/SQLite probes. These are local
 container results, not GitHub-hosted execution or exhaustive specification proof.
+
+The `destructuring-errors.js` regression checks exception propagation through
+nested array/object destructuring in default, JS 1.7 and ES2015 code (54 checks).
+Diagnostic decompilation must fall back to the value when a temporary group
+assignment slot cannot be described as a complete expression; it must not
+silently stop execution instead of throwing the original TypeError. The test
+also exercises `finally`, getter exceptions, successful assignments, and
+function decompilation/recompilation. The macOS package gate includes it.
+
+`strict-parameter-history.js` adds 30 checks across the three script editions.
+Strict duplicate-parameter checks must inspect the current function's parameter
+chain: `SPROP_IS_DUPLICATE` is mutable on shared property-tree nodes and can
+reflect an unrelated function. The regression compiles valid strict functions
+after both successful duplicate-parameter functions and failed compilations,
+and checks Function construction, decompilation and garbage collection.

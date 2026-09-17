@@ -177,7 +177,8 @@ The complete pinned corpus in explicit ES2015 mode ran all 28,582 cases in
 Compared with the initial historical-default baseline, 123 cases gained a pass
 and 40 lost a pass. The latter involve incomplete `let`/`yield` handling in the
 new mode, which currently inherits parts of the older block-scope parser.
-They remain failures to resolve, not exclusions. The object-literal subset
+The subsequent contextual-keyword changes resolve those 40 regressions;
+they were never excluded. The object-literal subset
 improved from 85/208 to 105/208, with no previous passes lost. This comparison
 also includes the earlier Number additions; it is not an isolated measurement
 of the edition patch alone. The ES5 default-mode regression gate passes all
@@ -208,3 +209,101 @@ tests and focused regressions. Native embedding, chrome/content globals,
 XULRunner, Suite, ChatZilla and Calendar application checks are separate gates.
 Record architectures and runtime results explicitly; macOS arm64 results do
 not establish MSVC2005, other architectures or legacy operating-system support.
+
+## Contextual keywords and declaration checks
+
+In the explicitly selected ES2015 edition, `let` is recognized as a lexical
+statement only in declaration positions. Ordinary non-strict uses of `let`
+and `yield` remain identifiers; explicitly selected JS 1.7 retains its let
+expressions and historical generators. Lexical declarations cannot be bare
+`if`, loop, `with`, or labelled statement bodies, and a `let` for-in declaration
+cannot have an initializer. Escaped identifier spellings do not become a
+contextual declaration keyword.
+
+The parser tracks lexical and var declarations by statement-list scope to
+reject conflicts without confusing valid shadowing or separate sibling blocks.
+`contextual-keywords.js` exercises these rules with 84 assertions, including
+strict and non-strict cases, destructuring identifiers, catch parameters and
+legacy syntax. The macOS package gate runs this test alongside the earlier
+edition and Number tests.
+
+These checks do not complete lexical declarations. Top-level `let` still uses
+the historical global storage path; persistent global lexical environments,
+temporal dead zones, per-iteration environments, complete parameter/catch
+conflict rules, and ES2015 `const` semantics remain unfinished. Modern generator
+syntax and iteration semantics also remain unfinished. Do not describe the
+contextual-keyword checks as complete `let` or generator support.
+
+A separate diagnostic fix restores TypeError propagation for nested
+array destructuring of `null`, `undefined`, or an array hole inside a function.
+The upstream assignment/destructuring subset passes 74/267 cases with zero
+harness errors or lost previous passes; the remaining 193 are still failures.
+All six previously missing completion markers in this subset now pass.
+`../es5/destructuring-errors.js` adds 54 cross-edition regression checks,
+including complete function decompilation round trips. No bytecode format
+changes are involved in this diagnostic fix.
+
+
+After contextual-keyword and declaration checks, a complete 28,582-case run
+on macOS arm64 XULRunner recorded **22,595 passes, 5,963 failures, 14 unsupported,
+2 timeouts, 0 crashes, and 8 harness/completion errors** in 735.85 seconds.
+Runtime hashes were unchanged. Relative to the earlier explicit-edition run,
+45 cases gained a pass and none lost a pass. The corresponding complete ES5
+run passed **11,540/11,540** again. These full-run totals precede the subsequent
+destructuring-diagnostic and radix-literal fixes.
+
+## Binary and octal numbers
+
+Explicit ES2015 mode accepts `0b`/`0B` and `0o`/`0O` literals and numeric
+strings. Conversion uses the existing integer converter, including its
+rounding logic for power-of-two radices. Signed radix strings remain invalid;
+unary signs on source literals still work. `parseInt` and `parseFloat` retain
+their own grammars. Historical modes keep their earlier source and conversion
+behavior. `radix-literals.js` supplies 130 checks for grammar, whitespace,
+rounding, overflow, property names, coercion callbacks, and decompilation.
+
+The pinned numeric-literal subset passes **170/170** and the Number subset
+passes **362/364** on macOS arm64 XULRunner. The two remaining Number failures
+require Symbol conversion. A later upstream numeric regression,
+`built-ins/Number/string-hex-literal-invalid.js`, also passes in strict and
+non-strict modes at current-upstream pin
+`35d566604512cba908054eec49f85e64a59f3091`. That is a separately reviewed test,
+not a full current-Test262 result. The current corpus inventory has 48,912
+JavaScript files under the three core roots and still needs edition review;
+its later-language tests must not be confused with ES2015 requirements.
+
+The subsequent complete run including radix support and diagnostic fallback
+records **22,609 passes, 5,955 failures, 14 unsupported, 2 timeouts, 0 crashes,
+and 2 harness errors** in 543.99 seconds, with unchanged runtime hashes.
+It gains 14 passes over the contextual-keyword run and loses none. The two
+remaining harness errors require `Float64Array`; the six destructuring
+completion failures are resolved. The corresponding full ES5 run passes
+**11,540/11,540**. These full totals precede the parameter-history correction.
+
+Function-body `let` declarations now reject conflicts with ordinary or
+destructured formal parameters, while nested blocks may shadow parameters.
+Catch-body conflicts also report SyntaxError. `lexical-parameters.js` covers
+36 cases, including Function construction and preserved JS 1.7 shadowing.
+The native embedding fixture now has 13 checks, including modern rejection and
+legacy acceptance through `JS_CompileFunction`. Its XDR/decompilation payload
+and the real window fixture also exercise lexical bindings, numeric prefixes,
+and nested destructuring exceptions. See `../es5/strict-parameter-history.js`
+for the separate shared-property duplicate-marker regression.
+
+After the parameter correction, the complete ES5 gate again passes
+**11,540/11,540** on macOS arm64 XULRunner. The complete ES2015 language subset
+records 6,670 passes, 1,508 failures, 14 unsupported modules, 2 timeouts and no
+crashes/harness errors across 8,194 cases. The Function subset records 657
+passes and 58 failures across 715 cases. Neither subset loses any previous
+passes. They are supplemental checks, not replacements for the full totals
+above or claims of complete ES2015 compliance.
+
+The final batch rebuilds the engine for all four macOS arm64 applications.
+Suite, Browser, Calendar and XULRunner each pass packaging, all new shell and
+13 native edition/embedding checks, and relocated desktop regressions with the
+expanded mixed-edition fixture. Calendar passes its eight compatibility files
+and four views; Suite passes Composer lifecycle and ChatZilla startup. Browser
+navigation passes all 169 existing layout assertions. Unchanged ChatZilla also
+initializes its input widget in a disposable standalone XULRunner application.
+Other operating systems and architectures have not been revalidated for this
+batch; these native macOS results do not establish their compatibility.

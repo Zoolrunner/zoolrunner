@@ -1238,6 +1238,8 @@ js_PushStatement(JSTreeContext *tc, JSStmtInfo *stmt, JSStmtType type,
 {
     stmt->type = type;
     stmt->flags = 0;
+    ATOM_LIST_INIT(&stmt->lexicalDecls);
+    ATOM_LIST_INIT(&stmt->varDecls);
     SET_STATEMENT_TOP(stmt, top);
     stmt->atom = NULL;
     stmt->down = tc->topStmt;
