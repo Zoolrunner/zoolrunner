@@ -21,6 +21,15 @@ wait after close exceeds the selection update timer delay. It then opens and
 closes Address Book, DOM Inspector, and Venkman and rejects script console
 errors. These are unchanged application scripts.
 
+Before registering the command observer, the fixture resets and verifies the
+editor's modification count. An initial `about:blank` document can already be
+modified during startup; inserting text into an already-dirty document need
+not emit another clean-to-dirty notification. The fixture must establish the
+transition it tests. It still requires an actual notification from insertion,
+successful undo and no notifications after close; those assertions are not
+relaxed. Package diagnostics reproduced `modified=true` before the failed
+insertion and no state transition, while clean documents notified normally.
+
 The platform updater must become inactive when its document is destroyed or
 its docshell starts destruction. Canceling a timer alone is insufficient:
 selection callbacks can rearm it, and retained editors can outlive their window
