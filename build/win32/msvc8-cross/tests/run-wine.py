@@ -30,15 +30,22 @@ def uri(path):
 def run(exe, args, label, marker=None, expected=0, timeout=180, data=None,
         wait_for_restart=False):
     logfile = logs / (label + '.log')
-    with logfile.open('w') as output:
-        r = subprocess.run([wine, '--', windows(exe)] + args, env=env,
-                           input=data, stdout=output, stderr=subprocess.STDOUT,
-                           text=True, errors='replace', timeout=timeout)
-        if wait_for_restart:
-            # First-run registration can relaunch the GUI and let its original
-            # process exit before the fixture runs. This prefix is private to CI.
-            subprocess.run(['wineserver', '-w'], env=env, stdout=output,
-                           stderr=subprocess.STDOUT, timeout=timeout, check=True)
+    try:
+        with logfile.open('w') as output:
+            r = subprocess.run([wine, '--', windows(exe)] + args, env=env,
+                               input=data, stdout=output, stderr=subprocess.STDOUT,
+                               text=True, errors='replace', timeout=timeout)
+            if wait_for_restart:
+                # First-run registration can relaunch the GUI and let its original
+                # process exit before the fixture runs. This prefix is private to CI.
+                subprocess.run(['wineserver', '-w'], env=env, stdout=output,
+                               stderr=subprocess.STDOUT, timeout=timeout, check=True)
+    except subprocess.TimeoutExpired as error:
+        detail = logfile.read_text(errors='replace')[-3000:]
+        result = logs / (label + '-result.log')
+        if result.exists():
+            detail += '\nFixture result:\n' + result.read_text(errors='replace')[-3000:]
+        raise RuntimeError(label + ': timed out; application output:\n' + detail) from error
     output = logfile.read_text(errors='replace')
     if r.returncode != expected or (marker and marker not in output):
         raise RuntimeError(label + ': exit=' + str(r.returncode) + '\n' + output[-3000:])
