@@ -192,6 +192,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             print(result.stdout)
             if result.returncode or marker not in result.stdout:
                 raise RuntimeError("Packaged runtime failed " + test)
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/function-metadata.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-FUNCTION-METADATA checks=82 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed modern function metadata")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -203,7 +211,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         embedding_env = dict(environment, DYLD_LIBRARY_PATH=str(runtime))
         for source, marker in (
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
-                ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=13 failures=0")):
+                ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=13 failures=0"),
+                ("es6/TestFunctionMetadata.c",
+                 "ES6-FUNCTION-METADATA-EMBEDDING checks=17 failures=0")):
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",

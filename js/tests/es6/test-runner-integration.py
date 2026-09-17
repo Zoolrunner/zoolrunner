@@ -16,6 +16,7 @@ args = p.parse_args()
 shell = args.shell.absolute()
 env = dict(os.environ, DYLD_LIBRARY_PATH=str(shell.parent), LD_LIBRARY_PATH=str(shell.parent))
 fixtures = [
+    ('modern-global', 'strict', {}, 'if(!Object.getOwnPropertyDescriptor(Number,"length").configurable) throw Error("global");', 'pass'),
     ('edition', 'strict', {}, 'if(version()!==2015 || ({x:1,x:2}).x!==2) throw Error("edition");', 'pass'),
     ('unicode', 'strict', {}, 'if ("𐒠".charCodeAt(1) !== 0xDCA0) throw Error("transport");', 'pass'),
     ('own-directive', 'non-strict', {}, '"use strict"; if ((function(){return this;})() !== undefined) throw Error("directive");', 'pass'),

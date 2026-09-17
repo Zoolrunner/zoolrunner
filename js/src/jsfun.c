@@ -910,7 +910,10 @@ call_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
     if (!JSVAL_IS_STRING(id))
         return JS_TRUE;
 
-    funobj = fp->argv ? JSVAL_TO_OBJECT(fp->argv[-2]) : fp->fun->object;
+    /* Modern clones do not inherit from their compiler template. Parameters
+     * and locals still live on that template, as in call_enumerate. */
+    funobj = fp->fun->edition >= JSVERSION_ECMA_2015 ? fp->fun->object :
+             (fp->argv ? JSVAL_TO_OBJECT(fp->argv[-2]) : fp->fun->object);
     if (!funobj)
         return JS_TRUE;
     JS_ASSERT((JSFunction *) JS_GetPrivate(cx, funobj) == fp->fun);
@@ -1020,6 +1023,65 @@ static JSPropertySpec function_props[] = {
     {js_name_str,      FUN_NAME,       JSPROP_PERMANENT,  0,0},
     {0,0,0,0,0}
 };
+
+/* Modern globals use own function metadata and inherited restricted accessors.
+ * Legacy globals continue using function_props unchanged. */
+static JSPropertySpec modern_function_props[] = {
+    {js_arity_str,     FUN_ARITY,      JSPROP_PERMANENT, 0,0},
+    {0,0,0,0,0}
+};
+
+/* A legacy script can be compiled in a modern global. Its function metadata
+ * still needs the historical getters rather than modern prototype defaults. */
+static JSPropertySpec legacy_function_metadata[] = {
+    {js_length_str, ARGS_LENGTH, LENGTH_PROP_ATTRS, 0,0},
+    {js_name_str, FUN_NAME, JSPROP_PERMANENT, 0,0},
+    {0,0,0,0,0}
+};
+
+JSBool
+js_IsModernFunction(JSContext *cx, JSObject *obj)
+{
+    JSFunction *fun;
+
+    if (OBJ_GET_CLASS(cx, obj) != &js_FunctionClass)
+        return JS_FALSE;
+    fun = (JSFunction *) JS_GetPrivate(cx, obj);
+    return fun && fun->edition >= JSVERSION_ECMA_2015;
+}
+
+JSBool
+js_InitFunctionProperties(JSContext *cx, JSObject *obj)
+{
+    JSFunction *fun = (JSFunction *) JS_GetPrivate(cx, obj);
+    JSAtom *name;
+    JSObject *proto;
+
+    if (!fun)
+        return JS_TRUE;
+    if (fun->edition < JSVERSION_ECMA_2015) {
+        proto = OBJ_GET_PROTO(cx, obj);
+        if (proto && js_IsModernFunction(cx, proto))
+            return JS_DefineProperties(cx, obj, legacy_function_metadata);
+        return JS_TRUE;
+    }
+    if (fun->flags & JSFUN_BOUND_FUNCTION)
+        return JS_TRUE;
+    if (!js_DefineNativeProperty(cx, obj,
+                                ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                                INT_TO_JSVAL(fun->nargs), NULL, NULL,
+                                JSPROP_READONLY, 0, 0, NULL))
+        return JS_FALSE;
+    /* Anonymous function expressions acquire a name only where the language
+     * explicitly infers one. Function.prototype itself has the empty name. */
+    if (!fun->atom && FUN_INTERPRETED(fun) && !(fun->flags & JSFUN_NO_CONSTRUCT))
+        return JS_TRUE;
+    name = fun->atom ? fun->atom : cx->runtime->atomState.emptyAtom;
+    return js_DefineNativeProperty(cx, obj,
+                                   ATOM_TO_JSID(cx->runtime->atomState.nameAtom),
+                                   ATOM_KEY(name), NULL, NULL,
+                                   JSPROP_READONLY, 0, 0, NULL);
+}
 
 static JSBool
 fun_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
@@ -1141,7 +1203,8 @@ fun_enumerate(JSContext *cx, JSObject *obj)
     JSProperty *prop;
     JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, obj);
 
-    if (fun && (fun->flags & JSFUN_STRICT) &&
+    if (fun && fun->edition < JSVERSION_ECMA_2015 &&
+        (fun->flags & JSFUN_STRICT) &&
         !DefinePoisonProperties(cx, obj, "caller", "arguments"))
         return JS_FALSE;
     prototypeId = ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom);
@@ -1163,13 +1226,32 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
     if (!(flags & JSRESOLVE_HIDDEN) && JSVAL_IS_STRING(id)) {
         str = JSVAL_TO_STRING(id);
         fun = (JSFunction *)JS_GetPrivate(cx, obj);
-        if (fun && (fun->flags & JSFUN_STRICT) &&
+        if (fun && fun->edition < JSVERSION_ECMA_2015 &&
+            (fun->flags & JSFUN_STRICT) &&
             (js_EqualStrings(str, ATOM_TO_STRING(cx->runtime->atomState.callerAtom)) ||
              js_EqualStrings(str, ATOM_TO_STRING(cx->runtime->atomState.argumentsAtom)))) {
             if (!DefinePoisonProperties(cx, obj, "caller", "arguments"))
                 return JS_FALSE;
             *objp = obj;
             return JS_TRUE;
+        }
+        if (fun && (fun->edition < JSVERSION_ECMA_2015 || FUN_INTERPRETED(fun)) &&
+            !(fun->flags & (JSFUN_STRICT | JSFUN_BOUND_FUNCTION)) &&
+            OBJ_GET_PROTO(cx, obj) &&
+            js_IsModernFunction(cx, OBJ_GET_PROTO(cx, obj))) {
+            int8 tinyid = 0;
+            if (js_EqualStrings(str, ATOM_TO_STRING(cx->runtime->atomState.callerAtom)))
+                tinyid = FUN_CALLER;
+            else if (js_EqualStrings(str, ATOM_TO_STRING(cx->runtime->atomState.argumentsAtom)))
+                tinyid = CALL_ARGUMENTS;
+            if (tinyid) {
+                if (!JS_DefinePropertyWithTinyId(cx, obj,
+                         tinyid == FUN_CALLER ? "caller" : "arguments", tinyid,
+                         JSVAL_VOID, NULL, NULL, JSPROP_PERMANENT))
+                    return JS_FALSE;
+                *objp = obj;
+                return JS_TRUE;
+            }
         }
     }
 
@@ -1204,7 +1286,8 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
             return JS_TRUE;
 
         proto = parentProto = NULL;
-        if (fun->object != obj && fun->object) {
+        if (fun->object != obj && fun->object &&
+            fun->edition < JSVERSION_ECMA_2015) {
             /*
              * Clone of a function: make its prototype property value have the
              * same class as the clone-parent's prototype.
@@ -1310,7 +1393,6 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
     uint32 nullAtom;            /* flag to indicate if fun->atom is NULL */
     JSTempValueRooter tvr;
     uint32 flagsword;           /* originally only flags was JS_XDRUint8'd */
-    uint16 extraUnused;         /* variable for no longer used field */
     JSAtom *propAtom;
     JSScopeProperty *sprop;
     uint32 userid;              /* NB: holds a signed int-tagged jsval */
@@ -1339,7 +1421,6 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         }
         nullAtom = !fun->atom;
         flagsword = ((uint32)fun->u.i.nregexps << 16) | fun->flags;
-        extraUnused = 0;
     } else {
         fun = js_NewFunction(cx, NULL, NULL, 0, 0, NULL, NULL);
         if (!fun)
@@ -1356,14 +1437,11 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         goto bad;
 
     if (!JS_XDRUint16(xdr, &fun->nargs) ||
-        !JS_XDRUint16(xdr, &extraUnused) ||
+        !JS_XDRUint16(xdr, &fun->edition) ||
         !JS_XDRUint16(xdr, &fun->u.i.nvars) ||
         !JS_XDRUint32(xdr, &flagsword)) {
         goto bad;
     }
-
-    /* Assert that all previous writes of extraUnused were writes of 0. */
-    JS_ASSERT(extraUnused == 0);
 
     /* do arguments and local vars */
     if (fun->object) {
@@ -1469,6 +1547,8 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         fun->flags = (uint16) flagsword | JSFUN_INTERPRETED;
         fun->u.i.nregexps = (uint16) (flagsword >> 16);
 
+        if (!js_InitFunctionProperties(cx, fun->object))
+            goto bad;
         *objp = fun->object;
         js_CallNewScriptHook(cx, fun->u.i.script, fun);
     }
@@ -1942,6 +2022,10 @@ DefinePoisonProperties(JSContext *cx, JSObject *obj, const char *first,
         if (!thrower) goto out;
         root.u.value = OBJECT_TO_JSVAL(thrower->object);
         if (!JS_SetReservedSlot(cx, proto, 2, root.u.value)) goto out;
+        if (js_IsModernFunction(cx, thrower->object) &&
+            !JS_DefineProperty(cx, thrower->object, "length", INT_TO_JSVAL(0),
+                               NULL, NULL, JSPROP_READONLY | JSPROP_PERMANENT))
+            goto out;
         JS_LOCK_OBJ(cx, thrower->object);
         scope = js_GetMutableScope(cx, thrower->object);
         if (scope) scope->flags |= SCOPE_NONEXTENSIBLE;
@@ -1952,11 +2036,13 @@ DefinePoisonProperties(JSContext *cx, JSObject *obj, const char *first,
     ok = JS_DefineProperty(cx, obj, first, JSVAL_VOID,
                            (JSPropertyOp)JSVAL_TO_OBJECT(value),
                            (JSPropertyOp)JSVAL_TO_OBJECT(value),
-                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED | JSPROP_PERMANENT) &&
+                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED |
+                           ((obj == proto && js_IsModernFunction(cx, proto)) ? 0 : JSPROP_PERMANENT)) &&
          JS_DefineProperty(cx, obj, second, JSVAL_VOID,
                            (JSPropertyOp)JSVAL_TO_OBJECT(value),
                            (JSPropertyOp)JSVAL_TO_OBJECT(value),
-                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED | JSPROP_PERMANENT);
+                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED |
+                           ((obj == proto && js_IsModernFunction(cx, proto)) ? 0 : JSPROP_PERMANENT));
 out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
@@ -1967,7 +2053,9 @@ fun_bind(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     JSFunction *fun;
     JSObject *bound, *array;
-    jsval roots[3];
+    jsval roots[5], key, own;
+    JSString *name, *prefix;
+    JSBool modern = JS_VERSION_IS_ES2015(cx);
     JSTempValueRooter root;
     JSScope *scope;
     jsdouble length = 0;
@@ -1979,9 +2067,21 @@ fun_bind(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                              JSMSG_INCOMPATIBLE_PROTO, "Function", "bind", "object");
         return JS_FALSE;
     }
-    roots[0] = roots[1] = roots[2] = JSVAL_VOID;
-    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
-    if (OBJ_GET_CLASS(cx, obj) == &js_FunctionClass) {
+    roots[0] = roots[1] = roots[2] = roots[3] = roots[4] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 5, roots, &root);
+    if (modern) {
+        key = ATOM_KEY(cx->runtime->atomState.lengthAtom);
+        if (!js_HasOwnPropertyHelper(cx, obj, obj->map->ops->lookupProperty,
+                                     1, &key, &own)) goto out;
+        if (own == JSVAL_TRUE) {
+            if (!JS_GetProperty(cx, obj, "length", &roots[0])) goto out;
+            if (JSVAL_IS_NUMBER(roots[0])) {
+                if (!JS_ValueToNumber(cx, roots[0], &length)) goto out;
+                length = js_DoubleToInteger(length) - count;
+                if (length <= 0) length = 0; /* max(length, +0), including -0 */
+            }
+        }
+    } else if (OBJ_GET_CLASS(cx, obj) == &js_FunctionClass) {
         if (!JS_GetProperty(cx, obj, "length", &roots[0]) ||
             !JS_ValueToNumber(cx, roots[0], &length)) goto out;
         length = js_DoubleToInteger(length) - count;
@@ -1991,7 +2091,7 @@ fun_bind(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                          OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(argv[-2])), NULL);
     if (!fun) goto out;
     bound = fun->object;
-    *rval = OBJECT_TO_JSVAL(bound);
+    *rval = roots[3] = OBJECT_TO_JSVAL(bound);
     /* Acquire the own scope before storing reserved values. Otherwise the
      * later slotless poison accessors can detach the shared scope with a
      * freeslot below those values, hiding them from the garbage collector. */
@@ -2008,7 +2108,22 @@ fun_bind(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         !JS_SetReservedSlot(cx, bound, 4, roots[1]) ||
         !JS_SetReservedSlot(cx, bound, 5, roots[0])) goto out;
 
-    ok = DefinePoisonProperties(cx, bound, "caller", "arguments");
+    if (modern) {
+        if (!JS_GetProperty(cx, obj, "name", &roots[2])) goto out;
+        if (!JSVAL_IS_STRING(roots[2]))
+            roots[2] = ATOM_KEY(cx->runtime->atomState.emptyAtom);
+        prefix = JS_NewStringCopyZ(cx, "bound ");
+        if (!prefix) goto out;
+        roots[4] = STRING_TO_JSVAL(prefix);
+        name = js_ConcatStrings(cx, prefix, JSVAL_TO_STRING(roots[2]));
+        if (!name) goto out;
+        roots[2] = STRING_TO_JSVAL(name);
+        if (!JS_DefineProperty(cx, bound, "length", roots[0], NULL, NULL,
+                               JSPROP_READONLY) ||
+            !JS_DefineProperty(cx, bound, "name", roots[2], NULL, NULL,
+                               JSPROP_READONLY)) goto out;
+    }
+    ok = modern || DefinePoisonProperties(cx, bound, "caller", "arguments");
 out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
@@ -2353,7 +2468,9 @@ js_InitFunctionClass(JSContext *cx, JSObject *obj)
     JSFunction *fun;
 
     proto = JS_InitClass(cx, obj, NULL, &js_FunctionClass, Function, 1,
-                         function_props, function_methods, NULL, NULL);
+                         JS_VERSION_IS_ES2015(cx) ? modern_function_props
+                                                : function_props,
+                         function_methods, NULL, NULL);
     if (!proto)
         return NULL;
     fun = js_NewFunction(cx, proto, NULL, 0, 0, obj, NULL);
@@ -2364,6 +2481,11 @@ js_InitFunctionClass(JSContext *cx, JSObject *obj)
         goto bad;
     fun->u.i.script->code[0] = JSOP_STOP;
     fun->flags |= JSFUN_INTERPRETED | JSFUN_NO_CONSTRUCT;
+    if (!js_InitFunctionProperties(cx, proto))
+        goto bad;
+    if (JS_VERSION_IS_ES2015(cx) &&
+        !DefinePoisonProperties(cx, proto, "caller", "arguments"))
+        goto bad;
     if (!js_SetBuiltinMethodFlags(cx, proto, function_methods,
                                   JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
         goto bad;
@@ -2423,6 +2545,7 @@ js_NewFunction(JSContext *cx, JSObject *funobj, JSNative native, uintN nargs,
     fun->object = NULL;
     fun->nargs = nargs;
     fun->flags = flags & JSFUN_INTERNAL_FLAGS_MASK;
+    fun->edition = (uint16) JSVERSION_NUMBER(cx);
     fun->u.n.native = native;
     fun->u.n.extra = 0;
     fun->u.n.spare = 0;
@@ -2430,7 +2553,10 @@ js_NewFunction(JSContext *cx, JSObject *funobj, JSNative native, uintN nargs,
     fun->clasp = NULL;
 
     /* Link fun to funobj and vice versa. */
-    if (!js_LinkFunctionObject(cx, fun, funobj)) {
+    /* Interpreted functions acquire metadata after parsing or XDR decoding,
+     * once both their argument count and saved edition are known. */
+    if (!js_LinkFunctionObject(cx, fun, funobj) ||
+        (native && !js_InitFunctionProperties(cx, funobj))) {
         cx->weakRoots.newborn[GCX_OBJECT] = NULL;
         fun = NULL;
     }
@@ -2443,18 +2569,37 @@ out:
 JSObject *
 js_CloneFunctionObject(JSContext *cx, JSObject *funobj, JSObject *parent)
 {
-    JSObject *newfunobj;
+    JSObject *newfunobj, *proto;
     JSFunction *fun;
+    JSTempValueRooter metadataRoot;
+    JSBool metadataOK;
 
     JS_ASSERT(OBJ_GET_CLASS(cx, funobj) == &js_FunctionClass);
-    newfunobj = js_NewObject(cx, &js_FunctionClass, funobj, parent);
+    fun = (JSFunction *) JS_GetPrivate(cx, funobj);
+    proto = funobj;
+    if (fun->edition >= JSVERSION_ECMA_2015 &&
+        !(fun->flags & JSFUN_BOUND_FUNCTION)) {
+        /* Internal function templates must not re-expose deleted own name
+         * and length properties through the visible prototype chain. Bound
+         * functions have no compiler template: explicit JSAPI clones retain
+         * their historical delegation to the original function object. */
+        do {
+            proto = OBJ_GET_PROTO(cx, proto);
+        } while (proto && OBJ_GET_CLASS(cx, proto) == &js_FunctionClass &&
+                 JS_GetPrivate(cx, proto) == fun);
+    }
+    newfunobj = js_NewObject(cx, &js_FunctionClass, proto, parent);
     if (!newfunobj)
         return NULL;
-    fun = (JSFunction *) JS_GetPrivate(cx, funobj);
     if (!js_LinkFunctionObject(cx, fun, newfunobj)) {
         cx->weakRoots.newborn[GCX_OBJECT] = NULL;
         return NULL;
     }
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, newfunobj, &metadataRoot);
+    metadataOK = js_InitFunctionProperties(cx, newfunobj);
+    JS_POP_TEMP_ROOT(cx, &metadataRoot);
+    if (!metadataOK)
+        return NULL;
     if (fun->flags & JSFUN_BOUND_FUNCTION) {
         JSTempValueRooter root;
         JSScope *scope;

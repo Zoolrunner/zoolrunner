@@ -1721,7 +1721,9 @@ js_HasOwnPropertyHelper(JSContext *cx, JSObject *obj, JSLookupPropOp lookup,
              * owned, or indirectly delegated.
              */
             sprop = (JSScopeProperty *)prop;
-            *rval = BOOLEAN_TO_JSVAL(SPROP_IS_SHARED_PERMANENT(sprop));
+            *rval = BOOLEAN_TO_JSVAL(SPROP_IS_SHARED_PERMANENT(sprop) &&
+                !(id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom) &&
+                  js_IsModernFunction(cx, obj)));
         } else {
             *rval = JSVAL_FALSE;
         }
@@ -1779,7 +1781,9 @@ obj_propertyIsEnumerable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
      */
     if (obj2 != obj &&
         !(OBJ_IS_NATIVE(obj2) &&
-          SPROP_IS_SHARED_PERMANENT((JSScopeProperty *)prop))) {
+          SPROP_IS_SHARED_PERMANENT((JSScopeProperty *)prop) &&
+          !(id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom) &&
+            js_IsModernFunction(cx, obj)))) {
         OBJ_DROP_PROPERTY(cx, obj2, prop);
         *rval = JSVAL_FALSE;
         return JS_TRUE;
@@ -4174,7 +4178,9 @@ js_DeleteProperty(JSContext *cx, JSObject *obj, jsid id, jsval *rval)
         if (prop) {
             if (OBJ_IS_NATIVE(proto)) {
                 sprop = (JSScopeProperty *)prop;
-                if (SPROP_IS_SHARED_PERMANENT(sprop))
+                if (SPROP_IS_SHARED_PERMANENT(sprop) &&
+                    !(id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom) &&
+                      js_IsModernFunction(cx, obj)))
                     *rval = JSVAL_FALSE;
             }
             OBJ_DROP_PROPERTY(cx, proto, prop);

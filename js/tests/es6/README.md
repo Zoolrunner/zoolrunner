@@ -51,7 +51,7 @@ compiled as separate global scripts, with a transport/strictness preflight.
 Expected exceptions use this snapshot's negative-test patterns. A harness
 exception, crash, timeout or missing completion marker cannot satisfy a test.
 The timezone defaults to `America/Los_Angeles` and is recorded in the report.
-The runner now selects the explicit ES2015 edition (`xpcshell -v 2015`) and
+The runner now selects the explicit ES2015 edition (`xpcshell -E -v 2015`) and
 checks that selection during preflight. `--edition legacy` reproduces the
 original default-language baseline. Reports identify the selected edition;
 do not compare a legacy run with an ES2015 run as if the semantics were equal.
@@ -307,3 +307,52 @@ navigation passes all 169 existing layout assertions. Unchanged ChatZilla also
 initializes its input widget in a disposable standalone XULRunner application.
 Other operating systems and architectures have not been revalidated for this
 batch; these native macOS results do not establish their compatibility.
+
+## Modern function metadata and globals
+
+`xpcshell -E` selects ES2015 before global built-ins are initialized. The
+conformance runner uses this option and checks the native `Number.length`
+descriptor during preflight. `-v 2015` still switches subsequent scripts in
+an existing global; it does not replace that global's built-ins. Existing
+application globals and unversioned shell invocations retain their historical
+initialization. Native embeddings can select `JSVERSION_ECMA_2015` before
+`JS_InitStandardClasses` to create a modern global.
+
+Modern functions have own, non-enumerable, read-only, configurable `length`
+data properties; named functions also have matching `name` properties.
+Anonymous expressions without an inferred name have no own `name` property. Function clones preserve their creation edition;
+internal templates no longer expose deleted metadata through inheritance.
+Metadata is installed after code generation has reserved regexp cache slots.
+Direct eval continues resolving locals through the compiler template.
+Bound functions compute their metadata without coercing non-number lengths
+or non-string names. Modern globals install the shared restricted `caller`
+and `arguments` accessors on `Function.prototype`. Legacy globals retain
+their earlier descriptors. Anonymous inferred names and complete mixed-global
+interoperability still require work; this is not full function conformance.
+The XDR version is incremented because cached functions now retain their
+creation edition.
+
+`function-metadata.js` has 82 checks including reentrant getters, collection,
+closures, bound construction, and restricted accessors. Run it with `-E`.
+`TestFunctionMetadata.c` has 17 native checks for modern initialization,
+XDR decoding in both directions between modern and legacy modes, and JSAPI cloning of
+interpreted and bound functions. Legacy functions created inside a modern
+global retain their metadata getters and historical `arguments` behavior. Both
+pass on macOS arm64 XULRunner. A complete ES5 rerun passes all 11,540 cases.
+The final complete ES2015 run on Suite records **22,846 passes, 5,718 failures,
+14 unsupported modules, two timeouts, zero crashes, and two harness errors**
+in 462.87 seconds, with unchanged runtime hashes. It gains 237 passes and loses
+none relative to the previous full baseline. The final Function subset passes
+691/715, gaining 34 passes and losing none; remaining cases exercise Symbols
+or Proxies, and accessor-function prototype restrictions also remain incomplete.
+
+All four macOS arm64 applications rebuild and pass packaging with the 82 shell
+checks, 17 metadata embedding checks, and existing 13 edition embedding checks.
+Relocated desktop tests pass for Suite, Browser, Calendar and XULRunner, including
+the expanded mixed-edition window fixture. Suite passes Composer lifecycle and
+ChatZilla startup; Browser navigation passes 169 layout assertions. Calendar's
+eight compatibility files and four views pass. Unchanged standalone ChatZilla
+also initializes its input widget in XULRunner and exits successfully. The
+runner's five unit checks and 17 real-shell checks pass. Other operating systems
+and architectures have not been revalidated for this batch. Thousands of
+conformance failures remain; these results do not establish ES2015 completion.

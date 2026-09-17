@@ -1421,6 +1421,10 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
      */
     if (fun) {
         JS_ASSERT(FUN_INTERPRETED(fun) && !FUN_SCRIPT(fun));
+        /* Regexp cache slots are counted by code generation. Installing own
+         * function properties earlier would allocate those same slots. */
+        if (!js_InitFunctionProperties(cx, fun->object))
+            goto bad;
         fun->u.i.script = script;
         if (cg->treeContext.flags & TCF_FUN_HEAVYWEIGHT)
             fun->flags |= JSFUN_HEAVYWEIGHT;

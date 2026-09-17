@@ -125,8 +125,8 @@ def run_case(case, suite, shell, env, timeout, edition='es2015'):
             marker = 'ZOOL262-' + Path(tmp).name + ' '
             driver = Path(tmp) / 'driver.js'
             driver.write_text(driver_source(case, harness, marker), encoding='utf-8')
-            proc = subprocess.run([str(shell), '-v', '2015' if edition == 'es2015' else '0',
-                                   '-f', str(driver)], env=env,
+            options = ['-E', '-v', '2015'] if edition == 'es2015' else ['-v', '0']
+            proc = subprocess.run([str(shell)] + options + ['-f', str(driver)], env=env,
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
             output = proc.stdout.decode('utf-8', errors='replace')
             status, detail = classify(case, output, proc.returncode, marker)
@@ -168,6 +168,9 @@ def main():
     if args.edition == 'es2015':
         preflight['source'] += '\nif (version() !== 2015 || ({x:1,x:2}).x !== 2) '
         preflight['source'] += 'throw Error("ES2015 edition selection");'
+        preflight['source'] += ('\nif (!Object.getOwnPropertyDescriptor(Number, '
+                                '"length").configurable) '
+                                'throw Error("ES2015 global initialization");')
     check = run_case(preflight, suite, shell, env, args.timeout, args.edition)
     if check['status'] != 'pass':
         p.error('Harness/Unicode/strict-mode preflight failed: ' + repr(check))
@@ -193,7 +196,7 @@ def main():
     report = dict(suite_revision=revision, corpus='ES2015-era baseline',
                   roots=ROOTS, filter=args.filter, timezone=args.timezone,
                   full_selection=not args.filter, unmarked_default='both',
-                  language_edition=args.edition,
+                  language_edition=args.edition, global_initialization=args.edition,
                   source_transport='unicode-global-script', harness_layout='separate-global-script',
                   shell=str(shell), shell_sha256=hashlib.sha256(shell.read_bytes()).hexdigest(),
                   runtime_sha256=binaries,

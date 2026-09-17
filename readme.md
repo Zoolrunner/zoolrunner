@@ -167,7 +167,12 @@ covering the new boundary. Modern contextual `let`/`yield` parsing and
 scope-local declaration conflict checks have focused regressions; full lexical
 environments and temporal dead zones remain unfinished. Explicit ES2015 mode
 also accepts binary/octal literals and numeric strings, with separate legacy
-grammar and conversion regressions.
+grammar and conversion regressions. Modern global initialization is opt-in
+through `xpcshell -E` or selection of ES2015 before native standard-class
+initialization; script edition changes alone do not replace existing built-ins.
+Modern function metadata and restricted accessors have native, shell and
+window regressions; inferred function names and other ES2015 behavior remain
+incomplete.
 
 Application compatibility is tested separately from language conformance:
 

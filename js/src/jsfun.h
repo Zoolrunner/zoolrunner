@@ -51,6 +51,7 @@ struct JSFunction {
     JSObject     *object;       /* back-pointer to GC'ed object header */
     uint16       nargs;         /* minimum number of actual arguments */
     uint16       flags;         /* bound method and other flags, see jsapi.h */
+    uint16       edition;       /* creation edition, including native functions */
     union {
         struct {
             uint16   extra;     /* number of arg slots for local GC roots */
@@ -74,6 +75,13 @@ struct JSFunction {
 #define JSFUN_REQUIRE_THIS   0x2000 /* native CheckObjectCoercible receiver */
 #define JSFUN_INTERNAL_FLAGS_MASK \
     (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS | JSFUN_BOUND_FUNCTION | JSFUN_STRICT)
+
+/* Install edition-specific own metadata after compilation has reserved regexp cache slots. */
+extern JSBool
+js_InitFunctionProperties(JSContext *cx, JSObject *obj);
+
+extern JSBool
+js_IsModernFunction(JSContext *cx, JSObject *obj);
 
 extern JSBool
 js_IsCallable(JSContext *cx, jsval v);

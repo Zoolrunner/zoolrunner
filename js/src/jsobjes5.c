@@ -179,6 +179,9 @@ IsVirtualOwn(JSContext *cx, JSObject *target, JSObject *owner,
              JSProperty *prop)
 {
     JSClass *clasp = OBJ_GET_CLASS(cx, target);
+    if (prop->id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom) &&
+        js_IsModernFunction(cx, target))
+        return JS_FALSE;
     return clasp != &js_ObjectClass && OBJ_IS_NATIVE(owner) &&
            !(((JSScopeProperty *) prop)->attrs & (JSPROP_GETTER | JSPROP_SETTER)) &&
            OBJ_GET_CLASS(cx, owner) == clasp &&

@@ -781,7 +781,7 @@ static int
 usage(void)
 {
     fprintf(gErrFile, "%s\n", JS_GetImplementationVersion());
-    fprintf(gErrFile, "usage: xpcshell [-PswWxC] [-v version] [-f scriptfile] [-e script] [scriptfile] [scriptarg...]\n");
+    fprintf(gErrFile, "usage: xpcshell [-EPswWxC] [-v version] [-f scriptfile] [-e script] [scriptfile] [scriptarg...]\n");
     return 2;
 }
 
@@ -854,6 +854,9 @@ ProcessArgs(JSContext *cx, JSObject *obj, char **argv, int argc)
             break;
         }
         switch (argv[i][1]) {
+        case 'E':
+            JS_SetVersion(cx, JSVERSION_ECMA_2015);
+            break;
         case 'v':
             if (++i == argc) {
                 return usage();
@@ -1190,6 +1193,18 @@ main(int argc, char **argv, char **envp)
             fprintf(gErrFile, "+++ Failed to get backstage pass from rtsvc: %8x\n",
                     rv);
             return 1;
+        }
+
+        /* -E selects a modern global before its built-ins are initialized.
+         * -v retains its historical role of switching subsequent scripts. */
+        for (int arg = 1; arg < argc; ++arg) {
+            if (argv[arg][0] != '-' || argv[arg][1] == '\0')
+                break;
+            if (strcmp(argv[arg], "-E") == 0)
+                JS_SetVersion(cx, JSVERSION_ECMA_2015);
+            else if (argv[arg][1] == 'v' || argv[arg][1] == 'f' ||
+                     argv[arg][1] == 'e')
+                ++arg;
         }
 
         nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
