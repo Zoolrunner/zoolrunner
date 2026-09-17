@@ -155,8 +155,11 @@ descriptors and integrity controls, JSON, function binding, parsing, and built-i
 behavior. Passing a finite suite is evidence of progress, not exhaustive proof
 of specification correctness or a result for every operating system. The
 [ES5 testing guide](js/tests/es5/README.md) records the pinned revision, commands,
-focused regressions, and embedding checks. Selected later JavaScript features
-may be added when they fit the existing architecture.
+focused regressions, and embedding checks. Full ECMAScript 2015 (ES6) compliance
+is the next required target, with historical XUL applications and legacy
+JavaScript compatibility preserved. This work is in progress; the engine is
+not yet ES6 compliant. The [ES6 testing guide](js/tests/es6/README.md) records
+the baseline corpus, runner limitations and remaining implementation work.
 
 Application compatibility is tested separately from language conformance:
 

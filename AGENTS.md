@@ -399,15 +399,16 @@ Run `editor/composer/tests/run-lifecycle.py` for editor/lifecycle changes and
 commands into dying docshells or retain raw script iterators across callbacks;
 callbacks may close windows, collect scripts, or turn debugging off.
 
-Selected ECMAScript 2015/ES6 features may also be implemented when practical.
-
-Potentially useful additions include things such as:
-
-* `let`
-* `const`
-* useful standard-library improvements
-* selected syntax improvements
-* other reasonably self-contained features
+Full ECMAScript 2015 (ES6) compliance is the next required modernization target.
+Track the conformance corpus, failures and implementation status in
+`js/tests/es6/README.md`. All required Test262 cases must pass, including syntax,
+runtime semantics, modules and asynchronous behavior; unsupported cases remain
+unfinished work and must not be excluded to obtain a passing result. Preserve
+the complete ES5.1 regression gate and historical application compatibility.
+Keep explicit legacy language versions and historical XUL/component script
+loading behavior usable while implementing the modern language semantics.
+Test real applications separately: a Test262 pass cannot establish that every
+historical application remains compatible.
 
 Do not automatically attempt complete current ECMAScript compatibility.
 
@@ -415,9 +416,8 @@ Do not replace SpiderMonkey wholesale merely to obtain modern JavaScript.
 
 Do not import enormous portions of later SpiderMonkey without first determining whether the functionality can be implemented cleanly in the existing engine.
 
-Features beyond ECMAScript 5.1 may be intentionally omitted when they require
-disproportionate architectural work. Preserve the classic embedding APIs while
-implementing the required ES5 behavior.
+Features beyond ECMAScript 2015 may be evaluated separately. Preserve the classic
+embedding APIs while implementing the required ES5 and ES2015 behavior.
 
 ---
 

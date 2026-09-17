@@ -88,6 +88,57 @@ num_isFinite(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+/* ES2015 Number predicates never coerce their argument (including wrappers). */
+static JSBool
+num_numberIsNaN(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                jsval *rval)
+{
+    *rval = BOOLEAN_TO_JSVAL(argc && JSVAL_IS_DOUBLE(argv[0]) &&
+                            JSDOUBLE_IS_NaN(*JSVAL_TO_DOUBLE(argv[0])));
+    return JS_TRUE;
+}
+
+static JSBool
+num_numberIsFinite(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                   jsval *rval)
+{
+    *rval = BOOLEAN_TO_JSVAL(argc &&
+        (JSVAL_IS_INT(argv[0]) ||
+         (JSVAL_IS_DOUBLE(argv[0]) &&
+          JSDOUBLE_IS_FINITE(*JSVAL_TO_DOUBLE(argv[0])))));
+    return JS_TRUE;
+}
+
+static JSBool
+num_integerPredicate(uintN argc, jsval *argv, jsval *rval, JSBool safe)
+{
+    jsdouble d;
+
+    *rval = JSVAL_FALSE;
+    if (!argc || !JSVAL_IS_NUMBER(argv[0]))
+        return JS_TRUE;
+    d = JSVAL_IS_INT(argv[0]) ? (jsdouble) JSVAL_TO_INT(argv[0])
+                             : *JSVAL_TO_DOUBLE(argv[0]);
+    if (JSDOUBLE_IS_FINITE(d) && floor(d) == d &&
+        (!safe || (d >= -9007199254740991.0 && d <= 9007199254740991.0))) {
+        *rval = JSVAL_TRUE;
+    }
+    return JS_TRUE;
+}
+
+static JSBool
+num_isInteger(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return num_integerPredicate(argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+num_isSafeInteger(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                  jsval *rval)
+{
+    return num_integerPredicate(argc, argv, rval, JS_TRUE);
+}
+
 static JSBool
 num_parseFloat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -510,6 +561,15 @@ static JSFunctionSpec number_methods[] = {
     {0,0,0,0,0}
 };
 
+static JSFunctionSpec number_static_methods[] = {
+    /* The branch's spec flags are only uint8; set internal flags below. */
+    {"isNaN",         num_numberIsNaN,    1, 0, 0},
+    {"isFinite",      num_numberIsFinite, 1, 0, 0},
+    {"isInteger",     num_isInteger,     1, 0, 0},
+    {"isSafeInteger", num_isSafeInteger, 1, 0, 0},
+    {0,0,0,0,0}
+};
+
 /* NB: Keep this in synch with number_constants[]. */
 enum nc_slot {
     NC_NaN,
@@ -517,13 +577,16 @@ enum nc_slot {
     NC_NEGATIVE_INFINITY,
     NC_MAX_VALUE,
     NC_MIN_VALUE,
+    NC_EPSILON,
+    NC_MAX_SAFE_INTEGER,
+    NC_MIN_SAFE_INTEGER,
     NC_LIMIT
 };
 
 /*
  * Some to most C compilers forbid spelling these at compile time, or barf
- * if you try, so all but MAX_VALUE are set up by js_InitRuntimeNumberState
- * using union jsdpun.
+ * if you try, so NaN, infinities and MIN_VALUE are set up by
+ * js_InitRuntimeNumberState using union jsdpun.
  */
 static JSConstDoubleSpec number_constants[] = {
     {0,                         js_NaN_str,          0,{0,0,0}},
@@ -531,6 +594,9 @@ static JSConstDoubleSpec number_constants[] = {
     {0,                         "NEGATIVE_INFINITY", 0,{0,0,0}},
     {1.7976931348623157E+308,   "MAX_VALUE",         0,{0,0,0}},
     {0,                         "MIN_VALUE",         0,{0,0,0}},
+    {2.2204460492503130808472633361816E-16, "EPSILON", 0,{0,0,0}},
+    {9007199254740991.0,         "MAX_SAFE_INTEGER",  0,{0,0,0}},
+    {-9007199254740991.0,        "MIN_SAFE_INTEGER",  0,{0,0,0}},
     {0,0,0,{0,0,0}}
 };
 
@@ -636,11 +702,13 @@ js_InitNumberClass(JSContext *cx, JSObject *obj)
         return NULL;
 
     proto = JS_InitClass(cx, obj, NULL, &js_NumberClass, Number, 1,
-                         NULL, number_methods, NULL, NULL);
+                         NULL, number_methods, NULL, number_static_methods);
     if (!proto || !(ctor = JS_GetConstructor(cx, proto)))
         return NULL;
     if (!js_SetBuiltinMethodFlags(cx, proto, number_methods,
-                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS) ||
+        !js_SetBuiltinMethodFlags(cx, ctor, number_static_methods,
+                                  JSFUN_NO_CONSTRUCT))
         return NULL;
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_ZERO);
     if (!JS_DefineConstDoubles(cx, ctor, number_constants))
