@@ -95,11 +95,12 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         run(command, case + '-build')
         run([base / case], case, marker)
     if a.arch == 'aarch64':
+        xpcom_library = '-lxpcom_core' if (runtime / 'libxpcom_core.so').exists() else '-lxul'
         command = ['g++', '-std=gnu++98', '-fno-rtti', '-fno-exceptions',
                    '-fshort-wchar', '-fno-strict-aliasing', '-O2', '-DXP_UNIX',
                    '-I' + str(includes / 'xpcom'), '-I' + str(includes / 'nspr'),
                    str(root / 'build/linux/TestXPTCallABI.cpp'),
-                   '-L' + str(runtime), '-lxpcom_core', '-lplds4', '-lplc4', '-lnspr4',
+                   '-L' + str(runtime), xpcom_library, '-lplds4', '-lplc4', '-lnspr4',
                    '-o', str(base / 'xptcall-abi')]
         run(command, 'xptcall-abi-build')
         run([base / 'xptcall-abi'], 'xptcall-abi', 'XPTCALL-ABI checks=2000 failures=0')

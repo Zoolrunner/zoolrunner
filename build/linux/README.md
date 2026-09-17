@@ -132,7 +132,9 @@ banks, and spilled scalars occupy eight-byte slots. Darwin's compact stack
 layout is not applicable. ELF stubs declare their function type and size.
 `TestXPTCallABI.cpp` checks native invocation and incoming stubs with mixed
 register/stack arguments, narrow scalars, 64-bit values, pointers, out parameters
-and repeated calls. Big-endian AArch64 and ILP32 are outside this port's scope.
+and repeated calls. The probe links against the packaged XPCOM library:
+`libxul` for XULRunner, or `libxpcom_core` for the separate-library builds.
+Big-endian AArch64 and ILP32 are outside this port's scope.
 
 Every ARM runtime job checks 2,000 ABI calls and runs the complete pinned ES5.1
 Test262 required-mode suite (11,540 cases, America/Los_Angeles). It fetches the
