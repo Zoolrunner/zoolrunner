@@ -134,6 +134,8 @@ layout is not applicable. ELF stubs declare their function type and size.
 register/stack arguments, narrow scalars, 64-bit values, pointers, out parameters
 and repeated calls. The probe links against the packaged XPCOM library:
 `libxul` for XULRunner, or `libxpcom_core` for the separate-library builds.
+The combined Xlib `libxul` link also retains `MOZ_XLIB_LDFLAGS`, including
+libXext for the drag cursor's X Shape calls, just as the separate widget library does.
 Big-endian AArch64 and ILP32 are outside this port's scope.
 
 Every ARM runtime job checks 2,000 ABI calls and runs the complete pinned ES5.1
