@@ -1314,7 +1314,8 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
 #if JS_HAS_SCRIPT_OBJECT
     /* Preserve explicit historical eval-with-scope use in JS 1.7 mode. */
-    if (argc > 1 && JSVERSION_NUMBER(cx) >= JSVERSION_1_7)
+    if (argc > 1 && JSVERSION_NUMBER(cx) >= JSVERSION_1_7 &&
+        !JS_VERSION_IS_ES2015(cx))
         return obj_eval_legacy(cx, obj, argc, argv, rval);
 #endif
     *rval = argc ? argv[0] : JSVAL_VOID;

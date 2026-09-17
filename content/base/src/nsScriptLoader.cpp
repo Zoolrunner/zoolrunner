@@ -481,7 +481,9 @@ nsScriptLoader::DoProcessScriptElement(nsIScriptElement *aElement,
         if (rv != NS_ERROR_INVALID_ARG)
           return rv;
       } else {
-        if (value.Length() != 3 || value[0] != '1' || value[1] != '.')
+        if (value.EqualsLiteral("2015"))
+          jsVersion = JSVERSION_ECMA_2015;
+        else if (value.Length() != 3 || value[0] != '1' || value[1] != '.')
           jsVersion = JSVERSION_UNKNOWN;
         else switch (value[2]) {
           case '0': jsVersion = JSVERSION_1_0; break;

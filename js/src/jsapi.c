@@ -617,7 +617,8 @@ JS_TypeOfValue(JSContext *cx, jsval v)
                 if ((ops == &js_ObjectOps)
                     ? (clasp->call
                        ? ((clasp == &js_RegExpClass &&
-                           JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT) ||
+                           JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT &&
+                           !JS_VERSION_IS_ES2015(cx)) ||
                           clasp == &js_ScriptClass)
                        : clasp == &js_FunctionClass)
                     : ops->call != NULL) {
@@ -1058,6 +1059,7 @@ static struct v2smap {
     {JSVERSION_1_6,     "1.6"},
     {JSVERSION_1_7,     "1.7"},
     {JSVERSION_1_8,     "1.8"},
+    {JSVERSION_ECMA_2015, "ECMAv6"},
     {JSVERSION_DEFAULT, js_default_str},
     {JSVERSION_UNKNOWN, NULL},          /* must be last, NULL is sentinel */
 };

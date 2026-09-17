@@ -813,8 +813,10 @@ class JSAutoTempValueRooter
 #define JSVERSION_HAS_XML               0x1000  /* flag induced by XML option */
 
 #define JSVERSION_NUMBER(cx)            ((cx)->version & JSVERSION_MASK)
-#define JS_HAS_XML_OPTION(cx)           ((cx)->version & JSVERSION_HAS_XML || \
-                                         JSVERSION_NUMBER(cx) >= JSVERSION_1_6)
+#define JS_VERSION_IS_ES2015(cx)        (JSVERSION_NUMBER(cx) >= JSVERSION_ECMA_2015)
+#define JS_HAS_XML_OPTION(cx)           (!JS_VERSION_IS_ES2015(cx) && \
+                                        ((cx)->version & JSVERSION_HAS_XML || \
+                                         JSVERSION_NUMBER(cx) >= JSVERSION_1_6))
 
 #define JS_HAS_NATIVE_BRANCH_CALLBACK_OPTION(cx)                              \
     JS_HAS_OPTION(cx, JSOPTION_NATIVE_BRANCH_CALLBACK)

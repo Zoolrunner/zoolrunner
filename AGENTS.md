@@ -407,6 +407,14 @@ unfinished work and must not be excluded to obtain a passing result. Preserve
 the complete ES5.1 regression gate and historical application compatibility.
 Keep explicit legacy language versions and historical XUL/component script
 loading behavior usable while implementing the modern language semantics.
+The initial ES2015 boundary uses `JSVERSION_ECMA_2015` (2015), selected by
+`xpcshell -v 2015` or a script MIME `version=2015`. Keep default HTML semantics,
+unversioned XUL's JS 1.7 selection and existing JSAPI version values stable.
+Exercise `js/tests/es6/editions.js`, `TestEditionEmbedding.c` and the mixed-edition
+window fixture when changing the boundary. Preserve saved editions through
+XDR, eval, decompilation, native callbacks and calls between language versions.
+Script selection is not yet a complete policy for global built-in semantics;
+do not claim that partial edition support establishes ES2015 compliance.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 

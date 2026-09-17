@@ -160,6 +160,10 @@ is the next required target, with historical XUL applications and legacy
 JavaScript compatibility preserved. This work is in progress; the engine is
 not yet ES6 compliant. The [ES6 testing guide](js/tests/es6/README.md) records
 the baseline corpus, runner limitations and remaining implementation work.
+An explicit ES2015 mode now separates initial modern parser behavior from
+historical script modes; it remains incomplete. Existing application scripts
+keep their current defaults, with mixed-edition and embedding regressions
+covering the new boundary.
 
 Application compatibility is tested separately from language conformance:
 

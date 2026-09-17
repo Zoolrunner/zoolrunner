@@ -175,7 +175,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         for test, marker in (
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
                 ("legacy-application.js", "LEGACY-APPLICATION checks=58 failures=0"),
-                ("debugger-lifecycle.js", "DEBUGGER-LIFECYCLE checks=5 failures=0")):
+                ("debugger-lifecycle.js", "DEBUGGER-LIFECYCLE checks=5 failures=0"),
+                ("../es6/number.js", "ES6-NUMBER checks=156 failures=0"),
+                ("../es6/editions.js", "ES6-EDITIONS checks=36 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-f", str(root / "js/tests/es5" / test)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -191,18 +193,22 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         with (sdk / "SDKSettings.plist").open("rb") as info:
             if plistlib.load(info).get("Version") != "11.3":
                 raise RuntimeError("Embedding checks require macOS SDK 11.3")
-        subprocess.run([
-            "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk), "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
-            "-I" + str(dist / "include/js"), "-I" + str(dist / "include/nspr"),
-            str(root / "js/tests/es5/TestObjectEmbedding.c"),
-            "-L" + str(runtime), "-lmozjs", "-o", str(embedding)], check=True)
         embedding_env = dict(environment, DYLD_LIBRARY_PATH=str(runtime))
-        result = subprocess.run([str(embedding)], env=embedding_env,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, timeout=60)
-        print(result.stdout)
-        if result.returncode or "failures=0" not in result.stdout:
-            raise RuntimeError("Packaged runtime failed embedding compatibility")
+        for source, marker in (
+                ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
+                ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=11 failures=0")):
+            subprocess.run([
+                "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
+                "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
+                "-I" + str(dist / "include/js"), "-I" + str(dist / "include/nspr"),
+                str(root / "js/tests" / source),
+                "-L" + str(runtime), "-lmozjs", "-o", str(embedding)], check=True)
+            result = subprocess.run([str(embedding)], env=embedding_env,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    text=True, timeout=60)
+            print(result.stdout)
+            if result.returncode or marker not in result.stdout:
+                raise RuntimeError("Packaged runtime failed embedding compatibility: " + source)
         if args.app == "calendar":
             subprocess.run([
                 "python3", str(root / "calendar/test/run-compatibility.py"),

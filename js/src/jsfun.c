@@ -1660,7 +1660,7 @@ js_IsCallable(JSContext *cx, jsval v)
         return JS_FALSE;
     obj = JSVAL_TO_OBJECT(v);
     if (OBJ_GET_CLASS(cx, obj) == &js_RegExpClass &&
-        JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT)
+        (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT || JS_VERSION_IS_ES2015(cx)))
         return JS_FALSE;
     return VALUE_IS_FUNCTION(cx, v) || OBJ_GET_CLASS(cx, obj)->call ||
            (obj->map->ops != &js_ObjectOps && obj->map->ops->call);

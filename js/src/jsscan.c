@@ -1571,7 +1571,7 @@ retry:
 
       case '.':
 #if JS_HAS_XML_SUPPORT
-        if (MatchChar(ts, c))
+        if (!JS_VERSION_IS_ES2015(cx) && MatchChar(ts, c))
             tt = TOK_DBLDOT;
         else
 #endif
@@ -1580,7 +1580,7 @@ retry:
 
       case ':':
 #if JS_HAS_XML_SUPPORT
-        if (MatchChar(ts, c)) {
+        if (!JS_VERSION_IS_ES2015(cx) && MatchChar(ts, c)) {
             tt = TOK_DBLCOLON;
             break;
         }
@@ -1646,6 +1646,11 @@ retry:
 
 #if JS_HAS_XML_SUPPORT
       case '@':
+        if (JS_VERSION_IS_ES2015(cx)) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                         JSMSG_ILLEGAL_CHARACTER);
+            goto error;
+        }
         tt = TOK_AT;
         break;
 #endif
@@ -1672,7 +1677,7 @@ retry:
          * to end of line, used since Netscape 2 to hide script tag content
          * from script-unaware browsers.
          */
-        if ((ts->flags & TSF_OPERAND) &&
+        if (!JS_VERSION_IS_ES2015(cx) && (ts->flags & TSF_OPERAND) &&
             (JS_HAS_XML_OPTION(cx) || PeekChar(ts) != '!')) {
             /* Check for XML comment or CDATA section. */
             if (MatchChar(ts, '!')) {
@@ -1943,12 +1948,13 @@ skipline:
                     ADD_TO_TOKENBUF(c);
                     c = GetChar(ts);
                     /* Classic application scripts allow escaped line breaks
-                     * in regexp literals. ES5 default/strict code does not.
+                     * in regexp literals. Default, ES2015 and strict code do not.
                      * EOF must remain an error in every language version.
                      */
                     if (c == EOF ||
                         (c == '\n' &&
                          (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                          JS_VERSION_IS_ES2015(cx) ||
                           (ts->flags & TSF_STRICT_MODE)))) {
                         UngetChar(ts, c);
                         js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,

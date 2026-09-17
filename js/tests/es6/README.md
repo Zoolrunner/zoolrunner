@@ -51,6 +51,10 @@ compiled as separate global scripts, with a transport/strictness preflight.
 Expected exceptions use this snapshot's negative-test patterns. A harness
 exception, crash, timeout or missing completion marker cannot satisfy a test.
 The timezone defaults to `America/Los_Angeles` and is recorded in the report.
+The runner now selects the explicit ES2015 edition (`xpcshell -v 2015`) and
+checks that selection during preflight. `--edition legacy` reproduces the
+original default-language baseline. Reports identify the selected edition;
+do not compare a legacy run with an ES2015 run as if the semantics were equal.
 
 Modules are currently reported as **unsupported**, not passed or skipped.
 Async tests without synchronous `$DONE` completion are also unsupported: a
@@ -103,7 +107,7 @@ on macOS arm64 XULRunner, with zero failures, timeouts, crashes or harness error
 XULRunner also passes the 156 Number assertions, 15 Number window checks,
 18 native embedding checks, 17 existing window-bootstrap checks, the existing
 packaged shell/application regressions and all 169 layout assertions.
-The complete ES2015 corpus has not yet been rerun against these additions.
+The subsequent complete run with explicit ES2015 selection is recorded below.
 The rebuilt macOS arm64 Suite also passes 358/364 Number cases, all 156 focused
 Number assertions, packaging/embedding and the existing desktop regressions,
 including Composer lifecycle, window bootstrap and ChatZilla initialization.
@@ -128,11 +132,76 @@ Before implementing such changes, provide an explicit edition selection for
 conformance execution and preserve historical loader/version behavior. Keep
 the original ES5 assertions, running them in the ES5 compatibility environment;
 run the ES2015 assertions in the ES2015 environment. Record that selection in
-reports. No separate ES2015 execution environment has been implemented yet.
-Parser/execution edition must survive nested compilation, XDR and callbacks;
-global built-in initialization also needs a consistent compatibility policy.
+reports. The first edition boundary is now implemented through
+`JSVERSION_ECMA_2015` / `JS_SetVersion`, with `ECMAv6` as its JSAPI string name.
+Existing numeric version values and the historical default remain unchanged.
+ES2015 allows repeated ordinary object properties, including strict code;
+duplicate literal `__proto__` setters remain an early error. Accessors can
+shadow inherited properties while honoring embedding access checks. The new
+mode does not inherit legacy E4X operators, callable regexps, implicit regexp
+input or eval's second-argument scope extension. Legacy versions retain those
+behaviors. The bytecode cache version has been advanced.
+
+HTML and XUL scripts can opt in with `type="application/javascript;version=2015"`.
+Unversioned XUL scripts still use the historical JS 1.7 grammar; ordinary
+unversioned HTML scripts retain the existing default. This is an implementation
+boundary, not a claim of complete ES2015 support. Global built-in initialization
+still needs a compatibility policy: script edition selection alone cannot give
+one shared function object two incompatible property descriptors.
+
+`editions.js` tests the language boundary. `TestEditionEmbedding.c` tests JSAPI
+version round trips, saved editions in XDR, nested eval/Function compilation,
+decompilation, cross-edition callbacks, garbage collection, caller restoration
+and embedding access controls. Compile it using the same flags as
+`../es5/TestObjectEmbedding.c`. The `window-editions.xul` fixture tests explicit
+modern scripts alongside unchanged legacy XUL and default HTML scripts; launch
+the existing `window-app/application.ini` with
+`-chrome chrome://es6window/content/window-editions.xul` and a disposable profile.
 Do not approximate edition selection by changing behavior only while a test
 is running or by identifying Test262 sources.
+
+## Edition boundary validation (macOS arm64, 2026-09-17)
+
+The complete pinned corpus in explicit ES2015 mode ran all 28,582 cases in
+814 seconds, with the runtime binary hashes unchanged throughout:
+
+| Result | Test/mode cases |
+| --- | ---: |
+| Pass | 22,550 |
+| Fail | 6,008 |
+| Unsupported | 14 |
+| Timeout | 2 |
+| Crash | 0 |
+| Harness/completion error | 8 |
+
+Compared with the initial historical-default baseline, 123 cases gained a pass
+and 40 lost a pass. The latter involve incomplete `let`/`yield` handling in the
+new mode, which currently inherits parts of the older block-scope parser.
+They remain failures to resolve, not exclusions. The object-literal subset
+improved from 85/208 to 105/208, with no previous passes lost. This comparison
+also includes the earlier Number additions; it is not an isolated measurement
+of the edition patch alone. The ES5 default-mode regression gate passes all
+11,540 cases again, with no failures, crashes, timeouts or harness errors.
+
+All four native arm64 applications build and pass packaging, 156 Number
+checks, 36 edition checks, 18 existing embedding checks and 11 new edition
+embedding checks. Their relocated desktop runs pass the existing shell/window
+regressions and all five mixed-edition window checks. Browser navigation through
+the normal browser window passes all 169 layout assertions. Calendar passes
+eight compatibility test files and all four views. ChatZilla initializes in
+Suite and in its unchanged standalone XULRunner wrapper with the input widget.
+
+The first Suite lifecycle run exposed a fixture-state problem: some initial
+Composer documents were already modified, so insertion caused no new dirty-state
+notification. Package diagnostics reproduced that state. The fixture now resets
+and verifies its modification count before observing the clean-to-dirty
+transition, preserving all editing/undo/shutdown assertions. Three fresh-package
+runs pass all 24 checks after that correction. See the
+[lifecycle test documentation](../../../editor/composer/tests/README.md).
+
+Modern macOS packaging now includes the focused edition and native embedding
+gates, and the desktop runner includes the mixed-edition window fixture. These
+are local arm64 results, not new GitHub-hosted, x86_64, Windows or Linux results.
 
 For engine changes, rerun the complete pinned ES5 corpus, the affected ES2015
 tests and focused regressions. Native embedding, chrome/content globals,

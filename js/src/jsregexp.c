@@ -4042,7 +4042,8 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         goto out;
 
     /* Now that obj is unlocked, it's safe to (potentially) grab the GC lock. */
-    if (argc == 0 && JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT) {
+    if (argc == 0 && JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT &&
+        !JS_VERSION_IS_ES2015(cx)) {
         str = cx->regExpStatics.pendingInput;
         if (!str) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,

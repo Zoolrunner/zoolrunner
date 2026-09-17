@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html><head><title>Mixed edition content</title>
+<script type="application/javascript;version=2015" src="edition-modern.js"></script>
+<script type="application/javascript">
+function legacyContentEdition() {
+    try { eval("'use strict'; ({value:1,value:2})"); }
+    catch (e) { return e instanceof SyntaxError && modernWindowEdition(); }
+    return false;
+}
+var contentEditionsLoaded = legacyContentEdition();
+</script>
+</head><body>Mixed edition content</body></html>

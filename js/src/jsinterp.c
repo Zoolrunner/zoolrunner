@@ -1144,7 +1144,8 @@ js_Invoke(JSContext *cx, uintN argc, uintN flags)
     funobj = JSVAL_TO_OBJECT(v);
     parent = OBJ_GET_PARENT(cx, funobj);
     clasp = OBJ_GET_CLASS(cx, funobj);
-    if (clasp == &js_RegExpClass && JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT)
+    if (clasp == &js_RegExpClass &&
+        (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT || JS_VERSION_IS_ES2015(cx)))
         goto bad;
     if (clasp != &js_FunctionClass) {
         /* Function is inlined, all other classes use object ops. */
@@ -1858,6 +1859,16 @@ js_CheckRedeclaration(JSContext *cx, JSObject *obj, jsid id, uintN attrs,
     }
     if (!prop)
         return JS_TRUE;
+
+    /* ES2015 accessor definitions create an own property. Attributes of an
+     * inherited property do not forbid shadowing it. Keep the historical
+     * declaration checks and the caller's embedding access check intact.
+     */
+    if (JS_VERSION_IS_ES2015(cx) && !propp && obj2 != obj &&
+        (attrs & (JSPROP_GETTER | JSPROP_SETTER))) {
+        OBJ_DROP_PROPERTY(cx, obj2, prop);
+        return JS_TRUE;
+    }
 
     /*
      * Use prop as a speedup hint to OBJ_GET_ATTRIBUTES, but drop it on error.

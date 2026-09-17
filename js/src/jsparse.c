@@ -5643,10 +5643,11 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                                     cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
                                 /* Historical language versions allow accessor argument
                                  * lists used by unchanged XUL/XPCOM applications.
-                                 * Keep ES5 grammar for the default version and for
-                                 * accessors opting into strict mode.
+                                 * Keep standard arity for default and ES2015
+                                 * code and accessors opting into strict mode.
                                  */
                                 if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                                     JS_VERSION_IS_ES2015(cx) ||
                                      (accessor->flags & JSFUN_STRICT)) &&
                                     accessor->nargs != (op == JSOP_GETTER ? 0 : 1)) {
                                     StrictSyntaxError(cx, ts);
@@ -5721,7 +5722,17 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             ATOM_LIST_SEARCH(entry, &properties, propertyAtom);
             if (entry) {
                 previousKind = ALE_INDEX(entry);
-                if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                /* ES2015 permits repeated ordinary properties, but Annex B
+                 * keeps duplicate prototype setters an early error.
+                 */
+                if (JS_VERSION_IS_ES2015(cx) && propertyKind == 1 &&
+                    (previousKind & 1) &&
+                    propertyAtom == cx->runtime->atomState.protoAtom) {
+                    StrictSyntaxError(cx, ts);
+                    return NULL;
+                }
+                if (!JS_VERSION_IS_ES2015(cx) &&
+                    (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
                      (tc->flags & TCF_STRICT_MODE)) &&
                     ((propertyKind == 1 &&
                       ((previousKind & 6) || (tc->flags & TCF_STRICT_MODE))) ||

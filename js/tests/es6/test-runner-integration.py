@@ -16,6 +16,7 @@ args = p.parse_args()
 shell = args.shell.absolute()
 env = dict(os.environ, DYLD_LIBRARY_PATH=str(shell.parent), LD_LIBRARY_PATH=str(shell.parent))
 fixtures = [
+    ('edition', 'strict', {}, 'if(version()!==2015 || ({x:1,x:2}).x!==2) throw Error("edition");', 'pass'),
     ('unicode', 'strict', {}, 'if ("𐒠".charCodeAt(1) !== 0xDCA0) throw Error("transport");', 'pass'),
     ('own-directive', 'non-strict', {}, '"use strict"; if ((function(){return this;})() !== undefined) throw Error("directive");', 'pass'),
     ('global-bookkeeping', 'strict', {}, 'var emit = null, compile = null, stringify = null, done = 42;', 'pass'),
@@ -35,6 +36,11 @@ for name, mode, record, source, expected in fixtures:
     result = runner.run_case(case, args.suite, shell, env, 2)
     if result['status'] != expected:
         raise RuntimeError('%s expected %s: %r' % (name, expected, result))
+case = dict(test='legacy-edition', mode='strict', record={'negative': 'SyntaxError'},
+            source='({x:1,x:2});')
+result = runner.run_case(case, args.suite, shell, env, 2, 'legacy')
+if result['status'] != 'pass':
+    raise RuntimeError('Legacy grammar changed: %r' % result)
 with tempfile.TemporaryDirectory(prefix='zoolrunner-es6-harness-') as temporary:
     suite = Path(temporary)
     harness = suite / 'harness'
@@ -46,4 +52,4 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-es6-harness-') as temporary:
     result = runner.run_case(case, suite, shell, env, 2)
     if result['status'] != 'harness-error':
         raise RuntimeError('Harness exception satisfied negative test: %r' % result)
-print('ES6-RUNNER checks=%d failures=0' % (len(fixtures) + 1))
+print('ES6-RUNNER checks=%d failures=0' % (len(fixtures) + 2))

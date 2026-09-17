@@ -102,7 +102,7 @@ def classify(case, output, code, marker):
     return ('pass' if passed else 'fail'), detail
 
 
-def run_case(case, suite, shell, env, timeout):
+def run_case(case, suite, shell, env, timeout, edition='es2015'):
     result = {key: case[key] for key in ('test', 'mode')}
     result['features'] = case['record'].get('features', [])
     result['specification'] = {key: case['record'][key]
@@ -125,7 +125,8 @@ def run_case(case, suite, shell, env, timeout):
             marker = 'ZOOL262-' + Path(tmp).name + ' '
             driver = Path(tmp) / 'driver.js'
             driver.write_text(driver_source(case, harness, marker), encoding='utf-8')
-            proc = subprocess.run([str(shell), '-f', str(driver)], env=env,
+            proc = subprocess.run([str(shell), '-v', '2015' if edition == 'es2015' else '0',
+                                   '-f', str(driver)], env=env,
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)
             output = proc.stdout.decode('utf-8', errors='replace')
             status, detail = classify(case, output, proc.returncode, marker)
@@ -145,6 +146,8 @@ def main():
     p.add_argument('--jobs', type=int, default=4)
     p.add_argument('--timeout', type=float, default=10)
     p.add_argument('--timezone', default='America/Los_Angeles')
+    p.add_argument('--edition', choices=('es2015', 'legacy'), default='es2015',
+                   help='ES2015 opt-in, or the historical default for baseline comparisons')
     args = p.parse_args()
     if args.jobs < 1 or args.timeout <= 0:
         p.error('jobs and timeout must be positive')
@@ -162,7 +165,10 @@ def main():
         'if ("𐒠".length !== 2 || "𐒠".charCodeAt(0) !== 0xD801 || '
         '"𐒠".charCodeAt(1) !== 0xDCA0) throw Error("Unicode transport");\n'
         'if ((function () { return this; })() !== undefined) throw Error("strict mode");')
-    check = run_case(preflight, suite, shell, env, args.timeout)
+    if args.edition == 'es2015':
+        preflight['source'] += '\nif (version() !== 2015 || ({x:1,x:2}).x !== 2) '
+        preflight['source'] += 'throw Error("ES2015 edition selection");'
+    check = run_case(preflight, suite, shell, env, args.timeout, args.edition)
     if check['status'] != 'pass':
         p.error('Harness/Unicode/strict-mode preflight failed: ' + repr(check))
     cases = list(records(suite, args.filter))
@@ -178,7 +184,7 @@ def main():
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
         def run(case):
-            return run_case(case, suite, shell, env, args.timeout)
+            return run_case(case, suite, shell, env, args.timeout, args.edition)
         for result in pool.map(run, cases):
             results.append(result)
             if len(results) % 500 == 0:
@@ -187,6 +193,7 @@ def main():
     report = dict(suite_revision=revision, corpus='ES2015-era baseline',
                   roots=ROOTS, filter=args.filter, timezone=args.timezone,
                   full_selection=not args.filter, unmarked_default='both',
+                  language_edition=args.edition,
                   source_transport='unicode-global-script', harness_layout='separate-global-script',
                   shell=str(shell), shell_sha256=hashlib.sha256(shell.read_bytes()).hexdigest(),
                   runtime_sha256=binaries,
