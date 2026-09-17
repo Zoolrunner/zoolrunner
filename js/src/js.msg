@@ -306,3 +306,4 @@ MSG_DEF(JSMSG_BAD_DESCRIPTOR,        223, 0, JSEXN_TYPEERR, "invalid property de
 MSG_DEF(JSMSG_BAD_JSON,              224, 0, JSEXN_SYNTAXERR, "invalid JSON text")
 MSG_DEF(JSMSG_JSON_CYCLE,            225, 0, JSEXN_TYPEERR, "cyclic value in JSON serialization")
 MSG_DEF(JSMSG_STRICT_SYNTAX,         226, 0, JSEXN_SYNTAXERR, "invalid construct in strict mode")
+MSG_DEF(JSMSG_CONST_ASSIGNMENT,      227, 0, JSEXN_TYPEERR, "assignment to constant binding")

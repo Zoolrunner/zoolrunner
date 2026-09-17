@@ -1173,7 +1173,13 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
         LOCAL_ASSERT(*pc == JSOP_POP);
         break;
 
+      case JSOP_LITOPX:
+        LOCAL_ASSERT(pc[1 + LITERAL_INDEX_LEN] == JSOP_CONSTASSIGN);
+        atom = js_GetAtom(cx, &jp->script->atomMap, GET_LITERAL_INDEX(pc));
+        goto do_const_lhs;
+
       case JSOP_SETARG:
+      case JSOP_CONSTASSIGN:
       case JSOP_SETVAR:
       case JSOP_SETGVAR:
       case JSOP_SETLOCAL:
@@ -1188,10 +1194,11 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
             atom = GetSlotAtom(jp, js_GetArgument, i);
         else if (op == JSOP_SETVAR)
             atom = GetSlotAtom(jp, js_GetLocalVariable, i);
-        else if (op == JSOP_SETGVAR)
+        else if (op == JSOP_SETGVAR || op == JSOP_CONSTASSIGN)
             atom = GET_ATOM(cx, jp->script, pc);
         else
             lval = GetLocal(ss, i);
+      do_const_lhs:
         if (atom)
             lval = js_AtomToPrintableString(cx, atom);
         LOCAL_ASSERT(lval);
@@ -2955,6 +2962,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 goto do_setname;
 
               case JSOP_SETCONST:
+              case JSOP_CONSTASSIGN:
               case JSOP_SETNAME:
               case JSOP_SETGVAR:
                 atomIndex = GET_ATOM_INDEX(pc);
@@ -3119,6 +3127,11 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 LOCAL_ASSERT(atom);
                 goto do_incatom;
 
+              case JSOP_CONSTINC:
+              case JSOP_CONSTDEC:
+                lval = POP_STR();
+                goto do_inclval;
+
               case JSOP_INCVAR:
               case JSOP_DECVAR:
                 atom = GetSlotAtom(jp, js_GetLocalVariable, GET_VARNO(pc));
@@ -3180,6 +3193,11 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 atom = GetSlotAtom(jp, js_GetArgument, GET_ARGNO(pc));
                 LOCAL_ASSERT(atom);
                 goto do_atominc;
+
+              case JSOP_CONSTPOSTINC:
+              case JSOP_CONSTPOSTDEC:
+                lval = POP_STR();
+                goto do_lvalinc;
 
               case JSOP_VARINC:
               case JSOP_VARDEC:
@@ -3424,6 +3442,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                   case JSOP_ANONFUNOBJ:   goto do_JSOP_ANONFUNOBJ;
                   case JSOP_BINDNAME:     goto do_JSOP_BINDNAME;
                   case JSOP_CLOSURE:      goto do_JSOP_CLOSURE;
+                  case JSOP_CONSTASSIGN:  goto do_JSOP_SETCONST;
 #if JS_HAS_EXPORT_IMPORT
                   case JSOP_EXPORTNAME:   goto do_JSOP_EXPORTNAME;
 #endif

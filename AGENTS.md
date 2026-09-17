@@ -426,6 +426,14 @@ Script selection is not yet a complete policy for global built-in semantics;
 do not claim that partial edition support establishes ES2015 compliance.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
+Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve
+legacy const behavior, modern operand-coercion order, captured/eval bindings,
+exception/finally behavior and decompilation. Run `test-const-large-script.py`
+against the matching shell to exercise extended atom operands and object
+initializer ordering beyond the 16-bit index boundary. Keep the XDR bytecode
+version synchronized with new opcodes and rebuild the XPConnect loader and its
+containing library before application tests. Const write checks alone do not
+establish lexical scoping or temporal-dead-zone support.
 
 Do not automatically attempt complete current ECMAScript compatibility.
 

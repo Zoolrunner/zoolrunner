@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 from legacy_tar import LegacyTarInfo
 import tempfile
@@ -184,7 +185,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("../es6/contextual-keywords.js",
                  "ES6-CONTEXTUAL-KEYWORDS checks=84 failures=0"),
                 ("../es6/lexical-parameters.js",
-                 "ES6-LEXICAL-PARAMETERS checks=36 failures=0")):
+                 "ES6-LEXICAL-PARAMETERS checks=36 failures=0"),
+                ("../es6/const-writes.js", "ES6-CONST-WRITES checks=104 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-f", str(root / "js/tests/es5" / test)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -200,6 +202,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-FUNCTION-METADATA checks=82 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed modern function metadata")
+        subprocess.run(
+            [sys.executable, str(root / "js/tests/es6/test-const-large-script.py"),
+             "--shell", str(runtime / "xpcshell")], check=True)
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"

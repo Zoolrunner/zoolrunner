@@ -3935,6 +3935,13 @@ js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 
         if ((attrs & JSPROP_READONLY) ||
             (SCOPE_IS_SEALED(scope) && pobj == obj)) {
+            if ((attrs & JSPROP_READONLY) && (sprop->flags & SPROP_IS_CONST) &&
+                JS_VERSION_IS_ES2015(cx)) {
+                JS_UNLOCK_SCOPE(cx, scope);
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_CONST_ASSIGNMENT);
+                return JS_FALSE;
+            }
             JS_UNLOCK_SCOPE(cx, scope);
 
             /*

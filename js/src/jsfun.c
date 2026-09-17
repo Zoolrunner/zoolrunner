@@ -961,6 +961,9 @@ call_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
                 spflags = 0;
                 shortid = 0;
             }
+            if ((attrs & JSPROP_READONLY) &&
+                fp->fun->edition >= JSVERSION_ECMA_2015)
+                spflags |= SPROP_IS_CONST;
             if (!js_DefineNativeProperty(cx, obj, ATOM_TO_JSID(atom), value,
                                          getter, setter, attrs,
                                          spflags, shortid, NULL)) {

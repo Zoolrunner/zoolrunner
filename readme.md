@@ -172,7 +172,11 @@ through `xpcshell -E` or selection of ES2015 before native standard-class
 initialization; script edition changes alone do not replace existing built-ins.
 Modern function metadata and restricted accessors have native, shell and
 window regressions; inferred function names and other ES2015 behavior remain
-incomplete.
+incomplete. Modern `const` declarations require initializers, and writes to
+initialized constant bindings throw after evaluating their operands. Legacy
+script modes retain their historical behavior. Focused checks cover closures,
+eval, destructuring, decompilation and extended atom operands; lexical scoping,
+temporal dead zones and per-iteration bindings still require implementation.
 
 Application compatibility is tested separately from language conformance:
 

@@ -356,3 +356,50 @@ also initializes its input widget in XULRunner and exits successfully. The
 runner's five unit checks and 17 real-shell checks pass. Other operating systems
 and architectures have not been revalidated for this batch. Thousands of
 conformance failures remain; these results do not establish ES2015 completion.
+
+## Immutable writes and extended operands
+
+Explicit ES2015 mode now rejects missing `const` initializers and constant
+statements where a lexical declaration is not permitted. Assignment, compound
+assignment, increment/decrement and destructuring writes to initialized
+constant bindings throw `TypeError`, including captured bindings and direct
+eval. Operand evaluation and numeric coercion happen before the immutable-write
+exception; coercion exceptions retain precedence. Legacy script editions keep
+their historical ignored-write and optional-initializer behavior. Ordinary
+read-only object properties and named-function self-bindings remain separate.
+
+This does **not** complete lexical bindings: block/global lexical environments,
+temporal dead zones, per-iteration environments and const for-in/of declarations
+remain unfinished. Modern const still uses historical storage internally.
+
+`const-writes.js` has 104 checks covering both language editions, strict and
+non-strict writes, closures, eval, GC during coercion, finally blocks and
+function decompilation. `test-const-large-script.py --shell PATH` adds 14 checks
+across the 16-bit atom-index boundary, including compound/destructuring writes
+and legacy/modern object initializer value ordering. These checks execute both
+compiled and decompiled functions. The large-script test caught and corrected
+an extended-property initializer ordering bug as well as the new opcode's
+extended-operand emission. Both regressions run during macOS packaging.
+The bytecode cache version is now 34; the native edition/XDR and real-window
+fixtures also exercise modern const writes.
+
+The first full macOS arm64 XULRunner run with immutable-write support recorded
+**22,884 passes, 5,682 failures, 14 unsupported modules, zero timeouts, zero
+crashes and two harness errors** in 507 seconds. It gained 38 passes and lost
+none relative to the preceding metadata run. ES5 passed all 11,540 cases.
+After the extended-operand fixes, a second complete XULRunner run records the
+same counts in 745.97 seconds; its ES5 rerun passes 11,540/11,540 in 540.85
+seconds. The final Suite run, including the locked-property lookup adjustment,
+also records the same ES2015 counts in 677.97 seconds. Both ES2015 runs
+verify unchanged runtime hashes. No previous passing case is lost.
+
+All four macOS arm64 applications pass engine/loader builds, packaging and
+relocated desktop checks. XULRunner's aggregate XUL library is relinked after
+its XPConnect loader rebuild. Package checks include all 104 immutable-write
+checks, 14 extended-operand checks, 82 metadata checks, 17 metadata embedding
+checks and 13 edition embedding checks. Suite passes the 24 lifecycle checks
+and ChatZilla startup; Browser navigation passes 169 assertions; Calendar
+passes eight unit files and all four views. Standalone ChatZilla initializes
+its input widget and exits successfully in XULRunner. Runner unit and
+integration checks pass. Other operating systems and architectures have not
+been revalidated for this batch; full ES2015 conformance remains incomplete.

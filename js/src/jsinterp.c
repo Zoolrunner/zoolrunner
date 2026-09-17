@@ -2853,6 +2853,12 @@ interrupt:
                 break;
 
               case JSOP_FORCONST:
+                if (JS_VERSION_IS_ES2015(cx)) {
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                         JSMSG_CONST_ASSIGNMENT);
+                    ok = JS_FALSE;
+                    goto out;
+                }
                 /* Don't update the const slot. */
                 break;
 
@@ -3030,6 +3036,24 @@ interrupt:
 
 #define END_LITOPX_CASE(OP)                                                   \
           END_CASE(OP)
+
+          BEGIN_CASE(JSOP_CONSTINC)
+          BEGIN_CASE(JSOP_CONSTDEC)
+          BEGIN_CASE(JSOP_CONSTPOSTINC)
+          BEGIN_CASE(JSOP_CONSTPOSTDEC)
+            SAVE_SP_AND_PC(fp);
+            FETCH_NUMBER(cx, -1, d);
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_CONST_ASSIGNMENT);
+            ok = JS_FALSE;
+            goto out;
+
+          BEGIN_LITOPX_CASE(JSOP_CONSTASSIGN, 0)
+            SAVE_SP_AND_PC(fp);
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_CONST_ASSIGNMENT);
+            ok = JS_FALSE;
+            goto out;
 
           BEGIN_LITOPX_CASE(JSOP_SETCONST, 0)
             obj = fp->varobj;
@@ -4316,6 +4340,7 @@ interrupt:
               case JSOP_ANONFUNOBJ:   goto do_JSOP_ANONFUNOBJ;
               case JSOP_BINDNAME:     goto do_JSOP_BINDNAME;
               case JSOP_CLOSURE:      goto do_JSOP_CLOSURE;
+              case JSOP_CONSTASSIGN:  goto do_JSOP_CONSTASSIGN;
               case JSOP_DEFCONST:     goto do_JSOP_DEFCONST;
               case JSOP_DEFFUN:       goto do_JSOP_DEFFUN;
               case JSOP_DEFLOCALFUN:  goto do_JSOP_DEFLOCALFUN;

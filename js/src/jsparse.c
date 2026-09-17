@@ -3573,6 +3573,11 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         return pn;
 
       case TOK_VAR:
+        if (JS_VERSION_IS_ES2015(cx) &&
+            CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST && !allowLexical) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
         pn = Variables(cx, ts, tc);
         if (!pn)
             return NULL;
@@ -4005,6 +4010,11 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                          : JSOP_SETNAME;
             if (!let && atom == cx->runtime->atomState.argumentsAtom)
                 tc->flags |= TCF_FUN_HEAVYWEIGHT;
+        } else if (JS_VERSION_IS_ES2015(cx) && data.op == JSOP_DEFCONST &&
+                   !((tc->flags & TCF_IN_FOR_INIT) &&
+                     js_PeekToken(cx, ts) == TOK_IN)) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
         }
     } while (js_MatchToken(cx, ts, TOK_COMMA));
 
