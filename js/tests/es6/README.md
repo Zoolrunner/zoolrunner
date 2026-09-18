@@ -1678,3 +1678,41 @@ Calendar passes eight unit suites and four views; Browser passes 169 navigation/
 layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/array-text-runtime`. Other platforms and full ES6 remain incomplete.
+
+### Error construction and prototypes
+
+Modern Error instances use a nonconstructible native class retaining the classic
+report/stack representation. Prototypes are ordinary objects, NativeError
+constructors inherit from Error, and each prototype owns its empty message.
+Modern message properties are configurable own data properties that stay deleted;
+lazy native resolution does not recreate them. The classic report APIs recognize
+both native classes. Legacy globals keep their original constructor/prototype
+and lazy-resolution behavior.
+
+Modern constructors allow nested Error creation from message conversion and
+ignore the legacy optional filename/line arguments. Generic Error.toString uses
+ordered name/message conversion with standard defaults and rejects primitive
+receivers. NewTarget and JSAPI-cloned constructors retain the appropriate realm
+and native Error identity. Engine-generated exceptions retain native reports,
+file/line extensions and garbage-collected stacks.
+
+Diagnostic subsets pass 148/148 cases: Error 74 and Object.getPrototypeOf 74.
+Focused checks pass 72 script and 32 native assertions under MallocScribble; C89
+checks pass. The native fixture enables JSOPTION_DONT_REPORT_UNCAUGHT before
+inspecting a pending exception; otherwise outermost evaluation reports and clears
+it. Upstream tests are unchanged.
+
+The full pinned ES2015 run passes **26,482 cases**, with **2,084 failures**,
+14 unsupported module cases and two harness errors: **20 gained, zero lost**
+relative to string/sort methods. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/error-modern-full.json` and
+`error-modern-es5.json`; snapshot: `/tmp/zr-error-modern-conformance-20260918`.
+Its libmozjs SHA-256 `005485a3545a71c1452d84b3583c0fb8265d8693f154a063cb0e347b97c4e60e`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/error-modern-runtime`. Other platforms and full ES6 remain incomplete.

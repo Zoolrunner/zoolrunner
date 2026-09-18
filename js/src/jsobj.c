@@ -1272,7 +1272,8 @@ ObjectToString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         else if (clasp == &js_DateClass &&
                  !JSVAL_IS_DOUBLE(OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE)))
             clazz = "Object";
-        else if (clasp == &js_ErrorClass || clasp == &js_BooleanClass ||
+        else if (clasp == &js_ErrorClass || clasp == &js_ModernErrorClass ||
+                 clasp == &js_BooleanClass ||
                  clasp == &js_NumberClass ||
                  clasp == &js_DateClass || clasp == &js_RegExpClass)
             clazz = clasp->name;

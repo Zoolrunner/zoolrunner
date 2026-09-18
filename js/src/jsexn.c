@@ -56,6 +56,8 @@
 #include "jsexn.h"
 #include "jsfun.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
+#include "jsrealm.h"
 #include "jsnum.h"
 #include "jsopcode.h"
 #include "jsscript.h"
@@ -63,6 +65,9 @@
 /* Forward declarations for js_ErrorClass's initializer. */
 static JSBool
 Exception(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval);
+
+static JSBool
+ModernException(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval);
 
 static void
 exn_finalize(JSContext *cx, JSObject *obj);
@@ -89,6 +94,24 @@ JSClass js_ErrorClass = {
     NULL,             NULL,             NULL,             Exception,
     NULL,             NULL,             exn_mark,         NULL
 };
+
+JSClass js_ModernErrorClass = {
+    js_Error_str,
+    JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE |
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Error),
+    JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,  JS_PropertyStub,
+    exn_enumerate,    (JSResolveOp)exn_resolve, JS_ConvertStub, exn_finalize,
+    NULL,             NULL,             NULL,             NULL,
+    NULL,             NULL,             exn_mark,         NULL
+};
+
+JSBool
+js_IsErrorObject(JSContext *cx, JSObject *obj)
+{
+    JSClass *clasp = OBJ_GET_CLASS(cx, obj);
+    return clasp == &js_ErrorClass || clasp == &js_ModernErrorClass;
+}
+
 
 typedef struct JSStackTraceElem {
     JSString            *funName;
@@ -257,7 +280,7 @@ InitExnPrivate(JSContext *cx, JSObject *exnObject, JSString *message,
     JSStackTraceElem *elem;
     jsval *values;
 
-    JS_ASSERT(OBJ_GET_CLASS(cx, exnObject) == &js_ErrorClass);
+    JS_ASSERT(js_IsErrorObject(cx, exnObject));
 
     /*
      * Prepare stack trace data.
@@ -357,6 +380,9 @@ InitExnPrivate(JSContext *cx, JSObject *exnObject, JSString *message,
         }
     }
 
+    if (OBJ_GET_CLASS(cx, exnObject) == &js_ModernErrorClass && message &&
+        !JS_DefineProperty(cx, exnObject, js_message_str, STRING_TO_JSVAL(message),
+                           NULL, NULL, 0)) return JS_FALSE;
     return JS_TRUE;
 }
 
@@ -366,7 +392,7 @@ GetExnPrivate(JSContext *cx, JSObject *obj)
     jsval privateValue;
     JSExnPrivate *priv;
 
-    JS_ASSERT(OBJ_GET_CLASS(cx, obj) == &js_ErrorClass);
+    JS_ASSERT(js_IsErrorObject(cx, obj));
     privateValue = OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE);
     if (JSVAL_IS_VOID(privateValue))
         return NULL;
@@ -464,7 +490,8 @@ exn_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
         str = JSVAL_TO_STRING(id);
 
         atom = cx->runtime->atomState.messageAtom;
-        if (str == ATOM_TO_STRING(atom) && priv->message) {
+        if (str == ATOM_TO_STRING(atom) && priv->message &&
+            OBJ_GET_CLASS(cx, obj) != &js_ModernErrorClass) {
             prop = js_message_str;
             v = STRING_TO_JSVAL(priv->message);
             goto define;
@@ -515,7 +542,7 @@ js_ErrorFromException(JSContext *cx, jsval exn)
     if (JSVAL_IS_PRIMITIVE(exn))
         return NULL;
     obj = JSVAL_TO_OBJECT(exn);
-    if (OBJ_GET_CLASS(cx, obj) != &js_ErrorClass)
+    if (!js_IsErrorObject(cx, obj))
         return NULL;
     priv = GetExnPrivate(cx, obj);
     if (!priv)
@@ -528,6 +555,7 @@ struct JSExnSpec {
     const char *name;
     JSProtoKey key;
     JSNative native;
+    JSNative modern;
 };
 
 /*
@@ -541,6 +569,11 @@ static JSBool                                                                 \
 name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)      \
 {                                                                             \
     return Exception(cx, obj, argc, argv, rval);                              \
+}                                                                            \
+static JSBool                                                                \
+Modern##name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)  \
+{                                                                            \
+    return ModernException(cx, obj, argc, argv, rval);                         \
 }
 
 MAKE_EXCEPTION_CTOR(Error)
@@ -555,15 +588,15 @@ MAKE_EXCEPTION_CTOR(URIError)
 #undef MAKE_EXCEPTION_CTOR
 
 static struct JSExnSpec exceptions[] = {
-    {JSEXN_NONE, js_Error_str,          JSProto_Error,          Error},
-    {JSEXN_ERR,  js_InternalError_str,  JSProto_InternalError,  InternalError},
-    {JSEXN_ERR,  js_EvalError_str,      JSProto_EvalError,      EvalError},
-    {JSEXN_ERR,  js_RangeError_str,     JSProto_RangeError,     RangeError},
-    {JSEXN_ERR,  js_ReferenceError_str, JSProto_ReferenceError, ReferenceError},
-    {JSEXN_ERR,  js_SyntaxError_str,    JSProto_SyntaxError,    SyntaxError},
-    {JSEXN_ERR,  js_TypeError_str,      JSProto_TypeError,      TypeError},
-    {JSEXN_ERR,  js_URIError_str,       JSProto_URIError,       URIError},
-    {0,          NULL,                  JSProto_Null,           NULL}
+    {JSEXN_NONE, js_Error_str,          JSProto_Error,          Error, ModernError},
+    {JSEXN_ERR,  js_InternalError_str,  JSProto_InternalError,  InternalError, ModernInternalError},
+    {JSEXN_ERR,  js_EvalError_str,      JSProto_EvalError,      EvalError, ModernEvalError},
+    {JSEXN_ERR,  js_RangeError_str,     JSProto_RangeError,     RangeError, ModernRangeError},
+    {JSEXN_ERR,  js_ReferenceError_str, JSProto_ReferenceError, ReferenceError, ModernReferenceError},
+    {JSEXN_ERR,  js_SyntaxError_str,    JSProto_SyntaxError,    SyntaxError, ModernSyntaxError},
+    {JSEXN_ERR,  js_TypeError_str,      JSProto_TypeError,      TypeError, ModernTypeError},
+    {JSEXN_ERR,  js_URIError_str,       JSProto_URIError,       URIError, ModernURIError},
+    {0,          NULL,                  JSProto_Null,           NULL, NULL}
 };
 
 JSProtoKey
@@ -571,7 +604,8 @@ js_GetExceptionProtoKey(JSNative native)
 {
     uintN i;
     for (i = 0; exceptions[i].name; ++i) {
-        if (exceptions[i].native == native) return exceptions[i].key;
+        if (exceptions[i].native == native || exceptions[i].modern == native)
+            return exceptions[i].key;
     }
     return JSProto_Error;
 }
@@ -830,6 +864,94 @@ Exception(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return ok;
 }
 
+/* Modern Error constructors retain native reports/stacks but ignore the legacy
+ * filename/line arguments. Conversion callbacks may construct further errors. */
+static JSBool
+ModernException(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[3] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *proto;
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(argv[-2]));
+    JSString *message = NULL, *filename;
+    JSStackFrame *caller;
+    uint32 line;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!(cx->fp->flags & JSFRAME_CONSTRUCTING)) {
+        if (!OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(argv[-2]),
+                              ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom), &values[0])) goto out;
+        proto = JSVAL_IS_PRIMITIVE(values[0]) ?
+                js_BuiltinPrototype(cx, global, js_GetExceptionProtoKey(fun->u.n.native)) : JSVAL_TO_OBJECT(values[0]);
+        if (!proto) goto out;
+        obj = js_NewObject(cx, &js_ModernErrorClass, proto, global);
+        if (!obj) goto out;
+    }
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (argc && !JSVAL_IS_VOID(argv[0])) {
+        message = js_ValueToString(cx, argv[0]);
+        if (!message) goto out;
+        values[1] = STRING_TO_JSVAL(message);
+    }
+    caller = JS_GetScriptedCaller(cx, NULL);
+    filename = caller ? FilenameToString(cx, caller->script->filename) : cx->runtime->emptyString;
+    if (!filename) goto out;
+    values[2] = STRING_TO_JSVAL(filename);
+    line = caller && caller->pc ? js_PCToLineNumber(cx, caller->script, caller->pc) : 0;
+    if (!InitExnPrivate(cx, obj, message, filename, line, NULL)) goto out;
+    *rval = values[0]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ModernErrorToString(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[3] = {argv[-1], JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *obj;
+    JSString *name, *message, *result;
+    jschar *chars;
+    size_t nameLength, messageLength, length;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED); return JS_FALSE;
+    }
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!JS_GetProperty(cx, obj, js_name_str, &values[1])) goto out;
+    name = JSVAL_IS_VOID(values[1]) ? JS_NewStringCopyZ(cx, js_Error_str) : js_ValueToString(cx, values[1]);
+    if (!name) goto out;
+    values[1] = STRING_TO_JSVAL(name);
+    if (!JS_GetProperty(cx, obj, js_message_str, &values[2])) goto out;
+    message = JSVAL_IS_VOID(values[2]) ? cx->runtime->emptyString : js_ValueToString(cx, values[2]);
+    if (!message) goto out;
+    values[2] = STRING_TO_JSVAL(message);
+    nameLength = JSSTRING_LENGTH(name); messageLength = JSSTRING_LENGTH(message);
+    if (!nameLength || !messageLength) {
+        *rval = nameLength ? values[1] : values[2]; ok = JS_TRUE; goto out;
+    }
+    if (nameLength > JSSTRING_LENGTH_MASK - 2 ||
+        messageLength > JSSTRING_LENGTH_MASK - nameLength - 2 ||
+        nameLength + messageLength + 2 >= ((size_t)-1) / sizeof(jschar)) {
+        JS_ReportOutOfMemory(cx); goto out;
+    }
+    length = nameLength + messageLength + 2;
+    chars = (jschar *)JS_malloc(cx, (length + 1) * sizeof(jschar));
+    if (!chars) goto out;
+    memcpy(chars, JSSTRING_CHARS(name), nameLength * sizeof(jschar));
+    chars[nameLength] = ':'; chars[nameLength + 1] = ' ';
+    memcpy(chars + nameLength + 2, JSSTRING_CHARS(message), messageLength * sizeof(jschar));
+    chars[length] = 0;
+    result = js_NewString(cx, chars, length, 0);
+    if (!result) { JS_free(cx, chars); goto out; }
+    *rval = STRING_TO_JSVAL(result); ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 /*
  * Convert to string.
  *
@@ -1020,7 +1142,8 @@ static JSFunctionSpec exception_methods[] = {
 JSObject *
 js_InitExceptionClasses(JSContext *cx, JSObject *obj)
 {
-    JSObject *obj_proto, *protos[JSEXN_LIMIT];
+    JSObject *obj_proto, *protos[JSEXN_LIMIT], *constructors[JSEXN_LIMIT];
+    JSBool modern;
     int i;
 
     /*
@@ -1038,6 +1161,7 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
         return NULL;
     }
 
+    modern = js_IsModernGlobal(cx, obj);
     if (!js_EnterLocalRootScope(cx))
         return NULL;
 
@@ -1050,7 +1174,7 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
         int protoIndex = exceptions[i].protoIndex;
 
         /* Make the prototype for the current constructor name. */
-        protos[i] = js_NewObject(cx, &js_ErrorClass,
+        protos[i] = js_NewObject(cx, modern ? &js_ObjectClass : &js_ErrorClass,
                                  (protoIndex != JSEXN_NONE)
                                  ? protos[protoIndex]
                                  : obj_proto,
@@ -1059,19 +1183,24 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
             break;
 
         /* So exn_finalize knows whether to destroy private data. */
-        OBJ_SET_SLOT(cx, protos[i], JSSLOT_PRIVATE, JSVAL_VOID);
+        if (!modern) OBJ_SET_SLOT(cx, protos[i], JSSLOT_PRIVATE, JSVAL_VOID);
 
         /* Make a constructor function for the current name. */
         atom = cx->runtime->atomState.classAtoms[exceptions[i].key];
-        fun = js_DefineFunction(cx, obj, atom, exceptions[i].native, 1, 0);
+        fun = js_DefineFunction(cx, obj, atom,
+                                modern ? exceptions[i].modern : exceptions[i].native,
+                                1, modern ? JSFUN_STRICT : 0);
         if (!fun)
             break;
 
         /* Make this constructor make objects of class Exception. */
-        fun->clasp = &js_ErrorClass;
+        fun->clasp = modern ? &js_ModernErrorClass : &js_ErrorClass;
 
         /* Extract the constructor object. */
         funobj = fun->object;
+        constructors[i] = funobj;
+        if (modern && protoIndex != JSEXN_NONE &&
+            !JS_SetPrototype(cx, funobj, constructors[protoIndex])) break;
 
         /* Make the prototype and constructor links. */
         if (!js_SetClassPrototype(cx, funobj, protos[i],
@@ -1091,6 +1220,9 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
                                0)) {
             break;
         }
+
+        if (modern && !JS_DefineProperty(cx, protos[i], js_message_str,
+                            STRING_TO_JSVAL(cx->runtime->emptyString), NULL, NULL, 0)) break;
 
         /* Finally, stash the constructor for later uses. */
         if (!js_SetClassObject(cx, obj, exceptions[i].key, funobj))
@@ -1128,6 +1260,15 @@ js_InitExceptionClasses(JSContext *cx, JSObject *obj)
      */
     if (!JS_DefineFunctions(cx, protos[0], exception_methods))
         return NULL;
+    if (modern) {
+        jsval method;
+        JSFunction *fun;
+        if (!JS_GetProperty(cx, protos[0], js_toString_str, &method)) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
+        fun->u.n.native = ModernErrorToString;
+        fun->flags |= JSFUN_STRICT | JSFUN_NO_CONSTRUCT;
+    }
+
 
     return protos[0];
 }
@@ -1224,7 +1365,8 @@ js_ErrorToException(JSContext *cx, const char *message, JSErrorReport *reportp)
         goto out;
     tv[0] = OBJECT_TO_JSVAL(errProto);
 
-    errObject = js_NewObject(cx, &js_ErrorClass, errProto, NULL);
+    errObject = js_NewObject(cx, errProto && OBJ_GET_CLASS(cx, errProto) != &js_ErrorClass
+                             ? &js_ModernErrorClass : &js_ErrorClass, errProto, NULL);
     if (!errObject) {
         ok = JS_FALSE;
         goto out;
@@ -1310,7 +1452,7 @@ js_ReportUncaughtException(JSContext *cx)
 
     if (!reportp &&
         exnObject &&
-        OBJ_GET_CLASS(cx, exnObject) == &js_ErrorClass) {
+        js_IsErrorObject(cx, exnObject)) {
         const char *filename;
         uint32 lineno;
 

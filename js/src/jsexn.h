@@ -47,6 +47,8 @@
 JS_BEGIN_EXTERN_C
 
 extern JSClass js_ErrorClass;
+extern JSClass js_ModernErrorClass;
+extern JSBool js_IsErrorObject(JSContext *cx, JSObject *obj);
 
 /*
  * Initialize the exception constructor/prototype hierarchy.

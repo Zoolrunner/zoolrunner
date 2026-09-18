@@ -367,7 +367,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("array-concat.js", "ES6-ARRAY-CONCAT checks=29 failures=0"),
                 ("array-iteration.js", "ES6-ARRAY-ITERATION checks=37 failures=0"),
                 ("array-indexed.js", "ES6-ARRAY-INDEXED checks=59 failures=0"),
-                ("array-text.js", "ES6-ARRAY-TEXT checks=36 failures=0")):
+                ("array-text.js", "ES6-ARRAY-TEXT checks=36 failures=0"),
+                ("error-modern.js", "ES6-ERROR-MODERN checks=72 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -411,6 +412,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestArrayIteration.c", "ES6-ARRAY-ITERATION-EMBEDDING checks=35 failures=0"),
                 ("es6/TestArrayIndexed.c", "ES6-ARRAY-INDEXED-EMBEDDING checks=48 failures=0"),
                 ("es6/TestArrayText.c", "ES6-ARRAY-TEXT-EMBEDDING checks=44 failures=0"),
+                ("es6/TestErrorModern.c", "ES6-ERROR-MODERN-EMBEDDING checks=32 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

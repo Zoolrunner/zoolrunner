@@ -1262,3 +1262,9 @@ Modern join cycle detection must not enumerate properties. Unwind its per-contex
 state on errors/interrupts, root sorted vectors across comparison callbacks, and
 preserve primitive receivers through Object.toLocaleString forwarding. Keep
 legacy string/sort behavior isolated and rebuild embeddings after context changes.
+
+For Error changes, run `error-modern.js` and `TestErrorModern.c`. Preserve native
+error reports and stack GC, legacy constructor/prototype behavior, and error
+construction during conversion callbacks. Modern deleted message properties must
+not be recreated by lazy resolution. Test engine-generated errors and foreign/
+cloned constructors as well as explicit JavaScript construction.

@@ -2125,7 +2125,8 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
         JSProtoKey key = (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(clasp);
         parent = js_ConstructorGlobal(cx, newTarget);
         if (!parent) return JS_FALSE;
-        if (clasp == &js_ErrorClass && fun && !FUN_INTERPRETED(fun))
+        if ((clasp == &js_ErrorClass || clasp == &js_ModernErrorClass) &&
+            fun && !FUN_INTERPRETED(fun))
             key = js_GetExceptionProtoKey(fun->u.n.native);
         if (key == JSProto_Null) key = JSProto_Object;
         proto = js_BuiltinPrototype(cx, parent, key);

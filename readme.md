@@ -509,11 +509,19 @@ incomplete. See [indexed-method validation notes](js/tests/es6/README.md#array-i
 
 The Array string/sort follow-up adds modern string dispatch, primitive locale
 forwarding, cycle handling without enumeration, and interruptible sparse sorting.
-All 141 method-subset cases pass. The latest full macOS arm64 ES2015 run passes
+All 141 method-subset cases pass. The string/sort full macOS arm64 ES2015 run passes
 **26,462 cases**, with **2,104 failures**, 14 unsupported module cases and two
 harness errors: 10 gained, zero lost. All 11,540 ES5.1 cases and all four build,
 package and desktop checks pass. Full ES6 and other-platform validation remain
 incomplete. See [string/sort validation notes](js/tests/es6/README.md#array-string-conversion-and-sorting).
+
+The Error follow-up implements modern constructor/prototype relationships,
+message deletion and conversion order while preserving native reports and legacy
+behavior. All 148 diagnostic cases pass. The latest full macOS arm64 ES2015 run
+passes **26,482 cases**, with **2,084 failures**, 14 unsupported module cases and
+two harness errors: 20 gained, zero lost. All 11,540 ES5.1 cases and all four
+build, package and desktop checks pass. Full ES6 and other-platform validation
+remain incomplete. See [Error validation notes](js/tests/es6/README.md#error-construction-and-prototypes).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS
