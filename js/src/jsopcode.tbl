@@ -489,3 +489,6 @@ OPDEF(JSOP_CONSTPOSTDEC, 221,"constpostdec",NULL,    1,  1,  1, 15,  JOF_BYTE|JO
 
 /* Modern literal constructors bypass mutable lexical/global bindings. */
 OPDEF(JSOP_INTRINSIC,    222,"intrinsic",   NULL,    3,  0,  1, 19,  JOF_UINT16)
+
+/* ES2015 evaluates each regexp literal to a new object. */
+OPDEF(JSOP_NEWREGEXP,    223,"newregexp",   NULL,    3,  0,  1, 19,  JOF_CONST)

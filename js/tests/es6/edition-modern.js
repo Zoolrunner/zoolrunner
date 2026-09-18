@@ -56,6 +56,9 @@ function modernWindowEdition() {
            "e\u0301".normalize() === "\u00e9" && "\uac01".normalize("NFD").length === 3 &&
            modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
            eval("({value:1,value:2}).value") === 2 &&
+           (function() { var values = []; for (var i = 0; i < 2; ++i) values.push(/fresh/g);
+                         values[0].lastIndex = 9;
+                         return values[0] !== values[1] && values[1].lastIndex === 0; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

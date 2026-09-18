@@ -4232,17 +4232,24 @@ js_CloneRegExpObject(JSContext *cx, JSObject *obj, JSObject *parent)
 {
     JSObject *clone;
     JSRegExp *re;
+    JSTempValueRooter root;
 
     JS_ASSERT(OBJ_GET_CLASS(cx, obj) == &js_RegExpClass);
     clone = js_NewObject(cx, &js_RegExpClass, NULL, parent);
     if (!clone)
         return NULL;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, clone, &root);
     re = JS_GetPrivate(cx, obj);
-    if (!JS_SetPrivate(cx, clone, re) || !js_SetLastIndex(cx, clone, 0)) {
-        cx->weakRoots.newborn[GCX_OBJECT] = NULL;
-        return NULL;
-    }
+    /* Once installed, the clone owns this reference even if subsequent
+     * initialization fails and the clone is later finalized. */
     HOLD_REGEXP(cx, re);
+    if (!JS_SetPrivate(cx, clone, re)) {
+        DROP_REGEXP(cx, re);
+        clone = NULL;
+    } else if (!js_SetLastIndex(cx, clone, 0)) {
+        clone = NULL;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
     return clone;
 }
 

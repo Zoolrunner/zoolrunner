@@ -3485,6 +3485,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                   case JSOP_QNAMEPART:    goto do_JSOP_QNAMEPART;
 #endif
                   case JSOP_REGEXP:       goto do_JSOP_REGEXP;
+                  case JSOP_NEWREGEXP:    goto do_JSOP_NEWREGEXP;
                   case JSOP_SETCONST:     goto do_JSOP_SETCONST;
                   case JSOP_STRING:       goto do_JSOP_STRING;
 #if JS_HAS_XML_SUPPORT
@@ -3526,16 +3527,19 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 
               case JSOP_OBJECT:
               case JSOP_REGEXP:
+              case JSOP_NEWREGEXP:
               case JSOP_ANONFUNOBJ:
               case JSOP_NAMEDFUNOBJ:
                 atomIndex = GET_ATOM_INDEX(pc);
 
               do_JSOP_OBJECT:
               do_JSOP_REGEXP:
+              do_JSOP_NEWREGEXP:
               do_JSOP_ANONFUNOBJ:
               do_JSOP_NAMEDFUNOBJ:
                 atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
-                if (op == JSOP_OBJECT || op == JSOP_REGEXP) {
+                if (op == JSOP_OBJECT || op == JSOP_REGEXP ||
+                    op == JSOP_NEWREGEXP) {
                     if (!js_regexp_toString(cx, ATOM_TO_OBJECT(atom), 0, NULL,
                                             &val)) {
                         return NULL;

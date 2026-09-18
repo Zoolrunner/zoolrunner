@@ -888,3 +888,34 @@ desktop checks. Calendar's eight unit suites and four views, Browser's 169
 navigation/layout assertions, Suite Composer/ChatZilla and standalone XULRunner
 ChatZilla pass. Other architectures and operating systems have not been
 revalidated for this batch.
+
+
+### Fresh modern RegExp literals
+
+The explicitly selected ES2015 edition emits a dedicated RegExp literal
+bytecode. Each evaluation creates a new object with independent identity,
+properties and lastIndex while sharing the compiled pattern. Global loops,
+function calls and eval follow this rule; explicitly selected legacy editions
+retain their historical literal identity. The interpreter and decompiler
+handle both ordinary and extended atom operands. Bytecode cache version **37**
+invalidates older caches. Clone initialization roots the new object and takes
+its pattern reference before later initialization can fail.
+
+`regexp-literals.js` passes 33 focused checks on macOS arm64. The separate
+`regexp-literals-wide.js` covers execution and decompilation beyond 65,535
+atoms. The edition/XDR probe includes fresh literal state and legacy identity
+in its 13 checks; the realm probe passes 22 checks, including RegExp prototypes
+across globals and context teardown. The pinned regexp-literal subset passes
+116/124 cases; the eight remaining cases require Unicode regexp behavior.
+The complete pinned ES2015 run retains **23,787 passes** and **4,779 failures**,
+with 14 unsupported module cases and two harness errors. There are no lost
+passes, crashes or timeouts; runtime hashes remain unchanged. All **11,540
+required ES5 cases** pass. Reports are `artifacts/es6/regexp-literals-full.json`
+and `regexp-literals-es5.json`. The focused tests cover the identity gap that
+the pinned corpus did not expose.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.

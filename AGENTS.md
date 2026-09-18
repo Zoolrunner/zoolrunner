@@ -1084,3 +1084,10 @@ registry lifetime across context recreation, native string views, property-key
 GC roots and real window globals. Keep well-known protocol gaps explicit;
 exposing named symbols alone is not conformance. Do not serialize Symbol
 identity as a string in XDR.
+
+
+Modern RegExp literal changes must preserve explicitly selected legacy literal
+identity. Run `js/tests/es6/regexp-literals.js`, the separate extended-atom
+`regexp-literals-wide.js`, and the edition/XDR and realm embedding probes.
+Keep normal and extended opcode dispatch/decompilation paths aligned and bump
+the bytecode cache version when introducing new instructions.

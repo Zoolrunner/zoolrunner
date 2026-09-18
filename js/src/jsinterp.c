@@ -4380,6 +4380,7 @@ interrupt:
               case JSOP_QNAMEPART:    goto do_JSOP_QNAMEPART;
 #endif
               case JSOP_REGEXP:       goto do_JSOP_REGEXP;
+              case JSOP_NEWREGEXP:    goto do_JSOP_NEWREGEXP;
               case JSOP_SETCONST:     goto do_JSOP_SETCONST;
               case JSOP_STRING:       goto do_JSOP_STRING;
 #if JS_HAS_XML_SUPPORT
@@ -4405,6 +4406,23 @@ interrupt:
             PUSH_OPND(ATOM_KEY(atom));
             obj = NULL;
           END_CASE(JSOP_NUMBER)
+
+          BEGIN_LITOPX_CASE(JSOP_NEWREGEXP, 0)
+            /* The atom retains only an immutable compiled pattern template.
+             * Each evaluation owns its identity, properties and lastIndex. */
+            obj = ATOM_TO_OBJECT(atom);
+            obj2 = fp->scopeChain;
+            while ((parent = OBJ_GET_PARENT(cx, obj2)) != NULL)
+                obj2 = parent;
+            SAVE_SP_AND_PC(fp);
+            obj = js_CloneRegExpObject(cx, obj, obj2);
+            if (!obj) {
+                ok = JS_FALSE;
+                goto out;
+            }
+            PUSH_OPND(OBJECT_TO_JSVAL(obj));
+            obj = NULL;
+          END_LITOPX_CASE(JSOP_NEWREGEXP)
 
           BEGIN_LITOPX_CASE(JSOP_REGEXP, 0)
           {

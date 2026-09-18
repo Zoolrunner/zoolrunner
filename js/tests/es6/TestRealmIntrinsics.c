@@ -50,12 +50,19 @@ int main(void)
     CHECK(firstArray != secondArray);
     CHECK(JS_AddNamedRoot(cx, &second, "test secondary realm"));
     CHECK(Evaluate(other, second, "Array.prototype.realmMarker=27;Array=null;[].realmMarker===27"));
+    CHECK(Evaluate(other, second,
+        "RegExp.prototype.realmMarker=31;RegExp=null;"
+        "function realmRegExp(){return /realm/g;}"
+        "realmRegExp().realmMarker===31 && realmRegExp()!==realmRegExp()"));
     JS_EndRequest(other);
     JS_DestroyContextNoGC(other); other = NULL;
     JS_ClearNewbornRoots(cx);
     JS_GC(cx);
     CHECK(finalized == 0);
     CHECK(Evaluate(cx, second, "[].realmMarker===27"));
+    CHECK(Evaluate(cx, second,
+        "realmRegExp().realmMarker===31 && realmRegExp()!==realmRegExp()"));
+    CHECK(Evaluate(cx, global, "/realm/.realmMarker===undefined"));
     JS_RemoveRoot(cx, &second); second = NULL;
     JS_ClearNewbornRoots(cx);
     JS_GC(cx);

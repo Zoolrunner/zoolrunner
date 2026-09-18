@@ -306,7 +306,7 @@ third-party license files for applicable terms and credits.
 On the ES6 development branch, modern array/object literal construction now
 uses private per-global intrinsic constructors, including classic embedding
 globals without reserved slots. Legacy scripts retain their historical binding
-lookup. Bytecode cache version 36 invalidates earlier caches. All four macOS arm64 applications pass the packaged compatibility checks;
+lookup. The current bytecode cache version is 37; older caches are invalidated. All four macOS arm64 applications pass the packaged compatibility checks;
 the full ES5 run passes 11,540 cases, and ES2015 remains at 23,528 passes with
 5,038 failures, 14 unsupported cases and two harness errors. Other platforms
 have not been revalidated for this change. See `js/tests/es6/README.md`.
@@ -330,3 +330,11 @@ RegExp classification. The full macOS arm64 ES2015 run passes 23,787 cases,
 with 4,779 failures, 14 unsupported cases and two harness errors; all 11,540
 ES5 cases pass. All four applications pass packaged compatibility checks.
 Other platforms have not been revalidated for this batch.
+
+Fresh RegExp literal evaluation is implemented in the explicitly selected
+ES2015 edition; legacy editions retain their historical literal identity.
+Execution, decompilation, realm and XDR checks pass on macOS arm64, as do all
+four applications' packaged compatibility checks. The complete ES2015 result
+remains 23,787 passes and 4,779 failures, with 14 unsupported cases and two
+harness errors; all 11,540 ES5 cases pass. Other platforms have not been
+revalidated for this batch.

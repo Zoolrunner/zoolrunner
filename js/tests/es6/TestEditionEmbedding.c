@@ -60,6 +60,7 @@ int main(void)
     void *data;
     int status = 1;
     const char *legacy =
+        "function legacyRegExp(){return /legacy/g;}"
         "function legacyEdition(){return edition()===170 && /a/('a')[0]==='a';}true";
     const char *modern =
         "'use strict';"
@@ -70,6 +71,9 @@ int main(void)
         "try{constantValue+=1;immutable=false;}catch(error){immutable=immutable && error instanceof TypeError;}"
         "return radixValue===20 && Number('0b101')===5 && caught && "
         "immutable && "
+        "(function(){var a=[];for(var i=0;i<3;++i)a.push(/fresh/g);"
+        "a[0].lastIndex=9;return a[0]!==a[1] && a[1].lastIndex===0;})() && "
+        "legacyRegExp()===legacyRegExp() && "
         "(function(Array,Object){return [].length===0 && ({answer:42}).answer===42;})(null,null) && "
         "edition()===2015 && ({x:1,x:2}).x===2"
         " && legacyEdition() && nativeNested() && edition()===2015;}"

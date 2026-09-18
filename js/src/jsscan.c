@@ -2039,13 +2039,16 @@ skipline:
                 goto error;
 
             /*
-             * If the regexp's script is one-shot, we can avoid the extra
+             * Modern literals always create a fresh object at evaluation.
+             * Legacy versions retain their historical literal identity.
+             * If the legacy script is one-shot, we can avoid the extra
              * fork-on-exec costs of JSOP_REGEXP by selecting JSOP_OBJECT.
              * Otherwise, to avoid incorrect proto, parent, and lastIndex
              * sharing among threads and sequentially across re-execution,
              * select JSOP_REGEXP.
              */
-            tp->t_op = (cx->fp->flags & (JSFRAME_EVAL | JSFRAME_COMPILE_N_GO))
+            tp->t_op = JS_VERSION_IS_ES2015(cx) ? JSOP_NEWREGEXP :
+                       (cx->fp->flags & (JSFRAME_EVAL | JSFRAME_COMPILE_N_GO))
                        ? JSOP_OBJECT
                        : JSOP_REGEXP;
             tp->t_atom = atom;
