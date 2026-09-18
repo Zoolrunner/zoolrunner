@@ -14,6 +14,8 @@ function modernWindowEdition() {
                    name.value === "modernWindowEdition" && name.configurable;
     var windowSymbol = Symbol('window'), symbolTarget = {};
     symbolTarget[windowSymbol] = 42;
+    var modernObject = {radixValue, [windowSymbol]() { return this; },
+                        get ["computedAccessor"]() { return 27; }};
     var symbolChecks = typeof windowSymbol === 'symbol' &&
                        Object.getOwnPropertySymbols(symbolTarget)[0] === windowSymbol &&
                        Object.keys(symbolTarget).length === 0 &&
@@ -28,6 +30,8 @@ function modernWindowEdition() {
     try { fixed++; } catch (error) { immutable = error instanceof TypeError; }
     return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
            metadata && inferredMetadata && immutable && symbolChecks &&
+           modernObject.radixValue === 20 && modernObject[windowSymbol]() === modernObject &&
+           modernObject[windowSymbol].name === "[window]" && modernObject.computedAccessor === 27 &&
            (function(Array, Object) { return [].length === 0 && ({answer:42}).answer === 42; })(null, null) &&
            Math.imul(4294967295, 5) === -5 && Math.clz32(1) === 31 &&
            1 / Math.trunc(-0.25) === -Infinity && Math.sign(-7) === -1 &&

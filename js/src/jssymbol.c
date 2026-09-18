@@ -89,6 +89,7 @@ js_NewSymbol(JSContext *cx, JSString *description)
         symbol->string.length = JSSTRFLAG_PREFIX | (length + 8);
         symbol->string.chars = chars;
         symbol->registered = JS_FALSE;
+        symbol->hasDescription = description != NULL;
         JS_RUNTIME_METER(cx->runtime, liveStrings);
         JS_RUNTIME_METER(cx->runtime, totalStrings);
     } else {

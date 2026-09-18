@@ -2451,6 +2451,13 @@ CheckDestructuring(JSContext *cx, BindData *data,
 
         while (lhs) {
             JS_ASSERT(lhs->pn_type == TOK_COLON);
+            if (lhs->pn_left->pn_type == TOK_COMPUTED_NAME) {
+                /* Computed destructuring needs separate binding emission. */
+                js_ReportCompileErrorNumber(cx, lhs, JSREPORT_PN | JSREPORT_ERROR,
+                                            JSMSG_STRICT_SYNTAX);
+                ok = JS_FALSE;
+                goto out;
+            }
             pn = lhs->pn_right;
             if (!data) {
                 /* Skip parenthesization if not in a variable declaration. */
@@ -5840,6 +5847,18 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             tt = js_GetToken(cx, ts);
             ts->flags &= ~TSF_KEYWORD_IS_NAME;
             switch (tt) {
+              case TOK_LB:
+                if (!JS_VERSION_IS_ES2015(cx)) {
+                    StrictSyntaxError(cx, ts);
+                    return NULL;
+                }
+                pn3 = NewParseNode(cx, ts, PN_UNARY, tc);
+                if (!pn3) return NULL;
+                pn3->pn_type = TOK_COMPUTED_NAME;
+                pn3->pn_kid = AssignExpr(cx, ts, tc);
+                if (!pn3->pn_kid) return NULL;
+                MUST_MATCH_TOKEN(TOK_RB, JSMSG_BRACKET_AFTER_LIST);
+                break;
               case TOK_NUMBER:
                 pn3 = NewParseNode(cx, ts, PN_NULLARY, tc);
                 if (pn3)
@@ -5861,11 +5880,17 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                         ts->flags |= TSF_KEYWORD_IS_NAME;
                         tt = js_GetToken(cx, ts);
                         ts->flags &= ~TSF_KEYWORD_IS_NAME;
-                        if (tt == TOK_NAME || tt == TOK_STRING || tt == TOK_NUMBER) {
-                            pn3 = NewParseNode(cx, ts, PN_NULLARY, tc);
+                        if (tt == TOK_NAME || tt == TOK_STRING || tt == TOK_NUMBER ||
+                            (tt == TOK_LB && JS_VERSION_IS_ES2015(cx))) {
+                            pn3 = NewParseNode(cx, ts, tt == TOK_LB ? PN_UNARY : PN_NULLARY, tc);
                             if (!pn3)
                                 return NULL;
-                            if (tt == TOK_NUMBER)
+                            if (tt == TOK_LB) {
+                                pn3->pn_type = TOK_COMPUTED_NAME;
+                                pn3->pn_kid = AssignExpr(cx, ts, tc);
+                                if (!pn3->pn_kid) return NULL;
+                                MUST_MATCH_TOKEN(TOK_RB, JSMSG_BRACKET_AFTER_LIST);
+                            } else if (tt == TOK_NUMBER)
                                 pn3->pn_dval = CURRENT_TOKEN(ts).t_dval;
                             else
                                 pn3->pn_atom = CURRENT_TOKEN(ts).t_atom;
@@ -5877,6 +5902,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                             if (pn2) {
                                 JSFunction *accessor = (JSFunction *) JS_GetPrivate(
                                     cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
+                                if (JS_VERSION_IS_ES2015(cx))
+                                    accessor->flags |= JSFUN_NO_CONSTRUCT;
                                 /* Historical language versions allow accessor argument
                                  * lists used by unchanged XUL/XPCOM applications.
                                  * Keep standard arity for default and ES2015
@@ -5921,6 +5948,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 return NULL;
             }
 
+            if (!pn3)
+                return NULL;
             tt = js_GetToken(cx, ts);
 #if JS_HAS_GETTER_SETTER
             if (tt == TOK_NAME) {
@@ -5929,6 +5958,71 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     return NULL;
             }
 #endif
+            if ((tt == TOK_COMMA || tt == TOK_RC) &&
+                pn3->pn_type == TOK_NAME && JS_VERSION_IS_ES2015(cx)) {
+                JSString *name = ATOM_TO_STRING(pn3->pn_atom);
+                JSTokenType keyword = js_CheckKeyword(JSSTRING_CHARS(name), JSSTRING_LENGTH(name));
+                const char *bytes = keyword == TOK_RESERVED ? JS_GetStringBytes(name) : "";
+                JSParseNode *key = pn3;
+                if (!bytes) return NULL;
+                if ((keyword != TOK_EOF && keyword != TOK_RESERVED &&
+                     keyword != TOK_LET && keyword != TOK_YIELD) ||
+                    !strcmp(bytes,"class") || !strcmp(bytes,"enum") ||
+                    !strcmp(bytes,"extends") || !strcmp(bytes,"super")) {
+                    StrictSyntaxError(cx, ts);
+                    return NULL;
+                }
+                js_UngetToken(ts);
+                CURRENT_TOKEN(ts).t_op = JSOP_NAME;
+                pn2 = PrimaryExpr(cx, ts, tc, TOK_NAME, JS_FALSE);
+                if (!pn2) return NULL;
+                key->pn_type = TOK_STRING;
+                key->pn_op = JSOP_STRING;
+                pn3 = NewParseNode(cx, ts, PN_UNARY, tc);
+                if (!pn3) return NULL;
+                pn3->pn_type = TOK_COMPUTED_NAME;
+                pn3->pn_kid = key;
+                pn3->pn_pos = key->pn_pos;
+                pn2 = NewBinary(cx, TOK_COLON, JSOP_INITCOMPUTED, pn3, pn2, tc);
+                goto skip;
+            }
+            if (tt == TOK_LP && JS_VERSION_IS_ES2015(cx)) {
+                JSFunction *method;
+                JSAtomList formals;
+                JSAtomListElement *formal;
+                JSScopeProperty *parameter;
+                js_UngetToken(ts);
+                CURRENT_TOKEN(ts).t_op = JSOP_NOP;
+                CURRENT_TOKEN(ts).type = TOK_FUNCTION;
+                pn2 = FunctionExpr(cx, ts, tc);
+                if (!pn2) return NULL;
+                method = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
+                method->flags |= JSFUN_NO_CONSTRUCT;
+                ATOM_LIST_INIT(&formals);
+                for (parameter = SCOPE_LAST_PROP(OBJ_SCOPE(method->object)); parameter;
+                     parameter = parameter->parent) {
+                    if (parameter->getter == js_GetArgument) {
+                        JSAtom *name = JSID_TO_ATOM(parameter->id);
+                        ATOM_LIST_SEARCH(formal, &formals, name);
+                        if (formal) { StrictSyntaxError(cx, ts); return NULL; }
+                        if (!js_IndexAtom(cx, name, &formals)) return NULL;
+                    }
+                }
+                if (pn3->pn_type != TOK_COMPUTED_NAME) {
+                    JSParseNode *key = pn3;
+                    if (key->pn_type == TOK_NAME || key->pn_type == TOK_STRING) {
+                        key->pn_type = TOK_STRING;
+                        key->pn_op = JSOP_STRING;
+                    }
+                    pn3 = NewParseNode(cx, ts, PN_UNARY, tc);
+                    if (!pn3) return NULL;
+                    pn3->pn_type = TOK_COMPUTED_NAME;
+                    pn3->pn_kid = key;
+                    pn3->pn_pos = key->pn_pos;
+                }
+                pn2 = NewBinary(cx, TOK_COLON, JSOP_INITMETHODCOMPUTED, pn3, pn2, tc);
+                goto skip;
+            }
             if (tt != TOK_COLON) {
                 js_ReportCompileErrorNumber(cx, ts,
                                             JSREPORT_TS | JSREPORT_ERROR,
@@ -5937,12 +6031,16 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             }
             op = CURRENT_TOKEN(ts).t_op;
             pn2 = NewBinary(cx, TOK_COLON, op, pn3, AssignExpr(cx, ts, tc), tc);
-#if JS_HAS_GETTER_SETTER
           skip:
-#endif
             if (!pn2)
                 return NULL;
             pn3 = pn2->pn_left;
+            if (pn3->pn_type == TOK_COMPUTED_NAME) {
+                if (pn2->pn_op != JSOP_INITMETHODCOMPUTED &&
+                    pn2->pn_op != JSOP_GETTER && pn2->pn_op != JSOP_SETTER)
+                    pn2->pn_op = JSOP_INITCOMPUTED;
+                goto append_object_property;
+            }
             if (pn3->pn_type == TOK_NUMBER) {
                 propertyString = js_NumberToString(cx, pn3->pn_dval);
                 if (!propertyString)
@@ -5989,6 +6087,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     return NULL;
             }
             ALE_SET_INDEX(entry, propertyKind);
+          append_object_property:
             PN_APPEND(pn, pn2);
 
             tt = js_GetToken(cx, ts);

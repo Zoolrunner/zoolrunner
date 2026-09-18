@@ -1656,6 +1656,10 @@ retry:
         if (MatchChar(ts, c)) {
             tp->t_op = MatchChar(ts, c) ? JSOP_NEW_EQ : (JSOp)cx->jsop_eq;
             tt = TOK_EQOP;
+        } else if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, '>')) {
+            /* Keep this punctuator distinct even before arrow parsing exists. */
+            tp->t_op = JSOP_NOP;
+            tt = TOK_ARROW;
         } else {
             tp->t_op = JSOP_NOP;
             tt = TOK_ASSIGN;

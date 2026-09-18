@@ -492,3 +492,11 @@ OPDEF(JSOP_INTRINSIC,    222,"intrinsic",   NULL,    3,  0,  1, 19,  JOF_UINT16)
 
 /* ES2015 evaluates each regexp literal to a new object. */
 OPDEF(JSOP_NEWREGEXP,    223,"newregexp",   NULL,    3,  0,  1, 19,  JOF_CONST)
+
+/* Computed object keys are converted before evaluating their values. */
+OPDEF(JSOP_PROPERTYKEY,  224,"propertykey", NULL,   1,  1,  1, 19,  JOF_BYTE)
+OPDEF(JSOP_INITCOMPUTED, 225,"initcomputed",NULL,   1,  3,  1,  0,  JOF_BYTE)
+OPDEF(JSOP_INITNAMEDCOMPUTED,226,"initnamedcomputed",NULL,1,3,1,0,JOF_BYTE)
+OPDEF(JSOP_INITMETHODCOMPUTED,227,"initmethodcomputed",NULL,1,3,1,0,JOF_BYTE)
+OPDEF(JSOP_INITGETTERCOMPUTED,228,"initgettercomputed",NULL,1,3,1,0,JOF_BYTE)
+OPDEF(JSOP_INITSETTERCOMPUTED,229,"initsettercomputed",NULL,1,3,1,0,JOF_BYTE)

@@ -139,6 +139,8 @@ typedef enum JSTokenType {
     TOK_BODY = 84,                      /* synthetic body of function with
                                            destructuring formal parameters */
     TOK_RESERVED,                       /* reserved keywords */
+    TOK_ARROW,                          /* ES2015 => punctuator */
+    TOK_COMPUTED_NAME,                  /* computed object property parse node */
     TOK_LIMIT                           /* domain size */
 } JSTokenType;
 

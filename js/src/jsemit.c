@@ -6177,6 +6177,27 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         for (; pn2; pn2 = pn2->pn_next) {
             /* Emit an index for t[2], else map an atom for t.p or t['%q']. */
             pn3 = pn2->pn_left;
+            if (pn3->pn_type == TOK_COMPUTED_NAME) {
+                JSParseNode *value = pn2->pn_right;
+                JSBool infer = JS_FALSE;
+                while (value->pn_type == TOK_RP) value = value->pn_kid;
+                if (value->pn_type == TOK_FUNCTION && value->pn_op == JSOP_ANONFUNOBJ) {
+                    JSFunction *valueFun = (JSFunction *)JS_GetPrivate(cx,
+                                                ATOM_TO_OBJECT(value->pn_funAtom));
+                    infer = !valueFun->atom && !valueFun->inferredName;
+                }
+                if (!js_EmitTree(cx, cg, pn3->pn_kid) ||
+                    js_Emit1(cx, cg, JSOP_PROPERTYKEY) < 0 ||
+                    !js_EmitTree(cx, cg, pn2->pn_right) ||
+                    js_Emit1(cx, cg, pn2->pn_op == JSOP_GETTER ? JSOP_INITGETTERCOMPUTED
+                                    : pn2->pn_op == JSOP_SETTER ? JSOP_INITSETTERCOMPUTED
+                                    : pn2->pn_op == JSOP_INITMETHODCOMPUTED
+                                    ? JSOP_INITMETHODCOMPUTED
+                                    : infer ? JSOP_INITNAMEDCOMPUTED
+                                            : JSOP_INITCOMPUTED) < 0)
+                    return JS_FALSE;
+                continue;
+            }
             switch (pn3->pn_type) {
               case TOK_NUMBER:
                 if (!EmitNumberOp(cx, pn3->pn_dval, cg))

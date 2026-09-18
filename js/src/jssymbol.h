@@ -8,6 +8,7 @@ JS_BEGIN_EXTERN_C
 typedef struct JSSymbol {
     JSString string;
     JSBool registered;
+    JSBool hasDescription;
 } JSSymbol;
 
 typedef enum JSWellKnownSymbol {

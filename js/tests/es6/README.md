@@ -1058,3 +1058,39 @@ embedding and desktop checks. Calendar's eight unit suites and four views,
 Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 packaged standalone XULRunner ChatZilla pass. Other platforms have not been
 revalidated for this batch.
+
+
+### Modern object-literal properties
+
+Explicit ES2015 code supports computed data properties, ordinary concise
+methods, computed getters/setters and shorthand identifier properties. Computed
+keys are converted before evaluating values. Anonymous function names belong
+to each closure, including Symbol-derived names and the distinction between
+absent and empty Symbol descriptions. Methods/accessors are non-constructible;
+simple method parameter names are checked for duplicates. The historical accessor embedding access
+check still runs, with identifier atoms rooted through callback collection.
+Computed and shorthand __proto__ fields create own data properties. Legacy
+script modes keep their existing grammar.
+
+The new bytecodes use cache version **38**, with matching script decompilation
+and XDR coverage. On macOS arm64, 58 focused checks, two extended-atom checks
+and 14 edition/embedding checks pass. The object-expression subset passes
+142/208; the broader computed-name subset passes 20/90, retaining class,
+generator and other missing-feature cases. Array.from improves to 76/78; its
+remaining two cases require ArrayBuffer. These subsets are diagnostics.
+
+The complete pinned ES2015 run passes **24,063 cases**, with **4,503 failures**,
+14 unsupported module cases and two Float64Array harness errors. There are no
+crashes or timeouts, the runtime hash stays unchanged, and 81 cases newly pass
+without losing any previously passing case. All **11,540 ES5 cases** pass.
+The scanner recognizes the ES2015 arrow punctuator separately from assignment;
+arrow-function parsing remains unimplemented. This preserves SyntaxError for
+invalid arrow bindings now that shorthand properties parse successfully.
+
+All four macOS arm64 applications compile and pass package shell/native checks
+and relocated desktop checks, including real window globals and classic scripts.
+Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout checks; Suite passes Composer lifecycle and ChatZilla checks,
+and packaged standalone XULRunner passes ChatZilla initialization/input checks.
+Other platforms have not been revalidated. Computed destructuring, generator
+methods, super and remaining parameter grammar still require work.

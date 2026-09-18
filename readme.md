@@ -377,3 +377,13 @@ all 155 upstream with-statement cases pass. The full ES2015 run passes 23,982
 cases, with 4,584 failures, 14 unsupported cases and two harness errors; all
 11,540 ES5 cases pass. All four applications pass packaged compatibility checks.
 Other platforms have not been revalidated for this batch.
+
+
+ES2015 object literals support computed data properties, ordinary concise
+methods, computed accessors and shorthand properties, preserving legacy parsing.
+The bytecode cache is version 38. On macOS arm64, 58 focused checks, two
+extended-atom checks and 14 edition/embedding checks pass. The full ES2015 run
+passes 24,063 cases, with 4,503 failures, 14 unsupported module cases and two
+harness errors; all 11,540 ES5 cases pass. All four applications pass packaged
+compatibility checks. Other platforms remain unverified for this batch.
+Generator methods, super and computed destructuring remain separate work.

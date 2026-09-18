@@ -1126,3 +1126,14 @@ legacy scripts and ordinary embedding/global scopes. HasProperty precedes the
 exclusion getter, which can delete the resolved property or collect. Do not
 retain native properties/locks through callbacks or repeat lookup to decide
 whether the binding originally existed. Preserve implicit method receivers.
+
+
+For modern object-literal syntax, run `js/tests/es6/computed-properties.js`,
+the separate extended-atom `computed-properties-wide.js`, and the edition/XDR
+embedding probe. Convert computed keys before values; infer names per closure
+without changing shared function templates. Keep Symbol() distinct from
+Symbol('') for inferred names. Preserve method/accessor non-constructibility,
+embedding accessor access checks, identifier references in shorthand fields,
+and legacy parsing. Bytecode changes require cache-version and decompiler
+updates. Computed destructuring, generator methods and super remain separate
+features; do not confuse object-literal support with their implementation.

@@ -2149,6 +2149,101 @@ InternNonIntElementId(JSContext *cx, jsval idval, jsid *idp)
 # undef JS_THREADED_INTERP
 #endif
 
+/* SetFunctionName for a computed anonymous function definition. Set an own
+ * property on this closure, never the shared template's inferred-name atom. */
+static JSBool
+SetComputedFunctionName(JSContext *cx, JSObject *function, jsval key, JSOp kind)
+{
+    JSString *name;
+    JSSymbol *symbol;
+    jschar *chars;
+    size_t length;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (JSVAL_IS_SYMBOL(key)) {
+        symbol = (JSSymbol *)JSVAL_TO_STRING(key);
+        if (!symbol->hasDescription) {
+            name = ATOM_TO_STRING(cx->runtime->atomState.emptyAtom);
+        } else {
+            length = JSSTRING_LENGTH(&symbol->string) - 8;
+            chars = (jschar *)JS_malloc(cx, (length + 3) * sizeof(jschar));
+            if (!chars) return JS_FALSE;
+            chars[0] = '[';
+            memcpy(chars + 1, JSSTRING_CHARS(&symbol->string) + 7,
+                   length * sizeof(jschar));
+            chars[length + 1] = ']';
+            chars[length + 2] = 0;
+            name = js_NewString(cx, chars, length + 2, 0);
+            if (!name) { JS_free(cx, chars); return JS_FALSE; }
+        }
+    } else {
+        name = js_ValueToString(cx, key);
+        if (!name) return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT_STRING(cx, name, &root);
+    if (kind == JSOP_INITGETTERCOMPUTED || kind == JSOP_INITSETTERCOMPUTED) {
+        JSString *prefixed;
+        length = JSSTRING_LENGTH(name);
+        if (length > JSSTRING_LENGTH_MASK - 4 ||
+            length > ((size_t)-1 / sizeof(jschar)) - 5) {
+            JS_ReportOutOfMemory(cx);
+            JS_POP_TEMP_ROOT(cx, &root);
+            return JS_FALSE;
+        }
+        chars = (jschar *)JS_malloc(cx, (length + 5) * sizeof(jschar));
+        if (!chars) { JS_POP_TEMP_ROOT(cx, &root); return JS_FALSE; }
+        chars[0] = kind == JSOP_INITGETTERCOMPUTED ? 'g' : 's';
+        chars[1] = 'e'; chars[2] = 't'; chars[3] = ' ';
+        memcpy(chars + 4, JSSTRING_CHARS(name), length * sizeof(jschar));
+        chars[length + 4] = 0;
+        prefixed = js_NewString(cx, chars, length + 4, 0);
+        if (!prefixed) {
+            JS_free(cx, chars);
+            JS_POP_TEMP_ROOT(cx, &root);
+            return JS_FALSE;
+        }
+        JS_POP_TEMP_ROOT(cx, &root);
+        name = prefixed;
+        JS_PUSH_TEMP_ROOT_STRING(cx, name, &root);
+    }
+    ok = js_DefineNativeProperty(cx, function,
+                  ATOM_TO_JSID(cx->runtime->atomState.nameAtom),
+                  STRING_TO_JSVAL(name), NULL, NULL, JSPROP_READONLY, 0, 0, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+typedef struct ComputedIdRoot {
+    JSTempValueRooter root;
+    jsid id;
+} ComputedIdRoot;
+JS_STATIC_DLL_CALLBACK(void)
+MarkComputedId(JSContext *cx, JSTempValueRooter *root)
+{
+    jsid id = ((ComputedIdRoot *)root)->id;
+    if (JSID_IS_ATOM(id)) js_MarkAtom(cx, JSID_TO_ATOM(id));
+}
+
+static JSBool
+DefineComputedAccessor(JSContext *cx, JSObject *obj, jsval key,
+                        JSObject *function, JSBool isGetter)
+{
+    ComputedIdRoot root;
+    jsval value = JSVAL_VOID;
+    uintN attrs;
+    JSBool ok;
+    if (!js_ValueToPropertyId(cx, key, &root.id)) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkComputedId, &root.root);
+    ok = OBJ_CHECK_ACCESS(cx, obj, root.id, JSACC_WATCH, &value, &attrs);
+    attrs = JSPROP_SHARED | JSPROP_ENUMERATE | (isGetter ? JSPROP_GETTER : JSPROP_SETTER);
+    if (ok) ok = js_CheckRedeclaration(cx, obj, root.id, attrs, NULL, NULL);
+    if (ok) ok = OBJ_DEFINE_PROPERTY(cx, obj, root.id, JSVAL_VOID,
+                     isGetter ? (JSPropertyOp)function : NULL,
+                     isGetter ? NULL : (JSPropertyOp)function, attrs, NULL);
+    JS_POP_TEMP_ROOT(cx, &root.root);
+    return ok;
+}
+
 JSBool
 js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
 {
@@ -5505,6 +5600,38 @@ interrupt:
             cx->weakRoots.newborn[GCX_OBJECT] = JSVAL_TO_GCTHING(lval);
           END_CASE(JSOP_ENDINIT)
 
+          BEGIN_CASE(JSOP_PROPERTYKEY)
+            SAVE_SP_AND_PC(fp);
+            ok = js_ValueToPropertyId(cx, FETCH_OPND(-1), &id);
+            if (!ok) goto out;
+            STORE_OPND(-1, ID_TO_VALUE(id));
+          END_CASE(JSOP_PROPERTYKEY)
+
+          BEGIN_CASE(JSOP_INITCOMPUTED)
+          BEGIN_CASE(JSOP_INITNAMEDCOMPUTED)
+          BEGIN_CASE(JSOP_INITMETHODCOMPUTED)
+          BEGIN_CASE(JSOP_INITGETTERCOMPUTED)
+          BEGIN_CASE(JSOP_INITSETTERCOMPUTED)
+            SAVE_SP_AND_PC(fp);
+            if (op != JSOP_INITCOMPUTED &&
+                !SetComputedFunctionName(cx, JSVAL_TO_OBJECT(FETCH_OPND(-1)),
+                                          FETCH_OPND(-2), op)) {
+                ok = JS_FALSE;
+                goto out;
+            }
+            if (op == JSOP_INITGETTERCOMPUTED || op == JSOP_INITSETTERCOMPUTED) {
+                ok = DefineComputedAccessor(cx, JSVAL_TO_OBJECT(FETCH_OPND(-3)),
+                         FETCH_OPND(-2), JSVAL_TO_OBJECT(FETCH_OPND(-1)),
+                         op == JSOP_INITGETTERCOMPUTED);
+                if (!ok) goto out;
+                sp -= 2;
+                DO_NEXT_OP(1);
+            }
+            rval = FETCH_OPND(-1);
+            FETCH_ELEMENT_ID(-2, id);
+            i = -2;
+            goto do_init;
+
           BEGIN_CASE(JSOP_INITPROP)
             /* Pop the property's value into rval. */
             JS_ASSERT(sp - fp->spbase >= 2);
@@ -5544,7 +5671,9 @@ interrupt:
                 ok = js_ValueToECMAUint32(cx, FETCH_OPND(-2), &index);
                 if (ok)
                     ok = js_SetLengthProperty(cx, obj, index + 1);
-            } else if (id == ATOM_TO_JSID(rt->atomState.protoAtom)) {
+            } else if (id == ATOM_TO_JSID(rt->atomState.protoAtom) &&
+                       op != JSOP_INITCOMPUTED && op != JSOP_INITNAMEDCOMPUTED &&
+                       op != JSOP_INITMETHODCOMPUTED) {
                 /* Preserve the historical explicit prototype initializer. */
                 ok = OBJ_SET_PROPERTY(cx, obj, id, &rval);
             } else {

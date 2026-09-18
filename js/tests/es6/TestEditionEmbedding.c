@@ -27,12 +27,13 @@ Nested(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 
 static unsigned checks;
-static JSBool deniedWatch;
+static JSBool deniedWatch, allowWatch;
 
 static JSBool
 CheckAccess(JSContext *cx, JSObject *obj, jsval id, JSAccessMode mode, jsval *value)
 {
     if (mode == JSACC_WATCH) {
+        if (allowWatch) { JS_GC(cx); return JS_TRUE; }
         deniedWatch = JS_TRUE;
         JS_ReportError(cx, "embedding denied accessor");
         return JS_FALSE;
@@ -73,6 +74,10 @@ int main(void)
         "immutable && "
         "(function(){var a=[];for(var i=0;i<3;++i)a.push(/fresh/g);"
         "a[0].lastIndex=9;return a[0]!==a[1] && a[1].lastIndex===0;})() && "
+        "(function(){var key=Symbol('cached');var o=({[key]:function(){return 7;},"
+        "['__proto__']:9});return o[key]()===7 && o[key].name==='[cached]' && "
+        "o.hasOwnProperty('__proto__') && o.__proto__===9 && "
+        "({m(){return 8;}}).m()===8 && ({[key](){return 9;}})[key].name==='[cached]';})() && "
         "legacyRegExp()===legacyRegExp() && "
         "(function(Array,Object){return [].length===0 && ({answer:42}).answer===42;})(null,null) && "
         "edition()===2015 && ({x:1,x:2}).x===2"
@@ -121,6 +126,13 @@ int main(void)
                              "catch(e){denied=true;}denied";
         CHECK(JS_EvaluateScript(cx, global, source, strlen(source), "access-check", 1,
                                 &result) && result == JSVAL_TRUE && deniedWatch);
+    }
+    allowWatch = JS_TRUE;
+    {
+        const char *source = "var key=Symbol('native'),v=0;var o=({get [key](){return v;},"
+                             "set [key](n){v=n;}});o[key]=42;o[key]===42";
+        CHECK(JS_EvaluateScript(cx, global, source, strlen(source), "computed-access", 1,
+                                &result) && result == JSVAL_TRUE);
     }
     JS_SetCheckObjectAccessCallback(rt, NULL);
     {
