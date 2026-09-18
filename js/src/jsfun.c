@@ -56,6 +56,7 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
@@ -302,6 +303,9 @@ js_GetArgsObject(JSContext *cx, JSStackFrame *fp)
                                   JSPROP_ENUMERATE)) return NULL;
         }
     }
+    if (fp->script && (fp->script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015 &&
+        !js_InitArgumentsIterator(cx, global, argsobj))
+        return NULL;
     return argsobj;
 }
 

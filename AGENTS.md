@@ -1101,3 +1101,12 @@ For Object.prototype.toString and built-in tag changes, run
 `js/tests/es6/builtin-tags.js` and `TestBuiltinTags.c`. Preserve historical
 JSClass names in legacy modes; modern fallback tags must follow the specified
 internal types and must not invoke native callable objects to classify them.
+
+
+For modern Array/String iterator changes, run `js/tests/es6/modern-iterators.js`
+and `TestModernIterators.c`. Preserve classic Iterator/StopIteration behavior
+and legacy arguments objects. Check live lengths, callback reentrancy, GC,
+surrogate pairs, permanent exhaustion, defining-realm result prototypes, weak
+realm-cache lifetime and JS_ClearScope. Modern arguments must use the original
+Array values function even if its public property was replaced. Iterator
+interfaces do not establish support for iteration syntax or consumers.

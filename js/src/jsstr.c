@@ -64,6 +64,7 @@
 #include "jsgc.h"
 #include "jsfun.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsnormalization.h"
@@ -2852,6 +2853,8 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
     ctor = JSVAL_TO_OBJECT(v);
     if (!js_SetBuiltinMethodFlags(cx, ctor, string_static_methods,
                                   JSFUN_NO_CONSTRUCT))
+        return NULL;
+    if (!js_InitStringIteratorMethod(cx, obj, proto))
         return NULL;
     return proto;
 }

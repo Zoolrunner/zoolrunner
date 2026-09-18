@@ -118,7 +118,7 @@ files, startup and all four views. These application checks do not establish
 compatibility with every historical application.
 
 Major remaining work includes remaining well-known Symbol protocols; lexical scopes
-and TDZ; ES2015 functions, destructuring, classes and `super`; iterators and
+and TDZ; ES2015 functions, destructuring, classes and `super`; iteration consumers, syntax and
 generators; collections and typed arrays; standard-library and regexp changes;
 Promise jobs; and module compilation, linking and evaluation. Preserve XDR and
 decompilation when bytecode changes. Review compatibility at the script-loading
@@ -975,3 +975,36 @@ embedding and desktop checks. Calendar's eight unit suites and four views,
 Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
 for this batch.
+
+
+### Array and String iterators
+
+Array keys/values/entries and Symbol.iterator, String Symbol.iterator, and
+modern arguments' own Symbol.iterator are implemented. Array iteration reads
+live lengths and visits holes; String iteration combines valid UTF-16 surrogate
+pairs. Iterator state is private, exhaustion is permanent, and results and entry
+arrays use the executing built-in's realm. Private weak realm caches retain
+intrinsic prototypes and the original values function without expanding public
+global reserved slots. Classic Iterator/StopIteration and legacy arguments
+objects retain their existing behavior.
+
+`modern-iterators.js` passes 62 focused checks and `TestModernIterators.c` passes
+23 native embedding checks on macOS arm64, including callbacks, collection,
+borrowed methods, context teardown, realm collection and scope clearing.
+The String Symbol.iterator subset passes 10/10. The iterator-prototype subset
+passes 40/94; its remaining cases require Map, Set or typed arrays.
+
+The full pinned ES2015 run passes **23,909 cases**, with **4,657 failures**,
+14 unsupported module cases and two harness errors. This gains 94 passes
+without losing any; there are no crashes or timeouts and runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/iterators-full.json` and `iterators-es5.json`. An earlier Array
+prototype diagnostic overlapped compilation and is invalid; use the complete
+run for results.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch. This does not implement for-of, spread, generators or iterable
+consumers such as Array.from.

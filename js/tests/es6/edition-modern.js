@@ -62,6 +62,9 @@ function modernWindowEdition() {
            (function() { var target = {}; target[Symbol.hasInstance] = function(v) { return v === 7; };
                          return 7 instanceof target && !(8 instanceof target); })() &&
            Math[Symbol.toStringTag] === "Math" && JSON[Symbol.toStringTag] === "JSON" &&
+           [3].values().next().value === 3 && [3].entries().next().value.join() === "0,3" &&
+           "\ud83d\ude00"[Symbol.iterator]().next().value.length === 2 &&
+           (function(v) { return arguments[Symbol.iterator]().next().value === v; })(17) &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

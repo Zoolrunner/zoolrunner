@@ -4,6 +4,17 @@
 #define jsrealm_h___
 #include "jspubtd.h"
 JS_BEGIN_EXTERN_C
+typedef enum JSRealmIntrinsic {
+    JS_INTRINSIC_ITERATOR_PROTO,
+    JS_INTRINSIC_ARRAY_ITERATOR_PROTO,
+    JS_INTRINSIC_STRING_ITERATOR_PROTO,
+    JS_INTRINSIC_ARRAY_VALUES,
+    JS_INTRINSIC_LIMIT
+} JSRealmIntrinsic;
+extern JSObject *js_GetCachedIntrinsic(JSContext *cx, JSObject *global,
+                                       JSRealmIntrinsic key);
+extern JSBool js_CacheIntrinsic(JSContext *cx, JSObject *global,
+                                JSRealmIntrinsic key, JSObject *value);
 extern JSObject *js_GetCachedClassObject(JSContext *cx, JSObject *global,
                                          JSProtoKey key);
 extern JSBool js_CacheClassObject(JSContext *cx, JSObject *global,

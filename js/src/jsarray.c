@@ -53,6 +53,7 @@
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsfun.h"
+#include "jsiteres6.h"
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jslock.h"
@@ -1822,8 +1823,8 @@ array_every(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 
 /* These new methods use ToLength, not the historical methods' ToUint32.
  * Doubles represent every integer in the required [0, 2^53-1] range exactly. */
-static JSBool
-ArrayLikeLength(JSContext *cx, JSObject *obj, jsdouble *length)
+JSBool
+js_ArrayLikeLength(JSContext *cx, JSObject *obj, jsdouble *length)
 {
     JSTempValueRooter root;
     JSBool ok;
@@ -1861,8 +1862,8 @@ ArrayRelativeIndex(JSContext *cx, jsval value, jsdouble length,
 }
 
 /* The caller roots ID_TO_VALUE(*idp) before any subsequent allocation. */
-static JSBool
-ArrayLikeIndex(JSContext *cx, jsdouble index, jsid *idp)
+JSBool
+js_ArrayLikeIndex(JSContext *cx, jsdouble index, jsid *idp)
 {
     JSString *str;
     JSAtom *atom;
@@ -1891,7 +1892,7 @@ array_findHelper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     JSBool ok = JS_FALSE, selected;
     uintN i;
 
-    if (!ArrayLikeLength(cx, obj, &length))
+    if (!js_ArrayLikeLength(cx, obj, &length))
         return JS_FALSE;
     if (!js_IsCallable(cx, argv[0])) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -1905,7 +1906,7 @@ array_findHelper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
     *rval = returnIndex ? INT_TO_JSVAL(-1) : JSVAL_VOID;
     for (index = 0; index < length; ++index) {
-        if (!ArrayLikeIndex(cx, index, &id))
+        if (!js_ArrayLikeIndex(cx, index, &id))
             goto out;
         values[4] = ID_TO_VALUE(id);
         /* Get every index, including holes. Unlike filter/some, find does
@@ -1948,7 +1949,7 @@ array_fill(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSTempValueRooter root;
     JSBool ok = JS_FALSE;
 
-    if (!ArrayLikeLength(cx, obj, &length) ||
+    if (!js_ArrayLikeLength(cx, obj, &length) ||
         !ArrayRelativeIndex(cx, argc > 1 ? argv[1] : JSVAL_VOID, length, &index))
         return JS_FALSE;
     end = length;
@@ -1958,7 +1959,7 @@ array_fill(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     values[0] = values[1] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
     for (; index < end; ++index) {
-        if (!ArrayLikeIndex(cx, index, &id))
+        if (!js_ArrayLikeIndex(cx, index, &id))
             goto out;
         values[0] = ID_TO_VALUE(id);
         /* A native setter can replace its vp without changing fill's value. */
@@ -1984,7 +1985,7 @@ array_copyWithin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
     JSTempValueRooter root;
     JSBool ok = JS_FALSE, present;
 
-    if (!ArrayLikeLength(cx, obj, &length) ||
+    if (!js_ArrayLikeLength(cx, obj, &length) ||
         !ArrayRelativeIndex(cx, argv[0], length, &target) ||
         !ArrayRelativeIndex(cx, argv[1], length, &start))
         return JS_FALSE;
@@ -2002,10 +2003,10 @@ array_copyWithin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *r
     values[0] = values[1] = values[2] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
     for (; count > 0; --count, start += direction, target += direction) {
-        if (!ArrayLikeIndex(cx, start, &from))
+        if (!js_ArrayLikeIndex(cx, start, &from))
             goto out;
         values[0] = ID_TO_VALUE(from);
-        if (!ArrayLikeIndex(cx, target, &to))
+        if (!js_ArrayLikeIndex(cx, target, &to))
             goto out;
         values[1] = ID_TO_VALUE(to);
         if (!OBJ_LOOKUP_PROPERTY(cx, obj, from, &holder, &property))
@@ -2205,7 +2206,8 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
     if (!ctor || !JS_DefineFunction(cx, ctor, "isArray", array_isArray, 1,
                                     JSFUN_NO_CONSTRUCT) ||
         !JS_DefineFunction(cx, ctor, "of", array_of, 0,
-                           JSFUN_NO_CONSTRUCT | JSFUN_STRICT))
+                           JSFUN_NO_CONSTRUCT | JSFUN_STRICT) ||
+        !js_InitArrayIteratorMethods(cx, obj, proto))
         return NULL;
     return proto;
 }
@@ -2213,10 +2215,17 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
 JSObject *
 js_NewArrayObject(JSContext *cx, jsuint length, jsval *vector)
 {
+    return js_NewArrayObjectWithProto(cx, length, vector, NULL, NULL);
+}
+
+JSObject *
+js_NewArrayObjectWithProto(JSContext *cx, jsuint length, jsval *vector,
+                           JSObject *proto, JSObject *parent)
+{
     JSTempValueRooter tvr;
     JSObject *obj;
 
-    obj = js_NewObject(cx, &js_ArrayClass, NULL, NULL);
+    obj = js_NewObject(cx, &js_ArrayClass, proto, parent);
     if (!obj)
         return NULL;
 

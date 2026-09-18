@@ -15,19 +15,21 @@
 #include "jslock.h"
 #include "jsrealm.h"
 
+#define REALM_CACHE_LIMIT (JSProto_LIMIT + JS_INTRINSIC_LIMIT)
+
 typedef struct ClassCacheEntry {
     JSDHashEntryHdr hdr;
     JSObject *global; /* Same position as JSDHashEntryStub.key. */
-    JSObject *constructors[JSProto_LIMIT];
+    JSObject *constructors[REALM_CACHE_LIMIT];
 } ClassCacheEntry;
 
-JSObject *
-js_GetCachedClassObject(JSContext *cx, JSObject *global, JSProtoKey key)
+static JSObject *
+GetCachedObject(JSContext *cx, JSObject *global, uintN key)
 {
     JSRuntime *rt = cx->runtime;
     ClassCacheEntry *entry;
     JSObject *constructor = NULL;
-    JS_ASSERT((uintN)key < JSProto_LIMIT);
+    JS_ASSERT(key < REALM_CACHE_LIMIT);
     JS_LOCK_GC(rt);
     if (rt->classObjectCache) {
         entry = (ClassCacheEntry *)JS_DHashTableOperate(rt->classObjectCache,
@@ -39,13 +41,13 @@ js_GetCachedClassObject(JSContext *cx, JSObject *global, JSProtoKey key)
     return constructor;
 }
 
-JSBool
-js_CacheClassObject(JSContext *cx, JSObject *global, JSProtoKey key,
+static JSBool
+CacheObject(JSContext *cx, JSObject *global, uintN key,
                     JSObject *constructor)
 {
     JSRuntime *rt = cx->runtime;
     ClassCacheEntry *entry = NULL;
-    JS_ASSERT((uintN)key < JSProto_LIMIT);
+    JS_ASSERT(key < REALM_CACHE_LIMIT);
     JS_LOCK_GC(rt);
     if (!rt->classObjectCache) {
         rt->classObjectCache = JS_NewDHashTable(JS_DHashGetStubOps(), NULL,
@@ -74,13 +76,43 @@ js_CacheClassObject(JSContext *cx, JSObject *global, JSProtoKey key,
     return JS_TRUE;
 }
 
+JSObject *
+js_GetCachedClassObject(JSContext *cx, JSObject *global, JSProtoKey key)
+{
+    JS_ASSERT((uintN)key < JSProto_LIMIT);
+    return GetCachedObject(cx, global, (uintN)key);
+}
+
+JSBool
+js_CacheClassObject(JSContext *cx, JSObject *global, JSProtoKey key,
+                    JSObject *constructor)
+{
+    JS_ASSERT((uintN)key < JSProto_LIMIT);
+    return CacheObject(cx, global, (uintN)key, constructor);
+}
+
+JSObject *
+js_GetCachedIntrinsic(JSContext *cx, JSObject *global, JSRealmIntrinsic key)
+{
+    JS_ASSERT((uintN)key < JS_INTRINSIC_LIMIT);
+    return GetCachedObject(cx, global, JSProto_LIMIT + (uintN)key);
+}
+
+JSBool
+js_CacheIntrinsic(JSContext *cx, JSObject *global, JSRealmIntrinsic key,
+                   JSObject *value)
+{
+    JS_ASSERT((uintN)key < JS_INTRINSIC_LIMIT);
+    return CacheObject(cx, global, JSProto_LIMIT + (uintN)key, value);
+}
+
 /* The collector has suspended mutator requests. Copy before marking, so a
  * recursive class mark hook cannot invalidate an entry pointer by rehashing. */
 void
 js_MarkCachedClassObjects(JSContext *cx, JSObject *global)
 {
     ClassCacheEntry *entry;
-    JSObject *constructors[JSProto_LIMIT];
+    JSObject *constructors[REALM_CACHE_LIMIT];
     uintN i;
     if (!cx->runtime->classObjectCache)
         return;
@@ -89,9 +121,9 @@ js_MarkCachedClassObjects(JSContext *cx, JSObject *global)
     if (!JS_DHASH_ENTRY_IS_BUSY(&entry->hdr))
         return;
     memcpy(constructors, entry->constructors, sizeof(constructors));
-    for (i = 0; i < JSProto_LIMIT; ++i) {
+    for (i = 0; i < REALM_CACHE_LIMIT; ++i) {
         if (constructors[i])
-            GC_MARK(cx, constructors[i], "realm intrinsic constructor");
+            GC_MARK(cx, constructors[i], "realm intrinsic");
     }
 }
 

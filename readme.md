@@ -351,3 +351,12 @@ implemented, preserving legacy native class names. The full macOS arm64 ES2015
 run passes 23,815 cases, with 4,751 failures, 14 unsupported cases and two harness
 errors. All 11,540 ES5 cases and all four applications' packaged compatibility
 checks pass. Other platforms have not been revalidated for this batch.
+
+
+Array/String iterator methods and modern arguments' Symbol.iterator are
+implemented while preserving classic iteration. On macOS arm64, 62 focused
+checks and 23 native embedding checks pass. The full ES2015 run passes 23,909
+cases, with 4,657 failures, 14 unsupported cases and two harness errors; all
+11,540 ES5 cases pass. All four applications pass packaged compatibility checks.
+Iteration syntax and consumers remain separate work. Other platforms have not
+been revalidated for this batch.
