@@ -1429,3 +1429,44 @@ Windows, Linux and other architectures have not been revalidated for this batch.
 Unicode matching, replacement/splitting protocols and further ES6 work remain
 incomplete. Modern constructor selection follows the initialized global's
 policy; running an ES2015 script alone does not replace legacy window built-ins.
+
+### RegExp and String split protocols
+
+Modern globals dispatch String split through Symbol.split before converting the
+receiver. RegExp split resolves the species constructor, appends the sticky flag,
+constructs a separate matcher, preserves capture values without string coercion,
+and creates arrays in the executing method's realm. String fallback converts
+ordinary separators and preserves the legacy limit conversion and empty-piece
+behavior. Existing legacy globals retain their original split implementation.
+
+The pinned ES2015 corpus incorporates the [July 2015 limit correction](https://tc39.es/archives/bugzilla/4432/):
+split limits use ToUint32, preserving negative-limit compatibility. Match indices
+and capture counts still use ToLength. Native loops remain interruptible,
+including custom exec results with excessive capture counts. Out-of-range custom
+match indices cannot create out-of-bounds dependent strings.
+
+The diagnostic subsets pass all 210 String split cases and 80/84 RegExp split
+cases; the four remaining failures require Unicode u matching. There are 33
+focused script checks and 27 native embedding checks under MallocScribble,
+covering callback GC, constructor order, primitive receivers, foreign contexts
+destroyed before use, cloned methods, result realms and legacy behavior.
+The full pinned ES2015 run passes **26,143 cases**, with **2,423 failures**,
+14 unsupported module cases and two harness errors: **82 gained, zero lost**
+relative to constructor/sticky. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/regexp-split-full.json` and
+`regexp-split-es5.json`; runtime: `/tmp/zr-regexp-split-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass on the completed desktop run. Calendar passes eight unit suites and four
+views; Browser passes 169 navigation/layout assertions; Suite and XULRunner pass
+ChatZilla initialization/input checks. The first Suite run recorded an
+intermittent Inspector `mDocPanel` lifecycle error under concurrent conformance
+load despite all 24 explicit assertions passing. The unchanged package passed
+its rerun; retain `regexp-split-runtime/suite-first-failure` as diagnostic evidence.
+Two additional lifecycle runs after conformance each pass all 24 assertions
+without console errors. These repeats do not establish that the intermittent
+Inspector issue is fixed. No application code or
+upstream assertions were changed to bypass the failure. Other operating systems
+and architectures have not been revalidated. Unicode matching, replacement
+protocols and the remaining ES6 work are still incomplete.

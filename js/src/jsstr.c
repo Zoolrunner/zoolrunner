@@ -1878,6 +1878,92 @@ find_split(JSContext *cx, JSString *str, JSRegExp *re, jsint *ip,
 }
 
 static JSBool
+StringModernSplit(JSContext *cx, jsval *argv, jsval *rval)
+{
+    jsval values[4] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval args[2] = {argv[-1], argv[1]};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *array;
+    JSProtoKey key;
+    JSString *str, *separator, *sub;
+    jsid id;
+    uint32 limit = (uint32)-1, count = 0;
+    size_t p = 0, q = 0, size, sepLength;
+    jsdouble number;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_SPLIT, &id)) goto out;
+    if (!JSVAL_IS_NULL(argv[0]) && !JSVAL_IS_VOID(argv[0])) {
+        if (JSVAL_IS_PRIMITIVE(argv[0])) {
+            key = JSVAL_IS_SYMBOL(argv[0]) ? JSProto_Symbol :
+                  JSVAL_IS_STRING(argv[0]) ? JSProto_String :
+                  JSVAL_IS_BOOLEAN(argv[0]) ? JSProto_Boolean : JSProto_Number;
+            obj = js_BuiltinPrototype(cx, global, key);
+            if (!obj || !js_GetPropertyValue(cx, obj, argv[0], id, &values[1])) goto out;
+        } else if (!OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(argv[0]), id, &values[1])) goto out;
+        if (!JSVAL_IS_VOID(values[1]) && !JSVAL_IS_NULL(values[1])) {
+            if (!js_IsCallable(cx, values[1])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "split symbol method");
+                goto out;
+            }
+            ok = js_InternalInvokeValue(cx, argv[0], values[1], 0, 2, args, rval);
+            goto out;
+        }
+    }
+    str = js_ValueToString(cx, argv[-1]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    obj = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!obj) goto out;
+    array = js_NewArrayObjectWithProto(cx, 0, NULL, obj, global);
+    if (!array) goto out;
+    values[2] = OBJECT_TO_JSVAL(array);
+    if (!JSVAL_IS_VOID(argv[1]) &&
+        (!js_ValueToNumber(cx, argv[1], &number) ||
+         !js_DoubleToECMAUint32(cx, number, &limit))) goto out;
+    separator = js_ValueToString(cx, argv[0]);
+    if (!separator) goto out;
+    values[1] = STRING_TO_JSVAL(separator);
+    if (!limit) goto done;
+    size = JSSTRING_LENGTH(str); sepLength = JSSTRING_LENGTH(separator);
+    if (JSVAL_IS_VOID(argv[0]) || (!size && sepLength)) {
+        if (!OBJ_DEFINE_PROPERTY(cx, array, INT_TO_JSID(0), values[0], JS_PropertyStub,
+                                 JS_PropertyStub, JSPROP_ENUMERATE, NULL)) goto out;
+        goto done;
+    }
+    if (!size) goto done;
+    while (q < size) {
+        if (cx->branchCallback && !(q & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (sepLength > size - q ||
+            memcmp(JSSTRING_CHARS(str) + q, JSSTRING_CHARS(separator), sepLength * sizeof(jschar)) ||
+            q + sepLength == p) { ++q; continue; }
+        sub = js_NewDependentString(cx, str, p, q - p, 0);
+        if (!sub) goto out;
+        values[3] = STRING_TO_JSVAL(sub);
+        if (!js_ArrayLikeIndex(cx, count, &id) ||
+            !OBJ_DEFINE_PROPERTY(cx, array, id, values[3], JS_PropertyStub,
+                                 JS_PropertyStub, JSPROP_ENUMERATE, NULL)) goto out;
+        if (++count == limit) goto done;
+        p = q + sepLength; q = p;
+    }
+    sub = js_NewDependentString(cx, str, p, size - p, 0);
+    if (!sub) goto out;
+    values[3] = STRING_TO_JSVAL(sub);
+    if (!js_ArrayLikeIndex(cx, count, &id) ||
+        !OBJ_DEFINE_PROPERTY(cx, array, id, values[3], JS_PropertyStub,
+                             JS_PropertyStub, JSPROP_ENUMERATE, NULL)) goto out;
+  done:
+    *rval = values[2]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
 str_split(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     JSString *str, *sub;
@@ -1889,6 +1975,9 @@ str_split(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     jsdouble d;
     jsint i, j;
     uint32 len, limit;
+
+    if (js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
+        return StringModernSplit(cx, argv, rval);
 
     str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
     if (!str)
@@ -2913,7 +3002,7 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
     jsval v;
     JSFunction *fun;
     uintN i;
-    static const char *protocols[] = {"match", "search"};
+    static const char *protocols[] = {"match", "search", "split"};
 
     /* Define the escape, unescape functions in the global object. */
     if (!JS_DefineFunctions(cx, obj, string_functions) ||

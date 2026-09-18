@@ -1,0 +1,55 @@
+/* ES2015 splitting protocols and legacy isolation.
+ * MPL 1.1/GPL 2.0/LGPL 2.1. */
+var checks=0;
+function check(v,name){++checks;if(!v)throw Error('RegExp split: '+name);}
+function caught(f){try{f();}catch(e){return e;}return null;}
+var split=RegExp.prototype[Symbol.split],d=Object.getOwnPropertyDescriptor(RegExp.prototype,Symbol.split);
+check(d.writable&&d.configurable&&!d.enumerable&&split.length===2&&split.name==='[Symbol.split]','metadata');
+check(!split.hasOwnProperty('prototype')&&caught(function(){new split();}) instanceof TypeError,'nonconstructor');
+check(caught(function(){split.call(null,'a');}) instanceof TypeError,'null receiver');
+check(caught(function(){split.call('a','a');}) instanceof TypeError,'primitive receiver');
+check(split.call(/,/,'a,b,').join('|')==='a|b|','trailing empty');
+check(split.call(/(?:)/,'ab').join('|')==='a|b','empty matcher');
+check(split.call(/a*?/,'ab').join('|')==='a|b','lazy matcher');
+check(split.call(/a*/,'ab').join('|')==='|b','greedy matcher');
+var a=split.call(/(,)|(x)/,'a,b');
+check(a.length===4&&a[0]==='a'&&a[1]===','&&a[2]===undefined&&a[3]==='b','raw captures');
+check(split.call(/x/,'').length===1&&split.call(/(?:)/,'').length===0,'empty input');
+check(split.call(/./,'abc',-23).length===4&&split.call(/./,'abc',4294967297).length===1,'corrected uint32 limit');
+check(split.call(/./,'abc',NaN).length===0,'NaN limit');
+var r=/,/g;r.lastIndex=7;
+check(split.call(r,'a,b').join('|')==='a|b'&&r.lastIndex===7,'original index unchanged');
+var log=[],fake={lastIndex:0,exec:function(s){gc();log.push('exec');return null;}},obj={};
+Object.defineProperty(obj,'constructor',{get:function(){log.push('constructor');var c={};Object.defineProperty(c,Symbol.species,{get:function(){log.push('species');return function(rx,flags){log.push('construct:'+flags);check(rx===obj,'species pattern');gc();return fake;};}});return c;}});
+Object.defineProperty(obj,'flags',{get:function(){log.push('flags');return {toString:function(){gc();log.push('flags-string');return '';}};}});
+a=split.call(obj,{toString:function(){log.push('input');return 'ab';}},{valueOf:function(){log.push('limit');gc();return 0;}});
+check(a.length===0&&log.join()==='input,constructor,species,flags,flags-string,construct:y,limit','ordering before zero limit');
+var marker={};obj={constructor:null,flags:''};
+check(caught(function(){split.call(obj,'a');}) instanceof TypeError,'null constructor rejected');
+obj={constructor:{},flags:''};obj.constructor[Symbol.species]=42;
+check(caught(function(){split.call(obj,'a');}) instanceof TypeError,'nonconstructor species rejected');
+var seen=[],raw={};fake={exec:function(){seen.push(this.lastIndex);if(this.lastIndex===0){this.lastIndex=2;return {length:2,1:raw};}return null;}};
+obj={flags:'',constructor:{}};obj.constructor[Symbol.species]=function(){return fake;};
+a=split.call(obj,'abc');check(a.length===3&&a[0]===''&&a[1]===raw&&a[2]==='c','capture identity and custom index');
+fake.exec=function(){this.lastIndex=1e100;return {length:1};};
+check(split.call(obj,'a').join('|')==='|','oversized custom index safe');
+fake.exec=function(){return 3;};check(caught(function(){split.call(obj,'a');}) instanceof TypeError,'primitive exec result rejected');
+fake.exec=function(){throw marker;};check(caught(function(){split.call(obj,'a');})===marker,'exec exception preserved');
+seen=[];obj.flags='u';fake.exec=function(){seen.push(this.lastIndex);return null;};
+a=split.call(obj,'\ud83d\ude00x');check(seen.join()==='0,2'&&a[0]==='\ud83d\ude00x','custom Unicode advancement');
+obj.flags='';fake.exec=function(){this.lastIndex=1;return {get length(){gc();return 3;},get 1(){gc();return raw;},get 2(){throw marker;}};};
+a=split.call(obj,'x',2);check(a.length===2&&a[1]===raw,'limit stops before next capture getter');
+var receiver={},limit={},separator={};separator[Symbol.split]=function(s,l){'use strict';gc();return this===separator&&s===receiver&&l===limit;};
+check(String.prototype.split.call(receiver,separator,limit),'String raw dispatch');
+Object.defineProperty(Number.prototype,Symbol.split,{configurable:true,get:function(){'use strict';check(this===7,'primitive getter receiver');return function(s,l){'use strict';return this===7&&s===receiver&&l===limit;};}});
+check(String.prototype.split.call(receiver,7,limit),'primitive method receiver');delete Number.prototype[Symbol.split];
+check(caught(function(){String.prototype.split.call(null,separator);}) instanceof TypeError,'String null rejected before dispatch');
+separator={};separator[Symbol.split]=3;check(caught(function(){'a'.split(separator);}) instanceof TypeError,'String noncallable method');
+log=[];separator={toString:function(){log.push('separator');return ',';}};
+a=String.prototype.split.call({toString:function(){log.push('input');return 'a,b';}},separator,{valueOf:function(){log.push('limit');return 0;}});
+check(a.length===0&&log.join()==='input,limit,separator','String fallback ordering');
+r=/a/;r[Symbol.split]=null;check('x/a/y'.split(r).join('|')==='x|y','null protocol converts regexp to string');
+check('a,b,'.split(',').join('|')==='a|b|'&&'ab'.split('').join('|')==='a|b','String fallback pieces');
+check('a'.split(undefined)[0]==='a'&&''.split('').length===0&&''.split('x')[0]==='','String empty and undefined');
+check('abc'.split('',-1).length===3&&'abc'.split('',4294967297).length===1,'String uint32 limit');
+print('ES6-REGEXP-SPLIT checks='+checks+' failures=0');

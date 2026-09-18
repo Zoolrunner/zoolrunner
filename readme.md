@@ -449,13 +449,23 @@ for remaining limitations and platform scope.
 The constructor/sticky follow-up adds the `y` flag, ES2015 RegExp construction,
 species, newTarget realm handling and direct RegExpCreate for String fallback.
 Legacy source grammar and initialized legacy globals retain their behavior.
-The latest full macOS arm64 ES2015 run passes **26,061 cases**, with **2,505
+The constructor/sticky full macOS arm64 ES2015 run passes **26,061 cases**, with **2,505
 failures**, 14 unsupported module cases and two harness errors: 92 gained,
 zero lost. All 11,540 ES5.1 cases and all four application build, package and
 desktop checks pass. Cache version 39 invalidates older component caches.
 Unicode `u`, replacement/split protocols and other ES6 work remain incomplete;
 other operating systems and architectures have not been revalidated. See
 [constructor validation notes](js/tests/es6/README.md#regexp-constructors-and-sticky-flags).
+
+The split follow-up adds RegExp species construction, Symbol.split dispatch,
+capture preservation, result-realm handling and the corrected ES2015 limit
+conversion. The latest full macOS arm64 ES2015 run passes **26,143 cases**, with
+**2,423 failures**, 14 unsupported module cases and two harness errors: 82 gained,
+zero lost. All 11,540 ES5.1 cases pass. All four application builds and package
+checks pass, and the completed desktop run passes. An earlier intermittent
+Inspector lifecycle error is retained in the [split validation notes](js/tests/es6/README.md#regexp-and-string-split-protocols).
+Unicode matching, replacement protocols and other ES6 work remain incomplete;
+other platforms have not been revalidated.
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

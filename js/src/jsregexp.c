@@ -4584,12 +4584,169 @@ RegExpSymbolMatch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
     return ok;
 }
 
+/* RegExp index and capture counts use ToLength. */
+static JSBool
+RegExpToLength(JSContext *cx, jsval value, jsdouble *length)
+{
+    if (!js_ValueToNumber(cx, value, length)) return JS_FALSE;
+    *length = js_DoubleToInteger(*length);
+    if (*length < 0) *length = 0;
+    else if (*length > 9007199254740991.0) *length = 9007199254740991.0;
+    return JS_TRUE;
+}
+
+static jsdouble
+RegExpAdvanceIndex(JSString *str, jsdouble index, JSBool unicode)
+{
+    const jschar *chars = JSSTRING_CHARS(str);
+    if (unicode && index + 1 < JSSTRING_LENGTH(str) &&
+        chars[(size_t)index] >= 0xd800 && chars[(size_t)index] <= 0xdbff &&
+        chars[(size_t)index + 1] >= 0xdc00 && chars[(size_t)index + 1] <= 0xdfff)
+        return index + 2;
+    return index + 1;
+}
+
+static JSBool
+RegExpAppendElement(JSContext *cx, JSObject *array, jsdouble index, jsval value)
+{
+    jsid id;
+    if (index >= 4294967295.0) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
+    return js_ArrayLikeIndex(cx, index, &id) &&
+           OBJ_DEFINE_PROPERTY(cx, array, id, value, JS_PropertyStub,
+                               JS_PropertyStub, JSPROP_ENUMERATE, NULL);
+}
+
+static JSBool
+RegExpSymbolSplit(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[7] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID,
+                      JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global, *ctor, *proto, *splitter, *array;
+    JSString *str, *flags, *suffix, *sub;
+    JSBool unicode = JS_FALSE, sticky = JS_FALSE, ok = JS_FALSE;
+    jsdouble limit = 9007199254740991.0, p = 0, q = 0, e, count = 0, captures, i;
+    size_t size, j;
+    uint32 iterations = 0, limit32 = (uint32)-1;
+    jsid id;
+    jsval *base, *oldsp;
+    JSStackFrame *frame;
+    void *mark;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.split]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 7, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    global = js_BuiltinGlobal(cx, argv);
+    if (!JS_GetProperty(cx, obj, "constructor", &values[1])) goto out;
+    if (!JSVAL_IS_VOID(values[1])) {
+        if (JSVAL_IS_PRIMITIVE(values[1])) { RegExpReceiverError(cx, "constructor"); goto out; }
+        if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id) ||
+            !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[1]), id, &values[1])) goto out;
+    }
+    if (JSVAL_IS_VOID(values[1]) || JSVAL_IS_NULL(values[1])) {
+        ctor = js_GetCachedClassObject(cx, global, JSProto_RegExp);
+        if (!ctor) {
+            if (!js_BuiltinPrototype(cx, global, JSProto_RegExp)) goto out;
+            ctor = js_GetCachedClassObject(cx, global, JSProto_RegExp);
+        }
+        if (!ctor) goto out;
+        values[1] = OBJECT_TO_JSVAL(ctor);
+    } else if (!js_IsConstructor(cx, values[1])) {
+        RegExpReceiverError(cx, "species constructor"); goto out;
+    }
+    if (!JS_GetProperty(cx, obj, "flags", &values[2])) goto out;
+    flags = js_ValueToString(cx, values[2]);
+    if (!flags) goto out;
+    values[2] = STRING_TO_JSVAL(flags);
+    for (j = 0; j < JSSTRING_LENGTH(flags); ++j) {
+        if (JSSTRING_CHARS(flags)[j] == 'u') unicode = JS_TRUE;
+        if (JSSTRING_CHARS(flags)[j] == 'y') sticky = JS_TRUE;
+    }
+    if (!sticky) {
+        suffix = JS_NewStringCopyZ(cx, "y");
+        if (!suffix) goto out;
+        values[3] = STRING_TO_JSVAL(suffix);
+        flags = js_ConcatStrings(cx, flags, suffix);
+        if (!flags) goto out;
+        values[2] = STRING_TO_JSVAL(flags);
+    }
+    base = js_AllocStack(cx, 4, &mark);
+    if (!base) goto out;
+    base[0] = values[1]; base[1] = JSVAL_NULL;
+    base[2] = argv[-1]; base[3] = values[2];
+    frame = cx->fp; oldsp = frame->sp; frame->sp = base + 4;
+    ok = js_InvokeConstructorWithNewTarget(cx, base, 2, JSVAL_TO_OBJECT(values[1]));
+    if (ok) values[3] = base[0];
+    frame->sp = oldsp; js_FreeStack(cx, mark);
+    if (!ok) goto out;
+    ok = JS_FALSE;
+    splitter = JSVAL_TO_OBJECT(values[3]);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!proto) goto out;
+    array = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+    if (!array) goto out;
+    values[4] = OBJECT_TO_JSVAL(array);
+    /* The pinned ES2015 corpus includes the corrected ToUint32 limit. */
+    if (!JSVAL_IS_VOID(argv[1])) {
+        if (!js_ValueToNumber(cx, argv[1], &limit) ||
+            !js_DoubleToECMAUint32(cx, limit, &limit32)) goto out;
+    }
+    limit = limit32;
+    size = JSSTRING_LENGTH(str);
+    if (!limit) goto done;
+    if (!size) {
+        if (!RegExpExecMethod(cx, splitter, str, argv[-2], &values[5])) goto out;
+        if (values[5] == JSVAL_NULL && !RegExpAppendElement(cx, array, 0, values[0])) goto out;
+        goto done;
+    }
+    while (q < size) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_NewNumberValue(cx, q, &values[6]) ||
+            !SetRegExpIndexValue(cx, splitter, values[6]) ||
+            !RegExpExecMethod(cx, splitter, str, argv[-2], &values[5])) goto out;
+        if (values[5] == JSVAL_NULL) { q = RegExpAdvanceIndex(str, q, unicode); continue; }
+        if (!JS_GetProperty(cx, splitter, "lastIndex", &values[6]) ||
+            !RegExpToLength(cx, values[6], &e)) goto out;
+        if (e == p) { q = RegExpAdvanceIndex(str, q, unicode); continue; }
+        sub = js_NewDependentString(cx, str, (size_t)p, (size_t)(q - p), 0);
+        if (!sub) goto out;
+        values[6] = STRING_TO_JSVAL(sub);
+        if (!RegExpAppendElement(cx, array, count++, values[6])) goto out;
+        if (count == limit) goto done;
+        p = e;
+        if (!js_ArrayLikeLength(cx, JSVAL_TO_OBJECT(values[5]), &captures)) goto out;
+        for (i = 1; i < captures; ++i) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, i, &id) ||
+                !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[5]), id, &values[6]) ||
+                !RegExpAppendElement(cx, array, count++, values[6])) goto out;
+            if (count == limit) goto done;
+        }
+        q = p;
+    }
+    /* A custom exec may set an index beyond the string. Never form an
+     * out-of-bounds dependent string for the final empty suffix. */
+    if (p > size) p = size;
+    sub = js_NewDependentString(cx, str, (size_t)p, size - (size_t)p, 0);
+    if (!sub) goto out;
+    values[6] = STRING_TO_JSVAL(sub);
+    if (!RegExpAppendElement(cx, array, count, values[6])) goto out;
+  done:
+    *rval = values[4]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static JSBool
 InitRegExpProtocols(JSContext *cx, JSObject *global, JSObject *proto)
 {
     static struct { JSWellKnownSymbol symbol; const char *name; JSNative native; } methods[] = {
         {JS_WKS_MATCH, "[Symbol.match]", RegExpSymbolMatch},
-        {JS_WKS_SEARCH, "[Symbol.search]", RegExpSymbolSearch}
+        {JS_WKS_SEARCH, "[Symbol.search]", RegExpSymbolSearch},
+        {JS_WKS_SPLIT, "[Symbol.split]", RegExpSymbolSplit}
     };
     JSFunction *fun;
     jsval value;
@@ -4599,7 +4756,7 @@ InitRegExpProtocols(JSContext *cx, JSObject *global, JSObject *proto)
     JSBool ok;
     for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
         if (!js_WellKnownSymbolId(cx, methods[i].symbol, &id)) return JS_FALSE;
-        fun = JS_NewFunction(cx, methods[i].native, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+        fun = JS_NewFunction(cx, methods[i].native, methods[i].symbol == JS_WKS_SPLIT ? 2 : 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
                              global, methods[i].name);
         if (!fun) return JS_FALSE;
         JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);

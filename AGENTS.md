@@ -1217,3 +1217,11 @@ cloning conventions and validate fallback realms through bound and Proxy
 newTargets, including revocation during prototype lookup. Native sticky flags,
 legacy grammar rejection, decompilation and XDR need separate checks. Cache
 version 39 invalidates components serialized before sticky flag semantics.
+
+For RegExp split changes, run `regexp-split.js` and `TestRegExpSplit.c`.
+Preserve species-constructor ordering, raw capture values, foreign result-array
+realms, primitive String symbol receivers and interruptible native capture loops.
+The pinned ES2015 suite incorporates the July 2015 correction restoring ToUint32
+for split limits; do not regress negative-limit compatibility to the original
+publication's ToLength text. Custom exec indices must never create out-of-bounds
+string slices. Legacy globals retain the historical split path.
