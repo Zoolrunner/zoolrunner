@@ -451,6 +451,7 @@ struct JSRuntime {
 #endif
     /* Weak global keys; constructors are traced from each live global. */
     JSDHashTable        *classObjectCache;
+    struct JSSymbolState *symbolState;
 };
 
 #ifdef DEBUG

@@ -826,6 +826,11 @@ js_ValueToNumber(JSContext *cx, jsval v, jsdouble *dp)
         if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_NUMBER, &v))
             return JS_FALSE;
     }
+    if (JSVAL_IS_SYMBOL(v)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_SYMBOL_CONVERSION, "number");
+        return JS_FALSE;
+    }
     if (JSVAL_IS_INT(v)) {
         *dp = (jsdouble)JSVAL_TO_INT(v);
     } else if (JSVAL_IS_DOUBLE(v)) {

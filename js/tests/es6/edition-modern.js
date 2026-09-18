@@ -12,6 +12,13 @@ function modernWindowEdition() {
     var name = Object.getOwnPropertyDescriptor(modernWindowEdition, "name");
     var metadata = length.value === 0 && length.configurable && !length.writable &&
                    name.value === "modernWindowEdition" && name.configurable;
+    var windowSymbol = Symbol('window'), symbolTarget = {};
+    symbolTarget[windowSymbol] = 42;
+    var symbolChecks = typeof windowSymbol === 'symbol' &&
+                       Object.getOwnPropertySymbols(symbolTarget)[0] === windowSymbol &&
+                       Object.keys(symbolTarget).length === 0 &&
+                       Object.assign({}, symbolTarget)[windowSymbol] === 42 &&
+                       Symbol.for('window-registry') === Symbol.for('window-registry');
     var inferred = function() { return 42; };
     var accessor = Object.getOwnPropertyDescriptor({get value() {return 42;}}, "value").get;
     var inferredMetadata = inferred.name === "inferred" && accessor.name === "get value" &&
@@ -20,7 +27,7 @@ function modernWindowEdition() {
     var immutable = false;
     try { fixed++; } catch (error) { immutable = error instanceof TypeError; }
     return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
-           metadata && inferredMetadata && immutable &&
+           metadata && inferredMetadata && immutable && symbolChecks &&
            (function(Array, Object) { return [].length === 0 && ({answer:42}).answer === 42; })(null, null) &&
            Math.imul(4294967295, 5) === -5 && Math.clz32(1) === 31 &&
            1 / Math.trunc(-0.25) === -Infinity && Math.sign(-7) === -1 &&

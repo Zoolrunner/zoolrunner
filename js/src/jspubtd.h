@@ -91,6 +91,7 @@ typedef enum JSType {
     JSTYPE_BOOLEAN,             /* boolean */
     JSTYPE_NULL,                /* null */
     JSTYPE_XML,                 /* xml object */
+    JSTYPE_SYMBOL,              /* ES2015 Symbol primitive */
     JSTYPE_LIMIT
 } JSType;
 

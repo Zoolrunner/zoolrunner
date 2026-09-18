@@ -312,3 +312,6 @@ MSG_DEF(JSMSG_BAD_REPEAT_COUNT,      229, 0, JSEXN_RANGEERR, "invalid string rep
 MSG_DEF(JSMSG_REGEXP_SEARCH,         230, 0, JSEXN_TYPEERR, "literal string search does not accept a regular expression")
 MSG_DEF(JSMSG_BAD_STRING_LENGTH,     231, 0, JSEXN_RANGEERR, "invalid string length")
 MSG_DEF(JSMSG_BAD_NORMALIZATION_FORM,232, 0, JSEXN_RANGEERR, "invalid Unicode normalization form")
+MSG_DEF(JSMSG_SYMBOL_REQUIRED,      233, 0, JSEXN_TYPEERR, "Symbol value required")
+MSG_DEF(JSMSG_SYMBOL_CONVERSION,    234, 1, JSEXN_TYPEERR, "cannot convert a Symbol value to {0}")
+MSG_DEF(JSMSG_SYMBOL_XDR,           235, 0, JSEXN_TYPEERR, "cannot serialize a Symbol value")

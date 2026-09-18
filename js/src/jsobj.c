@@ -63,6 +63,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 #include "jsrealm.h"
 #include "jsscan.h"
 #include "jsscope.h"
@@ -1155,9 +1156,13 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 jsval *rval)
 {
     jschar *chars;
-    size_t nchars;
-    const char *clazz, *prefix;
-    JSString *str;
+    size_t length, i;
+    const char *clazz, *prefix = "[object ";
+    JSString *str, *tag = NULL;
+    jsval tagValue = JSVAL_VOID;
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
 
     if (JSVAL_IS_VOID(argv[-1]))
         clazz = "Undefined";
@@ -1166,27 +1171,44 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     else
         clazz = OBJ_GET_CLASS(cx, obj) == &js_ArgumentsClass
                 ? "Arguments" : OBJ_GET_CLASS(cx, obj)->name;
-    nchars = 9 + strlen(clazz);         /* 9 for "[object ]" */
-    chars = (jschar *) JS_malloc(cx, (nchars + 1) * sizeof(jschar));
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, tagValue, &root);
+    if (!JSVAL_IS_NULL(argv[-1]) && !JSVAL_IS_VOID(argv[-1]) &&
+        cx->runtime->symbolState) {
+        if (!js_WellKnownSymbolId(cx, JS_WKS_TO_STRING_TAG, &id) ||
+            !OBJ_GET_PROPERTY(cx, obj, id, &root.u.value))
+            goto out;
+        if (JSVAL_IS_STRING(root.u.value))
+            tag = JSVAL_TO_STRING(root.u.value);
+    }
+    length = tag ? JSSTRING_LENGTH(tag) : strlen(clazz);
+    if (length > JSSTRING_LENGTH_MASK - 9 ||
+        length > (size_t)-1 / sizeof(jschar) - 10) {
+        JS_ReportOutOfMemory(cx);
+        goto out;
+    }
+    chars = (jschar *)JS_malloc(cx, (length + 10) * sizeof(jschar));
     if (!chars)
-        return JS_FALSE;
-
-    prefix = "[object ";
-    nchars = 0;
-    while ((chars[nchars] = (jschar)*prefix) != 0)
-        nchars++, prefix++;
-    while ((chars[nchars] = (jschar)*clazz) != 0)
-        nchars++, clazz++;
-    chars[nchars++] = ']';
-    chars[nchars] = 0;
-
-    str = js_NewString(cx, chars, nchars, 0);
+        goto out;
+    for (i = 0; i < 8; ++i)
+        chars[i] = prefix[i];
+    if (tag)
+        memcpy(chars + 8, JSSTRING_CHARS(tag), length * sizeof(jschar));
+    else {
+        for (i = 0; i < length; ++i)
+            chars[i + 8] = (unsigned char)clazz[i];
+    }
+    chars[length + 8] = ']';
+    chars[length + 9] = 0;
+    str = js_NewString(cx, chars, length + 9, 0);
     if (!str) {
         JS_free(cx, chars);
-        return JS_FALSE;
+        goto out;
     }
     *rval = STRING_TO_JSVAL(str);
-    return JS_TRUE;
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
 }
 
 static JSBool
@@ -2694,15 +2716,16 @@ js_GetClassObject(JSContext *cx, JSObject *obj, JSProtoKey key,
 
     while ((tmp = OBJ_GET_PARENT(cx, obj)) != NULL)
         obj = tmp;
-    if (JS_VERSION_IS_ES2015(cx)) {
+    if (JS_VERSION_IS_ES2015(cx) || key > JSProto_Block) {
         cobj = js_GetCachedClassObject(cx, obj, key);
         if (cobj) {
             *objp = cobj;
             return JS_TRUE;
         }
     }
-    reserved = (OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) != 0;
-    if (!reserved && !JS_VERSION_IS_ES2015(cx)) {
+    reserved = key <= JSProto_Block &&
+               (OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) != 0;
+    if (!reserved && !JS_VERSION_IS_ES2015(cx) && key <= JSProto_Block) {
         *objp = NULL;
         return JS_TRUE;
     }
@@ -2753,7 +2776,7 @@ js_SetClassObject(JSContext *cx, JSObject *obj, JSProtoKey key, JSObject *cobj)
     JS_ASSERT(!OBJ_GET_PARENT(cx, obj));
     if (!js_CacheClassObject(cx, obj, key, cobj))
         return JS_FALSE;
-    if (!(OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL))
+    if (key > JSProto_Block || !(OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL))
         return JS_TRUE;
 
     return JS_SetReservedSlot(cx, obj, key, OBJECT_TO_JSVAL(cobj));
@@ -4270,12 +4293,92 @@ js_DeleteProperty(JSContext *cx, JSObject *obj, jsid id, jsval *rval)
     return ok;
 }
 
+/* ES2015's explicit primitive hook is separate from the classic embedding
+ * JSTYPE_OBJECT/JSTYPE_FUNCTION conversion hints. */
+static JSBool
+TrySymbolPrimitive(JSContext *cx, JSObject *obj, JSType hint,
+                   jsval *vp, JSBool *handled)
+{
+    jsval roots[3] = {OBJECT_TO_JSVAL(obj), JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *name;
+    jsid id;
+    JSBool ok = JS_FALSE;
+    *handled = JS_FALSE;
+    if (!cx->runtime->symbolState ||
+        (hint != JSTYPE_VOID && hint != JSTYPE_STRING && hint != JSTYPE_NUMBER))
+        return JS_TRUE;
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_TO_PRIMITIVE, &id) ||
+        !OBJ_GET_PROPERTY(cx, obj, id, &roots[1]))
+        goto out;
+    if (JSVAL_IS_NULL(roots[1]) || JSVAL_IS_VOID(roots[1])) {
+        ok = JS_TRUE;
+        goto out;
+    }
+    *handled = JS_TRUE;
+    if (!js_IsCallable(cx, roots[1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "@@toPrimitive");
+        goto out;
+    }
+    name = JS_NewStringCopyZ(cx, hint == JSTYPE_STRING ? "string" :
+                                hint == JSTYPE_NUMBER ? "number" : "default");
+    if (!name)
+        goto out;
+    roots[2] = STRING_TO_JSVAL(name);
+    if (!js_InternalCall(cx, obj, roots[1], 1, &roots[2], &roots[1]))
+        goto out;
+    if (!JSVAL_IS_PRIMITIVE(roots[1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_CANT_CONVERT_TO, "@@toPrimitive result", "primitive type");
+        goto out;
+    }
+    *vp = roots[1];
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_ValueToPropertyId(JSContext *cx, jsval value, jsid *idp)
+{
+    JSTempValueRooter root;
+    JSAtom *atom;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_INT(value)) {
+        *idp = INT_JSVAL_TO_JSID(value);
+        return JS_TRUE;
+    }
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, value, &root);
+    if (!JSVAL_IS_PRIMITIVE(root.u.value) &&
+        !OBJ_DEFAULT_VALUE(cx, JSVAL_TO_OBJECT(root.u.value), JSTYPE_STRING,
+                           &root.u.value))
+        goto out;
+    atom = JSVAL_IS_SYMBOL(root.u.value) ? js_AtomizeValue(cx, root.u.value, 0)
+                                        : js_ValueToStringAtom(cx, root.u.value);
+    if (!atom)
+        goto out;
+    *idp = ATOM_TO_JSID(atom);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSBool
 js_DefaultValue(JSContext *cx, JSObject *obj, JSType hint, jsval *vp)
 {
     jsval v, save;
     JSString *str;
 
+    JSBool handled;
+
+    if (!TrySymbolPrimitive(cx, obj, hint, vp, &handled))
+        return JS_FALSE;
+    if (handled)
+        return JS_TRUE;
     v = save = OBJECT_TO_JSVAL(obj);
     switch (hint) {
       case JSTYPE_STRING:
@@ -4431,6 +4534,7 @@ js_Enumerate(JSContext *cx, JSObject *obj, JSIterateOp enum_op,
 #endif
                      (sprop->attrs & JSPROP_ENUMERATE)) &&
                     !(sprop->flags & SPROP_IS_ALIAS) &&
+                    !JSVAL_IS_SYMBOL(ID_TO_VALUE(sprop->id)) &&
                     (!SCOPE_HAD_MIDDLE_DELETE(scope) ||
                      SCOPE_HAS_PROPERTY(scope, sprop))) {
                     length++;
@@ -4449,6 +4553,7 @@ js_Enumerate(JSContext *cx, JSObject *obj, JSIterateOp enum_op,
 #endif
                      (sprop->attrs & JSPROP_ENUMERATE)) &&
                     !(sprop->flags & SPROP_IS_ALIAS) &&
+                    !JSVAL_IS_SYMBOL(ID_TO_VALUE(sprop->id)) &&
                     (!SCOPE_HAD_MIDDLE_DELETE(scope) ||
                      SCOPE_HAS_PROPERTY(scope, sprop))) {
                     JS_ASSERT(i > 0);
@@ -4922,7 +5027,9 @@ js_ValueToObject(JSContext *cx, jsval v, JSObject **objp)
         if (!JSVAL_IS_PRIMITIVE(v))
             obj = JSVAL_TO_OBJECT(v);
     } else {
-        if (JSVAL_IS_STRING(v)) {
+        if (JSVAL_IS_SYMBOL(v)) {
+            obj = js_SymbolToObject(cx, (JSSymbol *)JSVAL_TO_STRING(v));
+        } else if (JSVAL_IS_STRING(v)) {
             obj = js_StringToObject(cx, JSVAL_TO_STRING(v));
         } else if (JSVAL_IS_INT(v)) {
             obj = js_NumberToObject(cx, (jsdouble)JSVAL_TO_INT(v));

@@ -65,12 +65,16 @@ JS_BEGIN_EXTERN_C
 #define JSVAL_CLRTAG(v)         ((v) & ~(jsval)JSVAL_TAGMASK)
 #define JSVAL_ALIGN             JS_BIT(JSVAL_TAGBITS)
 
+/* Symbol values share the string tag but have a distinct private payload. */
+JS_PUBLIC_API(JSBool) JS_IsSymbolValue(jsval value);
+
 /* Predicates for type testing. */
 #define JSVAL_IS_OBJECT(v)      (JSVAL_TAG(v) == JSVAL_OBJECT)
 #define JSVAL_IS_NUMBER(v)      (JSVAL_IS_INT(v) || JSVAL_IS_DOUBLE(v))
 #define JSVAL_IS_INT(v)         (((v) & JSVAL_INT) && (v) != JSVAL_VOID)
 #define JSVAL_IS_DOUBLE(v)      (JSVAL_TAG(v) == JSVAL_DOUBLE)
-#define JSVAL_IS_STRING(v)      (JSVAL_TAG(v) == JSVAL_STRING)
+#define JSVAL_IS_SYMBOL(v)      JS_IsSymbolValue(v)
+#define JSVAL_IS_STRING(v)      (JSVAL_TAG(v) == JSVAL_STRING && !JSVAL_IS_SYMBOL(v))
 #define JSVAL_IS_BOOLEAN(v)     (JSVAL_TAG(v) == JSVAL_BOOLEAN)
 #define JSVAL_IS_NULL(v)        ((v) == JSVAL_NULL)
 #define JSVAL_IS_VOID(v)        ((v) == JSVAL_VOID)
@@ -1027,10 +1031,12 @@ struct JSExtendedClass {
  * with the following flags.  Failure to use JSCLASS_GLOBAL_FLAGS won't break
  * anything except the ECMA-262 "original prototype value" behavior, which was
  * broken for years in SpiderMonkey.  In other words, without these flags you
- * get backward compatibility.
+ * get backward compatibility for the original standard classes. Keep this
+ * reserved-slot count stable for previously compiled embedding globals; newer
+ * intrinsic keys use the private runtime cache.
  */
 #define JSCLASS_GLOBAL_FLAGS \
-    (JSCLASS_IS_GLOBAL | JSCLASS_HAS_RESERVED_SLOTS(JSProto_LIMIT))
+    (JSCLASS_IS_GLOBAL | JSCLASS_HAS_RESERVED_SLOTS(JSProto_Block + 1))
 
 /* Fast access to the original value of each standard class's prototype. */
 #define JSCLASS_CACHED_PROTO_SHIFT      (JSCLASS_HIGH_FLAGS_SHIFT + 8)

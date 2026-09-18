@@ -1075,3 +1075,11 @@ intrinsics survive GC, dead globals are collected, and JS_ClearScope resets the
 cache. Modern literal construction bypasses mutable Array/Object bindings;
 legacy scripts retain their historical lookup. Keep bytecode versioning,
 decompilation, cross-edition XDR and real XUL/content globals covered.
+
+
+Symbol changes must preserve old jsval encodings and global reserved-slot
+capacity. Run `symbol-primitives.js` and `TestSymbolEmbedding.c`, including
+registry lifetime across context recreation, native string views, property-key
+GC roots and real window globals. Keep well-known protocol gaps explicit;
+exposing named symbols alone is not conformance. Do not serialize Symbol
+identity as a string in XDR.

@@ -521,6 +521,9 @@ extern JSBool
 js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
 
 extern JSBool
+js_ValueToPropertyId(JSContext *cx, jsval value, jsid *idp);
+
+extern JSBool
 js_CreateDataPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval value);
 
 extern JSBool

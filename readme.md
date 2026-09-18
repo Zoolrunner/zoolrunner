@@ -182,7 +182,7 @@ the platform's historical Unicode tables. Array `find`, `findIndex`, `fill`
 and `copyWithin` use full ToLength indices and preserve callback/GC behavior;
 Symbol protocols, including Array unscopables, remain unfinished. `Object.is`
 and string-key `Object.assign` have focused identity, property-order and callback
-checks; Symbol copying awaits Symbol support. Reflection and integrity methods
+checks; Symbol copying is included in the Symbol implementation. Reflection and integrity methods
 accept primitive arguments in explicitly selected ES2015 scripts while retaining
 the ES5/legacy argument policy. `Object.setPrototypeOf` preserves
 embedding access checks and built-in instance fields across prototype changes;
@@ -316,3 +316,11 @@ throwing own-property creation. All four macOS arm64 applications pass the
 packaged compatibility checks. ES2015 is at 23,550 passes, 5,016 failures,
 14 unsupported cases and two harness errors; all 11,540 ES5 cases pass. Other
 platforms have not been revalidated for this change.
+
+Symbol primitives include identity, property keys, reflection, conversions and
+a runtime-wide registry. The full macOS arm64 ES2015 run passes 23,781 cases,
+with 4,785 failures, 14 unsupported cases and two harness errors. All 11,540 ES5
+cases pass. All four macOS arm64 applications pass build, package and runtime
+checks; other platforms have not been revalidated for this batch. Several
+well-known-symbol protocols remain unimplemented; this is not full ES2015
+compliance. See `js/tests/es6/README.md`.

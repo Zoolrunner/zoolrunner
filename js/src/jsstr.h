@@ -95,18 +95,23 @@ struct JSDependentString {
 #define JSSTRFLAG_DEPENDENT         JSSTRFLAG_SHIFT(1)
 #define JSSTRFLAG_PREFIX            JSSTRFLAG_SHIFT(2)
 
+/* PREFIX without DEPENDENT denotes a Symbol's owned display buffer. Symbols
+ * are primitive GC strings internally, but JSVAL_IS_STRING excludes them.
+ * No ordinary string or dependent string uses this flag combination. */
+
 /* Universal JSString type inquiry and accessor macros. */
 #define JSSTRING_BIT(n)             ((size_t)1 << (n))
 #define JSSTRING_BITMASK(n)         (JSSTRING_BIT(n) - 1)
 #define JSSTRING_HAS_FLAG(str,flg)  ((str)->length & (flg))
 #define JSSTRING_IS_DEPENDENT(str)  JSSTRING_HAS_FLAG(str, JSSTRFLAG_DEPENDENT)
 #define JSSTRING_IS_PREFIX(str)     JSSTRING_HAS_FLAG(str, JSSTRFLAG_PREFIX)
+#define JSSTRING_IS_SYMBOL(str)     (((str)->length & JSSTRFLAG_MASK) == JSSTRFLAG_PREFIX)
 #define JSSTRING_CHARS(str)         (JSSTRING_IS_DEPENDENT(str)               \
                                      ? JSSTRDEP_CHARS(str)                    \
                                      : (str)->chars)
 #define JSSTRING_LENGTH(str)        (JSSTRING_IS_DEPENDENT(str)               \
                                      ? JSSTRDEP_LENGTH(str)                   \
-                                     : (str)->length)
+                                     : ((str)->length & JSSTRING_LENGTH_MASK))
 #define JSSTRING_LENGTH_BITS        (sizeof(size_t) * JS_BITS_PER_BYTE        \
                                      - JSSTRFLAG_BITS)
 #define JSSTRING_LENGTH_MASK        JSSTRING_BITMASK(JSSTRING_LENGTH_BITS)

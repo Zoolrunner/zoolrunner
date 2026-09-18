@@ -63,6 +63,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 #include "jsopcode.h"
 #include "jsscan.h"
 #include "jsscope.h"
@@ -291,7 +292,9 @@ js_EnablePropertyCache(JSContext *cx)
 #define PRIMITIVE_TO_OBJECT(cx, v, obj)                                       \
     JS_BEGIN_MACRO                                                            \
         SAVE_SP(fp);                                                          \
-        if (JSVAL_IS_STRING(v)) {                                             \
+        if (JSVAL_IS_SYMBOL(v)) {                                             \
+            obj = js_SymbolToObject(cx, (JSSymbol *)JSVAL_TO_STRING(v));       \
+        } else if (JSVAL_IS_STRING(v)) {                                      \
             obj = js_StringToObject(cx, JSVAL_TO_STRING(v));                  \
         } else if (JSVAL_IS_INT(v)) {                                         \
             obj = js_NumberToObject(cx, (jsdouble)JSVAL_TO_INT(v));           \
@@ -1247,7 +1250,9 @@ have_fun:
             uintN thispflags = JSFUN_THISP_FLAGS(fun->flags);
 
             JS_ASSERT(!(flags & JSINVOKE_CONSTRUCT));
-            if (JSVAL_IS_STRING(thisv)) {
+            if (JSVAL_IS_SYMBOL(thisv)) {
+                thisp = js_SymbolToObject(cx, (JSSymbol *)JSVAL_TO_STRING(thisv));
+            } else if (JSVAL_IS_STRING(thisv)) {
                 if (JSFUN_THISP_TEST(thispflags, JSFUN_THISP_STRING)) {
                     thisp = (JSObject *) thisv;
                     goto init_frame;
@@ -1965,6 +1970,8 @@ js_StrictlyEqual(jsval lval, jsval rval)
         if (ltag == JSVAL_STRING) {
             JSString *lstr = JSVAL_TO_STRING(lval),
                      *rstr = JSVAL_TO_STRING(rval);
+            if (JSVAL_IS_SYMBOL(lval) || JSVAL_IS_SYMBOL(rval))
+                return lval == rval;
             return js_EqualStrings(lstr, rstr);
         }
         if (ltag == JSVAL_DOUBLE) {
@@ -2083,13 +2090,7 @@ js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
 static JSBool
 InternStringElementId(JSContext *cx, jsval idval, jsid *idp)
 {
-    JSAtom *atom;
-
-    atom = js_ValueToStringAtom(cx, idval);
-    if (!atom)
-        return JS_FALSE;
-    *idp = ATOM_TO_JSID(atom);
-    return JS_TRUE;
+    return js_ValueToPropertyId(cx, idval, idp);
 }
 
 static JSBool
@@ -3249,7 +3250,9 @@ interrupt:
         rtmp = JSVAL_TAG(rval);                                               \
         XML_EQUALITY_OP(OP)                                                   \
         if (ltmp == rtmp) {                                                   \
-            if (ltmp == JSVAL_STRING) {                                       \
+            if (JSVAL_IS_SYMBOL(lval) || JSVAL_IS_SYMBOL(rval)) {              \
+                cond = lval OP rval;                                         \
+            } else if (ltmp == JSVAL_STRING) {                                \
                 str  = JSVAL_TO_STRING(lval);                                 \
                 str2 = JSVAL_TO_STRING(rval);                                 \
                 cond = js_EqualStrings(str, str2) OP JS_TRUE;                 \
@@ -3277,7 +3280,9 @@ interrupt:
                     rval = sp[-1];                                            \
                     rtmp = JSVAL_TAG(rval);                                   \
                 }                                                             \
-                if (ltmp == JSVAL_STRING && rtmp == JSVAL_STRING) {           \
+                if (JSVAL_IS_SYMBOL(lval) || JSVAL_IS_SYMBOL(rval)) {          \
+                    cond = lval OP rval;                                     \
+                } else if (ltmp == JSVAL_STRING && rtmp == JSVAL_STRING) {    \
                     str  = JSVAL_TO_STRING(lval);                             \
                     str2 = JSVAL_TO_STRING(rval);                             \
                     cond = js_EqualStrings(str, str2) OP JS_TRUE;             \
@@ -6032,7 +6037,9 @@ interrupt:
                     CACHED_GET(OBJ_GET_PROPERTY(cx, obj, id, &rval));
                 }
             } else {
-                if (JSVAL_IS_STRING(lval)) {
+                if (JSVAL_IS_SYMBOL(lval)) {
+                    i = JSProto_Symbol;
+                } else if (JSVAL_IS_STRING(lval)) {
                     i = JSProto_String;
                 } else if (JSVAL_IS_NUMBER(lval)) {
                     i = JSProto_Number;

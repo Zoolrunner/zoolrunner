@@ -69,6 +69,7 @@
 #include "jsmath.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 #include "jsrealm.h"
 #include "jsopcode.h"
 #include "jsparse.h"
@@ -486,6 +487,13 @@ JS_ConvertValue(JSContext *cx, jsval v, JSType type, jsval *vp)
         obj = js_ValueToFunctionObject(cx, vp, JSV2F_SEARCH_STACK);
         ok = (obj != NULL);
         break;
+      case JSTYPE_SYMBOL:
+        ok = JSVAL_IS_SYMBOL(v);
+        if (ok)
+            *vp = v;
+        else
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_SYMBOL_REQUIRED);
+        break;
       case JSTYPE_STRING:
         str = js_ValueToString(cx, v);
         ok = (str != NULL);
@@ -642,6 +650,8 @@ JS_TypeOfValue(JSContext *cx, jsval v)
         type = JSTYPE_NUMBER;
     } else if (JSVAL_IS_STRING(v)) {
         type = JSTYPE_STRING;
+    } else if (JSVAL_IS_SYMBOL(v)) {
+        type = JSTYPE_SYMBOL;
     } else if (JSVAL_IS_BOOLEAN(v)) {
         type = JSTYPE_BOOLEAN;
     } else {
@@ -1276,6 +1286,7 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitNumberClass(cx, obj) &&
            js_InitRegExpClass(cx, obj) &&
            js_InitStringClass(cx, obj) &&
+           js_InitSymbolClass(cx, obj) &&
 #if JS_HAS_SCRIPT_OBJECT
            js_InitScriptClass(cx, obj) &&
 #endif
@@ -1346,6 +1357,7 @@ static JSStdName standard_class_atoms[] = {
     {js_InitJSONClass,                  0, "JSON", NULL},
     {js_InitNumberClass,                EAGER_ATOM_AND_CLASP(Number)},
     {js_InitStringClass,                EAGER_ATOM_AND_CLASP(String)},
+    {js_InitSymbolClass,                EAGER_ATOM_AND_CLASP(Symbol)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
     {js_InitExceptionClasses,           EAGER_ATOM_AND_CLASP(Error)},
     {js_InitRegExpClass,                EAGER_ATOM_AND_CLASP(RegExp)},
@@ -2107,6 +2119,10 @@ JS_ValueToId(JSContext *cx, jsval v, jsid *idp)
     JSAtom *atom;
 
     CHECK_REQUEST(cx);
+    if (JS_VERSION_IS_ES2015(cx) || JSVAL_IS_SYMBOL(v) ||
+        (!JSVAL_IS_PRIMITIVE(v) &&
+         OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(v)) == &js_SymbolClass))
+        return js_ValueToPropertyId(cx, v, idp);
     if (JSVAL_IS_INT(v)) {
         *idp = INT_JSVAL_TO_JSID(v);
     } else {
@@ -2116,7 +2132,8 @@ JS_ValueToId(JSContext *cx, jsval v, jsid *idp)
             return JS_TRUE;
         }
 #endif
-        atom = js_ValueToStringAtom(cx, v);
+        atom = JSVAL_IS_SYMBOL(v) ? js_AtomizeValue(cx, v, 0)
+                                  : js_ValueToStringAtom(cx, v);
         if (!atom)
             return JS_FALSE;
         *idp = ATOM_TO_JSID(atom);
@@ -3270,7 +3287,7 @@ JS_ClearScope(JSContext *cx, JSObject *obj)
     if (JS_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) {
         JSProtoKey key;
 
-        for (key = JSProto_Null; key < JSProto_LIMIT; key++)
+        for (key = JSProto_Null; key <= JSProto_Block; key++)
             JS_SetReservedSlot(cx, obj, key, JSVAL_VOID);
     }
 }
@@ -4682,8 +4699,31 @@ JS_NewDependentString(JSContext *cx, JSString *str, size_t start,
 JS_PUBLIC_API(JSString *)
 JS_ConcatStrings(JSContext *cx, JSString *left, JSString *right)
 {
+    jsval values[2];
+    JSTempValueRooter root;
+    JSString *result = NULL;
     CHECK_REQUEST(cx);
-    return js_ConcatStrings(cx, left, right);
+    if (!JSSTRING_IS_SYMBOL(left) && !JSSTRING_IS_SYMBOL(right))
+        return js_ConcatStrings(cx, left, right);
+    values[0] = STRING_TO_JSVAL(left);
+    values[1] = STRING_TO_JSVAL(right);
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    if (JSSTRING_IS_SYMBOL(left)) {
+        left = js_SymbolToString(cx, (JSSymbol *)left);
+        if (!left)
+            goto out;
+        values[0] = STRING_TO_JSVAL(left);
+    }
+    if (JSSTRING_IS_SYMBOL(right)) {
+        right = js_SymbolToString(cx, (JSSymbol *)right);
+        if (!right)
+            goto out;
+        values[1] = STRING_TO_JSVAL(right);
+    }
+    result = js_ConcatStrings(cx, left, right);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return result;
 }
 
 JS_PUBLIC_API(const jschar *)

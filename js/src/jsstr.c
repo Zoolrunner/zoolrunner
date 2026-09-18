@@ -68,6 +68,7 @@
 #include "jsnum.h"
 #include "jsnormalization.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 #include "jsopcode.h"
 #include "jsregexp.h"
 #include "jsstr.h"
@@ -2543,7 +2544,9 @@ String(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSString *str;
 
     if (argc > 0) {
-        str = js_ValueToString(cx, argv[0]);
+        str = JSVAL_IS_SYMBOL(argv[0]) && !(cx->fp->flags & JSFRAME_CONSTRUCTING)
+              ? js_SymbolToString(cx, (JSSymbol *)JSVAL_TO_STRING(argv[0]))
+              : js_ValueToString(cx, argv[0]);
         if (!str)
             return JS_FALSE;
         argv[0] = STRING_TO_JSVAL(str);
@@ -2888,6 +2891,11 @@ js_NewDependentString(JSContext *cx, JSString *base, size_t start,
     if (length == 0)
         return cx->runtime->emptyString;
 
+    /* Old embedding binaries may view a new Symbol through its string tag.
+     * A requested text view must be an ordinary string, including full slices. */
+    if (JSSTRING_IS_SYMBOL(base))
+        return js_NewStringCopyN(cx, JSSTRING_CHARS(base) + start, length, gcflag);
+
     if (start == 0 && length == JSSTRING_LENGTH(base))
         return base;
 
@@ -3102,6 +3110,11 @@ js_ValueToString(JSContext *cx, jsval v)
             return ATOM_TO_STRING(cx->runtime->atomState.nullAtom);
         if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_STRING, &v))
             return NULL;
+    }
+    if (JSVAL_IS_SYMBOL(v)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_SYMBOL_CONVERSION, "string");
+        return NULL;
     }
     if (JSVAL_IS_STRING(v)) {
         str = JSVAL_TO_STRING(v);

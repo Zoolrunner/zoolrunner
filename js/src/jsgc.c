@@ -69,6 +69,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 #include "jsrealm.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -727,6 +728,7 @@ js_FinishGC(JSRuntime *rt)
     js_DumpGCStats(rt, stdout);
 #endif
 
+    js_FinishSymbolState(rt);
     js_FinishCachedClassObjects(rt);
     FreePtrTable(&rt->gcIteratorTable, &iteratorTableInfo);
 #if JS_HAS_GENERATORS
@@ -2870,6 +2872,7 @@ restart:
     if (rt->gcLocksHash)
         JS_DHashTableEnumerate(rt->gcLocksHash, gc_lock_marker, cx);
     js_MarkAtomState(&rt->atomState, keepAtoms, gc_mark_atom_key_thing, cx);
+    js_MarkSymbolState(cx);
     js_MarkWatchPoints(cx);
     js_MarkScriptFilenames(rt, keepAtoms);
     js_MarkNativeIteratorStates(cx);

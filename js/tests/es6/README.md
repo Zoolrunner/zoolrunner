@@ -818,3 +818,47 @@ embedding and desktop checks. Calendar's eight unit suites and four views,
 Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 standalone XULRunner ChatZilla pass. These are macOS arm64 results; other
 platforms have not been revalidated for this batch.
+
+
+### Symbol primitives
+
+The engine now represents Symbol primitives independently of strings while
+preserving existing jsval tags and public JSClass layouts. An unused private
+string flag identifies a Symbol payload whose owned UTF-16 display buffer also
+contains its description. There are no hidden GC children. A private registry
+indexes slices of registered Symbols' owned buffers; it and the eleven ES2015
+well-known identities persist for the lifetime of the JSRuntime, including
+intervals without contexts. Runtime teardown frees these retained buffers.
+
+`JS_IsSymbolValue` and appended `JSTYPE_SYMBOL` expose the new type. Existing
+type enum values, classic global reserved-slot counts and old value encodings
+remain unchanged. Older native code viewing the string tag gets bounded display
+text from string accessors; dependent-string and concatenation APIs produce
+ordinary strings. Language ToString/ToNumber conversions still throw where
+required. Symbols cannot be serialized through XDR.
+
+Primitive conversion, boxing, identity comparisons, symbol property keys,
+descriptors, own-symbol reflection, assign, enumeration, JSON omission and
+@@toPrimitive/@@toStringTag are implemented. Symbol-valued descriptors stay
+rooted through callbacks. Additional well-known protocols such as iteration,
+matching, species and instanceof still require work; named well-known symbols
+alone do not establish their protocols or full ES2015 conformance.
+
+Current macOS arm64 focused validation passes 92 shell checks and 42 native
+embedding checks, including cross-global registries, classic 31-slot globals,
+GC and context teardown/recreation. A preliminary Symbol Test262 subset passes
+48/52 cases; the remaining cases require species getters and classes. The full
+pinned ES2015 run passes **23,781 cases**, with **4,785 failures**, 14 unsupported
+module cases and two harness errors. There are no timeouts or crashes, no lost
+passes, and 231 additional passes relative to Array.of. Runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/symbol-primitives-full.json` and `symbol-primitives-es5.json`.
+The native embedding probe also passes with its executable instrumented by
+AddressSanitizer; the engine itself was not instrumented. The focused script
+passes with macOS malloc scribbling enabled.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar passes its eight unit suites and four
+views; Browser passes 169 navigation/layout assertions. Suite Composer and
+ChatZilla, and standalone XULRunner ChatZilla pass. Windows, Linux and other
+architectures have not been revalidated for this batch.

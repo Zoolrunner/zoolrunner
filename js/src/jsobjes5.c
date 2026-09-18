@@ -217,7 +217,8 @@ obj_getOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
     JSObject *target, *owner, *desc;
     JSProperty *prop;
     JSScopeProperty *sprop;
-    JSString *key;
+    RootedIds ids;
+    JSIdArray idStorage;
     jsid id;
     uintN attrs, checkedAttrs;
     jsval values[3] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
@@ -227,13 +228,12 @@ obj_getOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
     target = ReflectionObject(cx, argc, argv);
     if (!target)
         return JS_FALSE;
-    /* Force ES5 ToString, bypassing JS_ValueToId's E4X object-key extension. */
-    key = js_ValueToString(cx, argv[1]);
-    if (!key)
+    if (!js_ValueToPropertyId(cx, argv[1], &id))
         return JS_FALSE;
-    argv[1] = STRING_TO_JSVAL(key);
-    if (!JS_ValueToId(cx, argv[1], &id))
-        return JS_FALSE;
+    idStorage.length = 1;
+    idStorage.vector[0] = id;
+    ids.ids = &idStorage;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
     JS_PUSH_TEMP_ROOT(cx, 3, values, &roots);
     if (!OBJ_CHECK_ACCESS(cx, target, id, JSACC_READ, &values[0], &checkedAttrs))
         goto out;
@@ -284,6 +284,7 @@ obj_getOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
                           BOOLEAN_TO_JSVAL(!(attrs & JSPROP_PERMANENT)));
 out:
     JS_POP_TEMP_ROOT(cx, &roots);
+    JS_POP_TEMP_ROOT(cx, &ids.root);
     return ok;
 }
 
@@ -601,21 +602,24 @@ obj_defineProperty(JSContext *cx, JSObject *obj, uintN argc,
                    jsval *argv, jsval *rval)
 {
     JSObject *target = RequireObject(cx, argc, argv);
-    JSString *str;
+    RootedIds ids;
+    JSIdArray idStorage;
     jsid id;
     ES5Descriptor d;
     JSTempValueRooter root;
     JSBool ok;
     uintN i;
     if (!target) return JS_FALSE;
-    str = js_ValueToString(cx, argv[1]);
-    if (!str) return JS_FALSE;
-    argv[1] = STRING_TO_JSVAL(str);
-    if (!JS_ValueToId(cx, argv[1], &id)) return JS_FALSE;
+    if (!js_ValueToPropertyId(cx, argv[1], &id)) return JS_FALSE;
+    idStorage.length = 1;
+    idStorage.vector[0] = id;
+    ids.ids = &idStorage;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
     for (i = 0; i < D_COUNT; ++i) d.v[i] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, D_COUNT, d.v, &root);
     ok = ToDescriptor(cx, argv[2], &d) && DefineOwn(cx, target, id, &d);
     JS_POP_TEMP_ROOT(cx, &root);
+    JS_POP_TEMP_ROOT(cx, &ids.root);
     if (ok) *rval = OBJECT_TO_JSVAL(target);
     return ok;
 }
@@ -643,6 +647,9 @@ DefineProperties(JSContext *cx, JSObject *target, jsval *properties)
     if (!ids.ids) return JS_FALSE;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
     JS_PUSH_TEMP_ROOT(cx, 1, &value, &valueRoot);
+    if (JS_VERSION_IS_ES2015(cx) && OBJ_IS_NATIVE(source) &&
+        !OrderOwnKeys(cx, ids.ids))
+        goto out;
     if (ids.ids->length) {
         if ((size_t)ids.ids->length > ((size_t)-1) / sizeof(*descs) ||
             (size_t)ids.ids->length > ((size_t)-1) / sizeof(*roots)) {
@@ -830,7 +837,7 @@ obj_getOwnPropertyNames(JSContext *cx, JSObject *obj, uintN argc,
     RootedIds ids;
     JSString *str;
     JSTempValueRooter strRoot;
-    jsint i;
+    jsint i, output = 0;
     JSBool ok = JS_FALSE;
     if (!target) return JS_FALSE;
     ids.ids = OwnNames(cx, target);
@@ -843,16 +850,53 @@ obj_getOwnPropertyNames(JSContext *cx, JSObject *obj, uintN argc,
     if (!array) goto out;
     *rval = OBJECT_TO_JSVAL(array);
     for (i = 0; i < ids.ids->length; ++i) {
+        if (JSVAL_IS_SYMBOL(ID_TO_VALUE(ids.ids->vector[i])))
+            continue;
         str = js_ValueToString(cx, ID_TO_VALUE(ids.ids->vector[i]));
         if (!str) goto out;
         JS_PUSH_TEMP_ROOT_STRING(cx, str, &strRoot);
-        ok = JS_DefineElement(cx, array, i, STRING_TO_JSVAL(str),
+        ok = JS_DefineElement(cx, array, output++, STRING_TO_JSVAL(str),
                               NULL, NULL, JSPROP_ENUMERATE);
         JS_POP_TEMP_ROOT(cx, &strRoot);
         if (!ok) goto out;
     }
     ok = JS_TRUE;
 out:
+    JS_POP_TEMP_ROOT(cx, &ids.root);
+    JS_DestroyIdArray(cx, ids.ids);
+    return ok;
+}
+
+static JSBool
+obj_getOwnPropertySymbols(JSContext *cx, JSObject *obj, uintN argc,
+                         jsval *argv, jsval *rval)
+{
+    JSObject *target, *array;
+    RootedIds ids;
+    jsint i, output = 0;
+    jsval value;
+    JSBool ok = JS_FALSE;
+    target = JSVAL_IS_PRIMITIVE(argv[0]) ? js_ValueToNonNullObject(cx, argv[0])
+                                        : JSVAL_TO_OBJECT(argv[0]);
+    if (!target)
+        return JS_FALSE;
+    argv[0] = OBJECT_TO_JSVAL(target);
+    ids.ids = OwnNames(cx, target);
+    if (!ids.ids)
+        return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    array = js_NewArrayObject(cx, 0, NULL);
+    if (!array)
+        goto out;
+    *rval = OBJECT_TO_JSVAL(array);
+    for (i = 0; i < ids.ids->length; ++i) {
+        value = ID_TO_VALUE(ids.ids->vector[i]);
+        if (JSVAL_IS_SYMBOL(value) &&
+            !JS_DefineElement(cx, array, output++, value, NULL, NULL, JSPROP_ENUMERATE))
+            goto out;
+    }
+    ok = JS_TRUE;
+  out:
     JS_POP_TEMP_ROOT(cx, &ids.root);
     JS_DestroyIdArray(cx, ids.ids);
     return ok;
@@ -1092,6 +1136,8 @@ CompareOwnKeys(const void *left, const void *right)
         return -1;
     if (b->index >= 0)
         return 1;
+    if (JSVAL_IS_SYMBOL(ID_TO_VALUE(a->id)) != JSVAL_IS_SYMBOL(ID_TO_VALUE(b->id)))
+        return JSVAL_IS_SYMBOL(ID_TO_VALUE(a->id)) ? 1 : -1;
     return a->ordinal < b->ordinal ? -1 : a->ordinal > b->ordinal ? 1 : 0;
 }
 
@@ -1201,6 +1247,7 @@ JSFunctionSpec js_object_static_methods[] = {
     {"is", obj_is, 2, 0, 0},
     {"assign", obj_assign, 2, 0, 0},
     {"getOwnPropertyNames", obj_getOwnPropertyNames, 1, 0, 0},
+    {"getOwnPropertySymbols", obj_getOwnPropertySymbols, 1, 0, 0},
     {"seal", obj_seal, 1, 0, 0},
     {"freeze", obj_freeze, 1, 0, 0},
     {"isSealed", obj_isSealed, 1, 0, 0},
