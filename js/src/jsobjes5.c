@@ -63,6 +63,22 @@ RequireObject(JSContext *cx, uintN argc, jsval *argv)
     return JSVAL_TO_OBJECT(argv[0]);
 }
 
+/* ES2015 reflection boxes primitives; ES5 and explicitly legacy scripts
+ * retain their historical TypeError. Keep the box rooted in the argument. */
+static JSObject *
+ReflectionObject(JSContext *cx, uintN argc, jsval *argv)
+{
+    JSObject *target;
+    if (!JS_VERSION_IS_ES2015(cx))
+        return RequireObject(cx, argc, argv);
+    if (!JSVAL_IS_PRIMITIVE(argv[0]))
+        return JSVAL_TO_OBJECT(argv[0]);
+    target = js_ValueToNonNullObject(cx, argv[0]);
+    if (target)
+        argv[0] = OBJECT_TO_JSVAL(target);
+    return target;
+}
+
 static JSBool
 obj_getPrototypeOf(JSContext *cx, JSObject *obj, uintN argc,
                    jsval *argv, jsval *rval)
@@ -72,7 +88,7 @@ obj_getPrototypeOf(JSContext *cx, JSObject *obj, uintN argc,
     JSExtendedClass *xclasp;
     uintN attrs;
 
-    target = RequireObject(cx, argc, argv);
+    target = ReflectionObject(cx, argc, argv);
     if (!target)
         return JS_FALSE;
     /* Use the same access checks and outer-object boundary as __proto__,
@@ -141,7 +157,7 @@ js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
     JSTempValueRooter stringRoot;
     JSBool ok = JS_FALSE;
 
-    target = RequireObject(cx, argc, argv);
+    target = ReflectionObject(cx, argc, argv);
     if (!target)
         return JS_FALSE;
     ids.ids = JS_Enumerate(cx, target);
@@ -208,7 +224,7 @@ obj_getOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
     JSTempValueRooter roots;
     JSBool accessor, ok = JS_FALSE;
 
-    target = RequireObject(cx, argc, argv);
+    target = ReflectionObject(cx, argc, argv);
     if (!target)
         return JS_FALSE;
     /* Force ES5 ToString, bypassing JS_ValueToId's E4X object-key extension. */
@@ -357,6 +373,7 @@ IsExtensible(JSContext *cx, JSObject *target)
 /* DefineOwn uses this snapshot to delete sparse array indices in descending
  * numeric order, including non-enumerable indices. */
 static JSIdArray *OwnNames(JSContext *cx, JSObject *target);
+static JSBool OrderOwnKeys(JSContext *cx, JSIdArray *ids);
 
 static int
 DescendingIndex(const void *a, const void *b)
@@ -675,7 +692,12 @@ static JSBool
 obj_isExtensible(JSContext *cx, JSObject *obj, uintN argc,
                  jsval *argv, jsval *rval)
 {
-    JSObject *target = RequireObject(cx, argc, argv);
+    JSObject *target;
+    if (JS_VERSION_IS_ES2015(cx) && JSVAL_IS_PRIMITIVE(argv[0])) {
+        *rval = JSVAL_FALSE;
+        return JS_TRUE;
+    }
+    target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
     *rval = BOOLEAN_TO_JSVAL(IsExtensible(cx, target));
     return JS_TRUE;
@@ -685,9 +707,14 @@ static JSBool
 obj_preventExtensions(JSContext *cx, JSObject *obj, uintN argc,
                       jsval *argv, jsval *rval)
 {
-    JSObject *target = RequireObject(cx, argc, argv);
+    JSObject *target;
     JSIdArray *ids;
     JSScope *scope;
+    if (JS_VERSION_IS_ES2015(cx) && JSVAL_IS_PRIMITIVE(argv[0])) {
+        *rval = argv[0];
+        return JS_TRUE;
+    }
+    target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
     /* Materialize lazy own properties before closing the object. */
     ids = JS_Enumerate(cx, target);
@@ -779,7 +806,7 @@ static JSBool
 obj_getOwnPropertyNames(JSContext *cx, JSObject *obj, uintN argc,
                        jsval *argv, jsval *rval)
 {
-    JSObject *target = RequireObject(cx, argc, argv), *array;
+    JSObject *target = ReflectionObject(cx, argc, argv), *array;
     RootedIds ids;
     JSString *str;
     JSTempValueRooter strRoot;
@@ -789,6 +816,9 @@ obj_getOwnPropertyNames(JSContext *cx, JSObject *obj, uintN argc,
     ids.ids = OwnNames(cx, target);
     if (!ids.ids) return JS_FALSE;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    if (JS_VERSION_IS_ES2015(cx) && OBJ_IS_NATIVE(target) &&
+        !OrderOwnKeys(cx, ids.ids))
+        goto out;
     array = js_NewArrayObject(cx, 0, NULL);
     if (!array) goto out;
     *rval = OBJECT_TO_JSVAL(array);
@@ -812,7 +842,7 @@ static JSBool
 ObjectIntegrity(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
                 JSBool freeze, JSBool query)
 {
-    JSObject *target = RequireObject(cx, argc, argv);
+    JSObject *target;
     RootedIds ids;
     JSObject *owner;
     JSProperty *prop;
@@ -820,6 +850,11 @@ ObjectIntegrity(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
     jsint i;
     ES5Descriptor d;
     JSBool ok = JS_FALSE;
+    if (JS_VERSION_IS_ES2015(cx) && JSVAL_IS_PRIMITIVE(argv[0])) {
+        *rval = query ? JSVAL_TRUE : argv[0];
+        return JS_TRUE;
+    }
+    target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
     if (query && IsExtensible(cx, target)) {
         *rval = JSVAL_FALSE;
@@ -872,23 +907,178 @@ INTEGRITY_METHOD(obj_isSealed, JS_FALSE, JS_TRUE)
 INTEGRITY_METHOD(obj_isFrozen, JS_TRUE, JS_TRUE)
 #undef INTEGRITY_METHOD
 
+static JSBool
+obj_is(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = BOOLEAN_TO_JSVAL(SameValue(argv[0], argv[1]));
+    return JS_TRUE;
+}
+
+typedef struct OrderedOwnKey {
+    jsid id;
+    jsdouble index;
+    jsint ordinal;
+} OrderedOwnKey;
+
+/* ES2015 integer indices include 2^32-1 through 2^53-1, unlike Array indices.
+ * Within this range canonical numeric strings contain decimal digits only. */
+static jsdouble
+OwnIntegerIndex(jsid id)
+{
+    jsval value = ID_TO_VALUE(id);
+    JSString *str;
+    const jschar *chars;
+    size_t length, i;
+    jsdouble index = 0;
+    if (JSVAL_IS_INT(value))
+        return JSVAL_TO_INT(value) >= 0 ? JSVAL_TO_INT(value) : -1;
+    if (!JSVAL_IS_STRING(value))
+        return -1;
+    str = JSVAL_TO_STRING(value);
+    length = JSSTRING_LENGTH(str);
+    chars = JSSTRING_CHARS(str);
+    if (!length || length > 16 || (length > 1 && chars[0] == '0'))
+        return -1;
+    for (i = 0; i < length; ++i) {
+        if (chars[i] < '0' || chars[i] > '9')
+            return -1;
+        index = index * 10 + (chars[i] - '0');
+        if (index > 9007199254740991.0)
+            return -1;
+    }
+    return index;
+}
+
+static int
+CompareOwnKeys(const void *left, const void *right)
+{
+    const OrderedOwnKey *a = (const OrderedOwnKey *)left;
+    const OrderedOwnKey *b = (const OrderedOwnKey *)right;
+    if (a->index >= 0 && b->index >= 0)
+        return a->index < b->index ? -1 : a->index > b->index ? 1 : 0;
+    if (a->index >= 0)
+        return -1;
+    if (b->index >= 0)
+        return 1;
+    return a->ordinal < b->ordinal ? -1 : a->ordinal > b->ordinal ? 1 : 0;
+}
+
+static JSBool
+OrderOwnKeys(JSContext *cx, JSIdArray *ids)
+{
+    OrderedOwnKey *keys;
+    jsint i;
+    if (ids->length < 2)
+        return JS_TRUE;
+    if ((size_t)ids->length > (size_t)-1 / sizeof(*keys)) {
+        JS_ReportOutOfMemory(cx);
+        return JS_FALSE;
+    }
+    keys = (OrderedOwnKey *)JS_malloc(cx, (size_t)ids->length * sizeof(*keys));
+    if (!keys)
+        return JS_FALSE;
+    for (i = 0; i < ids->length; ++i) {
+        keys[i].id = ids->vector[i];
+        keys[i].index = OwnIntegerIndex(keys[i].id);
+        keys[i].ordinal = i;
+    }
+    qsort(keys, ids->length, sizeof(*keys), CompareOwnKeys);
+    for (i = 0; i < ids->length; ++i)
+        ids->vector[i] = keys[i].id;
+    JS_free(cx, keys);
+    return JS_TRUE;
+}
+
+static JSBool
+obj_assign(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *target, *source, *owner;
+    JSProperty *property;
+    RootedIds ids;
+    JSTempValueRooter root;
+    jsval values[2];
+    jsid id;
+    uintN argument, attrs;
+    jsint i;
+    JSBool ok = JS_FALSE, own;
+
+    target = JSVAL_IS_PRIMITIVE(argv[0])
+             ? js_ValueToNonNullObject(cx, argv[0]) : JSVAL_TO_OBJECT(argv[0]);
+    if (!target)
+        return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(target);
+    values[0] = values[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    for (argument = 1; argument < argc; ++argument) {
+        if (JSVAL_IS_NULL(argv[argument]) || JSVAL_IS_VOID(argv[argument]))
+            continue;
+        source = JSVAL_IS_PRIMITIVE(argv[argument])
+                 ? js_ValueToNonNullObject(cx, argv[argument])
+                 : JSVAL_TO_OBJECT(argv[argument]);
+        if (!source)
+            goto out;
+        values[0] = OBJECT_TO_JSVAL(source);
+        ids.ids = OwnNames(cx, source);
+        if (!ids.ids)
+            goto out;
+        JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+        if (OBJ_IS_NATIVE(source) && !OrderOwnKeys(cx, ids.ids))
+            goto source_out;
+        for (i = 0; i < ids.ids->length; ++i) {
+            id = ids.ids->vector[i];
+            if (!OBJ_LOOKUP_PROPERTY(cx, source, id, &owner, &property))
+                goto source_out;
+            if (!property)
+                continue;
+            own = owner == source || IsVirtualOwn(cx, source, owner, property);
+            if (!own) {
+                OBJ_DROP_PROPERTY(cx, owner, property);
+                continue;
+            }
+            ok = OBJ_GET_ATTRIBUTES(cx, owner, id, property, &attrs);
+            OBJ_DROP_PROPERTY(cx, owner, property);
+            if (!ok)
+                goto source_out;
+            ok = JS_FALSE;
+            if (!(attrs & JSPROP_ENUMERATE))
+                continue;
+            if (!OBJ_GET_PROPERTY(cx, source, id, &values[1]) ||
+                !js_SetPropertyOrThrow(cx, target, id, &values[1]))
+                goto source_out;
+        }
+        ok = JS_TRUE;
+      source_out:
+        JS_POP_TEMP_ROOT(cx, &ids.root);
+        JS_DestroyIdArray(cx, ids.ids);
+        if (!ok)
+            goto out;
+        ok = JS_FALSE;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 /* Install these through JS_InitClass's direct constructor reference.  Reading
  * prototype.constructor here would invoke embedding security checks before
  * a lazily initialized DOM window has finished bootstrapping its classes.
  */
 JSFunctionSpec js_object_static_methods[] = {
-    {"getOwnPropertyNames", obj_getOwnPropertyNames, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"seal", obj_seal, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"freeze", obj_freeze, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"isSealed", obj_isSealed, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"isFrozen", obj_isFrozen, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"defineProperty", obj_defineProperty, 3, JSFUN_NO_CONSTRUCT, 0},
-    {"defineProperties", obj_defineProperties, 2, JSFUN_NO_CONSTRUCT, 0},
-    {"create", obj_create, 2, JSFUN_NO_CONSTRUCT, 0},
-    {"isExtensible", obj_isExtensible, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"preventExtensions", obj_preventExtensions, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"getPrototypeOf", obj_getPrototypeOf, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"keys", js_ObjectKeys, 1, JSFUN_NO_CONSTRUCT, 0},
-    {"getOwnPropertyDescriptor", obj_getOwnPropertyDescriptor, 2, JSFUN_NO_CONSTRUCT, 0},
+    {"is", obj_is, 2, 0, 0},
+    {"assign", obj_assign, 2, 0, 0},
+    {"getOwnPropertyNames", obj_getOwnPropertyNames, 1, 0, 0},
+    {"seal", obj_seal, 1, 0, 0},
+    {"freeze", obj_freeze, 1, 0, 0},
+    {"isSealed", obj_isSealed, 1, 0, 0},
+    {"isFrozen", obj_isFrozen, 1, 0, 0},
+    {"defineProperty", obj_defineProperty, 3, 0, 0},
+    {"defineProperties", obj_defineProperties, 2, 0, 0},
+    {"create", obj_create, 2, 0, 0},
+    {"isExtensible", obj_isExtensible, 1, 0, 0},
+    {"preventExtensions", obj_preventExtensions, 1, 0, 0},
+    {"getPrototypeOf", obj_getPrototypeOf, 1, 0, 0},
+    {"keys", js_ObjectKeys, 1, 0, 0},
+    {"getOwnPropertyDescriptor", obj_getOwnPropertyDescriptor, 2, 0, 0},
     {0, 0, 0, 0, 0}
 };

@@ -218,6 +218,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-INFERRED-NAMES checks=89 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed inferred function names")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/object-additions.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-OBJECT-ADDITIONS checks=145 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Object additions")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"

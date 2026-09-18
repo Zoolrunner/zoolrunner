@@ -449,6 +449,15 @@ Run `array-operations.js` for Array find/findIndex/fill/copyWithin changes.
 Keep ToLength indices above uint32, snapshot lengths, live property reads,
 sparse copying/deletion and callback rooting. Throw-on-rejection writes must
 not leak strictness into setter callbacks or change ordinary legacy assignments.
+Run `object-additions.js` in an ES2015 global for Object.is/assign and static
+method initialization changes. Preserve object identity during ToObject,
+ES2015 integer-index ordering through 2^53-1, snapshot keys with live
+own/enumerability checks, setter dispatch and callback/GC rooting. Apply
+internal constructor flags through the direct constructor reference; the public
+JSFunctionSpec flag field remains eight bits for embedding compatibility.
+Keep ES2015 reflection boxing and primitive integrity behavior gated by the
+selected script edition. Preserve ES5/legacy primitive TypeErrors and own-name
+ordering, alongside modern __proto__ ownership and integer-index ordering.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve

@@ -1722,6 +1722,7 @@ js_HasOwnPropertyHelper(JSContext *cx, JSObject *obj, JSLookupPropOp lookup,
              */
             sprop = (JSScopeProperty *)prop;
             *rval = BOOLEAN_TO_JSVAL(SPROP_IS_SHARED_PERMANENT(sprop) &&
+                !(JS_VERSION_IS_ES2015(cx) && clasp == &js_ObjectClass) &&
                 !(id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom) &&
                   js_IsModernFunction(cx, obj)));
         } else {

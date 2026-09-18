@@ -180,7 +180,11 @@ UTF-16 and callback/GC checks. `String.prototype.normalize` uses pinned Unicode
 18.0.0 data and passes the upstream normalization checks; this does not change
 the platform's historical Unicode tables. Array `find`, `findIndex`, `fill`
 and `copyWithin` use full ToLength indices and preserve callback/GC behavior;
-Symbol protocols, including Array unscopables, remain unfinished.
+Symbol protocols, including Array unscopables, remain unfinished. `Object.is`
+and string-key `Object.assign` have focused identity, property-order and callback
+checks; Symbol copying awaits Symbol support. Reflection and integrity methods
+accept primitive arguments in explicitly selected ES2015 scripts while retaining
+the ES5/legacy argument policy.
 Anonymous ordinary functions infer names from variable
 initializers, identifier assignments and static object properties; modern
 accessors have prefixed names and cannot be constructed. Inferred names remain

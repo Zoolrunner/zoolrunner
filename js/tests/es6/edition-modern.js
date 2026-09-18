@@ -35,6 +35,11 @@ function modernWindowEdition() {
            [1, 2].findIndex(function(v) { return v > 1; }) === 1 &&
            [1, 2, 3].fill(9, 1, 2).join() === "1,9,3" &&
            [1, 2, 3].copyWithin(1, 0, 2).join() === "1,1,2" &&
+           Object.is(NaN, NaN) && !Object.is(0, -0) &&
+           Object.assign({}, {a: 1}, {a: 2}).a === 2 &&
+           Object.getPrototypeOf(3) === Number.prototype &&
+           Object.keys("ab").join() === "0,1" && Object.isFrozen(1) &&
+           Object.freeze(1) === 1 && !({}).hasOwnProperty("__proto__") &&
            "e\u0301".normalize() === "\u00e9" && "\uac01".normalize("NFD").length === 3 &&
            modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
            eval("({value:1,value:2}).value") === 2 &&

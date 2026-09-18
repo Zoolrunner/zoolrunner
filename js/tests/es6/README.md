@@ -677,3 +677,44 @@ checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
 assertions, Calendar's eight unit suites/four views and standalone ChatZilla
 in XULRunner. Other operating systems and architectures remain unvalidated for
 this batch.
+
+
+## Object additions and edition-specific reflection
+
+`Object.is` uses SameValue, including NaN equality and distinct signed zeros.
+`Object.assign` snapshots each source's own keys when that source is reached,
+rechecks ownership/enumerability before each read, and uses throwing writes with
+ordinary setter dispatch. It preserves object identity without invoking valueOf.
+Native key order follows ES2015 integer indices through 2^53-1, followed by other
+string keys in creation order. Symbol keys and Proxy traps remain unfinished.
+
+ES2015 scripts box primitive inputs to getPrototypeOf, getOwnPropertyDescriptor,
+getOwnPropertyNames and keys. Integrity mutators return primitive inputs unchanged;
+isExtensible returns false and isFrozen/isSealed return true for primitives.
+ES5 and explicitly legacy scripts retain their primitive-argument TypeErrors and
+own-name order. Modern own-name reflection sorts integer indices and modern
+hasOwnProperty no longer treats inherited ordinary Object shared fields as own.
+
+Object's static methods now receive the internal non-constructor flag through
+JS_InitClass's constructor reference. The public eight-bit JSFunctionSpec field
+could not hold that flag. No public structure was widened, and initialization
+does not read prototype.constructor during DOM bootstrap.
+
+`object-additions.js` passes **145 checks** on macOS arm64, covering method
+metadata, numeric/object identity, boxed primitives, property order, live
+property changes, exceptions, setter dispatch, GC, reentrancy and legacy edition
+behavior. The new methods/reflection behavior also appear in the modern XUL and
+content-window fixture.
+
+The full ES2015 run records **23,520 passes, 5,046 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. This adds 146
+passes without losing any previous pass, with unchanged runtime hashes. The
+Object subset accounts for 5,890/5,984 passes. Required-mode ES5 passes all
+11,540 cases. Reports are `artifacts/es6/object-additions-full.json` and
+`artifacts/es6/object-additions-es5.json`.
+
+All four macOS arm64 applications rebuilt and passed package/relocated desktop
+checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
+assertions, Calendar's eight unit suites/four views and standalone ChatZilla
+in XULRunner. Other operating systems and architectures remain unvalidated for
+this batch, and complete ES2015 conformance remains unfinished.

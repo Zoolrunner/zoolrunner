@@ -2282,6 +2282,14 @@ JS_InitClass(JSContext *cx, JSObject *obj, JSObject *parent_proto,
         goto bad;
     }
 
+    /* Object's standard static methods have no [[Construct]]. The public
+     * JSFunctionSpec flags field is only eight bits; apply the internal flag
+     * here through the constructor reference, before DOM bootstrap exposes
+     * prototype.constructor to security callbacks. */
+    if (clasp == &js_ObjectClass && static_fs &&
+        !js_SetBuiltinMethodFlags(cx, ctor, static_fs, JSFUN_NO_CONSTRUCT))
+        goto bad;
+
     /* If this is a standard class, cache its prototype. */
     if (key != JSProto_Null && !js_SetClassObject(cx, obj, key, ctor))
         goto bad;
