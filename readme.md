@@ -368,3 +368,12 @@ and 17 embedding checks pass. The full ES2015 run passes 23,975 cases, with
 4,591 failures, 14 unsupported cases and two harness errors; all 11,540 ES5
 cases pass. All four applications pass packaged compatibility checks. Other
 platforms have not been revalidated for this batch.
+
+
+Symbol.unscopables and Array's standard exclusion table are implemented for
+modern with statements. Legacy scripts and embedding/global scopes retain their
+lookup behavior. On macOS arm64, 37 focused checks, 14 embedding checks and
+all 155 upstream with-statement cases pass. The full ES2015 run passes 23,982
+cases, with 4,584 failures, 14 unsupported cases and two harness errors; all
+11,540 ES5 cases pass. All four applications pass packaged compatibility checks.
+Other platforms have not been revalidated for this batch.

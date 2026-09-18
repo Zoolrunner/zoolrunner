@@ -1118,3 +1118,11 @@ argument counts, own property creation and ES2015 IteratorClose exception
 precedence. Next/done/value failures and final length failures do not close
 the iterator; mapper and indexed-definition failures do. Root index atoms and
 pending exceptions through callback collection.
+
+
+For Symbol.unscopables changes, run `js/tests/es6/unscopables.js` and
+`TestUnscopables.c`. Filter only modern syntactic with environments; preserve
+legacy scripts and ordinary embedding/global scopes. HasProperty precedes the
+exclusion getter, which can delete the resolved property or collect. Do not
+retain native properties/locks through callbacks or repeat lookup to decide
+whether the binding originally existed. Preserve implicit method receivers.

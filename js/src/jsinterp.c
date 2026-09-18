@@ -4278,8 +4278,10 @@ interrupt:
                 goto atom_not_defined;
             }
 
-            /* Take the slow path if prop was not found in a native object. */
-            if (!OBJ_IS_NATIVE(obj) || !OBJ_IS_NATIVE(obj2)) {
+            /* With bindings may carry an opaque marker after callbacks;
+             * they must be read through their object operations. */
+            if (!OBJ_IS_NATIVE(obj) || !OBJ_IS_NATIVE(obj2) ||
+                OBJ_GET_CLASS(cx, obj2) == &js_WithClass) {
                 OBJ_DROP_PROPERTY(cx, obj2, prop);
                 ok = OBJ_GET_PROPERTY(cx, obj, id, &rval);
                 if (!ok)
@@ -4299,6 +4301,9 @@ interrupt:
                 clasp == &js_DeclarativeScopeClass ||
                 (clasp != &js_WithClass && !OBJ_GET_PARENT(cx, obj)))
                 obj = NULL;
+            else if (clasp == &js_WithClass && JS_VERSION_IS_ES2015(cx) &&
+                     OBJ_BLOCK_DEPTH(cx, obj) >= 0 && OBJ_GET_PROTO(cx, obj))
+                obj = OBJ_GET_PROTO(cx, obj); /* WithBaseObject, even for strict callees. */
           END_CASE(JSOP_NAME)
 
           BEGIN_CASE(JSOP_UINT16)

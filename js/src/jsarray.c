@@ -2383,6 +2383,33 @@ array_of(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return ok;
 }
 
+static JSBool
+ArrayUnscopables(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    static const char *names[] = {
+        "copyWithin", "entries", "fill", "find", "findIndex", "keys", "values"
+    };
+    JSObject *table = js_NewObject(cx, &js_ObjectClass, NULL, global);
+    JSTempValueRooter root;
+    jsid id;
+    uintN i;
+    JSBool ok = JS_FALSE;
+    if (!table) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, table, &root);
+    if (!js_GetMutableScope(cx, table)) goto out;
+    OBJ_SET_PROTO(cx, table, NULL);
+    for (i = 0; i < sizeof names / sizeof names[0]; ++i) {
+        if (!JS_DefineProperty(cx, table, names[i], JSVAL_TRUE,
+                               NULL, NULL, JSPROP_ENUMERATE)) goto out;
+    }
+    ok = js_WellKnownSymbolId(cx, JS_WKS_UNSCOPABLES, &id) &&
+         OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(table),
+                             NULL, NULL, JSPROP_READONLY, NULL);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSObject *
 js_InitArrayClass(JSContext *cx, JSObject *obj)
 {
@@ -2405,7 +2432,8 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
                            JSFUN_NO_CONSTRUCT | JSFUN_STRICT) ||
         !JS_DefineFunction(cx, ctor, "from", array_from, 1,
                            JSFUN_NO_CONSTRUCT | JSFUN_STRICT) ||
-        !js_InitArrayIteratorMethods(cx, obj, proto))
+        !js_InitArrayIteratorMethods(cx, obj, proto) ||
+        !ArrayUnscopables(cx, obj, proto))
         return NULL;
     return proto;
 }

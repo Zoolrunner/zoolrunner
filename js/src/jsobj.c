@@ -2017,6 +2017,59 @@ Object(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 /*
  * ObjectOps and Class for with-statement stack objects.
  */
+/* A binding can survive deletion during @@unscopables lookup. Return an
+ * opaque with-binding marker rather than retaining a property/lock across
+ * user callbacks or performing a second HasProperty lookup. */
+static jsval withBindingMarker;
+
+static void
+with_DropProperty(JSContext *cx, JSObject *obj, JSProperty *prop)
+{
+    if (prop == (JSProperty *)&withBindingMarker)
+        return;
+#ifdef JS_THREADSAFE
+    js_DropProperty(cx, obj, prop);
+#endif
+}
+
+typedef struct WithBindingRoot {
+    JSTempValueRooter root;
+    jsid id;
+} WithBindingRoot;
+JS_STATIC_DLL_CALLBACK(void)
+MarkWithBindingId(JSContext *cx, JSTempValueRooter *root)
+{
+    jsid id = ((WithBindingRoot *)root)->id;
+    if (JSID_IS_ATOM(id))
+        js_MarkAtom(cx, JSID_TO_ATOM(id));
+}
+
+static JSBool
+with_IsBlocked(JSContext *cx, JSObject *obj, jsid id, JSBool *blocked)
+{
+    jsval values[4];
+    JSTempValueRooter root;
+    WithBindingRoot bindingRoot;
+    jsid symbol;
+    JSBool ok;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    values[1] = OBJECT_TO_JSVAL(OBJ_GET_PROTO(cx, obj));
+    values[2] = values[3] = JSVAL_VOID;
+    *blocked = JS_FALSE;
+    bindingRoot.id = id;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkWithBindingId, &bindingRoot.root);
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    ok = js_WellKnownSymbolId(cx, JS_WKS_UNSCOPABLES, &symbol) &&
+         OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[1]), symbol, &values[2]);
+    if (ok && !JSVAL_IS_PRIMITIVE(values[2])) {
+        ok = OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[2]), id, &values[3]) &&
+             js_ValueToBoolean(cx, values[3], blocked);
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    JS_POP_TEMP_ROOT(cx, &bindingRoot.root);
+    return ok;
+}
+
 static JSBool
 with_LookupProperty(JSContext *cx, JSObject *obj, jsid id, JSObject **objp,
                     JSProperty **propp)
@@ -2119,7 +2172,7 @@ JS_FRIEND_DATA(JSObjectOps) js_WithObjectOps = {
     with_GetAttributes,     with_SetAttributes,
     with_DeleteProperty,    with_DefaultValue,
     with_Enumerate,         with_CheckAccess,
-    with_ThisObject,        NATIVE_DROP_PROPERTY,
+    with_ThisObject,        with_DropProperty,
     NULL,                   NULL,
     NULL,                   NULL,
     js_SetProtoOrParent,    js_SetProtoOrParent,
@@ -3591,8 +3644,9 @@ js_FindProperty(JSContext *cx, jsid id, JSObject **objp, JSObject **pobjp,
     rt = cx->runtime;
     obj = cx->fp->scopeChain;
     do {
-        /* Try the property cache and return immediately on cache hit. */
-        if (OBJ_IS_NATIVE(obj)) {
+        /* Modern with bindings must recheck their observable exclusions. */
+        if (OBJ_IS_NATIVE(obj) &&
+            !(JS_VERSION_IS_ES2015(cx) && OBJ_GET_CLASS(cx, obj) == &js_WithClass)) {
             JS_LOCK_OBJ(cx, obj);
             PROPERTY_CACHE_TEST(&rt->propertyCache, obj, id, sprop);
             if (sprop) {
@@ -3608,6 +3662,22 @@ js_FindProperty(JSContext *cx, jsid id, JSObject **objp, JSObject **pobjp,
         /* If cache miss, take the slow path. */
         if (!OBJ_LOOKUP_PROPERTY(cx, obj, id, &pobj, &prop))
             return JS_FALSE;
+        if (prop && JS_VERSION_IS_ES2015(cx) &&
+            OBJ_GET_CLASS(cx, obj) == &js_WithClass &&
+            OBJ_BLOCK_DEPTH(cx, obj) >= 0 && OBJ_GET_PROTO(cx, obj)) {
+            JSBool blocked;
+            /* Only syntactic with environments participate. Object scopes
+             * supplied by embeddings and legacy eval retain their behavior. */
+            OBJ_DROP_PROPERTY(cx, pobj, prop);
+            if (!with_IsBlocked(cx, obj, id, &blocked))
+                return JS_FALSE;
+            if (!blocked) {
+                *objp = *pobjp = obj;
+                *propp = (JSProperty *)&withBindingMarker;
+                return JS_TRUE;
+            }
+            prop = NULL;
+        }
         if (prop) {
             if (OBJ_IS_NATIVE(pobj)) {
                 sprop = (JSScopeProperty *) prop;

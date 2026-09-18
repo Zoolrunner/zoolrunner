@@ -1033,3 +1033,28 @@ embedding and desktop checks. Calendar's eight unit suites and four views,
 Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
 for this batch.
+
+
+### Symbol.unscopables
+
+Modern syntactic with environments consult Symbol.unscopables after finding a
+property. Array.prototype provides the seven ES2015 exclusions in a null-prototype
+table. Legacy scripts and ordinary embedding/global scopes retain their prior
+lookup policy. Callback state and identifier atoms remain rooted; native
+property handles are released before getters run. A private binding marker
+preserves the lookup decision when a getter deletes the property. Reads then
+use object operations, and implicit method calls receive the binding object.
+
+On macOS arm64, 37 focused checks, 14 native embedding checks, all 14 targeted
+cases and all 155 upstream with-statement cases pass. The full pinned ES2015
+run passes **23,982 cases**, with **4,584 failures**, 14 unsupported module
+cases and two harness errors. This gains seven passes without losing any;
+there are no crashes or timeouts and runtime hashes remain unchanged. All
+**11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/unscopables-full.json` and `unscopables-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+packaged standalone XULRunner ChatZilla pass. Other platforms have not been
+revalidated for this batch.

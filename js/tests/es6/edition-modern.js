@@ -67,6 +67,7 @@ function modernWindowEdition() {
            [3].values().next().value === 3 && [3].entries().next().value.join() === "0,3" &&
            "\ud83d\ude00"[Symbol.iterator]().next().value.length === 2 &&
            (function(v) { return arguments[Symbol.iterator]().next().value === v; })(17) &&
+           Function("var values = 19; with ([]) { return values === 19; }")() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();
