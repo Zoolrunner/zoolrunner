@@ -430,12 +430,21 @@ The RegExp follow-up implements ES2015 prototype accessors, escaped source,
 generic flags/toString and own lastIndex in modern globals. Legacy globals
 retain their historical fields and matcher-bearing prototype. Native creation,
 cache decoding, failure cleanup and mixed-edition lazy initialization are
-covered. The latest full macOS arm64 ES2015 run passes **25,839 cases**, with
+covered. Its full macOS arm64 ES2015 run passes **25,839 cases**, with
 **2,727 failures**, 14 unsupported module cases and two harness errors:
 56 gained, zero lost. All 11,540 ES5.1 cases and all four applications' build,
 package and desktop checks pass. Unicode/sticky matching, RegExp protocols and
 other ES6 work remain; other platforms have not been revalidated for this batch.
 See [RegExp validation notes](js/tests/es6/README.md#regexp-prototype-fields).
+
+The match/search follow-up adds generic RegExp test, Symbol.match/Symbol.search,
+String dispatch, observable ES2015 exec property access and result-realm handling.
+Native loops remain interruptible; legacy globals retain their original methods.
+The latest full macOS arm64 ES2015 run passes **25,969 cases**, with **2,597
+failures**, 14 unsupported module cases and two harness errors: 130 gained, zero
+lost. All 11,540 ES5.1 cases and all four applications' build, package and desktop
+checks pass. See [match/search validation notes](js/tests/es6/README.md#regexp-matchsearch-protocols)
+for remaining limitations and platform scope.
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

@@ -47,13 +47,17 @@ var fn = function() { return 9; }, array = [1, 2];
 check(method(fn, second) === fn && fn() === 9 && fn.value === 2, 'function remains callable');
 check(method(array, second) === array && array[1] === 2 && array.length === 2 && array.value === 2, 'array retains indexed storage');
 var box = new String('ab'); method(box, second); check(box[0] === 'a' && box.length === 2 && box.value === 2, 'string wrapper retains private data');
-var regexp = /a/g; regexp.lastIndex = 1; method(regexp, second);
+var regexp = /a/g; regexp.lastIndex = 1;
+/* ES2015 exec reads global through ordinary property lookup. Keep that
+ * flag explicit while testing lastIndex after removing its prototype. */
+Object.defineProperty(regexp, 'global', {value:true});
+method(regexp, second);
 check(RegExp.prototype.exec.call(regexp, 'ba').index === 1 && regexp.lastIndex === 2, 'regexp private index remains live');
 regexp.lastIndex = 0;
 check(RegExp.prototype.exec.call(regexp, 'a').index === 0 && regexp.lastIndex === 1, 'regexp native setter retained');
 /* ES2015 source/global are inherited accessors; replacing the prototype
  * removes their lookup path without changing the internal matcher. */
-check(regexp.source === undefined && regexp.global === undefined && regexp.value === 2 &&
+check(regexp.source === undefined && regexp.global === true && regexp.value === 2 &&
       Object.getOwnPropertyDescriptor(RegExp.prototype, 'source').get.call(regexp) === 'a' &&
       Object.getOwnPropertyDescriptor(RegExp.prototype, 'global').get.call(regexp) === true,
       'regexp matcher preserved after removing inherited accessors');

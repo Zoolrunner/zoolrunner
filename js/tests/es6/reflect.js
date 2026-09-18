@@ -63,6 +63,8 @@ instance=Reflect.construct(String,['abc'],Other);var d=Object.getOwnPropertyDesc
 check(instance[1]==='b'&&d.value===3&&!d.writable&&!d.enumerable&&!d.configurable,'String owns length with alternate prototype');
 instance=Reflect.construct(RegExp,['a','g'],Other);d=Object.getOwnPropertyDescriptor(instance,'lastIndex');
 check(d.value===0&&d.writable&&!d.enumerable&&!d.configurable,'RegExp owns lastIndex with alternate prototype');
+/* ES2015 exec reads global from the alternate prototype's object. */
+Object.defineProperty(instance,'global',{value:true});
 instance.lastIndex=1;check(RegExp.prototype.exec.call(instance,'ba')[0]==='a'&&instance.lastIndex===2,'RegExp native lastIndex state');
 instance=Reflect.construct(Function,['return 23'],Other);check(instance()===23&&Object.getPrototypeOf(instance)===Other.prototype,'Function allocation');
 instance=Reflect.construct(Map,[],Other);Map.prototype.set.call(instance,sym,44);check(Map.prototype.get.call(instance,sym)===44,'Map private allocation');

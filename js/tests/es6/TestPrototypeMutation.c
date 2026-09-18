@@ -90,7 +90,8 @@ int main(void)
     JS_SetCheckObjectAccessCallback(rt, NULL);
     CHECK(Evaluate(cx, global, "var text=new String('ab');Object.setPrototypeOf(text,null);text.length===2&&text[1]==='b'"));
     JS_GC(cx);
-    CHECK(Evaluate(cx, global, "var re=/x/g;Object.setPrototypeOf(re,null);RegExp.prototype.exec.call(re,'x')[0]==='x'&&re.lastIndex===1"));
+    /* ES2015 exec observes the global property after prototype replacement. */
+    CHECK(Evaluate(cx, global, "var re=/x/g;Object.defineProperty(re,'global',{value:true});Object.setPrototypeOf(re,null);RegExp.prototype.exec.call(re,'x')[0]==='x'&&re.lastIndex===1"));
     printf("ES6-PROTOTYPE-EMBEDDING checks=%u failures=0\n", checks);
     status = 0;
   out:

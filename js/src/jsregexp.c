@@ -353,6 +353,7 @@ typedef struct REGlobalData {
     JSContext *cx;
     JSRegExp *regexp;               /* the RE in execution */
     JSBool ok;                      /* runtime error (out_of_memory only?) */
+    JSBool sticky;                  /* match only at the requested offset */
     size_t start;                   /* offset to start at */
     ptrdiff_t skipped;              /* chars skipped anchoring this r.e. */
     const jschar    *cpbegin;       /* text base address */
@@ -2764,6 +2765,8 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 op = (REOp) *pc++;
                 break;
             }
+            if (gData->sticky)
+                break;
             gData->skipped++;
             x->cp++;
         }
@@ -3257,7 +3260,7 @@ MatchRegExp(REGlobalData *gData, REMatchState *x)
         for (j = 0; j < gData->regexp->parenCount; j++)
             x->parens[j].index = -1;
         result = ExecuteREBytecode(gData, x);
-        if (!gData->ok || result)
+        if (!gData->ok || result || gData->sticky)
             return result;
         gData->backTrackSP = gData->backTrackStack;
         gData->cursz = 0;
@@ -3333,9 +3336,9 @@ js_RegExpStatics_clear(JSContext *cx, JSRegExpStatics *res)
     }
 }
 
-JSBool
-js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
-                 JSBool test, jsval *rval)
+static JSBool
+ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
+              JSBool test, JSBool sticky, JSObject *global, jsval *rval)
 {
     REGlobalData gData;
     REMatchState *x, *result;
@@ -3348,7 +3351,7 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
     ptrdiff_t matchlen;
     uintN num, morenum;
     JSString *parstr, *matchstr;
-    JSObject *obj;
+    JSObject *obj, *proto;
 
     RECapture *parsub = NULL;
 
@@ -3366,6 +3369,7 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
     cp += start;
     gData.start = start;
     gData.skipped = 0;
+    gData.sticky = sticky;
 
     JS_InitArenaPool(&gData.pool, "RegExpPool", 8096, 4);
     x = InitMatch(cx, &gData, re);
@@ -3410,7 +3414,11 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
          * matches, an index property telling the length of the left context,
          * and an input property referring to the input string.
          */
-        obj = js_NewArrayObject(cx, 0, NULL);
+        if (global) {
+            proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+            if (!proto) { ok = JS_FALSE; goto out; }
+            obj = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+        } else obj = js_NewArrayObject(cx, 0, NULL);
         if (!obj) {
             ok = JS_FALSE;
             goto out;
@@ -3544,6 +3552,13 @@ out:
         js_RegExpStatics_clear(cx,res);
     JS_FinishArenaPool(&gData.pool);
     return ok;
+}
+
+JSBool
+js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
+                 JSBool test, jsval *rval)
+{
+    return ExecuteRegExp(cx, re, str, indexp, test, JS_FALSE, NULL, rval);
 }
 
 /************************************************************************/
@@ -4340,6 +4355,253 @@ regexp_test(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+static JSBool SetRegExpIndexValue(JSContext *cx, JSObject *obj, jsval value);
+
+static JSBool
+RegExpBuiltinExec(JSContext *cx, JSObject *obj, JSString *str, JSObject *globalObject, jsval *rval)
+{
+    jsval values[3] = {STRING_TO_JSVAL(str), JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    jsdouble lastIndex;
+    JSBool global, sticky, ok = JS_FALSE;
+    JSRegExp *re = NULL;
+    size_t index;
+    if (OBJ_GET_CLASS(cx, obj) != &js_RegExpClass || !JS_GetPrivate(cx, obj))
+        return RegExpReceiverError(cx, "exec");
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!JS_GetProperty(cx, obj, "lastIndex", &values[1]) ||
+        !js_ValueToNumber(cx, values[1], &lastIndex)) goto out;
+    lastIndex = js_DoubleToInteger(lastIndex);
+    if (lastIndex < 0) lastIndex = 0;
+    else if (lastIndex > 9007199254740991.0) lastIndex = 9007199254740991.0;
+    if (!JS_GetProperty(cx, obj, "global", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &global) ||
+        !JS_GetProperty(cx, obj, "sticky", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &sticky)) goto out;
+    if (!global && !sticky) lastIndex = 0;
+    if (lastIndex > JSSTRING_LENGTH(str)) {
+        *rval = JSVAL_NULL;
+        ok = SetRegExpIndexValue(cx, obj, JSVAL_ZERO); goto out;
+    }
+    /* Snapshot the matcher only after user-visible conversions and gets. */
+    JS_LOCK_OBJ(cx, obj);
+    re = (JSRegExp *)JS_GetPrivate(cx, obj);
+    if (re) {
+        HOLD_REGEXP(cx, re);
+        values[2] = STRING_TO_JSVAL(re->source);
+    }
+    JS_UNLOCK_OBJ(cx, obj);
+    if (!re) { RegExpReceiverError(cx, "exec"); goto out; }
+    index = (size_t)lastIndex;
+    if (!ExecuteRegExp(cx, re, str, &index, JS_FALSE, sticky, globalObject, rval)) goto out;
+    if (*rval == JSVAL_NULL) ok = SetRegExpIndexValue(cx, obj, JSVAL_ZERO);
+    else if (global || sticky)
+        ok = js_NewNumberValue(cx, index, &values[1]) &&
+             SetRegExpIndexValue(cx, obj, values[1]);
+    else ok = JS_TRUE;
+  out:
+    if (re) DROP_REGEXP(cx, re);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpModernExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "exec");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    if (OBJ_GET_CLASS(cx, obj) != &js_RegExpClass || !JS_GetPrivate(cx, obj))
+        return RegExpReceiverError(cx, "exec");
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(str);
+    return RegExpBuiltinExec(cx, obj, str, js_BuiltinGlobal(cx, argv), rval);
+}
+
+/* ES2015 RegExpExec preserves overridden exec methods and their receivers. */
+static JSBool
+RegExpExecMethod(JSContext *cx, JSObject *obj, JSString *str, jsval callee,
+                  jsval *rval)
+{
+    jsval values[4] = {callee, OBJECT_TO_JSVAL(obj), STRING_TO_JSVAL(str), JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    if (!JS_GetProperty(cx, obj, "exec", &values[3])) goto out;
+    if (js_IsCallable(cx, values[3])) {
+        if (!js_InternalCall(cx, obj, values[3], 1, &values[2], rval)) goto out;
+        if (!JSVAL_IS_OBJECT(*rval)) {
+            RegExpReceiverError(cx, "exec result"); goto out;
+        }
+        ok = JS_TRUE;
+    } else {
+        ok = RegExpBuiltinExec(cx, obj, str, js_BuiltinGlobal(cx, &values[2]), rval);
+    }
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+SetRegExpIndexValue(JSContext *cx, JSObject *obj, jsval value)
+{
+    JSAtom *atom;
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_PUSH_TEMP_ROOT(cx, 1, &value, &root);
+    atom = js_Atomize(cx, "lastIndex", 9, 0);
+    ok = atom && js_SetPropertyOrThrow(cx, obj, ATOM_TO_JSID(atom), &value);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpModernTest(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "test");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_STRING(cx, str, &root);
+    ok = RegExpExecMethod(cx, obj, str, argv[-2], rval);
+    if (ok) *rval = BOOLEAN_TO_JSVAL(*rval != JSVAL_NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSymbolSearch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[3] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *str;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.search]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    if (!JS_GetProperty(cx, obj, "lastIndex", &values[1]) ||
+        !SetRegExpIndexValue(cx, obj, JSVAL_ZERO) ||
+        !RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+    /* ES2015 always performs both writes, and does not restore on exec throw. */
+    if (!SetRegExpIndexValue(cx, obj, values[1])) goto out;
+    if (values[2] == JSVAL_NULL) {
+        *rval = INT_TO_JSVAL(-1); ok = JS_TRUE;
+    } else ok = JS_GetProperty(cx, JSVAL_TO_OBJECT(values[2]), "index", rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSymbolMatch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[5] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *str, *matched;
+    JSObject *global, *proto, *array;
+    JSBool isGlobal, unicode, ok = JS_FALSE;
+    jsdouble index;
+    jsuint n = 0;
+    jsid id;
+    const jschar *chars;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.match]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    if (!JS_GetProperty(cx, obj, "global", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &isGlobal)) goto out;
+    if (!isGlobal) {
+        ok = RegExpExecMethod(cx, obj, str, argv[-2], rval); goto out;
+    }
+    if (!JS_GetProperty(cx, obj, "unicode", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &unicode) ||
+        !SetRegExpIndexValue(cx, obj, JSVAL_ZERO)) goto out;
+    global = js_BuiltinGlobal(cx, argv);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!proto) goto out;
+    array = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+    if (!array) goto out;
+    values[4] = OBJECT_TO_JSVAL(array);
+    for (;;) {
+        if (cx->branchCallback && (n & 127) == 0 && !cx->branchCallback(cx, NULL)) goto out;
+        if (!RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+        if (values[2] == JSVAL_NULL) {
+            *rval = n ? values[4] : JSVAL_NULL; ok = JS_TRUE; goto out;
+        }
+        if (!JS_GetElement(cx, JSVAL_TO_OBJECT(values[2]), 0, &values[3])) goto out;
+        matched = js_ValueToString(cx, values[3]);
+        if (!matched) goto out;
+        values[3] = STRING_TO_JSVAL(matched);
+        if (n == (jsuint)-1) { JS_ReportOutOfMemory(cx); goto out; }
+        if (!js_ArrayLikeIndex(cx, n, &id) ||
+            !OBJ_DEFINE_PROPERTY(cx, array, id, values[3], JS_PropertyStub,
+                                  JS_PropertyStub, JSPROP_ENUMERATE, NULL)) goto out;
+        ++n;
+        if (!JSSTRING_LENGTH(matched)) {
+            if (!JS_GetProperty(cx, obj, "lastIndex", &values[1]) ||
+                !js_ValueToNumber(cx, values[1], &index)) goto out;
+            index = js_DoubleToInteger(index);
+            if (index < 0) index = 0;
+            else if (index > 9007199254740991.0) index = 9007199254740991.0;
+            chars = JSSTRING_CHARS(str);
+            if (unicode && index + 1 < JSSTRING_LENGTH(str) &&
+                chars[(size_t)index] >= 0xd800 && chars[(size_t)index] <= 0xdbff &&
+                chars[(size_t)index + 1] >= 0xdc00 && chars[(size_t)index + 1] <= 0xdfff)
+                index += 2;
+            else index += 1;
+            if (!js_NewNumberValue(cx, index, &values[1]) ||
+                !SetRegExpIndexValue(cx, obj, values[1])) goto out;
+        }
+    }
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+InitRegExpProtocols(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    static struct { JSWellKnownSymbol symbol; const char *name; JSNative native; } methods[] = {
+        {JS_WKS_MATCH, "[Symbol.match]", RegExpSymbolMatch},
+        {JS_WKS_SEARCH, "[Symbol.search]", RegExpSymbolSearch}
+    };
+    JSFunction *fun;
+    jsval value;
+    jsid id;
+    uintN i;
+    JSTempValueRooter root;
+    JSBool ok;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        if (!js_WellKnownSymbolId(cx, methods[i].symbol, &id)) return JS_FALSE;
+        fun = JS_NewFunction(cx, methods[i].native, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                             global, methods[i].name);
+        if (!fun) return JS_FALSE;
+        JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+        ok = OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(fun->object),
+                                  JS_PropertyStub, JS_PropertyStub, 0, NULL);
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!ok) return JS_FALSE;
+    }
+    if (!JS_GetProperty(cx, proto, "test", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = RegExpModernTest;
+    fun->flags |= JSFUN_STRICT;
+    if (!JS_GetProperty(cx, proto, "exec", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = RegExpModernExec;
+    fun->flags |= JSFUN_STRICT;
+    return JS_TRUE;
+}
+
 static JSFunctionSpec regexp_methods[] = {
 #if JS_HAS_TOSOURCE
     {js_toSource_str,   js_regexp_toString,     0,0,0},
@@ -4422,6 +4684,7 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
             !JS_GetProperty(cx, proto, js_toString_str, &rval)) goto bad;
         fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(rval));
         fun->flags |= JSFUN_STRICT;
+        if (!InitRegExpProtocols(cx, obj, proto)) goto bad;
         return proto;
     }
     /* Give legacy RegExp.prototype private data so it matches the empty string. */

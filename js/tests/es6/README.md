@@ -1331,3 +1331,51 @@ Full ES6 compliance remains incomplete.
 
 The implementation follows [the original ES2015 RegExp specification](https://262.ecma-international.org/6.0/#sec-properties-of-the-regexp-prototype-object),
 including its rejection of the ordinary prototype by source/flag accessors.
+
+### RegExp match/search protocols
+
+Modern globals now provide generic RegExp test, Symbol.match and Symbol.search,
+and String match/search dispatch through symbol methods. These operations keep
+raw receivers and observable getter/conversion order, invoke overridden exec,
+reject primitive exec results, and preserve user exceptions. String fallback
+uses the defining realm's cached RegExp constructor. Legacy globals retain their
+original String/RegExp methods and ignore exec overrides as before.
+
+The original ES2015 RegExpBuiltinExec reads lastIndex, global and sticky through
+ordinary properties. It clamps lastIndex with ToLength, snapshots matcher state
+after callbacks, and checks index writes, including failed nonglobal matches.
+Sticky property overrides anchor the matcher, but the y flag/parser and Unicode
+matching remain unimplemented. Global match advances empty matches by code point
+when the observable unicode property is true, while preserving code-unit offsets.
+Search performs both index writes unconditionally in this edition and does not
+restore after an exec exception. Later-edition algorithms differ.
+
+Native result arrays use the executing method's realm; a callable exec may
+return an array from its own realm. The native probe covers foreign contexts
+destroyed before use, cloned methods, primitive symbol getter/method receivers,
+GC, interrupting a native match loop and collection after references are removed.
+There are 56 focused script checks and 28 native embedding checks. The diagnostic
+RegExp subset passes 1,236/1,546 cases with no timeouts; all 146 String match/search
+cases pass. The complete pinned ES2015 run passes **25,969 cases**, with
+**2,597 failures**, 14 unsupported module cases and two harness errors:
+**130 gained, zero lost** relative to RegExp fields. No crashes or timeouts
+occurred and the frozen runtime remained unchanged. All **11,540 required-mode
+ES5.1 cases** pass in America/Los_Angeles. Reports are
+`artifacts/es6/regexp-protocols-full.json` and `regexp-protocols-es5.json`;
+the frozen runtime is `/tmp/zr-regexp-protocols-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 root builds, package checks and relocated desktop
+checks pass. Calendar passes eight unit suites and all four views. Browser
+passes 169 navigation/layout assertions. Suite passes 24 lifecycle assertions
+and ChatZilla; standalone packaged XULRunner passes ChatZilla initialization and
+input. Final desktop reports are under `artifacts/es6/regexp-protocols-runtime`.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Constructor details, y/u flag support, replacement/splitting protocols and other
+ES6 work remain incomplete.
+
+The prototype-mutation and Reflect focused tests now supply an explicit global
+property when replacing a RegExp's prototype, preserving their original
+lastIndex assertions while following ES2015's property lookup semantics. The
+legacy prototype/field behavior remains covered separately. The upstream
+Test262 files and assertions are unchanged. No bytecode or cache-format changes
+are needed for these runtime operations.

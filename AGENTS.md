@@ -1196,3 +1196,14 @@ lastIndex live, source escaping GC-safe, and generic getter/conversion order
 observable. XDR must select the RegExp instance class even when its prototype
 is an ordinary object; exercise decoding under a different context edition.
 Decompilation must use internal patterns rather than mutable public properties.
+
+
+For RegExp execution and symbol protocols, run `regexp-protocols.js` and
+`TestRegExpProtocols.c`. Use the original ES2015 algorithms: exec observes the
+lastIndex/global/sticky properties, search always writes/restores lastIndex
+on its normal path, and user exec exceptions bypass restoration. Later editions
+differ. Root matcher source across reentrancy, select matcher state after
+observable conversions, and allocate results in the executing method's realm.
+Native match loops must remain interruptible. Preserve the legacy native/String
+paths for legacy globals, and distinguish script-edition selection from modern
+global initialization.

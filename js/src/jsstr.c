@@ -72,6 +72,7 @@
 #include "jssymbol.h"
 #include "jsopcode.h"
 #include "jsregexp.h"
+#include "jsrealm.h"
 #include "jsstr.h"
 
 #define JSSTRDEP_RECURSION_LIMIT        100
@@ -1295,10 +1296,75 @@ match_glob(JSContext *cx, jsint count, GlobData *data)
 }
 
 static JSBool
+StringRegExpMethod(JSContext *cx, jsval *argv, jsval *rval, JSWellKnownSymbol symbol)
+{
+    jsval values[3] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *ctor;
+    JSProtoKey key;
+    JSString *str;
+    jsid id;
+    jsval *base, *oldsp;
+    void *mark;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!js_WellKnownSymbolId(cx, symbol, &id)) goto out;
+    if (!JSVAL_IS_NULL(argv[0]) && !JSVAL_IS_VOID(argv[0])) {
+        if (JSVAL_IS_PRIMITIVE(argv[0])) {
+            key = JSVAL_IS_SYMBOL(argv[0]) ? JSProto_Symbol :
+                  JSVAL_IS_STRING(argv[0]) ? JSProto_String :
+                  JSVAL_IS_BOOLEAN(argv[0]) ? JSProto_Boolean : JSProto_Number;
+            obj = js_BuiltinPrototype(cx, global, key);
+            if (!obj || !js_GetPropertyValue(cx, obj, argv[0], id, &values[1])) goto out;
+        } else {
+            obj = JSVAL_TO_OBJECT(argv[0]);
+            if (!OBJ_GET_PROPERTY(cx, obj, id, &values[1])) goto out;
+        }
+        if (!JSVAL_IS_VOID(values[1]) && !JSVAL_IS_NULL(values[1])) {
+            if (!js_IsCallable(cx, values[1])) goto notCallable;
+            ok = js_InternalInvokeValue(cx, argv[0], values[1], 0, 1, &argv[-1], rval);
+            goto out;
+        }
+    }
+    str = js_ValueToString(cx, argv[-1]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    if (!js_BuiltinPrototype(cx, global, JSProto_RegExp)) goto out;
+    ctor = js_GetCachedClassObject(cx, global, JSProto_RegExp);
+    if (!ctor) goto out;
+    base = js_AllocStack(cx, 3, &mark);
+    if (!base) goto out;
+    base[0] = OBJECT_TO_JSVAL(ctor); base[1] = JSVAL_NULL; base[2] = argv[0];
+    oldsp = cx->fp->sp; cx->fp->sp = base + 3;
+    ok = js_InvokeConstructorWithNewTarget(cx, base, 1, ctor);
+    if (ok) values[2] = base[0];
+    cx->fp->sp = oldsp; js_FreeStack(cx, mark);
+    if (!ok) goto out;
+    ok = JS_FALSE;
+    obj = JSVAL_TO_OBJECT(values[2]);
+    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[1])) goto out;
+    if (!js_IsCallable(cx, values[1])) goto notCallable;
+    ok = js_InternalCall(cx, obj, values[1], 1, &values[0], rval);
+    goto out;
+  notCallable:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "RegExp symbol method");
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
 str_match(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     MatchData mdata;
     JSBool ok;
+
+    if (js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
+        return StringRegExpMethod(cx, argv, rval, JS_WKS_MATCH);
 
     mdata.base.flags = MODE_MATCH;
     mdata.base.optarg = 1;
@@ -1314,6 +1380,9 @@ static JSBool
 str_search(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     GlobData data;
+
+    if (js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
+        return StringRegExpMethod(cx, argv, rval, JS_WKS_SEARCH);
 
     data.flags = MODE_SEARCH;
     data.optarg = 1;
@@ -2855,6 +2924,9 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
 {
     JSObject *proto, *ctor;
     jsval v;
+    JSFunction *fun;
+    uintN i;
+    static const char *protocols[] = {"match", "search"};
 
     /* Define the escape, unescape functions in the global object. */
     if (!JS_DefineFunctions(cx, obj, string_functions) ||
@@ -2879,6 +2951,13 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
         return NULL;
     if (!js_InitStringIteratorMethod(cx, obj, proto))
         return NULL;
+    if (js_IsModernGlobal(cx, obj)) {
+        for (i = 0; i < sizeof(protocols) / sizeof(protocols[0]); ++i) {
+            if (!JS_GetProperty(cx, proto, protocols[i], &v)) return NULL;
+            fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(v));
+            fun->flags |= JSFUN_STRICT;
+        }
+    }
     return proto;
 }
 
