@@ -394,3 +394,10 @@ iteration and callback/GC handling. On macOS arm64, the full ES2015 run passes
 errors. All 11,540 ES5 cases and all four packaged application checks pass.
 Weak collections and arrow functions remain separate work; other platforms have
 not been revalidated for this batch.
+
+WeakMap and WeakSet include garbage-collector support for weak key/value
+reachability, native finalizer checks and legacy generator cleanup. On macOS
+arm64, all 322 pinned built-in cases pass; the full ES2015 run passes 25,064
+cases, with 3,502 failures, 14 unsupported module cases and two harness errors.
+All 11,540 ES5 cases and all four packaged application checks pass. Other
+platforms have not been revalidated for this batch.

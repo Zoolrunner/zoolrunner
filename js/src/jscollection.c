@@ -298,28 +298,16 @@ ITER(MapEntries, JS_FALSE, 2)
 ITER(SetValues, JS_TRUE, 1)
 ITER(SetEntries, JS_TRUE, 2)
 
-static JSBool
-Construct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSBool set)
+JSBool
+js_InitializeCollectionIterable(JSContext *cx, JSObject *obj, uintN argc,
+                                jsval *argv, JSBool set)
 {
-    JSCollectionData *data;
     jsval roots[8];
     JSTempValueRooter root;
     JSObject *source, *iterator;
     jsid id;
     JSBool done, ok = JS_FALSE;
     uintN i;
-    if (!JS_IsConstructing(cx)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INCOMPATIBLE_PROTO,
-                             set ? "Set" : "Map", "constructor", "receiver");
-        return JS_FALSE;
-    }
-    data = js_NewCollectionData();
-    if (!data) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
-    if (!JS_SetPrivate(cx, obj, data)) {
-        js_ReleaseCollectionData(data);
-        return JS_FALSE;
-    }
-    *rval = OBJECT_TO_JSVAL(obj);
     if (!argc || JSVAL_IS_NULL(argv[0]) || JSVAL_IS_VOID(argv[0])) return JS_TRUE;
     for (i = 0; i < 8; ++i) roots[i] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 8, roots, &root);
@@ -378,6 +366,24 @@ Construct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JS
   out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
+}
+static JSBool
+Construct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSBool set)
+{
+    JSCollectionData *data;
+    if (!JS_IsConstructing(cx)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INCOMPATIBLE_PROTO,
+                             set ? "Set" : "Map", "constructor", "receiver");
+        return JS_FALSE;
+    }
+    data = js_NewCollectionData();
+    if (!data) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
+    if (!JS_SetPrivate(cx, obj, data)) {
+        js_ReleaseCollectionData(data);
+        return JS_FALSE;
+    }
+    *rval = OBJECT_TO_JSVAL(obj);
+    return js_InitializeCollectionIterable(cx, obj, argc, argv, set);
 }
 static JSBool MapConstructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 { return Construct(cx, obj, argc, argv, rval, JS_FALSE); }

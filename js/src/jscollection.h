@@ -6,5 +6,7 @@ JS_BEGIN_EXTERN_C
 extern JSClass js_MapClass, js_SetClass;
 extern JSObject *js_InitMapClass(JSContext *cx, JSObject *global);
 extern JSObject *js_InitSetClass(JSContext *cx, JSObject *global);
+extern JSBool js_InitializeCollectionIterable(JSContext *cx, JSObject *obj,
+                                               uintN argc, jsval *argv, JSBool set);
 JS_END_EXTERN_C
 #endif

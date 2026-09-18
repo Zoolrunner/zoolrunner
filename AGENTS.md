@@ -1148,3 +1148,12 @@ storage without GC under object locks, then unlock before reporting errors or
 calling JavaScript. Deleted configurable Map/Set global bindings must not be
 resurrected by lazy resolution or standard-class enumeration; keep their
 intrinsics available through the private cache without enlarging classic globals.
+
+For weak collection or GC changes, run `js/tests/es6/weak-collections.js` and
+`TestWeakCollectionGC.c`. Weak keys must remain weak, including value-to-key
+cycles and unreachable owners. Compute ephemeron closure before legacy generator
+close discovery and after marking introduces more reachable keys/owners; clear
+dead keys before sweeping. Preserve the classic MARK_END callback guarantee:
+a host mark call returns with transitive marking, including weak values,
+complete. Validate native finalizer counts, transitive weak chains, callback-only
+roots, legacy generator cleanup and destroyed contexts, not just API names.

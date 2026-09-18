@@ -74,6 +74,8 @@ function modernWindowEdition() {
            Function("var values = 19; with ([]) { return values === 19; }")() &&
            new Map([[windowSymbol, 31]]).get(windowSymbol) === 31 &&
            Array.from(new Set([1, 1, 2])).join() === "1,2" &&
+           new WeakMap([[symbolTarget, windowSymbol]]).get(symbolTarget) === windowSymbol &&
+           new WeakSet([symbolTarget]).has(symbolTarget) &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

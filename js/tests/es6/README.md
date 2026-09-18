@@ -1126,3 +1126,34 @@ window globals. Calendar passes eight unit suites and four views; Browser passes
 169 navigation/layout checks; Suite passes Composer and ChatZilla checks; packaged
 standalone XULRunner passes ChatZilla initialization/input. Other platforms have
 not been revalidated for this batch.
+
+### Weak collections
+
+WeakMap and WeakSet have native object-only keys, iterable constructors and
+standard methods/tags, without exposing enumeration. Their tables do not trace
+keys or values during ordinary marking. The collector computes ephemeron
+reachability to a fixed point: a reachable owner and key may retain a value,
+and that value may expose another key or owner. Dead keys are removed before
+sweeping. Unreachable value-to-key cycles cannot keep themselves alive.
+
+Weak closure runs before legacy generator-close discovery, after its marking,
+and around the embedding mark callback. A host's mark call during MARK_END
+returns with weak reachability complete, preserving the classic immediate
+finalization guarantee. The native regression observes actual finalizer counts
+for key/value cycles, dead owners, transitive weak chains, callback-only roots,
+classic generators and destroyed contexts.
+
+On macOS arm64, 60 focused checks, 57 native GC/embedding checks, all 174 pinned
+WeakMap cases and all 148 WeakSet cases pass. The focused/native checks also
+pass with malloc scribbling enabled; this is not full-engine sanitizer coverage.
+The complete pinned ES2015 run passes **25,064 cases**, with **3,502 failures**,
+14 unsupported module cases and two Float64Array harness errors. All 356 new
+passes are gains, with no lost passes, crashes or timeouts; the runtime hash
+stays unchanged. All **11,540 ES5 cases** pass.
+
+All four macOS arm64 applications compile and pass packaged shell/native and
+relocated desktop checks, including weak collections in chrome/content globals.
+Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout checks; Suite passes Composer lifecycle and ChatZilla checks;
+packaged standalone XULRunner passes ChatZilla initialization/input. Other
+platforms have not been revalidated for this batch.

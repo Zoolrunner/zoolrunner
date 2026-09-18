@@ -86,6 +86,7 @@ CSRCS		= \
 		jsiteres6.c \
 		jscollection.c \
 		jscollectiontable.c \
+		jsweakcollection.c \
 		jsjson.c \
 		jslock.c \
 		jslog2.c \

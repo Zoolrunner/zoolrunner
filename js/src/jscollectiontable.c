@@ -247,3 +247,47 @@ js_MarkCollectionData(JSContext *cx, JSCollectionData *data)
             GC_MARK(cx, JSVAL_TO_GCTHING(row->value), "collection value");
     }
 }
+
+/* Weak tables do not expose iteration. Suppress compaction while mark hooks
+ * run; a hook may mutate entries. No row or hash-entry address survives GC_MARK.
+ * The collector cannot finalize the owner until this phase completes. */
+JSBool
+js_MarkWeakCollectionValues(JSContext *cx, JSCollectionData *data)
+{
+    uint32 index = 0;
+    jsval key, value;
+    JSBool changed = JS_FALSE;
+    JS_ASSERT(data->active == 0);
+    data->active = 1;
+    while (index < data->used) {
+        if (!data->rows[index].live) { ++index; continue; }
+        key = data->rows[index].key;
+        value = data->rows[index++].value;
+        JS_ASSERT(!JSVAL_IS_PRIMITIVE(key));
+        if ((*js_GetGCThingFlags(JSVAL_TO_OBJECT(key)) & GCF_MARK) &&
+            JSVAL_IS_GCTHING(value) && !JSVAL_IS_NULL(value) &&
+            !(*js_GetGCThingFlags(JSVAL_TO_GCTHING(value)) & GCF_MARK)) {
+            GC_MARK(cx, JSVAL_TO_GCTHING(value), "weak collection value");
+            changed = JS_TRUE;
+        }
+    }
+    data->active = 0;
+    return changed;
+}
+void
+js_SweepWeakCollectionKeys(JSContext *cx, JSCollectionData *data)
+{
+    uint32 index;
+    jsval key;
+    JS_ASSERT(data->active == 0);
+    data->active = 1;
+    for (index = 0; index < data->used; ++index) {
+        if (!data->rows[index].live) continue;
+        key = data->rows[index].key;
+        JS_ASSERT(!JSVAL_IS_PRIMITIVE(key));
+        if (!(*js_GetGCThingFlags(JSVAL_TO_OBJECT(key)) & GCF_MARK))
+            js_CollectionDelete(data, key);
+    }
+    data->active = 0;
+    Compact(data);
+}

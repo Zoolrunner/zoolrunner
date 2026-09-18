@@ -108,6 +108,8 @@ JS_PROTO(Block,                 30,     js_InitBlockClass)
 JS_PROTO(Symbol,                31,     js_InitSymbolClass)
 JS_PROTO(Map,                   32,     js_InitMapClass)
 JS_PROTO(Set,                   33,     js_InitSetClass)
+JS_PROTO(WeakMap,               34,     js_InitWeakMapClass)
+JS_PROTO(WeakSet,               35,     js_InitWeakSetClass)
 
 #undef SCRIPT_INIT
 #undef XML_INIT

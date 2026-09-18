@@ -18,5 +18,8 @@ extern void js_CollectionClear(JSCollectionData *data);
 extern JSBool js_CollectionNext(JSCollectionData *data, uint32 *cursor,
                                 jsval *key, jsval *value);
 extern void js_MarkCollectionData(JSContext *cx, JSCollectionData *data);
+/* Collector-only operations; weak tables have no public traversals. */
+extern JSBool js_MarkWeakCollectionValues(JSContext *cx, JSCollectionData *data);
+extern void js_SweepWeakCollectionKeys(JSContext *cx, JSCollectionData *data);
 JS_END_EXTERN_C
 #endif

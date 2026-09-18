@@ -70,6 +70,7 @@
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jssymbol.h"
+#include "jsweakcollection.h"
 #include "jsrealm.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -728,6 +729,7 @@ js_FinishGC(JSRuntime *rt)
     js_DumpGCStats(rt, stdout);
 #endif
 
+    js_FinishWeakCollections(rt);
     js_FinishSymbolState(rt);
     js_FinishCachedClassObjects(rt);
     FreePtrTable(&rt->gcIteratorTable, &iteratorTableInfo);
@@ -2440,6 +2442,15 @@ ScanDelayedChildren(JSContext *cx)
     JS_ASSERT(rt->gcUnscannedBagSize == 0);
 }
 
+/* Ephemeron values can expose more keys or owners. Drain deferred traversal
+ * before testing the next pass, including the classic callback return path. */
+static void
+MarkWeakCollectionsToClosure(JSContext *cx)
+{
+    while (js_MarkWeakCollections(cx))
+        ScanDelayedChildren(cx);
+}
+
 void
 js_MarkGCThing(JSContext *cx, void *thing)
 {
@@ -2476,6 +2487,7 @@ js_MarkGCThing(JSContext *cx, void *thing)
         cx->insideGCMarkCallback = JS_FALSE;
         MarkGCThingChildren(cx, thing, flagp, JS_FALSE);
         ScanDelayedChildren(cx);
+        MarkWeakCollectionsToClosure(cx);
         cx->insideGCMarkCallback = JS_TRUE;
     }
 }
@@ -2971,6 +2983,7 @@ restart:
      * marking phase.
      */
     ScanDelayedChildren(cx);
+    MarkWeakCollectionsToClosure(cx);
 
 #if JS_HAS_GENERATORS
     /*
@@ -2984,6 +2997,7 @@ restart:
      * just-completed marking part of the close phase.
      */
     ScanDelayedChildren(cx);
+    MarkWeakCollectionsToClosure(cx);
 #endif
 
     JS_ASSERT(!cx->insideGCMarkCallback);
@@ -2994,6 +3008,9 @@ restart:
         cx->insideGCMarkCallback = JS_FALSE;
     }
     JS_ASSERT(rt->gcUnscannedBagSize == 0);
+
+    MarkWeakCollectionsToClosure(cx);
+    js_SweepWeakCollections(cx);
 
     /* Inspect weak global keys before sweep clears mark bits/finalizes them. */
     js_SweepCachedClassObjects(rt);
