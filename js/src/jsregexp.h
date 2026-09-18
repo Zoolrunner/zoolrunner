@@ -135,6 +135,12 @@ js_DestroyRegExp(JSContext *cx, JSRegExp *re);
 extern JSBool
 js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
                  JSBool test, jsval *rval);
+extern JSBool
+js_ModernRegExpConstructor(JSContext *cx, JSObject *obj, uintN argc,
+                           jsval *argv, jsval *rval);
+extern JSBool
+js_RegExpCreate(JSContext *cx, JSObject *global, jsval pattern, jsval flags,
+                 jsval *rval);
 
 /*
  * These two add and remove GC roots, respectively, so their calls must be

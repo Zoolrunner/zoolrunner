@@ -1207,3 +1207,13 @@ observable conversions, and allocate results in the executing method's realm.
 Native match loops must remain interruptible. Preserve the legacy native/String
 paths for legacy globals, and distinguish script-edition selection from modern
 global initialization.
+
+
+For RegExp construction/sticky changes, run `regexp-constructor.js` and
+`TestRegExpConstructor.c`. Preserve IsRegExp/source/flags/newTarget lookup order
+and distinguish RegExpCreate from the public constructor. Delayed allocation
+must keep all inputs rooted across callbacks. Preserve native constructor
+cloning conventions and validate fallback realms through bound and Proxy
+newTargets, including revocation during prototype lookup. Native sticky flags,
+legacy grammar rejection, decompilation and XDR need separate checks. Cache
+version 39 invalidates components serialized before sticky flag semantics.

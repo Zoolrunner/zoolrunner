@@ -2010,6 +2010,8 @@ skipline:
                     flag = JSREG_FOLD;
                 else if (MatchChar(ts, 'm'))
                     flag = JSREG_MULTILINE;
+                else if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, 'y'))
+                    flag = JSREG_STICKY;
                 else
                     break;
                 if (flags & flag) {

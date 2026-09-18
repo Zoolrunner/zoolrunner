@@ -359,7 +359,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("annex-html.js", "ES6-ANNEX-HTML checks=27 failures=0"),
                 ("annex-globals.js", "ES6-ANNEX-GLOBALS checks=25 failures=0"),
                 ("regexp-fields.js", "ES6-REGEXP-FIELDS checks=66 failures=0"),
-                ("regexp-protocols.js", "ES6-REGEXP-PROTOCOLS checks=56 failures=0")):
+                ("regexp-protocols.js", "ES6-REGEXP-PROTOCOLS checks=56 failures=0"),
+                ("regexp-constructor.js", "ES6-REGEXP-CONSTRUCTOR checks=35 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -395,6 +396,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestAnnexBuiltins.c", "ES6-ANNEX-EMBEDDING checks=28 failures=0"),
                 ("es6/TestRegExpFields.c", "ES6-REGEXP-FIELDS-EMBEDDING checks=45 failures=0"),
                 ("es6/TestRegExpProtocols.c", "ES6-REGEXP-PROTOCOLS-EMBEDDING checks=28 failures=0"),
+                ("es6/TestRegExpConstructor.c", "ES6-REGEXP-CONSTRUCTOR-EMBEDDING checks=36 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

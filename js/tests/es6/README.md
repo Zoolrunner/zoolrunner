@@ -1379,3 +1379,53 @@ lastIndex assertions while following ES2015's property lookup semantics. The
 legacy prototype/field behavior remains covered separately. The upstream
 Test262 files and assertions are unchanged. No bytecode or cache-format changes
 are needed for these runtime operations.
+
+### RegExp constructors and sticky flags
+
+Modern RegExp construction observes Symbol.match and regexp-like properties
+before newTarget.prototype, preserves constructor identity short-circuits,
+copies actual matcher state without reading public source/flags overrides,
+and accepts explicit flag overrides. A dedicated native constructor delays
+allocation until the required observable steps complete. Bound and Proxy
+newTarget fallback uses the existing constructor-realm logic. RegExp species
+is a configurable accessor returning its raw receiver.
+
+The y flag is accepted by ES2015 literals and modern constructors; legacy
+source grammar still rejects it. Native JSAPI callers can request JSREG_STICKY.
+Both the initial simple-matcher search and the outer search loop honor
+anchoring. Literal decompilation and XDR preserve the flag. Cache version 39
+invalidates component caches made before the new RegExp flag semantics. Unicode
+matching and the u flag remain unimplemented.
+
+String match/search fallback now calls private RegExpCreate directly. That
+operation converts the pattern instead of performing the constructor's
+IsRegExp, identity or matcher-copy steps. The distinction prevents a second
+symbol lookup and preserves fallback behavior when a RegExp's symbol method
+is null or undefined. Constructor and String fallback share initialization
+of fresh matcher objects without changing public JSAPI layouts.
+
+Focused checks: 35 script and 36 native embedding checks under MallocScribble.
+Native coverage includes JS_NewRegExpObject, the classic construct-with-arguments
+API, foreign contexts destroyed before use, bound/Proxy constructor realms,
+JSAPI-cloned constructors, legacy callers, sticky XDR decode/execution under
+a different context edition, and return to legacy globals. Classic JSAPI
+function clones create their own ordinary prototypes; tests use intrinsic
+accessors to inspect their matcher state rather than changing that contract.
+The diagnostic RegExp subset passes 1,328/1,546 cases. The complete pinned
+ES2015 run passes **26,061 cases**, with **2,505 failures**, 14 unsupported
+module cases and two harness errors: **92 gained, zero lost** relative to
+match/search. No crashes or timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/regexp-constructor-full.json` and
+`regexp-constructor-es5.json`. Frozen runtime:
+`/tmp/zr-regexp-constructor-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 root builds, packages and relocated desktop
+checks pass. Calendar passes eight unit suites and all four views. Browser
+passes 169 navigation/layout assertions. Suite passes 24 lifecycle assertions
+and ChatZilla; standalone packaged XULRunner passes ChatZilla initialization
+and input. Desktop reports: `artifacts/es6/regexp-constructor-runtime`.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Unicode matching, replacement/splitting protocols and further ES6 work remain
+incomplete. Modern constructor selection follows the initialized global's
+policy; running an ES2015 script alone does not replace legacy window built-ins.

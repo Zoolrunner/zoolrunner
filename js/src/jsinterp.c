@@ -2016,8 +2016,8 @@ js_StrictlyEqual(jsval lval, jsval rval)
 }
 
 /* The realm used by GetPrototypeFromConstructor follows bound targets. */
-static JSObject *
-ConstructorGlobal(JSContext *cx, JSObject *constructor)
+JSObject *
+js_ConstructorGlobal(JSContext *cx, JSObject *constructor)
 {
     jsval target;
     JSObject *parent;
@@ -2088,6 +2088,12 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
         vp[1] = JSVAL_NULL;
         return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
     }
+    if (fun && FUN_NATIVE(fun) == js_ModernRegExpConstructor) {
+        /* RegExp checks @@match and source/flags before allocating or
+         * observing newTarget.prototype. Its native entry owns allocation. */
+        vp[1] = JSVAL_NULL;
+        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
+    }
     clasp = &js_ObjectClass;
     if (!obj2) {
         proto = parent = NULL;
@@ -2117,7 +2123,7 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
     }
     if (newTarget && !proto) {
         JSProtoKey key = (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(clasp);
-        parent = ConstructorGlobal(cx, newTarget);
+        parent = js_ConstructorGlobal(cx, newTarget);
         if (!parent) return JS_FALSE;
         if (clasp == &js_ErrorClass && fun && !FUN_INTERPRETED(fun))
             key = js_GetExceptionProtoKey(fun->u.n.native);

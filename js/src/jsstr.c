@@ -1300,12 +1300,10 @@ StringRegExpMethod(JSContext *cx, jsval *argv, jsval *rval, JSWellKnownSymbol sy
 {
     jsval values[3] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
     JSTempValueRooter root;
-    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *ctor;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj;
     JSProtoKey key;
     JSString *str;
     jsid id;
-    jsval *base, *oldsp;
-    void *mark;
     JSBool ok = JS_FALSE;
     if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
@@ -1333,18 +1331,7 @@ StringRegExpMethod(JSContext *cx, jsval *argv, jsval *rval, JSWellKnownSymbol sy
     str = js_ValueToString(cx, argv[-1]);
     if (!str) goto out;
     values[0] = STRING_TO_JSVAL(str);
-    if (!js_BuiltinPrototype(cx, global, JSProto_RegExp)) goto out;
-    ctor = js_GetCachedClassObject(cx, global, JSProto_RegExp);
-    if (!ctor) goto out;
-    base = js_AllocStack(cx, 3, &mark);
-    if (!base) goto out;
-    base[0] = OBJECT_TO_JSVAL(ctor); base[1] = JSVAL_NULL; base[2] = argv[0];
-    oldsp = cx->fp->sp; cx->fp->sp = base + 3;
-    ok = js_InvokeConstructorWithNewTarget(cx, base, 1, ctor);
-    if (ok) values[2] = base[0];
-    cx->fp->sp = oldsp; js_FreeStack(cx, mark);
-    if (!ok) goto out;
-    ok = JS_FALSE;
+    if (!js_RegExpCreate(cx, global, argv[0], JSVAL_VOID, &values[2])) goto out;
     obj = JSVAL_TO_OBJECT(values[2]);
     if (!OBJ_GET_PROPERTY(cx, obj, id, &values[1])) goto out;
     if (!js_IsCallable(cx, values[1])) goto notCallable;

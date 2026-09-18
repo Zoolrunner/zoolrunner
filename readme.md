@@ -440,11 +440,22 @@ See [RegExp validation notes](js/tests/es6/README.md#regexp-prototype-fields).
 The match/search follow-up adds generic RegExp test, Symbol.match/Symbol.search,
 String dispatch, observable ES2015 exec property access and result-realm handling.
 Native loops remain interruptible; legacy globals retain their original methods.
-The latest full macOS arm64 ES2015 run passes **25,969 cases**, with **2,597
+The match/search full macOS arm64 ES2015 run passes **25,969 cases**, with **2,597
 failures**, 14 unsupported module cases and two harness errors: 130 gained, zero
 lost. All 11,540 ES5.1 cases and all four applications' build, package and desktop
 checks pass. See [match/search validation notes](js/tests/es6/README.md#regexp-matchsearch-protocols)
 for remaining limitations and platform scope.
+
+The constructor/sticky follow-up adds the `y` flag, ES2015 RegExp construction,
+species, newTarget realm handling and direct RegExpCreate for String fallback.
+Legacy source grammar and initialized legacy globals retain their behavior.
+The latest full macOS arm64 ES2015 run passes **26,061 cases**, with **2,505
+failures**, 14 unsupported module cases and two harness errors: 92 gained,
+zero lost. All 11,540 ES5.1 cases and all four application build, package and
+desktop checks pass. Cache version 39 invalidates older component caches.
+Unicode `u`, replacement/split protocols and other ES6 work remain incomplete;
+other operating systems and architectures have not been revalidated. See
+[constructor validation notes](js/tests/es6/README.md#regexp-constructors-and-sticky-flags).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

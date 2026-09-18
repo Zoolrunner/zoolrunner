@@ -2037,9 +2037,9 @@ out:
     return re;
 }
 
-JSRegExp *
-js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
-                JSString *str, JSString *opt, JSBool flat)
+static JSRegExp *
+NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
+              JSString *str, JSString *opt, JSBool flat, JSBool modern)
 {
     uintN flags, flag;
     jschar *s;
@@ -2060,6 +2060,9 @@ js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
             case 'm':
                 flag = JSREG_MULTILINE;
                 break;
+            case 'y':
+                if (modern) { flag = JSREG_STICKY; break; }
+                /* Fall through for legacy source. */
             default:
                 charBuf[0] = (char)s[i];
                 charBuf[1] = '\0';
@@ -2079,6 +2082,13 @@ js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
         }
     }
     return js_NewRegExp(cx, ts, str, flags, flat);
+}
+
+JSRegExp *
+js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
+                JSString *str, JSString *opt, JSBool flat)
+{
+    return NewRegExpOpt(cx, ts, str, opt, flat, JS_VERSION_IS_ES2015(cx));
 }
 
 /*
@@ -3558,7 +3568,7 @@ JSBool
 js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
                  JSBool test, jsval *rval)
 {
-    return ExecuteRegExp(cx, re, str, indexp, test, JS_FALSE, NULL, rval);
+    return ExecuteRegExp(cx, re, str, indexp, test, (re->flags & JSREG_STICKY) != 0, NULL, rval);
 }
 
 /************************************************************************/
@@ -3568,7 +3578,8 @@ enum regexp_tinyid {
     REGEXP_GLOBAL       = -2,
     REGEXP_IGNORE_CASE  = -3,
     REGEXP_LAST_INDEX   = -4,
-    REGEXP_MULTILINE    = -5
+    REGEXP_MULTILINE    = -5,
+    REGEXP_STICKY       = -6
 };
 
 #define REGEXP_PROP_ATTRS (JSPROP_PERMANENT|JSPROP_SHARED)
@@ -3714,7 +3725,8 @@ ModernRegExpField(JSContext *cx, jsval *argv, jsint field, jsval *rval)
     if (field == REGEXP_SOURCE)
         return EscapeRegExpSource(cx, JSVAL_TO_STRING(*rval), rval);
     *rval = BOOLEAN_TO_JSVAL((flags & (field == REGEXP_GLOBAL ? JSREG_GLOB :
-                         field == REGEXP_IGNORE_CASE ? JSREG_FOLD : JSREG_MULTILINE)) != 0);
+                         field == REGEXP_IGNORE_CASE ? JSREG_FOLD :
+                         field == REGEXP_STICKY ? JSREG_STICKY : JSREG_MULTILINE)) != 0);
     return JS_TRUE;
 }
 #define REGEXP_FIELD_GETTER(name, field) \
@@ -3724,6 +3736,7 @@ REGEXP_FIELD_GETTER(regexp_sourceGetter, REGEXP_SOURCE)
 REGEXP_FIELD_GETTER(regexp_globalGetter, REGEXP_GLOBAL)
 REGEXP_FIELD_GETTER(regexp_ignoreCaseGetter, REGEXP_IGNORE_CASE)
 REGEXP_FIELD_GETTER(regexp_multilineGetter, REGEXP_MULTILINE)
+REGEXP_FIELD_GETTER(regexp_stickyGetter, REGEXP_STICKY)
 #undef REGEXP_FIELD_GETTER
 
 static JSBool
@@ -3800,7 +3813,7 @@ InitRegExpAccessors(JSContext *cx, JSObject *global, JSObject *proto)
     static struct { const char *name; JSNative native; } getters[] = {
         {"source", regexp_sourceGetter}, {"global", regexp_globalGetter},
         {"ignoreCase", regexp_ignoreCaseGetter}, {"multiline", regexp_multilineGetter},
-        {"flags", regexp_flagsGetter}
+        {"sticky", regexp_stickyGetter}, {"flags", regexp_flagsGetter}
     };
     uintN i;
     char name[32];
@@ -4136,6 +4149,8 @@ js_regexp_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
             chars[length++] = 'i';
         if (re->flags & JSREG_MULTILINE)
             chars[length++] = 'm';
+        if (re->flags & JSREG_STICKY)
+            chars[length++] = 'y';
     }
     JS_UNLOCK_OBJ(cx, obj);
     chars[length] = 0;
@@ -4251,7 +4266,9 @@ regexp_compile(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         }
     }
 
-    re = js_NewRegExpOpt(cx, NULL, str, opt, JS_FALSE);
+    re = NewRegExpOpt(cx, NULL, str, opt, JS_FALSE,
+                      JS_VERSION_IS_ES2015(cx) ||
+                      (argv && js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv))));
 created:
     if (!re)
         return JS_FALSE;
@@ -4292,7 +4309,7 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 
     /* NB: we must reach out: after this paragraph, in order to drop re. */
     HOLD_REGEXP(cx, re);
-    if (re->flags & JSREG_GLOB) {
+    if (re->flags & (JSREG_GLOB | JSREG_STICKY)) {
         ok = js_GetLastIndex(cx, obj, &lastIndex);
     } else {
         lastIndex = 0;
@@ -4330,7 +4347,7 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     } else {
         i = (size_t) lastIndex;
         ok = js_ExecuteRegExp(cx, re, str, &i, test, rval);
-        if (ok && (re->flags & JSREG_GLOB))
+        if (ok && (re->flags & (JSREG_GLOB | JSREG_STICKY)))
             ok = js_SetLastIndex(cx, obj, (*rval == JSVAL_NULL) ? 0 : i);
     }
 
@@ -4647,6 +4664,154 @@ RegExp(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+static JSString *
+RegExpFlagsString(JSContext *cx, uintN flags)
+{
+    jschar chars[4];
+    uintN length = 0;
+    if (flags & JSREG_GLOB) chars[length++] = 'g';
+    if (flags & JSREG_FOLD) chars[length++] = 'i';
+    if (flags & JSREG_MULTILINE) chars[length++] = 'm';
+    if (flags & JSREG_STICKY) chars[length++] = 'y';
+    return JS_NewUCStringCopyN(cx, chars, length);
+}
+
+static JSBool
+InitializeModernRegExp(JSContext *cx, JSObject *obj, jsval pattern, jsval flags,
+                       jsval *rval)
+{
+    jsval values[3] = {pattern, flags, OBJECT_TO_JSVAL(obj)};
+    JSTempValueRooter root;
+    JSString *str, *flagsString;
+    JSRegExp *re;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!JS_DefinePropertyWithTinyId(cx, obj, "lastIndex", REGEXP_LAST_INDEX,
+                                     JSVAL_VOID, regexp_getProperty,
+                                     regexp_setProperty, JSPROP_PERMANENT)) goto out;
+    str = JSVAL_IS_VOID(values[0]) ? cx->runtime->emptyString : js_ValueToString(cx, values[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    flagsString = JSVAL_IS_VOID(values[1]) ? cx->runtime->emptyString : js_ValueToString(cx, values[1]);
+    if (!flagsString) goto out;
+    values[1] = STRING_TO_JSVAL(flagsString);
+    re = NewRegExpOpt(cx, NULL, str, flagsString, JS_FALSE, JS_TRUE);
+    if (!re) goto out;
+    if (!JS_SetPrivate(cx, obj, re)) { js_DestroyRegExp(cx, re); goto out; }
+    if (!SetRegExpIndexValue(cx, obj, JSVAL_ZERO)) goto out;
+    *rval = values[2]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* RegExpCreate initializes a pattern directly; it does not perform the
+ * constructor's IsRegExp/identity/slot-copying steps. */
+JSBool
+js_RegExpCreate(JSContext *cx, JSObject *global, jsval pattern, jsval flags,
+                 jsval *rval)
+{
+    jsval values[3] = {pattern, flags, OBJECT_TO_JSVAL(global)};
+    JSTempValueRooter root;
+    JSObject *proto, *obj;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    proto = js_BuiltinPrototype(cx, global, JSProto_RegExp);
+    if (!proto) goto out;
+    obj = js_NewObject(cx, &js_RegExpClass, proto, global);
+    if (obj) ok = InitializeModernRegExp(cx, obj, values[0], values[1], rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_ModernRegExpConstructor(JSContext *cx, JSObject *obj, uintN argc,
+                           jsval *argv, jsval *rval)
+{
+    jsval values[4] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool isRegExp, constructing = (cx->fp->flags & JSFRAME_CONSTRUCTING) != 0;
+    JSBool ok = JS_FALSE;
+    JSObject *newTarget, *pattern, *global, *proto;
+    JSRegExp *re;
+    JSString *flagsString;
+    uintN flags;
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    if (!js_IsRegExp(cx, argv[0], &isRegExp)) goto out;
+    newTarget = constructing && cx->fp->newTarget
+                ? cx->fp->newTarget : JSVAL_TO_OBJECT(argv[-2]);
+    if (!constructing && isRegExp && JSVAL_IS_VOID(argv[1])) {
+        if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(argv[0]), "constructor", &values[2])) goto out;
+        if (values[2] == OBJECT_TO_JSVAL(newTarget)) {
+            *rval = argv[0]; ok = JS_TRUE; goto out;
+        }
+    }
+    values[1] = argv[1];
+    if (!JSVAL_IS_PRIMITIVE(argv[0]) &&
+        OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) == &js_RegExpClass) {
+        pattern = JSVAL_TO_OBJECT(argv[0]);
+        JS_LOCK_OBJ(cx, pattern);
+        re = (JSRegExp *)JS_GetPrivate(cx, pattern);
+        if (!re) {
+            JS_UNLOCK_OBJ(cx, pattern);
+            RegExpReceiverError(cx, "constructor"); goto out;
+        }
+        values[0] = STRING_TO_JSVAL(re->source); flags = re->flags;
+        JS_UNLOCK_OBJ(cx, pattern);
+        if (JSVAL_IS_VOID(argv[1])) {
+            flagsString = RegExpFlagsString(cx, flags);
+            if (!flagsString) goto out;
+            values[1] = STRING_TO_JSVAL(flagsString);
+        }
+    } else if (isRegExp) {
+        pattern = JSVAL_TO_OBJECT(argv[0]);
+        if (!JS_GetProperty(cx, pattern, "source", &values[0])) goto out;
+        if (JSVAL_IS_VOID(argv[1]) && !JS_GetProperty(cx, pattern, "flags", &values[1])) goto out;
+    } else values[0] = argv[0];
+    if (!OBJ_GET_PROPERTY(cx, newTarget,
+                          ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom), &values[2])) goto out;
+    global = js_BuiltinGlobal(cx, argv);
+    if (JSVAL_IS_PRIMITIVE(values[2])) {
+        global = js_ConstructorGlobal(cx, newTarget);
+        if (!global) goto out;
+        proto = js_BuiltinPrototype(cx, global, JSProto_RegExp);
+        if (!proto) goto out;
+        values[2] = OBJECT_TO_JSVAL(proto);
+    } else proto = JSVAL_TO_OBJECT(values[2]);
+    obj = js_NewObject(cx, &js_RegExpClass, proto, global);
+    if (!obj) goto out;
+    values[3] = OBJECT_TO_JSVAL(obj);
+    ok = InitializeModernRegExp(cx, obj, values[0], values[1], rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSpecies(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = argv[-1]; return JS_TRUE;
+}
+
+static JSBool
+InitRegExpSpecies(JSContext *cx, JSObject *global, JSObject *ctor)
+{
+    jsid id;
+    JSFunction *fun;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id)) return JS_FALSE;
+    fun = JS_NewFunction(cx, RegExpSpecies, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                         global, "get [Symbol.species]");
+    if (!fun) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = OBJ_DEFINE_PROPERTY(cx, ctor, id, JSVAL_VOID, (JSPropertyOp)fun->object,
+                             NULL, JSPROP_GETTER | JSPROP_SHARED, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSObject *
 js_InitRegExpClass(JSContext *cx, JSObject *obj)
 {
@@ -4659,7 +4824,8 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
     JSFunction *fun;
 
     proto = JS_InitClass(cx, obj, NULL,
-                         modern ? &regexpPrototypeClass : &js_RegExpClass, RegExp, 2,
+                         modern ? &regexpPrototypeClass : &js_RegExpClass,
+                         modern ? js_ModernRegExpConstructor : RegExp, 2,
                          modern ? NULL : regexp_props, regexp_methods,
                          regexp_static_props, NULL);
 
@@ -4684,7 +4850,7 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
             !JS_GetProperty(cx, proto, js_toString_str, &rval)) goto bad;
         fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(rval));
         fun->flags |= JSFUN_STRICT;
-        if (!InitRegExpProtocols(cx, obj, proto)) goto bad;
+        if (!InitRegExpProtocols(cx, obj, proto) || !InitRegExpSpecies(cx, obj, ctor)) goto bad;
         return proto;
     }
     /* Give legacy RegExp.prototype private data so it matches the empty string. */
