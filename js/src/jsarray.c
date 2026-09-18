@@ -1724,6 +1724,130 @@ typedef enum ArrayExtraMode {
 #define REDUCE_MODE(mode) ((mode) == REDUCE || (mode) == REDUCE_RIGHT)
 
 static JSBool
+ArrayModernExtra(JSContext *cx, uintN argc, jsval *argv, jsval *rval, ArrayExtraMode mode)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval args[4] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root, argumentRoot;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *output = NULL, *holder;
+    JSProperty *property;
+    jsdouble length, index, count = 0;
+    jsint step = mode == REDUCE_RIGHT ? -1 : 1;
+    JSBool reducing = REDUCE_MODE(mode), haveAccumulator = argc > 1;
+    JSBool present, selected, ok = JS_FALSE;
+    uint32 iterations = 0;
+    jsid id;
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    JS_PUSH_TEMP_ROOT(cx, 4, args, &argumentRoot);
+    obj = ArrayMethodObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (!js_IsCallable(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "Array callback"); goto out;
+    }
+    if (mode == MAP || mode == FILTER) {
+        if (!ArraySpeciesCreate(cx, obj, global, mode == MAP ? length : 0, &values[1])) goto out;
+        output = JSVAL_TO_OBJECT(values[1]);
+    }
+    if (reducing && haveAccumulator) values[2] = argv[1];
+    index = mode == REDUCE_RIGHT ? length - 1 : 0;
+    for (; index >= 0 && index < length; index += step) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[3] = ID_TO_VALUE(id);
+        if (!OBJ_LOOKUP_PROPERTY(cx, obj, id, &holder, &property)) goto out;
+        present = property != NULL;
+        if (!present) continue;
+        OBJ_DROP_PROPERTY(cx, holder, property);
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[4])) goto out;
+        if (reducing && !haveAccumulator) {
+            values[2] = values[4]; haveAccumulator = JS_TRUE; continue;
+        }
+        if (reducing) {
+            args[0] = values[2]; args[1] = values[4]; args[3] = values[0];
+            if (!js_NewNumberValue(cx, index, &args[2])) goto out;
+        } else {
+            args[0] = values[4]; args[2] = values[0];
+            if (!js_NewNumberValue(cx, index, &args[1])) goto out;
+        }
+        if (!js_InternalInvokeValue(cx, reducing || argc < 2 ? JSVAL_VOID : argv[1],
+                                     argv[0], 0, reducing ? 4 : 3, args, &values[5])) goto out;
+        if (reducing) values[2] = values[5];
+        else if (mode == MAP) {
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[3] = ID_TO_VALUE(id);
+            if (!js_CreateDataPropertyOrThrow(cx, output, id, values[5])) goto out;
+        } else if (mode != FOREACH) {
+            if (!js_ValueToBoolean(cx, values[5], &selected)) goto out;
+            if ((mode == SOME && selected) || (mode == EVERY && !selected)) {
+                *rval = BOOLEAN_TO_JSVAL(selected); ok = JS_TRUE; goto out;
+            }
+            if (mode == FILTER && selected) {
+                if (!js_ArrayLikeIndex(cx, count++, &id)) goto out;
+                values[3] = ID_TO_VALUE(id);
+                if (!js_CreateDataPropertyOrThrow(cx, output, id, values[4])) goto out;
+            }
+        }
+    }
+    if (reducing) {
+        if (!haveAccumulator) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_EMPTY_ARRAY_REDUCE); goto out;
+        }
+        *rval = values[2];
+    } else if (mode == MAP || mode == FILTER) *rval = values[1];
+    else if (mode == FOREACH) *rval = JSVAL_VOID;
+    else *rval = BOOLEAN_TO_JSVAL(mode == EVERY);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &argumentRoot);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayModernForEach(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, FOREACH);
+}
+
+static JSBool
+ArrayModernMap(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, MAP);
+}
+
+static JSBool
+ArrayModernFilter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, FILTER);
+}
+
+static JSBool
+ArrayModernSome(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, SOME);
+}
+
+static JSBool
+ArrayModernEvery(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, EVERY);
+}
+
+static JSBool
+ArrayModernReduce(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, REDUCE);
+}
+
+static JSBool
+ArrayModernReduceRight(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, REDUCE_RIGHT);
+}
+
+static JSBool
 array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
             ArrayExtraMode mode)
 {
@@ -2547,6 +2671,16 @@ ArraySpecies(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static JSBool
 InitArraySpecies(JSContext *cx, JSObject *global, JSObject *ctor, JSObject *proto)
 {
+    static struct { const char *name; JSNative native; } methods[] = {
+        {"concat", ArrayModernConcat},
+#if JS_HAS_ARRAY_EXTRAS
+        {"forEach", ArrayModernForEach}, {"map", ArrayModernMap},
+        {"filter", ArrayModernFilter}, {"some", ArrayModernSome},
+        {"every", ArrayModernEvery}, {"reduce", ArrayModernReduce},
+        {"reduceRight", ArrayModernReduceRight},
+#endif
+    };
+    uintN i;
     JSFunction *fun;
     JSTempValueRooter root;
     jsid id;
@@ -2559,10 +2693,13 @@ InitArraySpecies(JSContext *cx, JSObject *global, JSObject *ctor, JSObject *prot
     ok = OBJ_DEFINE_PROPERTY(cx, ctor, id, JSVAL_VOID, (JSPropertyOp)fun->object,
                              NULL, JSPROP_GETTER | JSPROP_SHARED, NULL);
     JS_POP_TEMP_ROOT(cx, &root);
-    if (!ok || !JS_GetProperty(cx, proto, "concat", &value)) return JS_FALSE;
-    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
-    fun->u.n.native = ArrayModernConcat;
-    fun->flags |= JSFUN_STRICT;
+    if (!ok) return JS_FALSE;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        if (!JS_GetProperty(cx, proto, methods[i].name, &value)) return JS_FALSE;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+        fun->u.n.native = methods[i].native;
+        fun->flags |= JSFUN_STRICT;
+    }
     return JS_TRUE;
 }
 

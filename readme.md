@@ -485,11 +485,19 @@ pass. Full ES6 and other-platform validation remain incomplete. See
 
 The concat follow-up adds Symbol.isConcatSpreadable, Array species construction,
 sparse results, safe-integer indices and method-realm handling. Legacy globals
-retain their historical concat. The latest full macOS arm64 ES2015 run passes
+retain their historical concat. The concat full macOS arm64 ES2015 run passes
 **26,330 cases**, with **2,236 failures**, 14 unsupported module cases and two
 harness errors: 49 gained, zero lost. All 11,540 ES5.1 cases and all four build,
 package and desktop checks pass. Full ES6 and other-platform validation remain
 incomplete. See [concat validation notes](js/tests/es6/README.md#array-concat-and-species).
+
+The callback-array follow-up adds ES2015 ToLength, map/filter species results,
+sparse/live traversal and native-loop interruption while preserving legacy
+methods. All 3,048 cases across seven methods pass. The latest full macOS arm64
+ES2015 run passes **26,394 cases**, with **2,172 failures**, 14 unsupported module
+cases and two harness errors: 64 gained, zero lost. All 11,540 ES5.1 cases and all
+four build, package and desktop checks pass. Full ES6 and other-platform
+validation remain incomplete. See [iteration validation notes](js/tests/es6/README.md#array-callback-methods).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

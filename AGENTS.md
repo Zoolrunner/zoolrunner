@@ -1246,3 +1246,8 @@ Preserve HasProperty/Get ordering, sparse entries, safe-integer output limits,
 custom result property definitions and final throwing length assignment. Check
 foreign intrinsic Array handling, primitive wrapper realms, callback GC,
 cloned methods, native loop interruption and legacy-global isolation.
+
+For Array callback-method changes, run `array-iteration.js` and
+`TestArrayIteration.c`. Preserve legacy ToUint32 behavior in legacy globals,
+modern ToLength and species ordering, sparse/live property traversal, raw callback
+receivers, native-loop interruption and foreign/JSAPI-cloned method realms.

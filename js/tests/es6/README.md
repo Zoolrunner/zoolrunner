@@ -1573,3 +1573,38 @@ Modern concat has a distinct native entry point, so a JSAPI clone into a legacy
 global preserves the modern method's semantics while using that destination's
 intrinsics. The superseded first full runs were stopped before completion and
 must not be reported as validation; final runs use a second frozen snapshot.
+
+### Array callback methods
+
+Modern forEach, map, filter, some, every, reduce and reduceRight use ToLength,
+live HasProperty/Get traversal with a snapshot length, and raw callback receivers.
+Map/filter use ArraySpeciesCreate and CreateDataProperty without an extra length
+Set on custom results. Distinct native entry points preserve modern semantics
+when JSAPI-cloned into legacy globals. Legacy globals retain their original
+methods and ToUint32 lengths. Long native loops remain interruptible.
+
+All 3,048 pinned cases in the seven method subsets pass: map 383, filter 438,
+forEach 366, some 424, every 421, reduce 509 and reduceRight 507. Focused coverage
+passes 37 script checks and 35 native embedding checks under MallocScribble.
+The first diagnostic invocation resolved xpcshell's symlink out of dist/bin and
+failed source preflight due to its missing runtime library; no cases executed.
+Corrected runs preserve the executable's dist/bin path and report unchanged
+runtime hashes. The native GC fixture releases the foreign cloned method before
+checking finalization, keeping a local method rooted for the later legacy-clone
+check. Upstream tests and assertions are unchanged.
+
+The full pinned ES2015 run passes **26,394 cases**, with **2,172 failures**,
+14 unsupported module cases and two harness errors: **64 gained, zero lost**
+relative to concat. No crashes/timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/array-iteration-full.json` and `array-iteration-es5.json`;
+snapshot: `/tmp/zr-array-iteration-conformance-20260918`. Its libmozjs SHA-256
+`11abfd5ba54784ea0622a37f18b3bcea8a2323cbdf1b3339b7746babd225d543` matches the
+completed Suite root build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/array-iteration-runtime`. Other platforms remain unvalidated;
+full ES6 remains incomplete.
