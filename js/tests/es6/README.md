@@ -1275,3 +1275,59 @@ input checks. The unchanged Object additions regression also passes all 145
 checks, including legacy virtual __proto__ ownership in a modern global.
 Windows, Linux and other architectures have not been revalidated for this batch.
 Full ES6 compliance remains incomplete.
+
+### RegExp prototype fields
+
+ES2015-initialized globals use an ordinary RegExp prototype and configurable,
+non-enumerable accessors for source, global, ignoreCase and multiline. Instances
+retain their internal matcher and own writable, non-enumerable, non-configurable
+lastIndex. The source getter escapes slashes and line terminators for literal
+round trips and reports the empty pattern as `(?:)`. Generic flags reads all five
+ES2015 flag properties in order; generic toString converts source before flags.
+The ordinary prototype has no matcher slots: ES2015 accessors reject it with
+TypeError. The special prototype values found in later editions do not apply.
+This does not implement Unicode/sticky matching or the remaining RegExp symbol
+protocols and constructor semantics. Script edition selection alone does not
+reinitialize a legacy window's built-in prototypes.
+
+Legacy-initialized globals retain callable/matcher-bearing RegExp prototypes
+and virtual own fields. The prototype-mutation regression now explicitly checks
+ES2015 inherited accessors; its original own-field expectation is retained in
+the native legacy-global test. Native construction supplies the modern
+prototype's parent when differing private-slot layouts prevent map sharing.
+XDR decodes RegExp literals using the instance class, independently of the
+modern prototype's ordinary-object class. Decoding failure leaves installed
+matcher state owned by its object; a debugger allocation hook forces the
+lastIndex failure path and GC checks cleanup under MallocScribble. Inherited
+read-only lastIndex properties cannot block modern own-field creation. Serialized bytes and bytecodes are
+unchanged. Function/script decompilation continues to read internal patterns
+rather than mutable public source/flags properties.
+
+Focused coverage has 66 script checks and 45 native embedding checks, including
+GC/reentrancy, cloned accessors, foreign contexts destroyed before use, native
+UTF-16 construction, cached-script decoding under a legacy context edition, and
+reset to a legacy global, and lazy class initialization by a modern script in
+a legacy global, plus RegExp as the first lazily resolved class. RegExp initialization and stringification follow the global
+policy even when the triggering caller has another edition. These checks are included in macOS packaging. The
+RegExp slice of the complete pinned run passes 1,120 of 1,546 cases.
+
+The complete pinned ES2015 run passes **25,839 cases**, with **2,727 failures**,
+14 unsupported module cases and two harness errors: **56 gained, zero lost**
+relative to Annex B. The frozen runtime remained unchanged; no crashes or
+timeouts occurred. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports are `artifacts/es6/regexp-fields-full.json` and
+`regexp-fields-es5.json`; the final snapshot is
+`/tmp/zr-regexp-fields-conformance-final3-20260918`.
+
+All four macOS arm64 / SDK 11.3 applications pass root builds, final package
+checks and relocated desktop checks. Calendar passes eight unit suites and all
+four views. Browser passes 169 navigation/layout checks. Suite passes 24
+lifecycle assertions and ChatZilla; standalone packaged XULRunner passes
+ChatZilla initialization and input. Final desktop reports are under
+`artifacts/es6/regexp-fields-runtime-final3`. Earlier canceled conformance runs
+and superseded package/desktop diagnostics are not completion evidence.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Full ES6 compliance remains incomplete.
+
+The implementation follows [the original ES2015 RegExp specification](https://262.ecma-international.org/6.0/#sec-properties-of-the-regexp-prototype-object),
+including its rejection of the ordinary prototype by source/flag accessors.

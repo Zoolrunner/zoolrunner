@@ -56,11 +56,14 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsopcode.h"
+#include "jsprf.h"
 #include "jsregexp.h"
+#include "jsrealm.h"
 #include "jsscan.h"
 #include "jsstr.h"
 #include "jssymbol.h"
@@ -3606,6 +3609,216 @@ regexp_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
            JS_SetReservedSlot(cx, obj, 0, *vp);
 }
 
+/* An ES2015 RegExp prototype is an ordinary object, without a matcher. Its
+ * private class keeps the RegExp intrinsic cache key without giving it the
+ * legacy RegExp instance hooks or private-data layout. */
+static JSClass regexpPrototypeClass = {
+    "RegExp", JSCLASS_HAS_CACHED_PROTO(JSProto_RegExp),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+RegExpReceiverError(JSContext *cx, const char *name)
+{
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INCOMPATIBLE_PROTO,
+                         "RegExp", name, "receiver");
+    return JS_FALSE;
+}
+
+static JSBool
+EscapeRegExpSource(JSContext *cx, JSString *source, jsval *rval)
+{
+    size_t i, j, amount, length = JSSTRING_LENGTH(source);
+    uintN pass;
+    JSBool escaped;
+    const char *replacement, *p;
+    jschar ch, *chars = NULL;
+    JSString *str;
+    if (!length) {
+        str = JS_NewStringCopyZ(cx, "(?:)");
+        if (!str) return JS_FALSE;
+        *rval = STRING_TO_JSVAL(str);
+        return JS_TRUE;
+    }
+    for (pass = 0; pass < 2; ++pass) {
+        j = 0; escaped = JS_FALSE;
+        for (i = 0; i < length; ++i) {
+            ch = JSSTRING_CHARS(source)[i];
+            replacement = ch == '\n' ? "\\n" : ch == '\r' ? "\\r" :
+                          ch == 0x2028 ? "\\u2028" : ch == 0x2029 ? "\\u2029" :
+                          ch == '/' && !escaped ? "\\/" : NULL;
+            if (replacement && escaped) ++replacement;
+            amount = replacement ? strlen(replacement) : 1;
+            if (amount > JSSTRING_LENGTH_MASK - j) {
+                JS_ReportOutOfMemory(cx); return JS_FALSE;
+            }
+            if (!pass) j += amount;
+            else if (replacement) {
+                for (p = replacement; *p; ++p) chars[j++] = (jschar)*p;
+            } else chars[j++] = ch;
+            escaped = ch == '\\' ? !escaped : JS_FALSE;
+        }
+        if (!pass) {
+            if (j >= ((size_t)-1) / sizeof(jschar)) {
+                JS_ReportOutOfMemory(cx); return JS_FALSE;
+            }
+            chars = (jschar *)JS_malloc(cx, (j + 1) * sizeof(jschar));
+            if (!chars) return JS_FALSE;
+        }
+    }
+    chars[j] = 0;
+    str = js_NewString(cx, chars, j, 0);
+    if (!str) { JS_free(cx, chars); return JS_FALSE; }
+    *rval = STRING_TO_JSVAL(str);
+    return JS_TRUE;
+}
+
+static JSBool
+ModernRegExpField(JSContext *cx, jsval *argv, jsint field, jsval *rval)
+{
+    JSObject *receiver;
+    JSRegExp *re;
+    uintN flags;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "accessor");
+    receiver = JSVAL_TO_OBJECT(argv[-1]);
+    /* ES2015 has no special case for the ordinary RegExp prototype.
+     * Its missing matcher slots must throw, unlike later editions. */
+    if (OBJ_GET_CLASS(cx, receiver) != &js_RegExpClass)
+        return RegExpReceiverError(cx, "accessor");
+    JS_LOCK_OBJ(cx, receiver);
+    re = (JSRegExp *)JS_GetPrivate(cx, receiver);
+    if (!re) {
+        JS_UNLOCK_OBJ(cx, receiver);
+        return RegExpReceiverError(cx, "accessor");
+    }
+    flags = re->flags;
+    if (field == REGEXP_SOURCE) *rval = STRING_TO_JSVAL(re->source);
+    JS_UNLOCK_OBJ(cx, receiver);
+    if (field == REGEXP_SOURCE)
+        return EscapeRegExpSource(cx, JSVAL_TO_STRING(*rval), rval);
+    *rval = BOOLEAN_TO_JSVAL((flags & (field == REGEXP_GLOBAL ? JSREG_GLOB :
+                         field == REGEXP_IGNORE_CASE ? JSREG_FOLD : JSREG_MULTILINE)) != 0);
+    return JS_TRUE;
+}
+#define REGEXP_FIELD_GETTER(name, field) \
+static JSBool name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) \
+{ return ModernRegExpField(cx, argv, field, rval); }
+REGEXP_FIELD_GETTER(regexp_sourceGetter, REGEXP_SOURCE)
+REGEXP_FIELD_GETTER(regexp_globalGetter, REGEXP_GLOBAL)
+REGEXP_FIELD_GETTER(regexp_ignoreCaseGetter, REGEXP_IGNORE_CASE)
+REGEXP_FIELD_GETTER(regexp_multilineGetter, REGEXP_MULTILINE)
+#undef REGEXP_FIELD_GETTER
+
+static JSBool
+regexp_flagsGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    static const char *names[] = {"global", "ignoreCase", "multiline", "unicode", "sticky"};
+    static const char letters[] = "gimuy";
+    jschar flags[5];
+    uintN i, length = 0;
+    JSBool boolean, ok = JS_FALSE;
+    JSTempValueRooter root;
+    JSString *str;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "flags");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, JSVAL_VOID, &root);
+    for (i = 0; i < 5; ++i) {
+        if (!JS_GetProperty(cx, obj, names[i], &root.u.value) ||
+            !JS_ValueToBoolean(cx, root.u.value, &boolean)) goto out;
+        if (boolean) flags[length++] = letters[i];
+    }
+    str = JS_NewUCStringCopyN(cx, flags, length);
+    if (!str) goto out;
+    *rval = STRING_TO_JSVAL(str); ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ModernRegExpString(JSContext *cx, jsval *argv, jsval *rval)
+{
+    JSObject *obj;
+    jsval roots[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *source, *flags, *str;
+    jschar *chars;
+    size_t sourceLength, flagsLength, length;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "toString");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    if (!JS_GetProperty(cx, obj, "source", &roots[0])) goto out;
+    source = js_ValueToString(cx, roots[0]);
+    if (!source) goto out;
+    roots[0] = STRING_TO_JSVAL(source);
+    if (!JS_GetProperty(cx, obj, "flags", &roots[1])) goto out;
+    flags = js_ValueToString(cx, roots[1]);
+    if (!flags) goto out;
+    roots[1] = STRING_TO_JSVAL(flags);
+    sourceLength = JSSTRING_LENGTH(source); flagsLength = JSSTRING_LENGTH(flags);
+    if (sourceLength > JSSTRING_LENGTH_MASK - 2 ||
+        flagsLength > JSSTRING_LENGTH_MASK - 2 - sourceLength) {
+        JS_ReportOutOfMemory(cx); goto out;
+    }
+    length = sourceLength + flagsLength + 2;
+    chars = (jschar *)JS_malloc(cx, (length + 1) * sizeof(jschar));
+    if (!chars) goto out;
+    chars[0] = '/';
+    js_strncpy(chars + 1, JSSTRING_CHARS(source), sourceLength);
+    chars[sourceLength + 1] = '/';
+    js_strncpy(chars + sourceLength + 2, JSSTRING_CHARS(flags), flagsLength);
+    chars[length] = 0;
+    str = js_NewString(cx, chars, length, 0);
+    if (!str) { JS_free(cx, chars); goto out; }
+    *rval = STRING_TO_JSVAL(str); ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+InitRegExpAccessors(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    static struct { const char *name; JSNative native; } getters[] = {
+        {"source", regexp_sourceGetter}, {"global", regexp_globalGetter},
+        {"ignoreCase", regexp_ignoreCaseGetter}, {"multiline", regexp_multilineGetter},
+        {"flags", regexp_flagsGetter}
+    };
+    uintN i;
+    char name[32];
+    JSFunction *fun;
+    JSTempValueRooter root;
+    JSBool ok;
+    for (i = 0; i < sizeof(getters) / sizeof(getters[0]); ++i) {
+        JS_snprintf(name, sizeof(name), "get %s", getters[i].name);
+        fun = JS_NewFunction(cx, getters[i].native, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                             global, name);
+        if (!fun) return JS_FALSE;
+        JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+        ok = JS_DefineProperty(cx, proto, getters[i].name, JSVAL_VOID,
+                               (JSPropertyOp)fun->object, NULL, JSPROP_GETTER | JSPROP_SHARED);
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!ok) return JS_FALSE;
+    }
+    return JS_TRUE;
+}
+
+/* Different private-slot layouts prevent map sharing with the modern
+ * prototype, so provide its parent explicitly for native-created instances. */
+static JSObject *
+NewRegExpInstance(JSContext *cx, JSObject *parent)
+{
+    JSObject *proto;
+    if (!js_GetClassPrototype(cx, parent, INT_TO_JSID(JSProto_RegExp), &proto))
+        return NULL;
+    if (!parent && proto && OBJ_GET_CLASS(cx, proto) == &regexpPrototypeClass)
+        parent = OBJ_GET_PARENT(cx, proto);
+    return js_NewObject(cx, &js_RegExpClass, proto, parent);
+}
+
 /*
  * RegExp class static properties and their Perl counterparts:
  *
@@ -3809,17 +4022,19 @@ regexp_xdrObject(JSXDRState *xdr, JSObject **objp)
         return JS_FALSE;
     }
     if (xdr->mode == JSXDR_DECODE) {
-        obj = js_NewObject(xdr->cx, &js_RegExpClass, NULL, NULL);
+        obj = NewRegExpInstance(xdr->cx, NULL);
         if (!obj)
             return JS_FALSE;
         re = js_NewRegExp(xdr->cx, NULL, source, (uint16)flagsword, JS_FALSE);
         if (!re)
             return JS_FALSE;
-        if (!JS_SetPrivate(xdr->cx, obj, re) ||
-            !js_SetLastIndex(xdr->cx, obj, 0)) {
+        if (!JS_SetPrivate(xdr->cx, obj, re)) {
             js_DestroyRegExp(xdr->cx, re);
             return JS_FALSE;
         }
+        /* The object owns re once installed, including on failure below. */
+        if (!js_SetLastIndex(xdr->cx, obj, 0))
+            return JS_FALSE;
         re->cloneIndex = (uint16)(flagsword >> 16);
         *objp = obj;
     }
@@ -3868,6 +4083,8 @@ js_regexp_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     uintN flags;
     JSString *str;
 
+    if (argv && js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
+        return ModernRegExpString(cx, argv, rval);
     if (!JS_InstanceOf(cx, obj, &js_RegExpClass, argv))
         return JS_FALSE;
     JS_LOCK_OBJ(cx, obj);
@@ -4151,7 +4368,7 @@ RegExp(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         }
 
         /* Otherwise, replace obj with a new RegExp object. */
-        obj = js_NewObject(cx, &js_RegExpClass, NULL, NULL);
+        obj = NewRegExpInstance(cx, NULL);
         if (!obj)
             return JS_FALSE;
 
@@ -4173,9 +4390,15 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
 {
     JSObject *proto, *ctor;
     jsval rval;
+    /* Lazy initialization can be triggered by a script of another edition.
+     * Follow the global's established policy, not that script's caller. */
+    JSBool modern = js_GetCachedClassObject(cx, obj, JSProto_Object)
+                    ? js_IsModernGlobal(cx, obj) : JS_VERSION_IS_ES2015(cx);
+    JSFunction *fun;
 
-    proto = JS_InitClass(cx, obj, NULL, &js_RegExpClass, RegExp, 2,
-                         regexp_props, regexp_methods,
+    proto = JS_InitClass(cx, obj, NULL,
+                         modern ? &regexpPrototypeClass : &js_RegExpClass, RegExp, 2,
+                         modern ? NULL : regexp_props, regexp_methods,
                          regexp_static_props, NULL);
 
     if (!proto || !(ctor = JS_GetConstructor(cx, proto)))
@@ -4192,7 +4415,16 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
         goto bad;
     }
 
-    /* Give RegExp.prototype private data so it matches the empty string. */
+    if (modern) {
+        fun = (JSFunction *)JS_GetPrivate(cx, ctor);
+        fun->clasp = &js_RegExpClass;
+        if (!InitRegExpAccessors(cx, obj, proto) ||
+            !JS_GetProperty(cx, proto, js_toString_str, &rval)) goto bad;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(rval));
+        fun->flags |= JSFUN_STRICT;
+        return proto;
+    }
+    /* Give legacy RegExp.prototype private data so it matches the empty string. */
     if (!regexp_compile(cx, proto, 0, NULL, &rval))
         goto bad;
     return proto;
@@ -4220,7 +4452,7 @@ js_NewRegExpObject(JSContext *cx, JSTokenStream *ts,
         JS_POP_TEMP_ROOT(cx, &tvr);
         return NULL;
     }
-    obj = js_NewObject(cx, &js_RegExpClass, NULL, NULL);
+    obj = NewRegExpInstance(cx, NULL);
     if (!obj || !JS_SetPrivate(cx, obj, re)) {
         js_DestroyRegExp(cx, re);
         obj = NULL;
@@ -4239,7 +4471,7 @@ js_CloneRegExpObject(JSContext *cx, JSObject *obj, JSObject *parent)
     JSTempValueRooter root;
 
     JS_ASSERT(OBJ_GET_CLASS(cx, obj) == &js_RegExpClass);
-    clone = js_NewObject(cx, &js_RegExpClass, NULL, parent);
+    clone = NewRegExpInstance(cx, parent);
     if (!clone)
         return NULL;
     JS_PUSH_TEMP_ROOT_OBJECT(cx, clone, &root);
@@ -4278,7 +4510,23 @@ js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex)
 {
     jsval v;
     uintN attrs;
-    JSBool found;
+    JSBool found, own;
+    JSObject *global = obj, *parent;
+    JSObject *owner;
+    JSProperty *prop;
+    JSAtom *atom;
+    while ((parent = OBJ_GET_PARENT(cx, global)) != NULL) global = parent;
+    if (js_IsModernGlobal(cx, global)) {
+        atom = js_Atomize(cx, "lastIndex", 9, 0);
+        if (!atom || !js_LookupOwnProperty(cx, obj, ATOM_TO_JSID(atom), &owner, &prop))
+            return JS_FALSE;
+        own = prop != NULL && owner == obj;
+        if (prop) OBJ_DROP_PROPERTY(cx, owner, prop);
+        if (!own && !JS_DefinePropertyWithTinyId(cx, obj, "lastIndex", REGEXP_LAST_INDEX,
+                                               JSVAL_ZERO, regexp_getProperty,
+                                               regexp_setProperty, JSPROP_PERMANENT))
+            return JS_FALSE;
+    }
     if (!JS_GetPropertyAttributes(cx, obj, "lastIndex", &attrs, &found))
         return JS_FALSE;
     if (found && (attrs & JSPROP_READONLY)) {

@@ -5471,7 +5471,10 @@ js_XDRObject(JSXDRState *xdr, JSObject **objp)
                        : ATOM_TO_JSID(atom);
             if (!js_GetClassPrototype(cx, NULL, classKey, &proto))
                 return JS_FALSE;
-            clasp = OBJ_GET_CLASS(cx, proto);
+            /* ES2015 RegExp.prototype is an ordinary object.  Serialized
+             * RegExp literals still use the matcher-bearing instance class. */
+            clasp = (protoKey == JSProto_RegExp)
+                    ? &js_RegExpClass : OBJ_GET_CLASS(cx, proto);
             if (!JS_XDRRegisterClass(xdr, clasp, &classId))
                 return JS_FALSE;
         } else {

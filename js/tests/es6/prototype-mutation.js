@@ -51,7 +51,12 @@ var regexp = /a/g; regexp.lastIndex = 1; method(regexp, second);
 check(RegExp.prototype.exec.call(regexp, 'ba').index === 1 && regexp.lastIndex === 2, 'regexp private index remains live');
 regexp.lastIndex = 0;
 check(RegExp.prototype.exec.call(regexp, 'a').index === 0 && regexp.lastIndex === 1, 'regexp native setter retained');
-check(regexp.source === 'a' && regexp.global === true && regexp.value === 2, 'regexp own fields preserved');
+/* ES2015 source/global are inherited accessors; replacing the prototype
+ * removes their lookup path without changing the internal matcher. */
+check(regexp.source === undefined && regexp.global === undefined && regexp.value === 2 &&
+      Object.getOwnPropertyDescriptor(RegExp.prototype, 'source').get.call(regexp) === 'a' &&
+      Object.getOwnPropertyDescriptor(RegExp.prototype, 'global').get.call(regexp) === true,
+      'regexp matcher preserved after removing inherited accessors');
 var nullTarget = Object.create(null), nullProto = Object.create(null); nullProto.x = 7;
 check(method(nullTarget, nullProto) === nullTarget && nullTarget.x === 7, 'empty scopes and null-origin prototype');
 for (i = 0; i < 50; ++i) {

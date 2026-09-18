@@ -419,12 +419,23 @@ validation still need work. The Annex B follow-up addresses __proto__ receivers.
 The Annex B follow-up adds standard __proto__ accessors to ES2015-initialized
 globals, correct HTML helper quoting/conversion order in ES2015 code, and
 persistent deletion of modern global String helpers. Legacy globals and
-cross-edition virtual ownership remain covered. The latest full macOS arm64
+cross-edition virtual ownership remain covered. Its full macOS arm64
 ES2015 run passes **25,783 cases**, with **2,783 failures**, 14 unsupported module
 cases and two harness errors: 16 gained, zero lost. All 11,540 ES5.1 cases and
 all four applications' build/package/desktop checks pass. Other platforms have
 not been revalidated for this batch; see the
 [Annex B validation notes](js/tests/es6/README.md#annex-b-built-ins).
+
+The RegExp follow-up implements ES2015 prototype accessors, escaped source,
+generic flags/toString and own lastIndex in modern globals. Legacy globals
+retain their historical fields and matcher-bearing prototype. Native creation,
+cache decoding, failure cleanup and mixed-edition lazy initialization are
+covered. The latest full macOS arm64 ES2015 run passes **25,839 cases**, with
+**2,727 failures**, 14 unsupported module cases and two harness errors:
+56 gained, zero lost. All 11,540 ES5.1 cases and all four applications' build,
+package and desktop checks pass. Unicode/sticky matching, RegExp protocols and
+other ES6 work remain; other platforms have not been revalidated for this batch.
+See [RegExp validation notes](js/tests/es6/README.md#regexp-prototype-fields).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

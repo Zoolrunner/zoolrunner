@@ -357,7 +357,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         for script, marker in (
                 ("annex-prototype.js", "ES6-ANNEX-PROTOTYPE checks=32 failures=0"),
                 ("annex-html.js", "ES6-ANNEX-HTML checks=27 failures=0"),
-                ("annex-globals.js", "ES6-ANNEX-GLOBALS checks=25 failures=0")):
+                ("annex-globals.js", "ES6-ANNEX-GLOBALS checks=25 failures=0"),
+                ("regexp-fields.js", "ES6-REGEXP-FIELDS checks=66 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -391,6 +392,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestReflect.c", "ES6-REFLECT-EMBEDDING checks=43 failures=0"),
                 ("es6/TestProxy.c", "ES6-PROXY-EMBEDDING checks=55 failures=0"),
                 ("es6/TestAnnexBuiltins.c", "ES6-ANNEX-EMBEDDING checks=28 failures=0"),
+                ("es6/TestRegExpFields.c", "ES6-REGEXP-FIELDS-EMBEDDING checks=45 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

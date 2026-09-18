@@ -1184,3 +1184,15 @@ checked quote expansion. Deleted modern global helpers must stay deleted
 across caller-edition changes; the private global cache records initialization
 policy and JS_ClearScope resets it. Test mixed-edition chrome/content windows
 separately from globals explicitly initialized with -E.
+
+
+For RegExp prototype changes, run `js/tests/es6/regexp-fields.js` and
+`TestRegExpFields.c` alongside full conformance and application checks. Preserve
+legacy matcher-bearing prototypes and virtual fields in legacy globals. Modern
+prototype accessors must reject all receivers without matcher state, including
+their own realm's original prototype (the later-edition exception does not apply
+to ES2015). Keep native construction parented, own
+lastIndex live, source escaping GC-safe, and generic getter/conversion order
+observable. XDR must select the RegExp instance class even when its prototype
+is an ordinary object; exercise decoding under a different context edition.
+Decompilation must use internal patterns rather than mutable public properties.
