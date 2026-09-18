@@ -1173,3 +1173,14 @@ metadata and preserve it through JSAPI cloning. Exercise native finalizers and
 opaque lookup-handle release. Do not treat Proxy object maps/properties as
 native scopes or pass them to native object-lock fast paths. Preserve public
 JSClass/JSObjectOps layouts and the existing non-Proxy embedding hooks.
+
+
+For Annex B built-in changes, run `annex-prototype.js`, `annex-html.js`,
+`annex-globals.js` and `TestAnnexBuiltins.c`. Keep legacy-initialized __proto__
+hooks and legacy HTML helper behavior intact. Modern accessors need raw
+receivers, defining-realm primitive prototypes and native access checks;
+CreateHTML needs receiver-before-attribute conversion, rooted strings and
+checked quote expansion. Deleted modern global helpers must stay deleted
+across caller-edition changes; the private global cache records initialization
+policy and JS_ClearScope resets it. Test mixed-edition chrome/content windows
+separately from globals explicitly initialized with -E.

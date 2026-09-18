@@ -84,6 +84,11 @@ function modernWindowEdition() {
            (function() { var p = Proxy.revocable({}, {}); p.revoke();
                          try { Reflect.ownKeys(p.proxy); return false; }
                          catch (e) { return e instanceof TypeError; } })() &&
+           "x".link('"') === '<a href="&quot;">x</a>' &&
+           (function() { var order = []; String.prototype.anchor.call(
+                         {toString:function(){order.push("receiver");return "x";}},
+                         {toString:function(){order.push("attribute");return "y";}});
+                         return order.join() === "receiver,attribute"; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

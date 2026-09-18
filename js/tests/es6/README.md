@@ -1232,7 +1232,46 @@ has been revalidated for this batch.
 Native C getter/setter hooks installed directly on a Proxy through JSAPI are
 not represented by ES property descriptors and currently reject that operation;
 existing native objects are unchanged. The historical native `__proto__`
-accessor also still needs receiver adaptation when reached through a Proxy;
-Reflect.getPrototypeOf and Object.getPrototypeOf use the Proxy trap directly.
+accessor needed receiver adaptation when reached through a Proxy in this batch;
+the Annex B follow-up below supplies modern accessors while retaining legacy
+hooks. Reflect.getPrototypeOf and Object.getPrototypeOf use the Proxy trap directly.
 These results do not establish full ES6
 conformance or all host-object wrapping semantics.
+
+
+### Annex B built-ins
+
+Globals explicitly initialized in ES2015 mode now expose `__proto__` as a
+configurable, non-enumerable accessor. Its getter/setter preserve raw receivers,
+Proxy traps, rejection exceptions, foreign-realm primitive prototypes and
+classic embedding access checks. Legacy-initialized globals retain the old
+short-id property hooks. Script edition selection alone does not recreate a
+window's pre-existing built-in prototypes.
+
+In ES2015 code, the four attribute-bearing String HTML helpers convert their
+receiver before the attribute and replace attribute quotes with `&quot;`.
+Legacy editions retain their previous order and quoting. The implementation
+checks the expanded allocation length and roots converted strings through
+callbacks and GC. Modern globals also retain deletion of escape/unescape and
+related String helpers, including when accessed from legacy code; a private
+per-global initialization marker preserves the legacy lazy-resolution behavior
+in legacy globals. JS_ClearScope starts a fresh cache lifetime.
+
+Focused checks currently pass: 32 prototype, 27 HTML, 25 global-binding and 28
+native embedding checks. The Annex B B.2 subset passes all 52 cases. Native
+coverage includes host access denial, callbacks replacing in/out values and
+collecting, JSAPI-cloned accessors, foreign contexts destroyed before use,
+standard-class enumeration after deletion, and reset to a legacy global.
+The complete pinned ES2015 run passes **25,783 cases**, with **2,783 failures**,
+14 unsupported module cases and two harness errors: **16 gained, zero lost**
+relative to Proxy. The runtime remained unchanged and had no crashes/timeouts.
+All **11,540 required-mode ES5.1 cases** pass (America/Los_Angeles).
+
+All four macOS arm64 / SDK 11.3 root builds, package checks and relocated desktop
+checks pass. Calendar passes eight unit suites and all four views; Browser
+passes 169 navigation/layout assertions; Suite passes all 24 lifecycle assertions
+and ChatZilla; standalone packaged XULRunner passes ChatZilla initialization and
+input checks. The unchanged Object additions regression also passes all 145
+checks, including legacy virtual __proto__ ownership in a modern global.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Full ES6 compliance remains incomplete.

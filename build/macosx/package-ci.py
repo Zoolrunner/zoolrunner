@@ -354,6 +354,17 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-PROXY checks=65 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed Proxy")
+        for script, marker in (
+                ("annex-prototype.js", "ES6-ANNEX-PROTOTYPE checks=32 failures=0"),
+                ("annex-html.js", "ES6-ANNEX-HTML checks=27 failures=0"),
+                ("annex-globals.js", "ES6-ANNEX-GLOBALS checks=25 failures=0")):
+            result = subprocess.run(
+                [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
+                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=60)
+            print(result.stdout)
+            if result.returncode or marker not in result.stdout:
+                raise RuntimeError("Packaged runtime failed " + script)
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -379,6 +390,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestWeakCollectionGC.c", "ES6-WEAK-COLLECTION-GC checks=57 failures=0"),
                 ("es6/TestReflect.c", "ES6-REFLECT-EMBEDDING checks=43 failures=0"),
                 ("es6/TestProxy.c", "ES6-PROXY-EMBEDDING checks=55 failures=0"),
+                ("es6/TestAnnexBuiltins.c", "ES6-ANNEX-EMBEDDING checks=28 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

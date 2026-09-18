@@ -2080,7 +2080,8 @@ tagify(JSContext *cx, JSObject *obj, jsval *argv,
     JSString *str;
     jschar *tagbuf;
     size_t beglen, endlen, parlen, taglen;
-    size_t i, j;
+    size_t i, j, quotes = 0;
+    JSBool escapeQuotes = JS_VERSION_IS_ES2015(cx);
 
     if (JSVAL_IS_STRING((jsval)obj)) {
         str = JSVAL_TO_STRING((jsval)obj);
@@ -2104,11 +2105,19 @@ tagify(JSContext *cx, JSObject *obj, jsval *argv,
     endlen = strlen(end);
     taglen += JSSTRING_LENGTH(str) + 2 + endlen + 1;    /* 'str</end>' */
 
-    if (taglen >= ~(size_t)0 / sizeof(jschar)) {
+    if (param && escapeQuotes) {
+        for (i = 0; i < parlen; ++i) {
+            if (JSSTRING_CHARS(param)[i] == '"') ++quotes;
+        }
+    }
+    if (taglen > JSSTRING_LENGTH_MASK ||
+        quotes > (JSSTRING_LENGTH_MASK - taglen) / 5 ||
+        taglen + quotes * 5 >= ~(size_t)0 / sizeof(jschar)) {
         JS_ReportOutOfMemory(cx);
         return JS_FALSE;
     }
 
+    taglen += quotes * 5;
     tagbuf = (jschar *) JS_malloc(cx, (taglen + 1) * sizeof(jschar));
     if (!tagbuf)
         return JS_FALSE;
@@ -2120,8 +2129,12 @@ tagify(JSContext *cx, JSObject *obj, jsval *argv,
     if (param) {
         tagbuf[j++] = '=';
         tagbuf[j++] = '"';
-        js_strncpy(&tagbuf[j], JSSTRING_CHARS(param), parlen);
-        j += parlen;
+        for (i = 0; i < parlen; ++i) {
+            if (escapeQuotes && JSSTRING_CHARS(param)[i] == '"') {
+                tagbuf[j++] = '&'; tagbuf[j++] = 'q'; tagbuf[j++] = 'u';
+                tagbuf[j++] = 'o'; tagbuf[j++] = 't'; tagbuf[j++] = ';';
+            } else tagbuf[j++] = JSSTRING_CHARS(param)[i];
+        }
         tagbuf[j++] = '"';
     }
     tagbuf[j++] = '>';
@@ -2149,8 +2162,15 @@ tagify_value(JSContext *cx, JSObject *obj, jsval *argv,
              const char *begin, const char *end,
              jsval *rval)
 {
-    JSString *param;
+    JSString *param, *receiver;
 
+    if (JS_VERSION_IS_ES2015(cx)) {
+        /* CreateHTML converts the receiver before the attribute argument. */
+        receiver = js_ValueToString(cx, argv[-1]);
+        if (!receiver) return JS_FALSE;
+        argv[-1] = STRING_TO_JSVAL(receiver);
+        obj = (JSObject *)argv[-1];
+    }
     param = js_ValueToString(cx, argv[0]);
     if (!param)
         return JS_FALSE;

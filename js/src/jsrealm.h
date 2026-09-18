@@ -4,6 +4,8 @@
 #define jsrealm_h___
 #include "jspubtd.h"
 JS_BEGIN_EXTERN_C
+
+extern JSBool js_IsModernGlobal(JSContext *cx, JSObject *global);
 typedef enum JSRealmIntrinsic {
     JS_INTRINSIC_ITERATOR_PROTO,
     JS_INTRINSIC_ARRAY_ITERATOR_PROTO,

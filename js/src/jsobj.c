@@ -62,10 +62,12 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsproxy.h"
+#include "jsreflect.h"
 #include "jssymbol.h"
 #include "jsrealm.h"
 #include "jsregexp.h"
@@ -210,6 +212,88 @@ obj_getSlot(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
         }
     }
     return JS_TRUE;
+}
+
+/* Annex B accessors use the actual receiver. Keep the old short-id hooks
+ * installed in legacy globals for historical embedding compatibility. */
+static JSBool
+obj_protoGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *receiver, *proto;
+    JSProtoKey key;
+    jsval args[3];
+    JSTempValueRooter root;
+    JSBool ok;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) {
+        if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+            return JS_FALSE;
+        }
+        /* The unobservable ToObject wrapper uses the getter's realm. */
+        key = JSVAL_IS_SYMBOL(argv[-1]) ? JSProto_Symbol :
+              JSVAL_IS_STRING(argv[-1]) ? JSProto_String :
+              JSVAL_IS_BOOLEAN(argv[-1]) ? JSProto_Boolean : JSProto_Number;
+        proto = js_BuiltinPrototype(cx, js_BuiltinGlobal(cx, argv), key);
+        if (!proto) return JS_FALSE;
+        *rval = OBJECT_TO_JSVAL(proto);
+        return JS_TRUE;
+    }
+    receiver = JSVAL_TO_OBJECT(argv[-1]);
+    args[0] = argv[-2]; args[1] = JSVAL_VOID;
+    args[2] = OBJECT_TO_JSVAL(receiver);
+    JS_PUSH_TEMP_ROOT(cx, 3, args, &root);
+    ok = js_ReflectGetPrototypeOf(cx, NULL, 1, args + 2, rval);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+obj_protoSetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval args[4], accepted;
+    JSTempValueRooter root;
+    JSBool ok;
+    *rval = JSVAL_VOID;
+    if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return JS_FALSE;
+    }
+    if (!JSVAL_IS_OBJECT(argv[0]) || JSVAL_IS_PRIMITIVE(argv[-1])) return JS_TRUE;
+    args[0] = argv[-2]; args[1] = JSVAL_VOID;
+    args[2] = argv[-1]; args[3] = argv[0];
+    JS_PUSH_TEMP_ROOT(cx, 4, args, &root);
+    ok = js_ReflectSetPrototypeOf(cx, NULL, 2, args + 2, &accepted);
+    JS_POP_TEMP_ROOT(cx, &root);
+    if (ok && accepted == JSVAL_FALSE) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+        return JS_FALSE;
+    }
+    return ok;
+}
+
+static JSBool
+InitProtoAccessors(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    JSFunction *getter, *setter;
+    jsval roots[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    getter = JS_NewFunction(cx, obj_protoGetter, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                            global, "get __proto__");
+    if (!getter) goto out;
+    roots[0] = OBJECT_TO_JSVAL(JS_GetFunctionObject(getter));
+    setter = JS_NewFunction(cx, obj_protoSetter, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                            global, "set __proto__");
+    if (!setter) goto out;
+    roots[1] = OBJECT_TO_JSVAL(JS_GetFunctionObject(setter));
+    ok = JS_DefineProperty(cx, proto, js_proto_str, JSVAL_VOID,
+                           (JSPropertyOp)JSVAL_TO_OBJECT(roots[0]),
+                           (JSPropertyOp)JSVAL_TO_OBJECT(roots[1]),
+                           JSPROP_GETTER | JSPROP_SETTER | JSPROP_SHARED);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
 }
 
 static JSBool
@@ -1778,6 +1862,17 @@ js_HasOwnPropertyHelper(JSContext *cx, JSObject *obj, JSLookupPropOp lookup,
                 !(JS_VERSION_IS_ES2015(cx) && clasp == &js_ObjectClass) &&
                 !(id == ATOM_TO_JSID(cx->runtime->atomState.lengthAtom) &&
                   js_IsModernFunction(cx, obj)));
+#if JS_HAS_OBJ_PROTO_PROP
+            /* Older scripts retain virtual ownership even when borrowing a
+             * modern global's original __proto__ accessor. User accessors
+             * with the same name do not acquire this compatibility behavior. */
+            if (!JS_VERSION_IS_ES2015(cx) && clasp == &js_ObjectClass &&
+                id == ATOM_TO_JSID(cx->runtime->atomState.protoAtom) &&
+                (sprop->attrs & JSPROP_GETTER) && sprop->getter &&
+                OBJ_GET_CLASS(cx, (JSObject *)sprop->getter) == &js_FunctionClass &&
+                FUN_NATIVE((JSFunction *)JS_GetPrivate(cx, (JSObject *)sprop->getter)) == obj_protoGetter)
+                *rval = JSVAL_TRUE;
+#endif
         } else {
             *rval = JSVAL_FALSE;
         }
@@ -2509,9 +2604,13 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
     JSObject *proto;
     jsval method;
     JSFunction *fun;
+    JSPropertySpec *properties = object_props;
 
+#if JS_HAS_OBJ_PROTO_PROP
+    if (JS_VERSION_IS_ES2015(cx)) properties = object_props + 1;
+#endif
     proto = JS_InitClass(cx, obj, NULL, &js_ObjectClass, Object, 1,
-                         object_props, object_methods, NULL,
+                         properties, object_methods, NULL,
                          js_object_static_methods);
     if (!proto ||
         !js_SetBuiltinMethodFlags(cx, proto, object_methods,
@@ -2521,6 +2620,11 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
         return NULL;
     fun = (JSFunction *) JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
     fun->flags &= ~JSFUN_REQUIRE_THIS;
+
+#if JS_HAS_OBJ_PROTO_PROP
+    if (JS_VERSION_IS_ES2015(cx) && !InitProtoAccessors(cx, obj, proto))
+        return NULL;
+#endif
 
     /* ECMA (15.1.2.1) says 'eval' is a property of the global object. */
     if (!js_DefineFunction(cx, obj, cx->runtime->atomState.evalAtom,

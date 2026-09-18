@@ -1568,6 +1568,11 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(stdnm->clasp))) {
             return JS_TRUE;
         }
+        /* ES2015 global String helpers are configurable. Resolving a deleted
+         * helper must not reinitialize String and silently resurrect it. */
+        if (js_IsModernGlobal(cx, obj) && stdnm->init == js_InitStringClass &&
+            js_GetCachedClassObject(cx, obj, JSProto_String))
+            return JS_TRUE;
         if (!stdnm->init(cx, obj))
             return JS_FALSE;
         *resolved = JS_TRUE;
@@ -1620,6 +1625,10 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
              standard_class_atoms[i].clasp == &js_ProxyClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(standard_class_atoms[i].clasp)))
+            continue;
+        if (standard_class_atoms[i].clasp == &js_StringClass &&
+            js_IsModernGlobal(cx, obj) &&
+            js_GetCachedClassObject(cx, obj, JSProto_String))
             continue;
         if (!AlreadyHasOwnProperty(cx, obj, atom) &&
             !standard_class_atoms[i].init(cx, obj)) {

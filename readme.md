@@ -412,9 +412,19 @@ pinned Proxy cases and all 288 Reflect cases pass. The full ES2015 run passes
 25,767 cases, with 2,799 failures, 14 unsupported module cases and two harness
 errors; 437 cases were gained without losing earlier passes. All 11,540 ES5.1
 cases and all four packaged application checks pass. This remains partial ES6
-support: the legacy __proto__ accessor's Proxy receiver, native host wrapping,
-other language features and other-platform validation still need work. See the
+support: native host wrapping, other language features and other-platform
+validation still need work. The Annex B follow-up addresses __proto__ receivers. See the
 [Proxy validation notes](js/tests/es6/README.md#proxy).
+
+The Annex B follow-up adds standard __proto__ accessors to ES2015-initialized
+globals, correct HTML helper quoting/conversion order in ES2015 code, and
+persistent deletion of modern global String helpers. Legacy globals and
+cross-edition virtual ownership remain covered. The latest full macOS arm64
+ES2015 run passes **25,783 cases**, with **2,783 failures**, 14 unsupported module
+cases and two harness errors: 16 gained, zero lost. All 11,540 ES5.1 cases and
+all four applications' build/package/desktop checks pass. Other platforms have
+not been revalidated for this batch; see the
+[Annex B validation notes](js/tests/es6/README.md#annex-b-built-ins).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

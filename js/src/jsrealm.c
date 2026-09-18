@@ -20,6 +20,7 @@
 typedef struct ClassCacheEntry {
     JSDHashEntryHdr hdr;
     JSObject *global; /* Same position as JSDHashEntryStub.key. */
+    JSBool modernGlobal;
     JSObject *constructors[REALM_CACHE_LIMIT];
 } ClassCacheEntry;
 
@@ -59,6 +60,7 @@ CacheObject(JSContext *cx, JSObject *global, uintN key,
         if (entry) {
             if (!entry->global) {
                 entry->global = global;
+                entry->modernGlobal = JS_VERSION_IS_ES2015(cx);
                 memset(entry->constructors, 0, sizeof(entry->constructors));
             }
             /* A deleted global name can cause a legacy resolve hook to
@@ -74,6 +76,22 @@ CacheObject(JSContext *cx, JSObject *global, uintN key,
         return JS_FALSE;
     }
     return JS_TRUE;
+}
+
+/* This is a property of the initialized global, not its current caller. */
+JSBool
+js_IsModernGlobal(JSContext *cx, JSObject *global)
+{
+    ClassCacheEntry *entry;
+    JSBool modern = JS_FALSE;
+    JS_LOCK_GC(cx->runtime);
+    if (cx->runtime->classObjectCache) {
+        entry = (ClassCacheEntry *)JS_DHashTableOperate(cx->runtime->classObjectCache,
+                                                       global, JS_DHASH_LOOKUP);
+        if (JS_DHASH_ENTRY_IS_BUSY(&entry->hdr)) modern = entry->modernGlobal;
+    }
+    JS_UNLOCK_GC(cx->runtime);
+    return modern;
 }
 
 JSObject *
