@@ -106,6 +106,8 @@ JS_PROTO(UnusedProto28,         28,     js_InitNullClass)
 JS_PROTO(File,                  29,     FILE_INIT)
 JS_PROTO(Block,                 30,     js_InitBlockClass)
 JS_PROTO(Symbol,                31,     js_InitSymbolClass)
+JS_PROTO(Map,                   32,     js_InitMapClass)
+JS_PROTO(Set,                   33,     js_InitSetClass)
 
 #undef SCRIPT_INIT
 #undef XML_INIT

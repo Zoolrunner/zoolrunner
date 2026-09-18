@@ -387,3 +387,10 @@ passes 24,063 cases, with 4,503 failures, 14 unsupported module cases and two
 harness errors; all 11,540 ES5 cases pass. All four applications pass packaged
 compatibility checks. Other platforms remain unverified for this batch.
 Generator methods, super and computed destructuring remain separate work.
+
+Map and Set support ordered storage, iterable construction, mutation-safe
+iteration and callback/GC handling. On macOS arm64, the full ES2015 run passes
+24,708 cases, with 3,858 failures, 14 unsupported module cases and two harness
+errors. All 11,540 ES5 cases and all four packaged application checks pass.
+Weak collections and arrow functions remain separate work; other platforms have
+not been revalidated for this batch.

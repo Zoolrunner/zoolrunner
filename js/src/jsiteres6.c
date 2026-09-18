@@ -29,8 +29,8 @@ static JSClass stringIteratorClass = {
 static JSBool ArrayNext(JSContext *, JSObject *, uintN, jsval *, jsval *);
 static JSBool StringNext(JSContext *, JSObject *, uintN, jsval *, jsval *);
 
-static JSObject *
-BuiltinGlobal(JSContext *cx, jsval *argv)
+JSObject *
+js_BuiltinGlobal(JSContext *cx, jsval *argv)
 {
     JSObject *global = JSVAL_TO_OBJECT(argv[-2]), *parent;
     while ((parent = OBJ_GET_PARENT(cx, global)) != NULL)
@@ -39,8 +39,8 @@ BuiltinGlobal(JSContext *cx, jsval *argv)
 }
 
 /* Intrinsics belong to the executing built-in, including legacy callers. */
-static JSObject *
-BuiltinPrototype(JSContext *cx, JSObject *global, JSProtoKey key)
+JSObject *
+js_BuiltinPrototype(JSContext *cx, JSObject *global, JSProtoKey key)
 {
     JSObject *ctor = js_GetCachedClassObject(cx, global, key);
     jsval value;
@@ -97,7 +97,7 @@ IteratorPrototype(JSContext *cx, JSObject *global, JSRealmIntrinsic key)
     if (proto)
         return proto;
     parent = key == JS_INTRINSIC_ITERATOR_PROTO
-             ? BuiltinPrototype(cx, global, JSProto_Object)
+             ? js_BuiltinPrototype(cx, global, JSProto_Object)
              : IteratorPrototype(cx, global, JS_INTRINSIC_ITERATOR_PROTO);
     if (!parent)
         return NULL;
@@ -120,8 +120,8 @@ IteratorPrototype(JSContext *cx, JSObject *global, JSRealmIntrinsic key)
     return ok ? js_GetCachedIntrinsic(cx, global, key) : NULL;
 }
 
-static JSBool
-IteratorResult(JSContext *cx, JSObject *global, jsval value, JSBool done, jsval *rval)
+JSBool
+js_IteratorResult(JSContext *cx, JSObject *global, jsval value, JSBool done, jsval *rval)
 {
     jsval roots[2];
     JSTempValueRooter root;
@@ -130,7 +130,7 @@ IteratorResult(JSContext *cx, JSObject *global, jsval value, JSBool done, jsval 
     roots[0] = value;
     roots[1] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
-    proto = BuiltinPrototype(cx, global, JSProto_Object);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Object);
     result = proto ? js_NewObject(cx, &js_ObjectClass, proto, global) : NULL;
     if (result) {
         roots[1] = OBJECT_TO_JSVAL(result);
@@ -183,7 +183,7 @@ ArrayNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JS_PUSH_TEMP_ROOT(cx, 5, roots, &root);
     indexRoot.id = INT_TO_JSID(0);
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIteratorId, &indexRoot.root);
-    global = BuiltinGlobal(cx, argv);
+    global = js_BuiltinGlobal(cx, argv);
     if (!JS_GetReservedSlot(cx, iterator, 0, &roots[1])) goto out;
     if (JSVAL_IS_VOID(roots[1])) { done = JS_TRUE; goto result; }
     target = JSVAL_TO_OBJECT(roots[1]);
@@ -207,7 +207,7 @@ ArrayNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (kind == INT_TO_JSVAL(1)) {
             roots[4] = roots[3];
         } else {
-            proto = BuiltinPrototype(cx, global, JSProto_Array);
+            proto = js_BuiltinPrototype(cx, global, JSProto_Array);
             if (!proto) goto out;
             pair = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
             if (!pair) goto out;
@@ -217,7 +217,7 @@ ArrayNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         }
     }
   result:
-    ok = IteratorResult(cx, global, roots[4], done, rval);
+    ok = js_IteratorResult(cx, global, roots[4], done, rval);
   out:
     JS_POP_TEMP_ROOT(cx, &indexRoot.root);
     JS_POP_TEMP_ROOT(cx, &root);
@@ -261,7 +261,7 @@ StringNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     if (!js_NewNumberValue(cx, (jsdouble)(index + count), &roots[2]) ||
         !JS_SetReservedSlot(cx, iterator, 1, roots[2])) goto out;
   result:
-    ok = IteratorResult(cx, BuiltinGlobal(cx, argv), roots[3], done, rval);
+    ok = js_IteratorResult(cx, js_BuiltinGlobal(cx, argv), roots[3], done, rval);
   out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
@@ -273,7 +273,7 @@ NewIterator(JSContext *cx, jsval *argv, jsval target, JSRealmIntrinsic key,
 {
     JSTempValueRooter root;
     jsval roots[2];
-    JSObject *global = BuiltinGlobal(cx, argv), *proto, *iterator;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *proto, *iterator;
     JSBool ok = JS_FALSE;
     roots[0] = target;
     roots[1] = JSVAL_VOID;
@@ -379,4 +379,42 @@ JSBool
 js_InitStringIteratorMethod(JSContext *cx, JSObject *global, JSObject *proto)
 {
     return DefineIteratorMethod(cx, global, proto, StringIterator);
+}
+
+JSObject *
+js_GetIteratorPrototype(JSContext *cx, JSObject *global)
+{
+    return IteratorPrototype(cx, global, JS_INTRINSIC_ITERATOR_PROTO);
+}
+
+/* ES2015 IteratorClose on a throw completion. A return getter failure takes
+ * precedence; after a successful GetMethod the original throw takes precedence
+ * over the return call's result or exception (7.4.6). */
+void
+js_IteratorCloseThrow(JSContext *cx, JSObject *iterator)
+{
+    jsval roots[3];
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!JS_IsExceptionPending(cx))
+        return; /* Do not call user code following an uncatchable failure. */
+    roots[0] = roots[1] = roots[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
+    if (!JS_GetPendingException(cx, &roots[0]))
+        goto out;
+    JS_ClearPendingException(cx);
+    ok = JS_GetProperty(cx, iterator, "return", &roots[1]);
+    if (!ok)
+        goto out;
+    if (!JSVAL_IS_VOID(roots[1]) && !JSVAL_IS_NULL(roots[1])) {
+        if (!js_IsCallable(cx, roots[1])) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_NOT_FUNCTION, "iterator return");
+            goto out;
+        }
+        js_InternalCall(cx, iterator, roots[1], 0, NULL, &roots[2]);
+    }
+    JS_SetPendingException(cx, roots[0]);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
 }

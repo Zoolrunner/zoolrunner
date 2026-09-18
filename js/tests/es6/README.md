@@ -1094,3 +1094,35 @@ navigation/layout checks; Suite passes Composer lifecycle and ChatZilla checks,
 and packaged standalone XULRunner passes ChatZilla initialization/input checks.
 Other platforms have not been revalidated. Computed destructuring, generator
 methods, super and remaining parameter grammar still require work.
+
+### Map and Set
+
+Native Map and Set now use an ordered SameValueZero hash table with tombstones
+for live iteration. Methods, iterable constructors, size accessors, iterator
+aliases, tags, species and iterator cleanup are implemented. Clear/delete/reinsert
+and additions during forEach or next retain iteration order. Shared native
+storage ownership protects either finalizer order; iterators also trace their
+collection objects. Native operations release object locks before callbacks,
+error reporting or GC allocation. The collection classes append prototype keys
+without increasing the classic global reserved-slot requirement.
+
+The storage regression `TestCollectionTable.c` currently passes 229,123 checks,
+including 50,000 deterministic randomized operations compared with an independent
+ordered-array model. A separate ASan/UBSan build of the storage and test passes;
+this is not whole-engine instrumentation. That build disables shift-base checks
+for the historical signed `INT_TO_JSVAL` tagging macro. The focused JavaScript
+fixture passes 53 checks, and the native cross-global/lifetime probe passes 26.
+The pinned Map subset passes 257/277; its remaining cases require WeakMap.
+The Set subset passes 352/368, retaining missing WeakSet and arrow-function
+coverage. These subsets do not replace the full suite.
+
+The complete pinned ES2015 run passes **24,708 cases**, with **3,858 failures**,
+14 unsupported module cases and two Float64Array harness errors. All 645 newly
+passing cases are gains; no previously passing case regresses. The runtime hash
+stays unchanged, with no crashes or timeouts. All **11,540 ES5 cases** pass.
+All four macOS arm64 applications compile, package and pass relocated shell,
+native embedding and desktop checks, including Map/Set in chrome and content
+window globals. Calendar passes eight unit suites and four views; Browser passes
+169 navigation/layout checks; Suite passes Composer and ChatZilla checks; packaged
+standalone XULRunner passes ChatZilla initialization/input. Other platforms have
+not been revalidated for this batch.

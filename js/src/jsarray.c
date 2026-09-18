@@ -2130,38 +2130,6 @@ MarkArrayFromId(JSContext *cx, JSTempValueRooter *root)
         js_MarkAtom(cx, JSID_TO_ATOM(id));
 }
 
-/* ES2015 IteratorClose on a throw completion. A return getter failure takes
- * precedence; after a successful GetMethod the original throw takes precedence
- * over the return call's result or exception (7.4.6). */
-static void
-ArrayFromCloseThrow(JSContext *cx, JSObject *iterator)
-{
-    jsval roots[3];
-    JSTempValueRooter root;
-    JSBool ok;
-    if (!JS_IsExceptionPending(cx))
-        return; /* Do not call user code following an uncatchable failure. */
-    roots[0] = roots[1] = roots[2] = JSVAL_VOID;
-    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
-    if (!JS_GetPendingException(cx, &roots[0]))
-        goto out;
-    JS_ClearPendingException(cx);
-    ok = JS_GetProperty(cx, iterator, "return", &roots[1]);
-    if (!ok)
-        goto out;
-    if (!JSVAL_IS_VOID(roots[1]) && !JSVAL_IS_NULL(roots[1])) {
-        if (!js_IsCallable(cx, roots[1])) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
-                                 JSMSG_NOT_FUNCTION, "iterator return");
-            goto out;
-        }
-        js_InternalCall(cx, iterator, roots[1], 0, NULL, &roots[2]);
-    }
-    JS_SetPendingException(cx, roots[0]);
-  out:
-    JS_POP_TEMP_ROOT(cx, &root);
-}
-
 static JSBool
 ArrayFromCreate(JSContext *cx, jsval *argv, JSBool iterable,
                 jsdouble length, jsval *rval)
@@ -2284,19 +2252,19 @@ array_from(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (mapping) {
             if (!js_NewNumberValue(cx, index, &roots[6])) goto out;
             if (!js_InternalInvokeValue(cx, thisv, mapfn, 0, 2, &roots[5], &roots[7])) {
-                if (iterable) ArrayFromCloseThrow(cx, iterator);
+                if (iterable) js_IteratorCloseThrow(cx, iterator);
                 goto out;
             }
             roots[5] = roots[7];
         }
         if (!js_CreateDataPropertyOrThrow(cx, array, indexRoot.id, roots[5])) {
-            if (iterable) ArrayFromCloseThrow(cx, iterator);
+            if (iterable) js_IteratorCloseThrow(cx, iterator);
             goto out;
         }
         if (index == 9007199254740991.0) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                                  JSMSG_CANT_CONVERT_TO, "iteration index", "safe integer");
-            if (iterable) ArrayFromCloseThrow(cx, iterator);
+            if (iterable) js_IteratorCloseThrow(cx, iterator);
             goto out;
         }
         ++index;

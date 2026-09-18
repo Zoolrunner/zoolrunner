@@ -1137,3 +1137,14 @@ embedding accessor access checks, identifier references in shorthand fields,
 and legacy parsing. Bytecode changes require cache-version and decompiler
 updates. Computed destructuring, generator methods and super remain separate
 features; do not confuse object-literal support with their implementation.
+
+For Map/Set changes, run `js/tests/es6/collections.js`, `TestCollections.c`, and
+`TestCollectionTable.c`. Preserve SameValueZero keys, insertion order, live
+iteration across clear/delete/reinsert, sticky exhaustion and defining-realm
+iterator results. Never retain hash/vector pointers across callbacks or GC.
+Keep shared native storage ownership safe in either collection/iterator
+finalizer order, while tracing the collection from a live iterator. Allocate
+storage without GC under object locks, then unlock before reporting errors or
+calling JavaScript. Deleted configurable Map/Set global bindings must not be
+resurrected by lazy resolution or standard-class enumeration; keep their
+intrinsics available through the private cache without enlarging classic globals.

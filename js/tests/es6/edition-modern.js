@@ -72,6 +72,8 @@ function modernWindowEdition() {
            "\ud83d\ude00"[Symbol.iterator]().next().value.length === 2 &&
            (function(v) { return arguments[Symbol.iterator]().next().value === v; })(17) &&
            Function("var values = 19; with ([]) { return values === 19; }")() &&
+           new Map([[windowSymbol, 31]]).get(windowSymbol) === 31 &&
+           Array.from(new Set([1, 1, 2])).join() === "1,2" &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

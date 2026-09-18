@@ -70,6 +70,7 @@
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jssymbol.h"
+#include "jscollection.h"
 #include "jsrealm.h"
 #include "jsopcode.h"
 #include "jsparse.h"
@@ -1287,6 +1288,8 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitRegExpClass(cx, obj) &&
            js_InitStringClass(cx, obj) &&
            js_InitSymbolClass(cx, obj) &&
+           js_InitMapClass(cx, obj) &&
+           js_InitSetClass(cx, obj) &&
 #if JS_HAS_SCRIPT_OBJECT
            js_InitScriptClass(cx, obj) &&
 #endif
@@ -1358,6 +1361,8 @@ static JSStdName standard_class_atoms[] = {
     {js_InitNumberClass,                EAGER_ATOM_AND_CLASP(Number)},
     {js_InitStringClass,                EAGER_ATOM_AND_CLASP(String)},
     {js_InitSymbolClass,                EAGER_ATOM_AND_CLASP(Symbol)},
+    {js_InitMapClass,                   EAGER_ATOM_AND_CLASP(Map)},
+    {js_InitSetClass,                   EAGER_ATOM_AND_CLASP(Set)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
     {js_InitExceptionClasses,           EAGER_ATOM_AND_CLASP(Error)},
     {js_InitRegExpClass,                EAGER_ATOM_AND_CLASP(RegExp)},
@@ -1543,6 +1548,13 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
             return JS_TRUE;
         }
 
+        /* A deleted configurable collection binding must stay deleted. Its
+         * intrinsic remains available through the private global cache. */
+        if ((stdnm->clasp == &js_MapClass || stdnm->clasp == &js_SetClass) &&
+            js_GetCachedClassObject(cx, obj,
+                (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(stdnm->clasp))) {
+            return JS_TRUE;
+        }
         if (!stdnm->init(cx, obj))
             return JS_FALSE;
         *resolved = JS_TRUE;
@@ -1587,6 +1599,11 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
         atom = StdNameToAtom(cx, &standard_class_atoms[i]);
         if (!atom)
             return JS_FALSE;
+        if ((standard_class_atoms[i].clasp == &js_MapClass ||
+             standard_class_atoms[i].clasp == &js_SetClass) &&
+            js_GetCachedClassObject(cx, obj,
+                (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(standard_class_atoms[i].clasp)))
+            continue;
         if (!AlreadyHasOwnProperty(cx, obj, atom) &&
             !standard_class_atoms[i].init(cx, obj)) {
             return JS_FALSE;
