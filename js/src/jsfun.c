@@ -49,6 +49,7 @@
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
+#include "jsbool.h"
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsdbgapi.h"
@@ -64,6 +65,7 @@
 #include "jsscope.h"
 #include "jsscript.h"
 #include "jsstr.h"
+#include "jssymbol.h"
 #include "jsexn.h"
 
 #if JS_HAS_GENERATORS
@@ -1624,6 +1626,131 @@ fun_hasInstance(JSContext *cx, JSObject *obj, jsval v, JSBool *bp)
     return js_IsDelegate(cx, JSVAL_TO_OBJECT(pval), v, bp);
 }
 
+/* ES2015 OrdinaryHasInstance is separate from the classic JSClass hook. */
+static JSBool
+OrdinaryHasInstance(JSContext *cx, jsval constructor, jsval value, JSBool *result)
+{
+    jsval roots[3];
+    JSTempValueRooter root;
+    JSObject *obj;
+    JSFunction *fun;
+    JSBool ok = JS_FALSE;
+
+    *result = JS_FALSE;
+    if (!js_IsCallable(cx, constructor))
+        return JS_TRUE;
+    if (!JS_CHECK_STACK_SIZE(cx, roots)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
+        return JS_FALSE;
+    }
+    roots[0] = constructor;
+    roots[1] = value;
+    roots[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
+    obj = JSVAL_TO_OBJECT(constructor);
+    fun = OBJ_GET_CLASS(cx, obj) == &js_FunctionClass
+          ? (JSFunction *)JS_GetPrivate(cx, obj) : NULL;
+    if (fun && (fun->flags & JSFUN_BOUND_FUNCTION)) {
+        if (JS_GetReservedSlot(cx, obj, 2, &roots[2]))
+            ok = js_InstanceOf(cx, roots[2], value, result);
+        goto out;
+    }
+    if (JSVAL_IS_PRIMITIVE(value)) {
+        ok = JS_TRUE;
+        goto out;
+    }
+    if (!OBJ_GET_PROPERTY(cx, obj,
+                          ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom),
+                          &roots[2]))
+        goto out;
+    if (JSVAL_IS_PRIMITIVE(roots[2])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_BAD_PROTOTYPE, "instanceof constructor");
+        goto out;
+    }
+    ok = js_IsDelegate(cx, JSVAL_TO_OBJECT(roots[2]), value, result);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_InstanceOf(JSContext *cx, jsval constructor, jsval value, JSBool *result)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    jsid id;
+    JSBool ok = JS_FALSE;
+
+    if (JSVAL_IS_PRIMITIVE(constructor)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_BAD_INSTANCEOF_RHS, "primitive");
+        return JS_FALSE;
+    }
+    if (!JS_CHECK_STACK_SIZE(cx, roots)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
+        return JS_FALSE;
+    }
+    roots[0] = constructor;
+    roots[1] = value;
+    roots[2] = roots[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_HAS_INSTANCE, &id) ||
+        !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(constructor), id, &roots[2]))
+        goto out;
+    if (!JSVAL_IS_NULL(roots[2]) && !JSVAL_IS_VOID(roots[2])) {
+        if (!js_IsCallable(cx, roots[2])) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_NOT_FUNCTION, "@@hasInstance");
+            goto out;
+        }
+        ok = js_InternalCall(cx, JSVAL_TO_OBJECT(constructor), roots[2],
+                             1, &roots[1], &roots[3]) &&
+             js_ValueToBoolean(cx, roots[3], result);
+    } else if (!js_IsCallable(cx, constructor)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_BAD_INSTANCEOF_RHS, "non-callable object");
+    } else {
+        ok = OrdinaryHasInstance(cx, constructor, value, result);
+    }
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+fun_symbolHasInstance(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                       jsval *rval)
+{
+    JSBool result;
+    if (!OrdinaryHasInstance(cx, argv[-1], argv[0], &result))
+        return JS_FALSE;
+    *rval = BOOLEAN_TO_JSVAL(result);
+    return JS_TRUE;
+}
+
+static JSBool
+InitHasInstance(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    JSAtom *name = js_Atomize(cx, "[Symbol.hasInstance]", 20, 0);
+    JSFunction *fun;
+    JSTempValueRooter root;
+    jsid id;
+    JSBool ok;
+    if (!name)
+        return JS_FALSE;
+    fun = js_NewFunction(cx, NULL, fun_symbolHasInstance, 1,
+                         JSFUN_STRICT | JSFUN_NO_CONSTRUCT, global, name);
+    if (!fun)
+        return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = js_WellKnownSymbolId(cx, JS_WKS_HAS_INSTANCE, &id) &&
+         OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(fun->object),
+                             NULL, NULL, JSPROP_READONLY | JSPROP_PERMANENT, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static uint32
 fun_mark(JSContext *cx, JSObject *obj, void *arg)
 {
@@ -2526,6 +2653,8 @@ js_InitFunctionClass(JSContext *cx, JSObject *obj)
         goto bad;
     if (!js_SetBuiltinMethodFlags(cx, proto, function_methods,
                                   JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+        goto bad;
+    if (!InitHasInstance(cx, obj, proto))
         goto bad;
     return proto;
 

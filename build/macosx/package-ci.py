@@ -274,6 +274,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-REGEXP-LITERALS checks=33 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed modern RegExp literal identity")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/has-instance.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-HAS-INSTANCE checks=34 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Symbol.hasInstance")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -293,7 +301,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestRealmIntrinsics.c",
                  "ES6-REALM-EMBEDDING checks=22 failures=0"),
                 ("es6/TestArrayOf.c", "ES6-ARRAY-OF-EMBEDDING checks=15 failures=0"),
-                ("es6/TestSymbolEmbedding.c", "ES6-SYMBOL-EMBEDDING checks=42 failures=0")):
+                ("es6/TestSymbolEmbedding.c", "ES6-SYMBOL-EMBEDDING checks=42 failures=0"),
+                ("es6/TestHasInstanceEmbedding.c", "ES6-HAS-INSTANCE-EMBEDDING checks=13 failures=0")):
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",

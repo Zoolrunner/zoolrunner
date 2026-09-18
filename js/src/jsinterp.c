@@ -5732,6 +5732,17 @@ interrupt:
           BEGIN_CASE(JSOP_INSTANCEOF)
             SAVE_SP_AND_PC(fp);
             rval = FETCH_OPND(-1);
+            if (JS_VERSION_IS_ES2015(cx)) {
+                lval = FETCH_OPND(-2);
+                if (!js_InstanceOf(cx, rval, lval, &cond)) {
+                    ok = JS_FALSE;
+                    goto out;
+                }
+                sp--;
+                STORE_OPND(-1, BOOLEAN_TO_JSVAL(cond));
+                len = JSOP_INSTANCEOF_LENGTH;
+                DO_NEXT_OP(len);
+            }
             if (JSVAL_IS_PRIMITIVE(rval) ||
                 !(obj = JSVAL_TO_OBJECT(rval))->map->ops->hasInstance) {
                 str = js_DecompileValueGenerator(cx, -1, rval, NULL);

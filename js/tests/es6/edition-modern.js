@@ -59,6 +59,8 @@ function modernWindowEdition() {
            (function() { var values = []; for (var i = 0; i < 2; ++i) values.push(/fresh/g);
                          values[0].lastIndex = 9;
                          return values[0] !== values[1] && values[1].lastIndex === 0; })() &&
+           (function() { var target = {}; target[Symbol.hasInstance] = function(v) { return v === 7; };
+                         return 7 instanceof target && !(8 instanceof target); })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

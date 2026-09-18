@@ -117,7 +117,7 @@ Calendar passes the 156 Number assertions, eight unchanged compatibility test
 files, startup and all four views. These application checks do not establish
 compatibility with every historical application.
 
-Major remaining work includes Symbol values and property keys; lexical scopes
+Major remaining work includes remaining well-known Symbol protocols; lexical scopes
 and TDZ; ES2015 functions, destructuring, classes and `super`; iterators and
 generators; collections and typed arrays; standard-library and regexp changes;
 Promise jobs; and module compilation, linking and evaluation. Preserve XDR and
@@ -913,6 +913,33 @@ passes, crashes or timeouts; runtime hashes remain unchanged. All **11,540
 required ES5 cases** pass. Reports are `artifacts/es6/regexp-literals-full.json`
 and `regexp-literals-es5.json`. The focused tests cover the identity gap that
 the pinned corpus did not expose.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.
+
+
+### Symbol.hasInstance
+
+Modern `instanceof` evaluates custom Symbol.hasInstance hooks, propagates getter
+and call exceptions, and converts the result to Boolean. Function.prototype's
+non-constructible hook implements OrdinaryHasInstance, including primitive
+short-circuiting and bound-target delegation. Native state remains rooted
+through callbacks. Explicit legacy script modes and the public JS_HasInstance
+API keep the historical native class dispatch.
+
+The focused fixture passes 34 checks on macOS arm64. All 75 pinned instanceof
+operator cases pass, and 22/24 Function.prototype Symbol.hasInstance cases pass;
+the remaining two require Proxy. TestHasInstanceEmbedding passes 13 checks for
+native class hooks, version transitions, custom modern hooks and GC.
+
+The full pinned ES2015 run passes **23,811 cases**, with **4,755 failures**,
+14 unsupported module cases and two harness errors. This gains 24 passes
+without losing any; there are no crashes or timeouts and runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/hasinstance-full.json` and `hasinstance-es5.json`.
 
 All four macOS arm64 applications build, package and pass shell, native
 embedding and desktop checks. Calendar's eight unit suites and four views,

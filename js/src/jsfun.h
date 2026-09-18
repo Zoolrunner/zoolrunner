@@ -88,6 +88,9 @@ extern JSBool
 js_IsCallable(JSContext *cx, jsval v);
 
 extern JSBool
+js_InstanceOf(JSContext *cx, jsval constructor, jsval value, JSBool *result);
+
+extern JSBool
 js_IsConstructor(JSContext *cx, jsval v);
 
 extern JSBool

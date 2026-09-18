@@ -1091,3 +1091,8 @@ identity. Run `js/tests/es6/regexp-literals.js`, the separate extended-atom
 `regexp-literals-wide.js`, and the edition/XDR and realm embedding probes.
 Keep normal and extended opcode dispatch/decompilation paths aligned and bump
 the bytecode cache version when introducing new instructions.
+
+For Symbol.hasInstance changes, run `js/tests/es6/has-instance.js` and
+`TestHasInstanceEmbedding.c`. Preserve native JSClass instance hooks for legacy
+scripts and the public JS_HasInstance API while validating modern custom hooks,
+bound targets, raw builtin receivers and collection during callbacks.

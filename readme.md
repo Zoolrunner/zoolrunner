@@ -338,3 +338,10 @@ four applications' packaged compatibility checks. The complete ES2015 result
 remains 23,787 passes and 4,779 failures, with 14 unsupported cases and two
 harness errors; all 11,540 ES5 cases pass. Other platforms have not been
 revalidated for this batch.
+
+Symbol.hasInstance custom dispatch and Function.prototype's ordinary instance
+check are implemented. The full macOS arm64 ES2015 run passes 23,811 cases,
+with 4,755 failures, 14 unsupported cases and two harness errors. All 11,540
+ES5 cases and all four applications' packaged compatibility checks pass.
+Legacy script modes and the public JS_HasInstance API preserve their native
+dispatch. Other platforms have not been revalidated for this batch.
