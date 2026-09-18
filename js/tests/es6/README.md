@@ -1539,3 +1539,37 @@ completed third subset is the final diagnostic result. A native fixture used
 `undefined` before initializing that global; replacing it with `void 0` preserves
 the assertion without requiring extra global bootstrap. Upstream tests are
 unchanged. Other operating systems and architectures have not been revalidated.
+
+### Array concat and species
+
+Modern concat observes Symbol.isConcatSpreadable, preserves sparse properties,
+uses ToLength and checked safe-integer output indices, and creates results through
+ArraySpeciesCreate. Foreign intrinsic Array constructors select the executing
+method's default Array rather than reading the foreign species accessor; custom
+constructors still participate. Primitive receiver wrappers use the method's
+realm. Modern Array has a configurable species getter returning its raw receiver.
+Legacy globals retain the previous concat implementation.
+
+Diagnostic concat coverage: 89/95 cases; the remaining six require typed arrays
+or classes. Focused checks: 29 script and 36 native embedding checks under
+MallocScribble, including GC, foreign contexts, cloned methods, primitive wrapper
+realms, custom species, Proxy trap order and native-loop interruption. The native
+GC fixture clears its non-deletable boxed-object variable before collecting the
+foreign global. The full pinned ES2015 run passes **26,330 cases**, with **2,236
+failures**, 14 unsupported module cases and two harness errors: **49 gained,
+zero lost** relative to Date. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/array-concat-full-final2.json` and
+`array-concat-es5-final2.json`; snapshot:
+`/tmp/zr-array-concat-conformance-final2-20260918`.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass. Calendar passes eight unit suites and four views; Browser passes 169
+navigation/layout assertions; Suite passes 24 lifecycle assertions and ChatZilla;
+standalone XULRunner passes packaged ChatZilla initialization/input. Reports:
+`artifacts/es6/array-concat-runtime`. Other platforms remain unvalidated.
+
+Modern concat has a distinct native entry point, so a JSAPI clone into a legacy
+global preserves the modern method's semantics while using that destination's
+intrinsics. The superseded first full runs were stopped before completion and
+must not be reported as validation; final runs use a second frozen snapshot.

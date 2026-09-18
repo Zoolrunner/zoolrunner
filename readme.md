@@ -477,11 +477,19 @@ other platforms have not been revalidated. See [replacement validation notes](js
 
 The Date follow-up adds Symbol.toPrimitive, modern prototype/constructor behavior,
 zero-argument ordinary conversion and legacy-global isolation. All 898 Date
-cases pass. The latest full macOS arm64 ES2015 run passes **26,281 cases**, with
+cases pass. The Date full macOS arm64 ES2015 run passes **26,281 cases**, with
 **2,285 failures**, 14 unsupported module cases and two harness errors: 32 gained,
 zero lost. All 11,540 ES5.1 cases and all four build, package and desktop checks
 pass. Full ES6 and other-platform validation remain incomplete. See
 [Date validation notes](js/tests/es6/README.md#date-conversion-and-prototype).
+
+The concat follow-up adds Symbol.isConcatSpreadable, Array species construction,
+sparse results, safe-integer indices and method-realm handling. Legacy globals
+retain their historical concat. The latest full macOS arm64 ES2015 run passes
+**26,330 cases**, with **2,236 failures**, 14 unsupported module cases and two
+harness errors: 49 gained, zero lost. All 11,540 ES5.1 cases and all four build,
+package and desktop checks pass. Full ES6 and other-platform validation remain
+incomplete. See [concat validation notes](js/tests/es6/README.md#array-concat-and-species).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

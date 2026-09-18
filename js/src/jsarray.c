@@ -54,6 +54,7 @@
 #include "jsconfig.h"
 #include "jsfun.h"
 #include "jsiteres6.h"
+#include "jsbool.h"
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jslock.h"
@@ -1362,6 +1363,150 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 /*
  * Python-esque sequence operations.
  */
+/* ToObject wrappers and default result arrays belong to the method's realm. */
+static JSObject *
+ArrayMethodObject(JSContext *cx, JSObject *global, jsval value)
+{
+    JSProtoKey key;
+    JSClass *clasp;
+    JSObject *proto, *obj;
+    if (!JSVAL_IS_PRIMITIVE(value)) return JSVAL_TO_OBJECT(value);
+    if (JSVAL_IS_NULL(value) || JSVAL_IS_VOID(value)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return NULL;
+    }
+    if (JSVAL_IS_SYMBOL(value)) { key = JSProto_Symbol; clasp = &js_SymbolClass; }
+    else if (JSVAL_IS_STRING(value)) { key = JSProto_String; clasp = &js_StringClass; }
+    else if (JSVAL_IS_BOOLEAN(value)) { key = JSProto_Boolean; clasp = &js_BooleanClass; }
+    else { key = JSProto_Number; clasp = &js_NumberClass; }
+    proto = js_BuiltinPrototype(cx, global, key);
+    if (!proto) return NULL;
+    obj = js_NewObject(cx, clasp, proto, global);
+    if (!obj) return NULL;
+    if (key == JSProto_Symbol) {
+        if (!JS_SetReservedSlot(cx, obj, 0, value)) return NULL;
+    } else OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, value);
+    return obj;
+}
+
+static JSBool
+ArraySpeciesCreate(JSContext *cx, JSObject *original, JSObject *global,
+                    jsdouble length, jsval *rval)
+{
+    jsval values[3] = {OBJECT_TO_JSVAL(original), OBJECT_TO_JSVAL(global), JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool isArray, ok = JS_FALSE;
+    JSObject *realm, *proto, *array;
+    jsid id;
+    jsval *base, *oldsp;
+    JSStackFrame *frame;
+    void *mark;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!js_IsArray(cx, original, &isArray)) goto out;
+    if (isArray) {
+        if (!JS_GetProperty(cx, original, "constructor", &values[2])) goto out;
+        if (js_IsConstructor(cx, values[2])) {
+            realm = js_ConstructorGlobal(cx, JSVAL_TO_OBJECT(values[2]));
+            if (!realm) goto out;
+            if (realm != global && values[2] == OBJECT_TO_JSVAL(js_GetCachedClassObject(cx, realm, JSProto_Array)))
+                values[2] = JSVAL_VOID;
+        }
+        if (!JSVAL_IS_PRIMITIVE(values[2])) {
+            if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id) ||
+                !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[2]), id, &values[2])) goto out;
+            if (JSVAL_IS_NULL(values[2])) values[2] = JSVAL_VOID;
+        }
+    }
+    if (JSVAL_IS_VOID(values[2])) {
+        if (length > MAXINDEX) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH); goto out;
+        }
+        proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+        if (!proto) goto out;
+        array = js_NewArrayObjectWithProto(cx, (jsuint)length, NULL, proto, global);
+        if (array) { *rval = OBJECT_TO_JSVAL(array); ok = JS_TRUE; }
+        goto out;
+    }
+    if (!js_IsConstructor(cx, values[2])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "Array species"); goto out;
+    }
+    base = js_AllocStack(cx, 3, &mark);
+    if (!base) goto out;
+    base[0] = values[2]; base[1] = JSVAL_NULL; base[2] = JSVAL_VOID;
+    frame = cx->fp; oldsp = frame->sp; frame->sp = base + 3;
+    ok = js_NewNumberValue(cx, length, &base[2]) &&
+         js_InvokeConstructorWithNewTarget(cx, base, 1, JSVAL_TO_OBJECT(values[2]));
+    if (ok) *rval = base[0];
+    frame->sp = oldsp; js_FreeStack(cx, mark);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayModernConcat(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *array, *item, *holder;
+    JSProperty *property;
+    JSBool spread, present, ok = JS_FALSE;
+    jsdouble length = 0, itemLength, k;
+    uintN i;
+    uint32 iterations = 0;
+    jsid symbol, id;
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    obj = ArrayMethodObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!ArraySpeciesCreate(cx, obj, global, 0, &values[1]) ||
+        !js_WellKnownSymbolId(cx, JS_WKS_IS_CONCAT_SPREADABLE, &symbol)) goto out;
+    array = JSVAL_TO_OBJECT(values[1]);
+    for (i = 0; i <= argc; ++i) {
+        values[2] = i ? argv[i - 1] : values[0];
+        spread = JS_FALSE;
+        if (!JSVAL_IS_PRIMITIVE(values[2])) {
+            item = JSVAL_TO_OBJECT(values[2]);
+            if (!OBJ_GET_PROPERTY(cx, item, symbol, &values[3])) goto out;
+            if (JSVAL_IS_VOID(values[3])) {
+                if (!js_IsArray(cx, item, &spread)) goto out;
+            } else if (!js_ValueToBoolean(cx, values[3], &spread)) goto out;
+        } else item = NULL;
+        if (spread) {
+            if (!js_ArrayLikeLength(cx, item, &itemLength)) goto out;
+            if (itemLength > 9007199254740991.0 - length) goto tooLong;
+            for (k = 0; k < itemLength; ++k, ++length) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, k, &id)) goto out;
+                values[5] = ID_TO_VALUE(id);
+                if (!OBJ_LOOKUP_PROPERTY(cx, item, id, &holder, &property)) goto out;
+                present = property != NULL;
+                if (present) {
+                    OBJ_DROP_PROPERTY(cx, holder, property);
+                    if (!OBJ_GET_PROPERTY(cx, item, id, &values[4]) ||
+                        !js_ArrayLikeIndex(cx, length, &id)) goto out;
+                    values[5] = ID_TO_VALUE(id);
+                    if (!js_CreateDataPropertyOrThrow(cx, array, id, values[4])) goto out;
+                }
+            }
+        } else {
+            if (length >= 9007199254740991.0) goto tooLong;
+            if (!js_ArrayLikeIndex(cx, length, &id)) goto out;
+            values[5] = ID_TO_VALUE(id);
+            if (!js_CreateDataPropertyOrThrow(cx, array, id, values[2])) goto out;
+            ++length;
+        }
+    }
+    if (!js_NewNumberValue(cx, length, &values[3]) ||
+        !js_SetPropertyOrThrow(cx, array, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[3])) goto out;
+    *rval = values[1]; ok = JS_TRUE; goto out;
+  tooLong:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO, "concat length", "safe integer");
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static JSBool
 array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -2393,10 +2538,40 @@ ArrayUnscopables(JSContext *cx, JSObject *global, JSObject *proto)
     return ok;
 }
 
+static JSBool
+ArraySpecies(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = argv[-1]; return JS_TRUE;
+}
+
+static JSBool
+InitArraySpecies(JSContext *cx, JSObject *global, JSObject *ctor, JSObject *proto)
+{
+    JSFunction *fun;
+    JSTempValueRooter root;
+    jsid id;
+    jsval value;
+    JSBool ok;
+    if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id)) return JS_FALSE;
+    fun = JS_NewFunction(cx, ArraySpecies, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT, global, "get [Symbol.species]");
+    if (!fun) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = OBJ_DEFINE_PROPERTY(cx, ctor, id, JSVAL_VOID, (JSPropertyOp)fun->object,
+                             NULL, JSPROP_GETTER | JSPROP_SHARED, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    if (!ok || !JS_GetProperty(cx, proto, "concat", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = ArrayModernConcat;
+    fun->flags |= JSFUN_STRICT;
+    return JS_TRUE;
+}
+
 JSObject *
 js_InitArrayClass(JSContext *cx, JSObject *obj)
 {
     JSObject *proto, *ctor;
+    JSBool modern = js_GetCachedClassObject(cx, obj, JSProto_Object)
+                    ? js_IsModernGlobal(cx, obj) : JS_VERSION_IS_ES2015(cx);
 
     proto = JS_InitClass(cx, obj, NULL, &js_ArrayClass, Array, 1,
                          NULL, array_methods, NULL, NULL);
@@ -2418,6 +2593,7 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
         !js_InitArrayIteratorMethods(cx, obj, proto) ||
         !ArrayUnscopables(cx, obj, proto))
         return NULL;
+    if (modern && !InitArraySpecies(cx, obj, ctor, proto)) return NULL;
     return proto;
 }
 

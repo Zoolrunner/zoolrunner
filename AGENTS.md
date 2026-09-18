@@ -1240,3 +1240,9 @@ legacy globals retain their historical NaN-valued prototype and hint-sensitive
 valueOf. Exercise native Date creation, cloned conversion methods, foreign
 contexts, getter exceptions, removal of Symbol.toPrimitive and GC callbacks.
 Do not route ordinary primitive conversion back through its symbol hook.
+
+For concat/species changes, run `array-concat.js` and `TestArrayConcat.c`.
+Preserve HasProperty/Get ordering, sparse entries, safe-integer output limits,
+custom result property definitions and final throwing length assignment. Check
+foreign intrinsic Array handling, primitive wrapper realms, callback GC,
+cloned methods, native loop interruption and legacy-global isolation.
