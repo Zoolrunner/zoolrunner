@@ -35,6 +35,12 @@ function modernWindowEdition() {
     return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
            constructed.target === WindowConstructor && constructed.evaluated === WindowConstructor &&
            WindowConstructor().target === undefined &&
+           (function() { var order = [], object = {}, key = {
+                             toString:function() { order.push('key'); return 'value'; }
+                         };
+                         object[key] = (order.push('rhs'), 7);
+                         object[key] += (order.push('rhs'), 3);
+                         return object.value === 10 && order.join() === 'key,rhs,key,rhs'; })() &&
            metadata && inferredMetadata && immutable && symbolChecks &&
            modernObject.radixValue === 20 && modernObject[windowSymbol]() === modernObject &&
            modernObject[windowSymbol].name === "[window]" && modernObject.computedAccessor === 27 &&

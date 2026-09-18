@@ -4090,12 +4090,10 @@ interrupt:
             }
           END_CASE(JSOP_GETPROP)
 
-          BEGIN_CASE(JSOP_SETPROP)
+          BEGIN_LITOPX_CASE(JSOP_SETPROP, 0)
             /* Pop the right-hand side into rval for OBJ_SET_PROPERTY. */
             rval = FETCH_OPND(-1);
 
-            /* Get an immediate atom naming the property. */
-            atom = GET_ATOM(cx, script, pc);
             id   = ATOM_TO_JSID(atom);
             PROPERTY_OP(-2, {
                 if (JSVAL_IS_PRIMITIVE(lval))
@@ -4576,6 +4574,8 @@ interrupt:
               case JSOP_REGEXP:       goto do_JSOP_REGEXP;
               case JSOP_NEWREGEXP:    goto do_JSOP_NEWREGEXP;
               case JSOP_SETCONST:     goto do_JSOP_SETCONST;
+              case JSOP_SETPROP:      goto do_JSOP_SETPROP;
+              case JSOP_INITPROP:     goto do_JSOP_INITPROP;
               case JSOP_STRING:       goto do_JSOP_STRING;
 #if JS_HAS_XML_SUPPORT
               case JSOP_XMLCDATA:     goto do_JSOP_XMLCDATA;
@@ -5595,10 +5595,19 @@ interrupt:
           BEGIN_CASE(JSOP_GETTER)
           BEGIN_CASE(JSOP_SETTER)
             op2 = (JSOp) *++pc;
+            atom = NULL;
+            if (op2 == JSOP_LITOPX) {
+                atomIndex = GET_LITERAL_INDEX(pc);
+                atom = js_GetAtom(cx, &script->atomMap, atomIndex);
+                op2 = (JSOp) pc[1 + LITERAL_INDEX_LEN];
+                JS_ASSERT(op2 == JSOP_SETPROP || op2 == JSOP_INITPROP);
+                pc += JSOP_LITOPX_LENGTH - (1 + ATOM_INDEX_LEN);
+            }
             switch (op2) {
               case JSOP_SETNAME:
               case JSOP_SETPROP:
-                atom = GET_ATOM(cx, script, pc);
+                if (!atom)
+                    atom = GET_ATOM(cx, script, pc);
                 id   = ATOM_TO_JSID(atom);
                 rval = FETCH_OPND(-1);
                 i = -1;
@@ -5616,7 +5625,8 @@ interrupt:
                 JS_ASSERT(sp - fp->spbase >= 2);
                 rval = FETCH_OPND(-1);
                 i = -1;
-                atom = GET_ATOM(cx, script, pc);
+                if (!atom)
+                    atom = GET_ATOM(cx, script, pc);
                 id   = ATOM_TO_JSID(atom);
                 goto gs_get_lval;
 
@@ -5700,6 +5710,27 @@ interrupt:
             cx->weakRoots.newborn[GCX_OBJECT] = JSVAL_TO_GCTHING(lval);
           END_CASE(JSOP_ENDINIT)
 
+          /* Form a property reference before evaluating its assignment RHS.
+           * Keep primitive receivers raw; boxing belongs to GetValue/PutValue.
+           * For computed references the key expression has already run, but
+           * its conversion must follow the null/undefined base check. */
+          BEGIN_CASE(JSOP_CHECKPROP)
+          BEGIN_CASE(JSOP_CHECKELEMENT)
+            lval = FETCH_OPND(op == JSOP_CHECKPROP ? -1 : -2);
+            SAVE_SP_AND_PC(fp);
+            if (JSVAL_IS_NULL(lval) || JSVAL_IS_VOID(lval)) {
+                (void) js_ValueToNonNullObject(cx, lval);
+                ok = JS_FALSE;
+                goto out;
+            }
+            if (op == JSOP_CHECKELEMENT) {
+                ok = js_ValueToPropertyId(cx, FETCH_OPND(-1), &id);
+                if (!ok) goto out;
+                STORE_OPND(-1, ID_TO_VALUE(id));
+            }
+            obj = NULL;
+          END_CASE(JSOP_CHECKPROP)
+
           BEGIN_CASE(JSOP_PROPERTYKEY)
             SAVE_SP_AND_PC(fp);
             ok = js_ValueToPropertyId(cx, FETCH_OPND(-1), &id);
@@ -5732,13 +5763,11 @@ interrupt:
             i = -2;
             goto do_init;
 
-          BEGIN_CASE(JSOP_INITPROP)
+          BEGIN_LITOPX_CASE(JSOP_INITPROP, 0)
             /* Pop the property's value into rval. */
             JS_ASSERT(sp - fp->spbase >= 2);
             rval = FETCH_OPND(-1);
 
-            /* Get the immediate property name into id. */
-            atom = GET_ATOM(cx, script, pc);
             id   = ATOM_TO_JSID(atom);
             i = -1;
             goto do_init;

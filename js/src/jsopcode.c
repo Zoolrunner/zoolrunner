@@ -3462,6 +3462,19 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                         goto do_fornameinloop;
                     goto do_forpropinloop;
                 }
+                /* Block/catch notes also belong to the extended prefix.
+                 * Keep its address and full length when entering the block,
+                 * or a wide catch falls through to the bare EXCEPTION op. */
+                if (op == JSOP_ENTERBLOCK)
+                    goto do_JSOP_ENTERBLOCK;
+                /* Property writes already have their value on the stack.
+                 * Keep both their operand order and prefix source notes. */
+                if (op == JSOP_SETPROP || op == JSOP_INITPROP) {
+                    atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
+                    if (op == JSOP_SETPROP)
+                        goto do_setprop;
+                    goto do_initprop_atom;
+                }
                 pc += len - (1 + ATOM_INDEX_LEN);
                 cs = &js_CodeSpec[op];
                 len = cs->length;
@@ -3870,6 +3883,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 
               case JSOP_INITPROP:
                 atom = GET_ATOM(cx, jp->script, pc);
+              do_initprop_atom:
                 xval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom),
                                    (jschar)
                                    (ATOM_IS_IDENTIFIER(atom) ? 0 : '\''));
@@ -3927,6 +3941,8 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 #endif
                 break;
 
+              case JSOP_CHECKPROP:
+              case JSOP_CHECKELEMENT:
               case JSOP_PROPERTYKEY:
                 todo = -2; /* Conversion has no extra source syntax. */
                 break;

@@ -1331,3 +1331,13 @@ decompilation and XDR. Bytecode cache version 40 adds the new.target opcode;
 keep cache-version assertions synchronized when adding later opcodes. Selected
 legacy script versions retain their grammar. Ordinary-function support alone
 is not arrow-function or class support.
+
+For property-reference evaluation changes, run `assignment-reference.js`,
+`assignment-reference-wide.js`, `TestEditionEmbedding.c` and mixed-edition
+chrome/content checks. Modern computed assignments must check the base and
+convert the key before the RHS, then reuse that key for GetValue and PutValue;
+keep primitive setter receivers raw and converted keys rooted across callbacks.
+Exercise extended atom indices, compound writes, legacy accessors, catch blocks
+and function decompilation. Extended property stores retain their original
+operand order; catch/block source notes belong to the extended opcode prefix.
+Cache version 41 adds reference checks and extended property-store dispatch.

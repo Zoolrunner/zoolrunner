@@ -374,7 +374,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("function-invoke.js", "ES6-FUNCTION-INVOKE checks=24 failures=0"),
                 ("reflection-keys.js", "ES6-REFLECTION-KEYS checks=16 failures=0"),
                 ("promise.js", "ES6-PROMISE checks=40 failures=0"),
-                ("new-target.js", "ES6-NEW-TARGET checks=38 failures=0")):
+                ("new-target.js", "ES6-NEW-TARGET checks=38 failures=0"),
+                ("assignment-reference.js", "ES6-ASSIGNMENT-REFERENCE checks=44 failures=0"),
+                ("assignment-reference-wide.js", "ES6-ASSIGNMENT-REFERENCE-WIDE checks=12 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

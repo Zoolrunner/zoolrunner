@@ -1773,6 +1773,7 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
                         op == JSOP_SETMETHOD ||
 #endif
                         op == JSOP_SETCONST || op == JSOP_CONSTASSIGN ||
+                        op == JSOP_SETPROP || op == JSOP_INITPROP ||
                         op == JSOP_FORNAME || op == JSOP_FORPROP)
                        ? JSOP_LITOPX
                        : (mode == JOF_NAME)
@@ -1795,7 +1796,7 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
           case JSOP_IMPORTPROP: op = JSOP_IMPORTELEM; break;
           case JSOP_INCNAME:    op = JSOP_INCELEM; break;
           case JSOP_INCPROP:    op = JSOP_INCELEM; break;
-          case JSOP_INITPROP:   op = JSOP_INITELEM; break;
+          case JSOP_INITPROP:   break;
           case JSOP_NAME:       op = JSOP_GETELEM; break;
           case JSOP_NAMEDEC:    op = JSOP_ELEMDEC; break;
           case JSOP_NAMEINC:    op = JSOP_ELEMINC; break;
@@ -1803,7 +1804,7 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
           case JSOP_PROPINC:    op = JSOP_ELEMINC; break;
           case JSOP_BINDNAME:   return JS_TRUE;
           case JSOP_SETNAME:    op = JSOP_SETELEM; break;
-          case JSOP_SETPROP:    op = JSOP_SETELEM; break;
+          case JSOP_SETPROP:    break;
 #if JS_HAS_EXPORT_IMPORT
           case JSOP_EXPORTNAME:
             ReportStatementTooLarge(cx, cg);
@@ -5327,6 +5328,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
           case TOK_DOT:
             if (!js_EmitTree(cx, cg, pn2->pn_expr))
                 return JS_FALSE;
+            if (JS_VERSION_IS_ES2015(cx) &&
+                js_Emit1(cx, cg, JSOP_CHECKPROP) < 0)
+                return JS_FALSE;
             ale = js_IndexAtom(cx, pn2->pn_atom, &cg->atomList);
             if (!ale)
                 return JS_FALSE;
@@ -5337,6 +5341,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             if (!js_EmitTree(cx, cg, pn2->pn_left))
                 return JS_FALSE;
             if (!js_EmitTree(cx, cg, pn2->pn_right))
+                return JS_FALSE;
+            if (JS_VERSION_IS_ES2015(cx) &&
+                js_Emit1(cx, cg, JSOP_CHECKELEMENT) < 0)
                 return JS_FALSE;
             break;
 #if JS_HAS_DESTRUCTURING
@@ -5367,7 +5374,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 #if JS_HAS_GETTER_SETTER
         if (op == JSOP_GETTER || op == JSOP_SETTER) {
             /* We'll emit these prefix bytecodes after emitting the r.h.s. */
-            if (atomIndex != (jsatomid) -1 && atomIndex >= JS_BIT(16)) {
+            if (atomIndex != (jsatomid) -1 && atomIndex >= JS_BIT(16) &&
+                pn2->pn_type != TOK_DOT) {
                 ReportStatementTooLarge(cx, cg);
                 return JS_FALSE;
             }
@@ -6208,9 +6216,6 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 ale = js_IndexAtom(cx, pn3->pn_atom, &cg->atomList);
                 if (!ale)
                     return JS_FALSE;
-                /* Extended property names must precede their values. */
-                if (ALE_INDEX(ale) >= JS_BIT(16))
-                    EMIT_ATOM_INDEX_OP(JSOP_STRING, ALE_INDEX(ale));
                 break;
               default:
                 JS_ASSERT(0);
@@ -6223,17 +6228,12 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 #if JS_HAS_GETTER_SETTER
             op = pn2->pn_op;
             if (op == JSOP_GETTER || op == JSOP_SETTER) {
-                if (pn3->pn_type != TOK_NUMBER &&
-                    ALE_INDEX(ale) >= JS_BIT(16)) {
-                    ReportStatementTooLarge(cx, cg);
-                    return JS_FALSE;
-                }
                 if (js_Emit1(cx, cg, op) < 0)
                     return JS_FALSE;
             }
 #endif
             /* Annotate JSOP_INITELEM so we decompile 2:c and not just c. */
-            if (pn3->pn_type == TOK_NUMBER || ALE_INDEX(ale) >= JS_BIT(16)) {
+            if (pn3->pn_type == TOK_NUMBER) {
                 if (js_NewSrcNote(cx, cg, SRC_INITPROP) < 0)
                     return JS_FALSE;
                 if (js_Emit1(cx, cg, JSOP_INITELEM) < 0)

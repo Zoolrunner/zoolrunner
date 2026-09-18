@@ -2019,3 +2019,42 @@ scanned a regexp as division. Operand scanning and a dedicated regression now
 preserve the required runtime TypeError for `new /pattern/()`. Invalid
 new.target assignment and destructuring targets report SyntaxError. Earlier
 `new-target-*` reports precede these corrections and are diagnostic only.
+
+### Property assignment references
+
+ES2015 property assignments now check null/undefined bases and convert computed
+keys before the right-hand side. Compound assignments reuse that converted key
+for reading and writing. The key expression still runs before the base check;
+primitive receivers stay unboxed until the actual property operation. Earlier
+selected-language modes retain their existing reference-evaluation behavior.
+This batch does not fix unresolved identifier references, lexical TDZ or
+remaining destructuring semantics.
+
+`assignment-reference.js` covers 44 checks, including callback exceptions,
+Symbol keys, single conversion, raw primitive setters, GC and decompilation.
+The initial fixture had 18 failures. `assignment-reference-wide.js` covers 12
+large-script execution/decompilation checks in ES2015 and JS 1.7, including
+accessor initializers and historical getter/setter assignment syntax. The
+large-script checks found existing extended-operand defects: property writes
+could reverse the key and value, and catch source notes were read at the wrong
+position, causing decompilation to fail. Extended stores now keep their operand
+order, and block/catch decompilation retains the prefix source position.
+
+Bytecode cache version 41 adds the reference-check opcodes and extended property
+store dispatch. Native XDR and real chrome/content fixtures include reference
+ordering. The complete pinned macOS arm64 run passes **27,064 ES2015 cases**,
+with **1,502 failures**, 14 unsupported module cases, two harness errors and no
+crashes/timeouts: **28 gained, zero lost** versus the new.target baseline.
+All **11,540 ES5.1 cases** and 23 runner integration checks pass. Both suites
+used the frozen runtime `/tmp/zr-assignment-reference-conformance-20260918`,
+whose hashes remained unchanged through both runs. Reports are
+`artifacts/es6/assignment-reference-{es6,es5}.json` and
+`assignment-reference-pass-comparison.json`.
+
+All four macOS arm64 applications build and package successfully, with identical
+engine binaries. Relocated desktop checks pass for XULRunner, Suite, Browser
+and Calendar, including real chrome/content globals, Suite lifecycle/ChatZilla,
+Calendar's four views, browser navigation/layout and actual XULRunner ChatZilla
+initialization/input. Logs and reports use the `assignment-reference-` prefix
+under `artifacts/es6`. C89 compatibility checks pass. Other platforms and full
+ES2015 compliance remain unverified.

@@ -572,7 +572,7 @@ ownership, teardown and validation limits.
 
 
 Promise construction, reactions, then/catch, resolve/reject, all/race and
-application job checkpoints are implemented. The latest full macOS arm64 run
+application job checkpoints are implemented. That batch’s full macOS arm64 run
 passes **27,036 ES2015 cases**, with **1,530 failures**, 14 unsupported module
 cases and two harness errors: 382 gained, zero lost, no crashes/timeouts.
 All **11,540 ES5.1 cases** and all four application build, package and desktop
@@ -586,3 +586,12 @@ constructors and serialized scripts. The final macOS arm64 checks preserve all
 27,036 ES6 passes and 11,540 ES5 passes, with all four application build, package
 and desktop checks passing. Bytecode cache version 40 invalidates older component
 caches. Arrow functions and classes remain unfinished; see the [new.target notes](js/tests/es6/README.md#function-environment-newtarget).
+
+ES2015 property-reference ordering and large-script property/decompilation fixes
+pass **27,064 ES6 cases**, with **1,502 failures**, 14 unsupported module cases
+and two harness errors: 28 gained, zero lost. All 11,540 ES5 cases pass.
+The fixes preserve computed keys across RHS evaluation and retain primitive
+setter receivers. All four macOS arm64 applications pass build, package and
+desktop checks, including Calendar views, browser navigation and ChatZilla.
+Cache version 41 invalidates older serialized code. See the [property reference notes](js/tests/es6/README.md#property-assignment-references)
+for scope and validation status.
