@@ -1470,3 +1470,33 @@ Inspector issue is fixed. No application code or
 upstream assertions were changed to bypass the failure. Other operating systems
 and architectures have not been revalidated. Unicode matching, replacement
 protocols and the remaining ES6 work are still incomplete.
+
+### RegExp and String replacement protocols
+
+Modern RegExp Symbol.replace collects exec results before invoking replacement
+callbacks, then observes result length, matched text, index and captures in
+order. Capture conversion preserves undefined, callback receivers remain raw,
+and overlapping results still invoke callbacks. A checked native UTF-16 output
+buffer handles substitutions without quadratic concatenation. Native capture
+loops remain interruptible. String replacement dispatches Symbol.replace before
+receiver conversion and uses literal string matching for fallback; legacy
+globals retain their historical method and `$+` behavior.
+
+Diagnostic subsets pass 106/108 RegExp replacement cases (two Unicode u failures)
+and all 86 String replacement cases. There are 34 focused script checks and
+27 native embedding checks under MallocScribble, covering callback GC, ordering,
+foreign realms, cloned methods, primitive receivers and interrupt recovery.
+The full pinned ES2015 run passes **26,249 cases**, with **2,317 failures**,
+14 unsupported module cases and two harness errors: **106 gained, zero lost**
+relative to split. No crashes/timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/regexp-replace-full.json` and `regexp-replace-es5.json`;
+runtime: `/tmp/zr-regexp-replace-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass. Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout assertions; Suite passes 24 lifecycle assertions and ChatZilla;
+standalone packaged XULRunner passes ChatZilla initialization and input. Desktop
+reports: `artifacts/es6/regexp-replace-runtime`. Other operating systems and
+architectures have not been revalidated. Unicode RegExp matching and the other
+remaining ES6 features are still incomplete.

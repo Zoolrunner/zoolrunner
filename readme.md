@@ -459,13 +459,21 @@ other operating systems and architectures have not been revalidated. See
 
 The split follow-up adds RegExp species construction, Symbol.split dispatch,
 capture preservation, result-realm handling and the corrected ES2015 limit
-conversion. The latest full macOS arm64 ES2015 run passes **26,143 cases**, with
+conversion. The split full macOS arm64 ES2015 run passes **26,143 cases**, with
 **2,423 failures**, 14 unsupported module cases and two harness errors: 82 gained,
 zero lost. All 11,540 ES5.1 cases pass. All four application builds and package
 checks pass, and the completed desktop run passes. An earlier intermittent
 Inspector lifecycle error is retained in the [split validation notes](js/tests/es6/README.md#regexp-and-string-split-protocols).
 Unicode matching, replacement protocols and other ES6 work remain incomplete;
 other platforms have not been revalidated.
+
+The replacement follow-up adds Symbol.replace, String dispatch, callback and
+capture ordering, checked substitution buffers and legacy-method isolation.
+The latest full macOS arm64 ES2015 run passes **26,249 cases**, with **2,317
+failures**, 14 unsupported module cases and two harness errors: 106 gained,
+zero lost. All 11,540 ES5.1 cases and all four application build, package and
+desktop checks pass. Unicode RegExp matching and other ES6 work remain incomplete;
+other platforms have not been revalidated. See [replacement validation notes](js/tests/es6/README.md#regexp-and-string-replacement-protocols).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

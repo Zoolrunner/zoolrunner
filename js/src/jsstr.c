@@ -1658,6 +1658,9 @@ str_replace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     jschar *chars;
     size_t leftlen, rightlen, length;
 
+    if (js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
+        return js_StringReplaceES2015(cx, argv, rval);
+
     str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
     if (!str)
         return JS_FALSE;
@@ -3002,7 +3005,7 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
     jsval v;
     JSFunction *fun;
     uintN i;
-    static const char *protocols[] = {"match", "search", "split"};
+    static const char *protocols[] = {"match", "search", "split", "replace"};
 
     /* Define the escape, unescape functions in the global object. */
     if (!JS_DefineFunctions(cx, obj, string_functions) ||

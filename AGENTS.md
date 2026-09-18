@@ -1225,3 +1225,10 @@ The pinned ES2015 suite incorporates the July 2015 correction restoring ToUint32
 for split limits; do not regress negative-limit compatibility to the original
 publication's ToLength text. Custom exec indices must never create out-of-bounds
 string slices. Legacy globals retain the historical split path.
+
+For replacement protocol changes, run `regexp-replace.js` and
+`TestRegExpReplace.c`. Preserve match collection before replacement callbacks,
+observable result/capture conversion order, raw callback receivers, overlap
+side effects and checked UTF-16 buffer growth. Keep native capture loops
+interruptible and exercise foreign contexts, cloned methods and GC callbacks.
+Legacy globals retain the original replace method and its historical `$+` token.

@@ -136,6 +136,9 @@ extern JSBool
 js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
                  JSBool test, jsval *rval);
 extern JSBool
+js_StringReplaceES2015(JSContext *cx, jsval *argv, jsval *rval);
+
+extern JSBool
 js_ModernRegExpConstructor(JSContext *cx, JSObject *obj, uintN argc,
                            jsval *argv, jsval *rval);
 extern JSBool

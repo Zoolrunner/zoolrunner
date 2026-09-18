@@ -4740,13 +4740,299 @@ RegExpSymbolSplit(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *
     return ok;
 }
 
+/* A checked native buffer avoids quadratic concatenation of replacement parts. */
+typedef struct RegExpText {
+    jschar *chars;
+    size_t length, capacity;
+} RegExpText;
+
+static JSBool
+AppendRegExpText(JSContext *cx, RegExpText *text, const jschar *chars, size_t length)
+{
+    size_t needed, capacity;
+    jschar *newChars;
+    if (length > JSSTRING_LENGTH_MASK - text->length ||
+        text->length + length >= ((size_t)-1) / sizeof(jschar)) {
+        JS_ReportOutOfMemory(cx); return JS_FALSE;
+    }
+    needed = text->length + length + 1;
+    if (needed > text->capacity) {
+        capacity = text->capacity ? text->capacity : 64;
+        while (capacity < needed) {
+            if (capacity > ((size_t)-1) / sizeof(jschar) / 2) { capacity = needed; break; }
+            capacity *= 2;
+        }
+        newChars = (jschar *)JS_realloc(cx, text->chars, capacity * sizeof(jschar));
+        if (!newChars) return JS_FALSE;
+        text->chars = newChars; text->capacity = capacity;
+    }
+    if (length) memcpy(text->chars + text->length, chars, length * sizeof(jschar));
+    text->length += length; text->chars[text->length] = 0;
+    return JS_TRUE;
+}
+
+/* captures contains already-converted strings or undefined, starting at 0. */
+static JSBool
+RegExpSubstitution(JSContext *cx, RegExpText *text, JSString *matched, JSString *str,
+                    size_t position, JSObject *captures, jsdouble count, JSString *replacement)
+{
+    size_t i, length = JSSTRING_LENGTH(replacement), end, n, skip;
+    const jschar *chars = JSSTRING_CHARS(replacement), *piece;
+    JSString *capture;
+    jsval value = JSVAL_VOID;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+    uintN number, second;
+    JS_PUSH_TEMP_ROOT(cx, 1, &value, &root);
+    for (i = 0; i < length; i += skip) {
+        piece = chars + i; n = 1; skip = 1;
+        if (chars[i] == '$' && i + 1 < length) {
+            switch (chars[i + 1]) {
+              case '$': skip = 2; break;
+              case '&': piece = JSSTRING_CHARS(matched); n = JSSTRING_LENGTH(matched); skip = 2; break;
+              case '`': piece = JSSTRING_CHARS(str); n = position; skip = 2; break;
+              case '\'':
+                end = position + JSSTRING_LENGTH(matched);
+                if (end > JSSTRING_LENGTH(str)) end = JSSTRING_LENGTH(str);
+                piece = JSSTRING_CHARS(str) + end; n = JSSTRING_LENGTH(str) - end; skip = 2; break;
+              default:
+                if (chars[i + 1] >= '0' && chars[i + 1] <= '9') {
+                    number = chars[i + 1] - '0';
+                    if (i + 2 < length && chars[i + 2] >= '0' && chars[i + 2] <= '9') {
+                        second = number * 10 + chars[i + 2] - '0';
+                        if (second && second <= count) { number = second; skip = 3; }
+                    }
+                    if (number && number <= count) {
+                        if (skip == 1) skip = 2;
+                        if (!JS_GetElement(cx, captures, number - 1, &value)) goto out;
+                        if (JSVAL_IS_VOID(value)) n = 0;
+                        else {
+                            capture = JSVAL_TO_STRING(value);
+                            piece = JSSTRING_CHARS(capture); n = JSSTRING_LENGTH(capture);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        if (!AppendRegExpText(cx, text, piece, n)) goto out;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSymbolReplace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[9] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID,
+                      JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *str, *replacement = NULL, *matched, *converted, *output;
+    JSObject *global, *proto, *results, *captures, *result;
+    JSBool functional, isGlobal, unicode = JS_FALSE, ok = JS_FALSE;
+    jsdouble index, length, count = 0, r, c;
+    size_t position, next = 0, size, matchLength;
+    uint32 iterations = 0;
+    jsid id;
+    jsval *args;
+    void *mark;
+    RegExpText text = {NULL, 0, 0}, substitution = {NULL, 0, 0};
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.replace]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 9, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str); size = JSSTRING_LENGTH(str);
+    functional = js_IsCallable(cx, argv[1]);
+    values[1] = argv[1];
+    if (!functional) {
+        replacement = js_ValueToString(cx, values[1]);
+        if (!replacement) goto out;
+        values[1] = STRING_TO_JSVAL(replacement);
+    }
+    if (!JS_GetProperty(cx, obj, "global", &values[2]) ||
+        !js_ValueToBoolean(cx, values[2], &isGlobal)) goto out;
+    if (isGlobal && (!JS_GetProperty(cx, obj, "unicode", &values[2]) ||
+        !js_ValueToBoolean(cx, values[2], &unicode) ||
+        !SetRegExpIndexValue(cx, obj, JSVAL_ZERO))) goto out;
+    global = js_BuiltinGlobal(cx, argv);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!proto) goto out;
+    results = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+    if (!results) goto out;
+    values[3] = OBJECT_TO_JSVAL(results);
+    for (;;) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+        if (values[2] == JSVAL_NULL) break;
+        if (!RegExpAppendElement(cx, results, count++, values[2])) goto out;
+        if (!isGlobal) break;
+        if (!JS_GetElement(cx, JSVAL_TO_OBJECT(values[2]), 0, &values[4])) goto out;
+        matched = js_ValueToString(cx, values[4]);
+        if (!matched) goto out;
+        values[4] = STRING_TO_JSVAL(matched);
+        if (!JSSTRING_LENGTH(matched)) {
+            if (!JS_GetProperty(cx, obj, "lastIndex", &values[5]) ||
+                !RegExpToLength(cx, values[5], &index) ||
+                !js_NewNumberValue(cx, RegExpAdvanceIndex(str, index, unicode), &values[5]) ||
+                !SetRegExpIndexValue(cx, obj, values[5])) goto out;
+        }
+    }
+    for (r = 0; r < count; ++r) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, r, &id) || !OBJ_GET_PROPERTY(cx, results, id, &values[2])) goto out;
+        result = JSVAL_TO_OBJECT(values[2]);
+        if (!js_ArrayLikeLength(cx, result, &length)) goto out;
+        if (length) --length;
+        if (!JS_GetElement(cx, result, 0, &values[4])) goto out;
+        matched = js_ValueToString(cx, values[4]);
+        if (!matched) goto out;
+        values[4] = STRING_TO_JSVAL(matched); matchLength = JSSTRING_LENGTH(matched);
+        if (!JS_GetProperty(cx, result, "index", &values[5]) ||
+            !js_ValueToNumber(cx, values[5], &index)) goto out;
+        index = js_DoubleToInteger(index);
+        if (index < 0) index = 0;
+        else if (index > size) index = (jsdouble)size;
+        position = (size_t)index;
+        captures = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+        if (!captures) goto out;
+        values[6] = OBJECT_TO_JSVAL(captures);
+        for (c = 0; c < length; ++c) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, c + 1, &id) || !OBJ_GET_PROPERTY(cx, result, id, &values[7])) goto out;
+            if (!JSVAL_IS_VOID(values[7])) {
+                converted = js_ValueToString(cx, values[7]);
+                if (!converted) goto out;
+                values[7] = STRING_TO_JSVAL(converted);
+            }
+            if (!RegExpAppendElement(cx, captures, c, values[7])) goto out;
+        }
+        substitution.length = 0;
+        if (functional) {
+            if (length >= ARRAY_INIT_LIMIT - 3) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS); goto out;
+            }
+            args = js_AllocStack(cx, (uintN)length + 3, &mark);
+            if (!args) goto out;
+            for (c = 0; c < length + 3; ++c) args[(uintN)c] = JSVAL_VOID;
+            args[0] = values[4];
+            for (c = 0; c < length; ++c) {
+                if (!JS_GetElement(cx, captures, (jsuint)c, &args[(uintN)c + 1])) break;
+            }
+            if (c == length && js_NewNumberValue(cx, position, &args[(uintN)length + 1])) {
+                args[(uintN)length + 2] = values[0];
+                ok = js_InternalInvokeValue(cx, JSVAL_VOID, values[1], 0, (uintN)length + 3, args, &values[8]);
+            }
+            js_FreeStack(cx, mark);
+            if (!ok) goto out;
+            ok = JS_FALSE;
+            converted = js_ValueToString(cx, values[8]);
+            if (!converted) goto out;
+            values[8] = STRING_TO_JSVAL(converted);
+            if (!AppendRegExpText(cx, &substitution, JSSTRING_CHARS(converted), JSSTRING_LENGTH(converted))) goto out;
+        } else if (!RegExpSubstitution(cx, &substitution, matched, str, position, captures, length, replacement)) goto out;
+        if (position >= next) {
+            if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(str) + next, position - next) ||
+                !AppendRegExpText(cx, &text, substitution.chars, substitution.length)) goto out;
+            next = position + matchLength;
+        }
+    }
+    if (next < size && !AppendRegExpText(cx, &text, JSSTRING_CHARS(str) + next, size - next)) goto out;
+    output = JS_NewUCStringCopyN(cx, text.chars ? text.chars : JSSTRING_CHARS(cx->runtime->emptyString), text.length);
+    if (!output) goto out;
+    *rval = STRING_TO_JSVAL(output); ok = JS_TRUE;
+  out:
+    JS_free(cx, text.chars); JS_free(cx, substitution.chars);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_StringReplaceES2015(JSContext *cx, jsval *argv, jsval *rval)
+{
+    jsval values[5] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval args[3] = {argv[-1], argv[1], JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj;
+    JSProtoKey key;
+    JSString *str, *search, *replacement = NULL, *output;
+    jsid id;
+    size_t size, searchLength, position;
+    JSBool functional, ok = JS_FALSE;
+    RegExpText text = {NULL, 0, 0};
+    if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_REPLACE, &id)) goto out;
+    if (!JSVAL_IS_NULL(argv[0]) && !JSVAL_IS_VOID(argv[0])) {
+        if (JSVAL_IS_PRIMITIVE(argv[0])) {
+            key = JSVAL_IS_SYMBOL(argv[0]) ? JSProto_Symbol :
+                  JSVAL_IS_STRING(argv[0]) ? JSProto_String :
+                  JSVAL_IS_BOOLEAN(argv[0]) ? JSProto_Boolean : JSProto_Number;
+            obj = js_BuiltinPrototype(cx, global, key);
+            if (!obj || !js_GetPropertyValue(cx, obj, argv[0], id, &values[3])) goto out;
+        } else if (!OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(argv[0]), id, &values[3])) goto out;
+        if (!JSVAL_IS_VOID(values[3]) && !JSVAL_IS_NULL(values[3])) {
+            if (!js_IsCallable(cx, values[3])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "replace symbol method");
+                goto out;
+            }
+            ok = js_InternalInvokeValue(cx, argv[0], values[3], 0, 2, args, rval);
+            goto out;
+        }
+    }
+    str = js_ValueToString(cx, argv[-1]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    search = js_ValueToString(cx, argv[0]);
+    if (!search) goto out;
+    values[1] = STRING_TO_JSVAL(search);
+    functional = js_IsCallable(cx, argv[1]); values[2] = argv[1];
+    if (!functional) {
+        replacement = js_ValueToString(cx, argv[1]);
+        if (!replacement) goto out;
+        values[2] = STRING_TO_JSVAL(replacement);
+    }
+    size = JSSTRING_LENGTH(str); searchLength = JSSTRING_LENGTH(search);
+    if (searchLength > size) { *rval = values[0]; ok = JS_TRUE; goto out; }
+    for (position = 0; position <= size - searchLength; ++position) {
+        if (cx->branchCallback && !(position & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!memcmp(JSSTRING_CHARS(str) + position, JSSTRING_CHARS(search), searchLength * sizeof(jschar))) break;
+    }
+    if (position > size - searchLength) { *rval = values[0]; ok = JS_TRUE; goto out; }
+    if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(str), position)) goto out;
+    if (functional) {
+        args[0] = values[1]; args[2] = values[0];
+        if (!js_NewNumberValue(cx, position, &values[4])) goto out;
+        args[1] = values[4];
+        if (!js_InternalInvokeValue(cx, JSVAL_VOID, values[2], 0, 3, args, &values[3])) goto out;
+        replacement = js_ValueToString(cx, values[3]);
+        if (!replacement) goto out;
+        values[3] = STRING_TO_JSVAL(replacement);
+        if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(replacement), JSSTRING_LENGTH(replacement))) goto out;
+    } else if (!RegExpSubstitution(cx, &text, search, str, position, NULL, 0, replacement)) goto out;
+    if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(str) + position + searchLength,
+                          size - position - searchLength)) goto out;
+    output = JS_NewUCStringCopyN(cx, text.chars, text.length);
+    if (!output) goto out;
+    *rval = STRING_TO_JSVAL(output); ok = JS_TRUE;
+  out:
+    JS_free(cx, text.chars); JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static JSBool
 InitRegExpProtocols(JSContext *cx, JSObject *global, JSObject *proto)
 {
     static struct { JSWellKnownSymbol symbol; const char *name; JSNative native; } methods[] = {
         {JS_WKS_MATCH, "[Symbol.match]", RegExpSymbolMatch},
         {JS_WKS_SEARCH, "[Symbol.search]", RegExpSymbolSearch},
-        {JS_WKS_SPLIT, "[Symbol.split]", RegExpSymbolSplit}
+        {JS_WKS_SPLIT, "[Symbol.split]", RegExpSymbolSplit},
+        {JS_WKS_REPLACE, "[Symbol.replace]", RegExpSymbolReplace}
     };
     JSFunction *fun;
     jsval value;
@@ -4756,7 +5042,7 @@ InitRegExpProtocols(JSContext *cx, JSObject *global, JSObject *proto)
     JSBool ok;
     for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
         if (!js_WellKnownSymbolId(cx, methods[i].symbol, &id)) return JS_FALSE;
-        fun = JS_NewFunction(cx, methods[i].native, methods[i].symbol == JS_WKS_SPLIT ? 2 : 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+        fun = JS_NewFunction(cx, methods[i].native, (methods[i].symbol == JS_WKS_SPLIT || methods[i].symbol == JS_WKS_REPLACE) ? 2 : 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
                              global, methods[i].name);
         if (!fun) return JS_FALSE;
         JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
