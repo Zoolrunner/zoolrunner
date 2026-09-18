@@ -2309,3 +2309,53 @@ work. The earlier `block-tdz-diagnostic-*` run precedes the bare for-in assignme
 and producer-PC follow-ups; it has the same totals but is not the final runtime.
 Other operating systems and architectures have not been revalidated for these
 changes.
+
+
+### Block const and per-iteration bindings
+
+Modern block/function-body const declarations now use lexical storage, retain
+TDZ checks and immutable writes, and can shadow outer bindings. Const identity
+survives captured-frame detachment, source reconstruction and XDR. Assignment
+checks initialization after evaluating the RHS; compound assignments read first.
+Selected legacy const behavior remains separate.
+
+Named C-style let loop bindings are fresh before the first condition and before
+each update, including continue paths with no update expression. Named let/const
+for-in bindings receive a fresh environment for each iteration; captured RHS
+bindings remain uninitialized. The old environment stays live while a replacement
+is allocated so native callbacks can capture it safely. Exception unwinding
+retains the replacement on the scope chain even when detachment fails. Ordinary
+var loops, including catch-variable loops, preserve their shared bindings.
+
+Cache version 47 preserves block const metadata and adds immutable local writes
+and environment transitions. Decompilation retains const in destructuring and
+for-in declarations and hides internal iteration transitions, including loops
+without an explicit updater.
+
+Focused const and loop scripts pass 40 and 26 checks, alongside the prior 44
+initialization checks. The native lexical probe passes 17 assertions, covering
+both const and mutable bindings, XDR/source round-trips, GC and debugger reentry
+while loop environments are allocated. Modern window checks exercise const and
+loop closures. C89 checks and 23 runner integration checks pass.
+
+The final frozen macOS arm64 runtime passes **27,377 ES2015 cases**, with
+**1,189 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **39 gained, zero lost** against the block-TDZ baseline. All
+**11,540 ES5.1 cases** pass, with engine hashes unchanged through both suites.
+Reports use `lexical-scope-final-*`; the frozen runtime is
+`/tmp/zr-lexical-scope-final-conformance-20260918`, with engine SHA-256
+`3954a8bcf7d44bc998d364df7395977ecca6ebb1b5d1a11e88181a288106dd67`.
+All four macOS arm64 applications pass root builds, packaging and packaged
+desktop checks with engines matching the frozen runtime. Calendar passes all
+four views; Browser navigation/layout passes 169 checks; Suite and XULRunner
+ChatZilla checks pass. These results do not establish validation on other
+architectures or operating systems.
+
+The intermediate `block-const-basic-*` snapshot passes 27,365 ES6 modes
+(1,201 failing, 14 unsupported, two harness errors), 27 gained/zero lost from
+block TDZ, plus all 11,540 ES5 modes. It precedes iteration, source-reconstruction
+and callback/unwind follow-ups and is diagnostic only.
+
+Global lexical environments, module environments, default/destructured parameters,
+and the broader iterator/destructuring semantics remain unfinished. This batch
+does not implement for-of. Non-macOS-arm64 validation remains outstanding.

@@ -1402,6 +1402,19 @@ uninitialized state in detached closures and XDR, and retain producer PCs used
 by value decompilation. Discarded lexical reads can throw and must not be
 optimized away. Exercise direct eval, native GC/debugger reentry and selected
 legacy let semantics. Cache version 46 adds lexical initialization metadata and
-instructions. Global lexical environments, block const scoping and fresh
-per-iteration bindings remain unfinished; focused checks do not replace full
-conformance and application validation.
+instructions. Global lexical environments remain unfinished; focused checks do
+not replace full conformance and application validation.
+
+
+For block const and iteration changes, also run `js/tests/es6/lexical-const.js`
+and `lexical-loops.js`. Preserve immutable flags in detached environments and
+XDR, and check TDZ before rejecting an immutable write, after its RHS executes.
+Freshen C-style let bindings before the first condition and before each update,
+including continue without an update expression. Named lexical for-in bindings
+need distinct iteration environments; ordinary var/catch bindings stay shared.
+Keep the old environment live while allocating its replacement and the new one
+on the unwind chain if detachment fails. Exercise native GC/debugger callbacks
+that capture bindings during this transition. Preserve const in reconstructed
+source and omit internal transitions from printed loop updaters. Cache version
+47 adds const metadata and iteration instructions. Global lexical environments,
+for-of and broader iterator/destructuring semantics remain unfinished.

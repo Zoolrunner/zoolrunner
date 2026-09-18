@@ -12,7 +12,7 @@ static JSClass globalClass = {
     JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
-static unsigned checks, allocationCalls, reentries;
+static unsigned checks, allocationCalls, reentries, constReentries, iterationReentries;
 static JSBool inAllocation, hookFailed;
 #define CHECK(v) do { ++checks; if (!(v)) { \
     fprintf(stderr,"FAIL lexical embedding check %u\n",checks); goto out; \
@@ -32,7 +32,7 @@ Allocation(JSContext *cx, JSObject *obj, JSBool creating, void *data)
     JSFunction *fun;
     JSString *name;
     JSClass *clasp;
-    jsval result;
+    jsval result, phase;
     const char *program =
         "(function(){try{typeof x;return false}"
         "catch(e){return e instanceof ReferenceError}})()";
@@ -46,10 +46,25 @@ Allocation(JSContext *cx, JSObject *obj, JSBool creating, void *data)
     fun = frame ? JS_GetFrameFunction(cx, frame) : NULL;
     name = fun ? JS_GetFunctionId(fun) : NULL;
     if (clasp && !strcmp(clasp->name, "Function") && name &&
-        !strcmp(JS_GetStringBytes(name), "lexicalProbe")) {
+        (!strcmp(JS_GetStringBytes(name), "lexicalProbe") ||
+         !strcmp(JS_GetStringBytes(name), "constProbe"))) {
         ++reentries;
+        if (!strcmp(JS_GetStringBytes(name), "constProbe"))
+            ++constReentries;
         if (!JS_EvaluateInStackFrame(cx, frame, program, strlen(program),
                                     "lexical-reentry", 1, &result) ||
+            result != JSVAL_TRUE)
+            hookFailed = JS_TRUE;
+        JS_GC(cx);
+    }
+    if (clasp && !strcmp(clasp->name, "Block") && name &&
+        !strcmp(JS_GetStringBytes(name), "loopProbe") &&
+        JS_GetProperty(cx, JS_GetGlobalObject(cx), "phase", &phase) &&
+        phase == JSVAL_TRUE) {
+        const char *capture = "saved.push(()=>i);true";
+        ++iterationReentries;
+        if (!JS_EvaluateInStackFrame(cx, frame, capture, strlen(capture),
+                                    "loop-reentry", 1, &result) ||
             result != JSVAL_TRUE)
             hookFailed = JS_TRUE;
         JS_GC(cx);
@@ -83,7 +98,21 @@ int main(void)
         "var live=initialized();"
         "function caught(){try{escaped();return false}"
         "catch(e){return e instanceof ReferenceError}}"
-        "caught() && live()===11";
+        "function constProbe(){return inner;const x=7;"
+        "function inner(){return x}}"
+        "var escapedConst=constProbe();"
+        "var immutable=(function(){const x=7;return ()=>{try{x=8;return false}"
+        "catch(e){return e instanceof TypeError}}})();"
+        "function caughtConst(){try{escapedConst();return false}"
+        "catch(e){return e instanceof ReferenceError}}"
+        "var phase=false,saved=[];"
+        "function loopProbe(){var r=[];for(let i=0;i<3;i++){"
+        "r.push(()=>i);phase=true}phase=false;return r}"
+        "var loopValues=loopProbe();"
+        "function values(r){return r.map(function(f){return f()}).join()}"
+        "var keys=[];for(const key in {a:1,b:2})keys.push(()=>key);"
+        "caught() && caughtConst() && immutable() && live()===11 && "
+        "values(loopValues)==='0,1,2' && values(keys)==='a,b'";
 
     rt = JS_NewRuntime(4 * 1024 * 1024);
     if (!rt) return 1;
@@ -107,8 +136,11 @@ int main(void)
     CHECK(JS_ExecuteScript(cx, global, script, &result) && result == JSVAL_TRUE);
     JS_SetObjectHook(rt, NULL, NULL);
     CHECK(allocationCalls > 0 && reentries > 0 && !hookFailed);
+    CHECK(constReentries > 0 && iterationReentries == 3);
+    CHECK(Evaluate(cx, global, "values(saved)==='0,1,2'", &result) && result == JSVAL_TRUE);
     JS_GC(cx);
     CHECK(Evaluate(cx, global, "caught() && live()===11", &result) && result == JSVAL_TRUE);
+    CHECK(Evaluate(cx, global, "caughtConst() && immutable()", &result) && result == JSVAL_TRUE);
     encoder = JS_XDRNewMem(cx, JSXDR_ENCODE);
     decoder = JS_XDRNewMem(cx, JSXDR_DECODE);
     CHECK(encoder && decoder && JS_XDRScript(encoder, &script));

@@ -354,6 +354,7 @@ struct JSParseNode {
 #define PNX_ENDCOMMA    0x10            /* array literal has comma at end */
 #define PNX_XMLROOT     0x20            /* top-most node in XML literal tree */
 #define PNX_GROUPINIT   0x40            /* var [a, b] = [c, d]; unit list */
+#define PNX_CONST      0x100           /* modern lexical const declaration */
 #define PNX_NEEDBRACES  0x80            /* braces necessary due to closure */
 
 /*

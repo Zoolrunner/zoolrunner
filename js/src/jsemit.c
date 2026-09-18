@@ -1920,6 +1920,10 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
 
         JS_ASSERT(stmt->flags & SIF_SCOPE);
         JS_ASSERT(slot >= 0);
+        sprop = SCOPE_GET_PROPERTY(OBJ_SCOPE(ATOM_TO_OBJECT(stmt->atom)),
+                                   ATOM_TO_JSID(atom));
+        JS_ASSERT(sprop);
+        pn->pn_attrs = sprop->attrs;
         op = pn->pn_op;
         switch (op) {
           case JSOP_NAME:     op = JSOP_GETLOCAL; break;
@@ -3350,7 +3354,12 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             JSAtomListElement *ale = js_IndexAtom(cx, pn->pn_atom, &cg->atomList);
             if (!ale)
                 return JS_FALSE;
-            EMIT_ATOM_INDEX_OP(JSOP_CONSTASSIGN, ALE_INDEX(ale));
+            if (pn->pn_op == JSOP_SETLOCAL) {
+                slot = (jsuint)pn->pn_slot;
+                EMIT_UINT16_IMM_OP(JSOP_SETCONSTLOCAL, slot);
+            } else {
+                EMIT_ATOM_INDEX_OP(JSOP_CONSTASSIGN, ALE_INDEX(ale));
+            }
             return !wantpop || js_Emit1(cx, cg, JSOP_POP) >= 0;
         }
 
@@ -3371,7 +3380,8 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             break;
 
           case JSOP_SETLOCAL:
-            if (declOp == JSOP_NOP && JS_VERSION_IS_ES2015(cx)) {
+            if ((declOp == JSOP_NOP || declOp == JSOP_DEFCONST) &&
+                JS_VERSION_IS_ES2015(cx)) {
                 slot = (jsuint) pn->pn_slot;
                 EMIT_UINT16_IMM_OP(JSOP_INITLOCAL, slot);
                 if (wantpop && js_Emit1(cx, cg, JSOP_POP) < 0)
@@ -3669,7 +3679,8 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
     forInVar = (pn->pn_extra & PNX_FORINVAR) != 0;
 #if JS_HAS_BLOCK_SCOPE
     forInLet = let && forInVar;
-    popScope = (inLetHead || (let && (tc->flags & TCF_IN_FOR_INIT)));
+    popScope = inLetHead || (let && (tc->flags & TCF_IN_FOR_INIT) &&
+                             !JS_VERSION_IS_ES2015(cx));
     JS_ASSERT(!popScope || let);
 #endif
 
@@ -3711,7 +3722,9 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                 JS_ASSERT(noteIndex < 0 && !pn2->pn_next);
                 op = JSOP_POP;
                 if (!MaybeEmitGroupAssignment(cx, cg,
-                                              inLetHead ? JSOP_POP : pn->pn_op,
+                                              inLetHead ? JSOP_POP
+                                              : (pn->pn_extra & PNX_CONST)
+                                                ? JSOP_DEFCONST : pn->pn_op,
                                               pn2, &op)) {
                     return JS_FALSE;
                 }
@@ -3771,7 +3784,9 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
              * we will emit at the bottom of this function.
              */
             if (!EmitDestructuringOps(cx, cg,
-                                      inLetHead ? JSOP_POP : pn->pn_op,
+                                      inLetHead ? JSOP_POP
+                                      : (pn->pn_extra & PNX_CONST)
+                                        ? JSOP_DEFCONST : pn->pn_op,
                                       pn3)) {
                 return JS_FALSE;
             }
@@ -3889,7 +3904,8 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
         if (pn2 == pn->pn_head &&
             !inLetHead &&
             js_NewSrcNote2(cx, cg, SRC_DECL,
-                           (pn->pn_op == JSOP_DEFCONST)
+                           (pn->pn_op == JSOP_DEFCONST ||
+                            (pn->pn_extra & PNX_CONST))
                            ? SRC_DECL_CONST
                            : (pn->pn_op == JSOP_DEFVAR)
                            ? SRC_DECL_VAR
@@ -3961,7 +3977,7 @@ GettableNoteForNextOp(JSCodeGenerator *cg)
 JSBool
 js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 {
-    JSBool ok, useful, wantval;
+    JSBool ok, useful, wantval, freshIteration;
     JSStmtInfo *stmt, stmtInfo;
     ptrdiff_t top, off, tmp, beq, jmp;
     JSParseNode *pn2, *pn3;
@@ -4305,6 +4321,11 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         break;
 
       case TOK_FOR:
+        freshIteration = JS_VERSION_IS_ES2015(cx) &&
+                         pn->pn_left->pn_type != TOK_IN &&
+                         pn->pn_left->pn_kid1 &&
+                         pn->pn_left->pn_kid1->pn_type == TOK_LET &&
+                         !(pn->pn_left->pn_kid1->pn_extra & PNX_CONST);
         beq = 0;                /* suppress gcc warnings */
         pn2 = pn->pn_left;
         js_PushStatement(&cg->treeContext, &stmtInfo, STMT_FOR_LOOP, top);
@@ -4395,7 +4416,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                     JS_ASSERT(pn3->pn_type == TOK_RB || pn3->pn_type == TOK_RC);
                 }
                 if (pn3->pn_type == TOK_RB || pn3->pn_type == TOK_RC) {
-                    op = pn2->pn_left->pn_op;
+                    op = (pn2->pn_left->pn_extra & PNX_CONST)
+                         ? JSOP_DEFCONST : pn2->pn_left->pn_op;
                     goto destructuring_for;
                 }
 #else
@@ -4417,9 +4439,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 #endif
                      !pn3->pn_expr) &&
                     js_NewSrcNote2(cx, cg, SRC_DECL,
-                                   type == TOK_VAR
-                                   ? SRC_DECL_VAR
-                                   : SRC_DECL_LET) < 0) {
+                                   (pn2->pn_left->pn_extra & PNX_CONST)
+                                   ? SRC_DECL_CONST : type == TOK_VAR
+                                   ? SRC_DECL_VAR : SRC_DECL_LET) < 0) {
                     return JS_FALSE;
                 }
                 /* FALL THROUGH */
@@ -4452,10 +4474,14 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                     pn3->pn_slot = -1;
                 }
                 if (pn3->pn_slot >= 0) {
-                    if (pn3->pn_attrs & JSPROP_READONLY) {
+                    if ((pn3->pn_attrs & JSPROP_READONLY) &&
+                        !(type == TOK_LET && op == JSOP_FORLOCAL)) {
                         JS_ASSERT(op == JSOP_FORVAR);
                         op = JSOP_FORCONST;
                     }
+                    if (JS_VERSION_IS_ES2015(cx) && type == TOK_LET &&
+                        op == JSOP_FORLOCAL)
+                        op = JSOP_FORLEXICAL;
                     atomIndex = (jsatomid) pn3->pn_slot;
                     EMIT_UINT16_IMM_OP(op, atomIndex);
                 } else {
@@ -4515,6 +4541,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 
 #if JS_HAS_DESTRUCTURING
                 if (pn3->pn_type == TOK_RB || pn3->pn_type == TOK_RC) {
+                    if (JS_VERSION_IS_ES2015(cx) && type == TOK_LET &&
+                        js_Emit1(cx, cg, JSOP_FRESHENBLOCK) < 0)
+                        return JS_FALSE;
                     if (!EmitDestructuringOps(cx, cg, op, pn3))
                         return JS_FALSE;
                     if (js_Emit1(cx, cg, JSOP_POP) < 0)
@@ -4594,6 +4623,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 }
                 cg->treeContext.flags &= ~TCF_IN_FOR_INIT;
             }
+            if (freshIteration && js_Emit1(cx, cg, JSOP_FRESHENBLOCK) < 0)
+                return JS_FALSE;
             noteIndex = js_NewSrcNote(cx, cg, SRC_FOR);
             if (noteIndex < 0 ||
                 js_Emit1(cx, cg, op) < 0) {
@@ -4634,14 +4665,17 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 return JS_FALSE;
             }
 
-            if (pn3) {
-                /* Set loop and enclosing "update" offsets, for continue. */
+            if (pn3 || freshIteration) {
+                /* Continue must create the next binding before the update. */
                 stmt = &stmtInfo;
                 do {
                     stmt->update = CG_OFFSET(cg);
                 } while ((stmt = stmt->down) != NULL &&
                          stmt->type == STMT_LABEL);
-
+            }
+            if (freshIteration && js_Emit1(cx, cg, JSOP_FRESHENBLOCK) < 0)
+                return JS_FALSE;
+            if (pn3) {
                 op = JSOP_POP;
 #if JS_HAS_DESTRUCTURING
                 if (pn3->pn_type == TOK_ASSIGN &&
@@ -5544,7 +5578,12 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                     if (!ale)
                         return JS_FALSE;
                     atomIndex = ALE_INDEX(ale);
-                    EMIT_ATOM_INDEX_OP(JSOP_CONSTASSIGN, atomIndex);
+                    if (pn2->pn_op == JSOP_SETLOCAL) {
+                        atomIndex = (jsatomid)pn2->pn_slot;
+                        EMIT_UINT16_IMM_OP(JSOP_SETCONSTLOCAL, atomIndex);
+                    } else {
+                        EMIT_ATOM_INDEX_OP(JSOP_CONSTASSIGN, atomIndex);
+                    }
                 }
                 break;
             }
@@ -5781,7 +5820,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                     if (JS_VERSION_IS_ES2015(cx)) {
                         uintN format = js_CodeSpec[op].format;
                         JSOp readop = ((format & JOF_TYPEMASK) == JOF_CONST)
-                                      ? JSOP_GETGVAR : JSOP_GETVAR;
+                                      ? JSOP_GETGVAR
+                                      : ((format & JOF_TYPEMASK) == JOF_LOCAL)
+                                        ? JSOP_GETLOCAL : JSOP_GETVAR;
                         EMIT_UINT16_IMM_OP(readop, (jsatomid)pn2->pn_slot);
                         op = (format & JOF_POST)
                              ? ((format & JOF_INC) ? JSOP_CONSTPOSTINC : JSOP_CONSTPOSTDEC)

@@ -2439,8 +2439,9 @@ js_PutBlockObject(JSContext *cx, JSObject *obj)
         JS_ASSERT(slot < fp->script->depth);
         if (!js_DefineNativeProperty(cx, obj, sprop->id,
                                      fp->spbase[slot], NULL, NULL,
-                                     JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                     SPROP_HAS_SHORTID, sprop->shortid,
+                                     sprop->attrs,
+                                     SPROP_HAS_SHORTID |
+                                     (sprop->flags & SPROP_IS_CONST), sprop->shortid,
                                      NULL)) {
             JS_SetPrivate(cx, obj, NULL);
             return JS_FALSE;
@@ -2625,24 +2626,29 @@ block_xdrObject(JSXDRState *xdr, JSObject **objp)
             shortid = sprop->shortid;
             uninitialized = OBJ_GET_SLOT(cx, obj, sprop->slot) ==
                             JSVAL_UNINITIALIZED;
+            if (sprop->flags & SPROP_IS_CONST)
+                uninitialized |= 2;
             JS_ASSERT(shortid >= 0);
         }
 
         /* XDR the real id, then the shortid. */
         if (!js_XDRStringAtom(xdr, &atom) ||
             !JS_XDRUint16(xdr, (uint16 *)&shortid) ||
-            !JS_XDRUint32(xdr, &uninitialized) || uninitialized > 1) {
+            !JS_XDRUint32(xdr, &uninitialized) || uninitialized > 3) {
             ok = JS_FALSE;
             break;
         }
 
         if (xdr->mode == JSXDR_DECODE) {
             if (!js_DefineNativeProperty(cx, obj, ATOM_TO_JSID(atom),
-                                         uninitialized ? JSVAL_UNINITIALIZED
-                                                       : JSVAL_VOID,
+                                         (uninitialized & 1) ? JSVAL_UNINITIALIZED
+                                                             : JSVAL_VOID,
                                          NULL, NULL,
-                                         JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                         SPROP_HAS_SHORTID, shortid, NULL)) {
+                                         JSPROP_ENUMERATE | JSPROP_PERMANENT |
+                                         ((uninitialized & 2) ? JSPROP_READONLY : 0),
+                                         SPROP_HAS_SHORTID |
+                                         ((uninitialized & 2) ? SPROP_IS_CONST : 0),
+                                         shortid, NULL)) {
                 ok = JS_FALSE;
                 break;
             }
@@ -4338,7 +4344,14 @@ SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp, JSBool strict)
             (SCOPE_IS_SEALED(scope) && pobj == obj)) {
             if ((attrs & JSPROP_READONLY) && (sprop->flags & SPROP_IS_CONST) &&
                 JS_VERSION_IS_ES2015(cx)) {
+                jsval old = JSVAL_VOID;
+                jsval shortId = INT_TO_JSVAL((uint16)sprop->shortid);
+                if (clasp == &js_BlockClass && SPROP_HAS_VALID_SLOT(sprop, scope))
+                    old = LOCKED_OBJ_GET_SLOT(pobj, sprop->slot);
                 JS_UNLOCK_SCOPE(cx, scope);
+                if (clasp == &js_BlockClass &&
+                    !block_getProperty(cx, obj, shortId, &old))
+                    return JS_FALSE;
                 JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                                      JSMSG_CONST_ASSIGNMENT);
                 return JS_FALSE;

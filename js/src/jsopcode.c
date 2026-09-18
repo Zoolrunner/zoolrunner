@@ -1371,6 +1371,7 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
       case JSOP_CONSTASSIGN:
       case JSOP_SETVAR:
       case JSOP_SETGVAR:
+      case JSOP_SETCONSTLOCAL:
       case JSOP_INITLOCAL:
       case JSOP_SETLOCAL:
         LOCAL_ASSERT(pc[oplen] == JSOP_POP || pc[oplen] == JSOP_SETSP);
@@ -1945,7 +1946,9 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 #define END_LITOPX_CASE                                                       \
                 break;
 
+              case JSOP_FRESHENBLOCK:
               case JSOP_RESTARG:
+                todo = -2;
                 break;
 
               case JSOP_NOP:
@@ -1987,9 +1990,12 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     /* Need a semicolon whether or not there was a cond. */
                     js_puts(jp, ";");
 
-                    if (pc[next] != JSOP_GOTO && pc[next] != JSOP_GOTOX) {
-                        /* Decompile the loop updater. */
-                        DECOMPILE_CODE(pc + next, tail - next - 1);
+                    pc2 = pc + next;
+                    if (*pc2 == JSOP_FRESHENBLOCK)
+                        pc2 += JSOP_FRESHENBLOCK_LENGTH;
+                    if (*pc2 != JSOP_GOTO && *pc2 != JSOP_GOTOX) {
+                        /* The environment transition is not an updater. */
+                        DECOMPILE_CODE(pc2, pc + tail - pc2 - 1);
                         js_printf(jp, " %s", POP_STR());
                     }
 
@@ -2641,6 +2647,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 todo = Sprint(&ss->sprinter, ss_format, VarPrefix(sn), rval);
                 break;
 
+              case JSOP_SETCONSTLOCAL:
               case JSOP_INITLOCAL:
               case JSOP_SETLOCAL:
               case JSOP_SETLOCALPOP:
@@ -2661,6 +2668,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 lval = GetLocal(ss, i);
                 goto do_lvalinc;
 
+              case JSOP_FORLEXICAL:
               case JSOP_FORLOCAL:
                 i = GET_UINT16(pc);
                 lval = GetStr(ss, i);

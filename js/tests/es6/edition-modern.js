@@ -134,6 +134,11 @@ function modernWindowEdition() {
                          try { read(); return false; }
                          catch (e) { return e instanceof ReferenceError; } })() &&
            (function() { let first = 7, second = first + 1; return second === 8; })() &&
+           (function() { const immutable = 7;
+                         try { immutable = 8; return false; }
+                         catch (e) { return e instanceof TypeError; } })() &&
+           (function() { var items = []; for (let i=0;i<2;i++) items.push(() => i);
+                         return items[0]() === 0 && items[1]() === 1; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

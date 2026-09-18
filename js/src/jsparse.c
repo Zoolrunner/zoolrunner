@@ -2208,7 +2208,8 @@ BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
     if (sprop && data->lexicalDeclaration)
         return LexicalSyntaxError(cx, data->ts);
     ATOM_LIST_SEARCH(ale, &tc->decls, atom);
-    if (sprop || (ale && ALE_JSOP(ale) == JSOP_DEFCONST)) {
+    if (sprop || (!data->lexicalDeclaration && ale &&
+                  ALE_JSOP(ale) == JSOP_DEFCONST)) {
         const char *name;
 
         if (sprop) {
@@ -2242,8 +2243,10 @@ BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
                                    data->lexicalDeclaration
                                    ? JSVAL_UNINITIALIZED : JSVAL_VOID,
                                    NULL, NULL,
-                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                   SPROP_HAS_SHORTID,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT |
+                                   (data->op == JSOP_DEFCONST ? JSPROP_READONLY : 0),
+                                   SPROP_HAS_SHORTID |
+                                   (data->op == JSOP_DEFCONST ? SPROP_IS_CONST : 0),
                                    (intN)data->u.let.index++,
                                    NULL);
 }
@@ -2438,10 +2441,9 @@ BindDestructuringVar(JSContext *cx, BindData *data, JSParseNode *pn,
      * point, we can't select the optimal final opcode, yet we must preserve
      * the CONST bit and convey "set", not "get".
      */
-    pn->pn_op = (data->op == JSOP_DEFCONST)
-                ? JSOP_SETCONST
-                : JSOP_SETNAME;
-    pn->pn_attrs = data->u.var.attrs;
+    pn->pn_op = (data->op == JSOP_DEFCONST && data->binder != BindLet)
+                ? JSOP_SETCONST : JSOP_SETNAME;
+    pn->pn_attrs = data->binder == BindLet ? 0 : data->u.var.attrs;
     return JS_TRUE;
 }
 
@@ -3345,6 +3347,9 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             tt = CURRENT_TOKEN(ts).type = TOK_LET;
             CURRENT_TOKEN(ts).t_op = JSOP_NOP;
         }
+        if (JS_VERSION_IS_ES2015(cx) && tt == TOK_VAR &&
+            CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST)
+            tt = CURRENT_TOKEN(ts).type = TOK_LET;
         js_UngetToken(ts);
         if (tt == TOK_SEMI) {
             if (pn->pn_op == JSOP_FOREACH)
@@ -3374,6 +3379,11 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             } else if (tt == TOK_LET) {
                 (void) js_GetToken(cx, ts);
                 if (js_PeekToken(cx, ts) == TOK_LP) {
+                    if (JS_VERSION_IS_ES2015(cx) &&
+                        CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST) {
+                        LexicalSyntaxError(cx, ts);
+                        return NULL;
+                    }
                     pn1 = LetBlock(cx, ts, tc, JS_FALSE);
                     tt = TOK_LEXICALSCOPE;
                 } else {
@@ -3897,9 +3907,13 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
       case TOK_VAR:
         if (JS_VERSION_IS_ES2015(cx) &&
-            CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST && !allowLexical) {
-            LexicalSyntaxError(cx, ts);
-            return NULL;
+            CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST) {
+            if (!allowLexical) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
+            CURRENT_TOKEN(ts).type = TOK_LET;
+            goto lexical_declaration;
         }
         pn = Variables(cx, ts, tc);
         if (!pn)
@@ -3911,6 +3925,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
 #if JS_HAS_BLOCK_SCOPE
       case TOK_LET:
+      lexical_declaration:
       {
         JSStmtInfo **sip;
         JSObject *obj;
@@ -3918,6 +3933,11 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
         /* Check for a let statement or let expression. */
         if (js_PeekToken(cx, ts) == TOK_LP) {
+            if (JS_VERSION_IS_ES2015(cx) &&
+                CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
             pn = LetBlock(cx, ts, tc, JS_TRUE);
             if (!pn || pn->pn_op == JSOP_LEAVEBLOCK)
                 return pn;
@@ -3961,8 +3981,9 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                  * and pretend this is a var declaration.
                  */
                 CURRENT_TOKEN(ts).type = TOK_VAR;
-                CURRENT_TOKEN(ts).t_op = JS_VERSION_IS_ES2015(cx)
-                                          ? JSOP_NOP : JSOP_DEFVAR;
+                if (CURRENT_TOKEN(ts).t_op != JSOP_DEFCONST)
+                    CURRENT_TOKEN(ts).t_op = JS_VERSION_IS_ES2015(cx)
+                                              ? JSOP_NOP : JSOP_DEFVAR;
 
                 pn = Variables(cx, ts, tc);
                 if (!pn)
@@ -4027,7 +4048,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         pn = Variables(cx, ts, tc);
         if (!pn)
             return NULL;
-        pn->pn_extra = PNX_POPVAR;
+        pn->pn_extra |= PNX_POPVAR;
         break;
       }
 #endif /* JS_HAS_BLOCK_SCOPE */
@@ -4220,7 +4241,9 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 
     data.pn = NULL;
     data.ts = ts;
-    data.op = let ? JSOP_NOP : CURRENT_TOKEN(ts).t_op;
+    data.op = let && !(tt == TOK_LET &&
+                      CURRENT_TOKEN(ts).t_op == JSOP_DEFCONST)
+              ? JSOP_NOP : CURRENT_TOKEN(ts).t_op;
     data.binder = let ? BindLet : BindVarOrConst;
     data.lexicalDeclaration = JS_VERSION_IS_ES2015(cx) &&
                               (let || data.op == JSOP_NOP ||
@@ -4228,8 +4251,11 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     pn = NewParseNode(cx, ts, PN_LIST, tc);
     if (!pn)
         return NULL;
-    pn->pn_op = (!let && data.op == JSOP_NOP) ? JSOP_DEFVAR : data.op;
+    pn->pn_op = let ? JSOP_NOP
+                   : data.op == JSOP_NOP ? JSOP_DEFVAR : data.op;
     PN_INIT_LIST(pn);
+    if (let && data.op == JSOP_DEFCONST)
+        pn->pn_extra |= PNX_CONST;
 
     /*
      * The tricky part of this code is to create special parsenode opcodes for

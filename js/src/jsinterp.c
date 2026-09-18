@@ -567,6 +567,34 @@ js_GetScopeChain(JSContext *cx, JSStackFrame *fp)
     return obj;
 }
 
+/* A captured loop environment must retain its old values.  Allocate the
+ * replacement while the old environment is still live: native allocation
+ * callbacks then see a complete scope chain, and may safely capture it. */
+static JSBool
+FreshenBlockScope(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *old, *next;
+    JSTempValueRooter root;
+    JSBool ok;
+
+    if (fp->blockChain)
+        return JS_TRUE;
+    old = fp->scopeChain;
+    JS_ASSERT(OBJ_GET_CLASS(cx, old) == &js_BlockClass);
+    JS_ASSERT(JS_GetPrivate(cx, old) == fp);
+    next = js_CloneBlockObject(cx, OBJ_GET_PROTO(cx, old),
+                              OBJ_GET_PARENT(cx, old), fp);
+    if (!next)
+        return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, next, &root);
+    ok = js_PutBlockObject(cx, old);
+    /* Even a failed detach clears the old frame pointer.  Keep the new
+     * environment on the chain so exception unwinding detaches it too. */
+    fp->scopeChain = next;
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 /*
  * Walk the scope chain looking for block scopes whose locals need to be
  * copied from stack slots into object slots before fp goes away.
@@ -3019,6 +3047,7 @@ interrupt:
           BEGIN_CASE(JSOP_FORARG)
           BEGIN_CASE(JSOP_FORVAR)
           BEGIN_CASE(JSOP_FORCONST)
+          BEGIN_CASE(JSOP_FORLEXICAL)
           BEGIN_CASE(JSOP_FORLOCAL)
             /*
              * JSOP_FORARG and JSOP_FORVAR don't require any lval computation
@@ -3077,6 +3106,16 @@ interrupt:
                 /* Don't update the const slot. */
                 break;
 
+              case JSOP_FORLEXICAL:
+                {
+                    JSTempValueRooter valueRoot;
+                    JS_PUSH_SINGLE_TEMP_ROOT(cx, rval, &valueRoot);
+                    ok = FreshenBlockScope(cx, fp);
+                    JS_POP_TEMP_ROOT(cx, &valueRoot);
+                    if (!ok)
+                        goto out;
+                }
+                /* FALL THROUGH */
               case JSOP_FORLOCAL:
                 slot = GET_UINT16(pc);
                 JS_ASSERT(slot < (uintN)depth);
@@ -6651,6 +6690,13 @@ interrupt:
           }
           END_CASE(JSOP_LEAVEBLOCK)
 
+          BEGIN_CASE(JSOP_FRESHENBLOCK)
+            SAVE_SP_AND_PC(fp);
+            ok = FreshenBlockScope(cx, fp);
+            if (!ok)
+                goto out;
+          END_CASE(JSOP_FRESHENBLOCK)
+
           BEGIN_CASE(JSOP_INITLOCALVOID)
             slot = GET_UINT16(pc);
             JS_ASSERT(slot < (uintN)depth);
@@ -6673,6 +6719,17 @@ interrupt:
             PUSH_OPND(fp->spbase[slot]);
             obj = NULL;
           END_CASE(JSOP_GETLOCAL)
+
+          BEGIN_CASE(JSOP_SETCONSTLOCAL)
+            slot = GET_UINT16(pc);
+            JS_ASSERT(slot < (uintN)depth);
+            if (fp->spbase[slot] == JSVAL_UNINITIALIZED)
+                goto uninitialized_lexical;
+            SAVE_SP_AND_PC(fp);
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_CONST_ASSIGNMENT);
+            ok = JS_FALSE;
+            goto out;
 
           BEGIN_CASE(JSOP_INITLOCAL)
           BEGIN_CASE(JSOP_SETLOCAL)
