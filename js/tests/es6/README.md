@@ -493,3 +493,61 @@ checks. This includes Suite Composer lifecycle and ChatZilla checks, Browser's
 and standalone ChatZilla startup/input in XULRunner. Other operating systems
 and architectures have not been revalidated for this batch; the ES6 goal remains
 incomplete.
+
+
+## Remaining ES2015 numeric Math methods
+
+The standard Math method names are now implemented, including `expm1`, `log1p`,
+`cbrt`, the hyperbolic/inverse-hyperbolic functions, `log10`, `log2`, `fround` and
+`hypot`. Math's Symbol-based tag remains unavailable until Symbol support lands.
+These additions are available in legacy globals as well as modern globals;
+existing application-facing methods and embeddings remain in place.
+
+Ten numerical kernels use the already bundled Sun fdlibm sources, with their
+original licenses retained. The normal configure/make build and standalone
+reference makefile compile only these selected kernels through a private target
+endianness adapter. Existing ES3/ES5 transcendental methods retain their current
+host/fdlibm policy. No C99-only math imports are required in the application,
+including the MSVC 2005 build. The adaptation also corrects stale union state in
+subnormal cube roots, signed exponent shifts, an atanh low-word negation and
+aliasing-dependent low-word reads in sinh/cosh.
+
+`fround` explicitly rounds a binary32 significand to nearest/even, including
+subnormals and overflow, without depending on a host float cast. `log2` preserves
+exact powers of two. `hypot` uses scaled compensated summation and performs all
+argument conversions in order, including after Infinity or NaN.
+
+`math-transcendental.js` passes **4,206 checks**, covering descriptors,
+nonconstructibility, signed zero, special values, coercion/GC, subnormals,
+rounding ties, overflow boundaries and many-argument hypot. The upstream Math
+subset passes **466/468 test/mode cases**; its two failures require
+`Symbol.toStringTag`.
+
+The complete ES2015 run records **23,028 passes, 5,538 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. Compared with the
+integer Math batch, 90 additional cases pass and no passing case regresses.
+Runtime hashes remained unchanged. The complete required-mode ES5 run passes
+all **11,540 cases**. Reports are `artifacts/es6/math-numeric-full.json` and
+`artifacts/es6/math-numeric-es5.json`.
+
+All four macOS arm64 engines rebuilt and passed packaging and relocated runtime
+checks, including Suite Composer/ChatZilla, Browser's 169 navigation assertions,
+Calendar's eight unit suites/four views and standalone ChatZilla in XULRunner.
+Other operating systems and architectures have not been revalidated for this
+batch. The remaining ES2015 failures still prevent a conformance claim.
+
+The optional host diagnostic compares ten kernels with a modern C99 libm using
+special/boundary values and deterministic binary64 samples. It checks special
+values exactly and finite results within four times binary64 epsilon relative
+tolerance (with a minimum-subnormal absolute floor). This is a numerical
+cross-check, not proof of correct rounding or target-OS compatibility:
+
+```sh
+python3 js/tests/es6/test-math-kernels.py \
+  --objdir obj-zoolrunner-macos-arm64-suite --cc clang --sanitize
+```
+
+On macOS arm64 this passes **2,000,510 comparisons** with ASan and UBSan. The
+application JavaScript fixture remains the portable runtime regression; the
+host diagnostic requires a compiler and C99 libm supporting the reference
+functions, which MSVC 2005 itself does not provide.

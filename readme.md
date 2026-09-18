@@ -172,7 +172,9 @@ through `xpcshell -E` or selection of ES2015 before native standard-class
 initialization; script edition changes alone do not replace existing built-ins.
 Modern function metadata and restricted accessors have native, shell and
 window regressions. Portable `Math.sign`, `trunc`, `clz32` and `imul` additions
-and corrected `Math.round` boundaries have focused regression coverage.
+and corrected `Math.round` boundaries have focused regression coverage. The
+remaining ES2015 numeric Math methods use selected bundled fdlibm kernels and
+portable rounding/summation code; Math's Symbol-based tag remains unfinished.
 Anonymous ordinary functions infer names from variable
 initializers, identifier assignments and static object properties; modern
 accessors have prefixed names and cannot be constructed. Inferred names remain

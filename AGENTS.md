@@ -429,7 +429,12 @@ GC, quoted/numeric accessor decompilation and the native XDR/clone checks.
 Script selection is not yet a complete policy for global built-in semantics;
 do not claim that partial edition support establishes ES2015 compliance.
 Run `js/tests/es6/math-integer.js` for Math conversion, signed-zero and rounding
-changes; preserve MSVC 2005 compatibility and callback/GC behavior.
+changes; preserve MSVC 2005 compatibility and callback/GC behavior. Selected
+bundled fdlibm kernels supply the ES2015 transcendental additions through a
+private target-endianness adapter. Keep their historical licenses, existing
+ES3/ES5 math policy and subnormal/overflow fixes. Run `math-transcendental.js`
+and the optional host `test-math-kernels.py` diagnostic for numerical changes;
+a host libm comparison is not target-OS runtime validation.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve

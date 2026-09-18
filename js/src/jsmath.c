@@ -53,6 +53,7 @@
 #include "jsconfig.h"
 #include "jslock.h"
 #include "jsmath.h"
+#include "jsmathfd.h"
 #include "jsnum.h"
 #include "jsobj.h"
 
@@ -495,6 +496,131 @@ math_imul(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return js_NewNumberValue(cx, result, rval);
 }
 
+/* The new transcendental kernels use the bundled fdlibm algorithms. */
+#define MATH_KERNEL_WRAPPER(name)                                             \
+static JSBool                                                                \
+math_##name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)  \
+{                                                                            \
+    jsdouble x;                                                              \
+    if (!js_ValueToNumber(cx, argv[0], &x))                                    \
+        return JS_FALSE;                                                     \
+    return js_NewNumberValue(cx, js_math_##name(x), rval);                     \
+}
+
+MATH_KERNEL_WRAPPER(expm1)
+MATH_KERNEL_WRAPPER(log1p)
+MATH_KERNEL_WRAPPER(cbrt)
+MATH_KERNEL_WRAPPER(asinh)
+MATH_KERNEL_WRAPPER(tanh)
+MATH_KERNEL_WRAPPER(acosh)
+MATH_KERNEL_WRAPPER(atanh)
+MATH_KERNEL_WRAPPER(cosh)
+MATH_KERNEL_WRAPPER(sinh)
+MATH_KERNEL_WRAPPER(log10)
+#undef MATH_KERNEL_WRAPPER
+
+static JSBool
+math_log2(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x, fraction, result;
+    int exponent;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    if (x > 0 && JSDOUBLE_IS_FINITE(x)) {
+        fraction = frexp(x, &exponent);
+        /* Powers of two, including subnormals, have exact integer results. */
+        result = fraction == 0.5 ? (jsdouble)(exponent - 1)
+                                : fd_log(x) * M_LOG2E;
+    } else {
+        result = fd_log(x);
+    }
+    return js_NewNumberValue(cx, result, rval);
+}
+
+static JSBool
+math_fround(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x, magnitude, fraction, scaled, integral, result;
+    int exponent, shift;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    if (!JSDOUBLE_IS_FINITE(x) || x == 0)
+        return js_NewNumberValue(cx, x, rval);
+    magnitude = fd_fabs(x);
+    fraction = frexp(magnitude, &exponent);
+    if (exponent > 128) {
+        result = *cx->runtime->jsPositiveInfinity;
+    } else {
+        /* Round the binary32 significand explicitly. This avoids dependence
+         * on a host float cast's overflow behavior or x87 excess precision. */
+        if (exponent < -125) {
+            scaled = ldexp(magnitude, 149);
+            shift = -149;
+        } else {
+            scaled = ldexp(fraction, 24);
+            shift = exponent - 24;
+        }
+        integral = fd_floor(scaled);
+        fraction = scaled - integral;
+        if (fraction > 0.5 || (fraction == 0.5 && ((uint32)integral & 1)))
+            integral += 1.0;
+        result = ldexp(integral, shift);
+        if (result >= 340282366920938463463374607431768211456.0) /* 2^128 */
+            result = *cx->runtime->jsPositiveInfinity;
+    }
+    return js_NewNumberValue(cx, fd_copysign(result, x), rval);
+}
+
+static JSBool
+math_hypot(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x, maximum, sum, correction, ratio, term, adjusted, next, result;
+    JSBool infinite, nan;
+    uintN i;
+
+    maximum = sum = correction = 0;
+    infinite = nan = JS_FALSE;
+    for (i = 0; i < argc; ++i) {
+        /* Every conversion is observable, even after infinity or NaN. */
+        if (!js_ValueToNumber(cx, argv[i], &x))
+            return JS_FALSE;
+        if (JSDOUBLE_IS_NaN(x)) {
+            nan = JS_TRUE;
+            continue;
+        }
+        if (!JSDOUBLE_IS_FINITE(x)) {
+            infinite = JS_TRUE;
+            continue;
+        }
+        x = fd_fabs(x);
+        if (x == 0)
+            continue;
+        if (x > maximum) {
+            ratio = maximum / x;
+            sum *= ratio * ratio;
+            correction *= ratio * ratio;
+            maximum = x;
+            term = 1;
+        } else {
+            ratio = x / maximum;
+            term = ratio * ratio;
+        }
+        adjusted = term - correction;
+        next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
+    }
+    if (infinite)
+        result = *cx->runtime->jsPositiveInfinity;
+    else if (nan)
+        result = *cx->runtime->jsNaN;
+    else
+        result = maximum * fd_sqrt(sum);
+    return js_NewNumberValue(cx, result, rval);
+}
+
 static JSBool
 math_sin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -564,6 +690,19 @@ static JSFunctionSpec math_static_methods[] = {
     {"sqrt",            math_sqrt,              1, 0, 0},
     {"tan",             math_tan,               1, 0, 0},
     {"trunc",           math_trunc,             1, 0, 0},
+    {"expm1",            math_expm1,             1, 0, 0},
+    {"log1p",            math_log1p,             1, 0, 0},
+    {"cbrt",             math_cbrt,              1, 0, 0},
+    {"asinh",            math_asinh,             1, 0, 0},
+    {"tanh",             math_tanh,              1, 0, 0},
+    {"acosh",            math_acosh,             1, 0, 0},
+    {"atanh",            math_atanh,             1, 0, 0},
+    {"cosh",             math_cosh,              1, 0, 0},
+    {"sinh",             math_sinh,              1, 0, 0},
+    {"log10",            math_log10,             1, 0, 0},
+    {"log2",             math_log2,              1, 0, 0},
+    {"fround",           math_fround,            1, 0, 0},
+    {"hypot",            math_hypot,             2, 0, 0},
     {0,0,0,0,0}
 };
 

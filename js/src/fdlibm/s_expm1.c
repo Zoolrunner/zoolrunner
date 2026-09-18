@@ -239,7 +239,7 @@ Q5  =  -2.01099218183624371326e-07; /* BE8AFDB7 6E09C32D */
 	    if (k <= -2 || k>56) {   /* suffice to return exp(x)-1 */
 	        y = one-(e-x);
                 u.d = y;
-	        __HI(u) += (k<<20);	/* add k to y's exponent */
+	        __HI(u) += (k * 1048576);	/* add k to y's exponent */
                 y = u.d;
 	        return y-one;
 	    }
@@ -250,7 +250,7 @@ Q5  =  -2.01099218183624371326e-07; /* BE8AFDB7 6E09C32D */
                 t = u.d;
 	       	y = t-(e-x);
                 u.d = y;
-	       	__HI(u) += (k<<20);	/* add k to y's exponent */
+                __HI(u) += (k * 1048576);	/* add k to y's exponent */
                 y = u.d;
 	   } else {
                u.d = t;
@@ -259,7 +259,7 @@ Q5  =  -2.01099218183624371326e-07; /* BE8AFDB7 6E09C32D */
 	       	y = x-(e+t);
 	       	y += one;
                 u.d = y;
-	       	__HI(u) += (k<<20);	/* add k to y's exponent */
+                __HI(u) += (k * 1048576);	/* add k to y's exponent */
                 y = u.d;
 	    }
 	}

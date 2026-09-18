@@ -110,7 +110,7 @@ static double one = 1.0, shuge = 1.0e307;
 	if (ix < 0x40862E42)  return h*__ieee754_exp(fd_fabs(x));
 
     /* |x| in [log(maxdouble), overflowthresold] */
-	lx = *( (((*(unsigned*)&one)>>29)) + (unsigned*)&x);
+	u.d = x; lx = __LO(u);
 	if (ix<0x408633CE || (ix==0x408633ce)&&(lx<=(unsigned)0x8fb9f87d)) {
 	    w = __ieee754_exp(0.5*fd_fabs(x));
 	    t = h*w;

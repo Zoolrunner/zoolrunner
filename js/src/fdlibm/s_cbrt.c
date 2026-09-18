@@ -101,7 +101,9 @@ G =  3.57142857142857150787e-01; /* 5/14      = 0x3FD6DB6D, 0xB6DB6DB7 */
     /* rough cbrt to 5 bits */
 	if(hx<0x00100000) 		/* subnormal number */
 	  {u.d = t; __HI(u)=0x43500000; t=u.d;		/* set t= 2**54 */
-	   t*=x; __HI(u)=__HI(u)/3+B2;
+	   t*=x;
+           /* Keep the scaled subnormal and the union view synchronized. */
+           u.d=t; __HI(u)=__HI(u)/3+B2; t=u.d;
 	  }
 	else {
 	  u.d = t; __HI(u)=hx/3+B1; t = u.d;

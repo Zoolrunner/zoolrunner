@@ -181,6 +181,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("strict-parameter-history.js", "STRICT-PARAMETER-HISTORY checks=30 failures=0"),
                 ("../es6/number.js", "ES6-NUMBER checks=156 failures=0"),
                 ("../es6/math-integer.js", "ES6-MATH-INTEGER checks=169 failures=0"),
+                ("../es6/math-transcendental.js", "ES6-MATH-NUMERIC checks=4206 failures=0"),
                 ("../es6/radix-literals.js", "ES6-RADIX-LITERALS checks=130 failures=0"),
                 ("../es6/editions.js", "ES6-EDITIONS checks=36 failures=0"),
                 ("../es6/contextual-keywords.js",

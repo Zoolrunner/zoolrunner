@@ -40,7 +40,7 @@
 DEPTH		= ../..
 topsrcdir	= @top_srcdir@
 srcdir		= @srcdir@
-VPATH		= @srcdir@
+VPATH		= @srcdir@:@srcdir@/fdlibm
 
 include $(DEPTH)/config/autoconf.mk
 
@@ -104,6 +104,9 @@ CSRCS		= \
 		jsxml.c \
 		prmjtime.c \
 		$(NULL)
+
+CSRCS += s_expm1.c s_log1p.c s_cbrt.c s_asinh.c s_tanh.c e_acosh.c e_atanh.c e_cosh.c e_sinh.c e_log10.c
+DEFINES += -DZR_ES2015_FDLIBM
 
 EXPORTS		= \
 		jsautocfg.h \

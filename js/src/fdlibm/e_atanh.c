@@ -93,7 +93,7 @@ static double zero = 0.0;
 	hx = __HI(u);		/* high word */
 	lx = __LO(u);		/* low word */
 	ix = hx&0x7fffffff;
-	if ((ix|((lx|(-(int)lx))>>31))>0x3ff00000) /* |x|>1 */
+	if ((ix|(lx != 0))>0x3ff00000) /* |x|>1 */
 	    return (x-x)/(x-x);
 	if(ix==0x3ff00000) 
 	    return x/zero;
