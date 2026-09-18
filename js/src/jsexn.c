@@ -1306,7 +1306,7 @@ js_ErrorToException(JSContext *cx, const char *message, JSErrorReport *reportp)
     jsval tv[4];
     JSTempValueRooter tvr;
     JSBool ok;
-    JSObject *errProto, *errObject;
+    JSObject *errProto, *errObject, *errorScope = NULL;
     JSString *messageStr, *filenameStr;
 
     /*
@@ -1359,7 +1359,13 @@ js_ErrorToException(JSContext *cx, const char *message, JSErrorReport *reportp)
      * exception constructor name in the scope chain of the current context's
      * top stack frame, or in the global object if no frame is active.
      */
-    ok = js_GetClassPrototype(cx, NULL, INT_TO_JSID(exceptions[exn].key),
+    /* Native frames intentionally inherit the caller's scope for classic
+     * embedding/eval behavior. Modern native exceptions nevertheless belong
+     * to the executing function's realm, not that inherited scope. */
+    if (cx->fp->fun && !FUN_INTERPRETED(cx->fp->fun) && cx->fp->callee &&
+        js_IsModernFunction(cx, cx->fp->callee))
+        errorScope = js_BuiltinGlobal(cx, cx->fp->argv);
+    ok = js_GetClassPrototype(cx, errorScope, INT_TO_JSID(exceptions[exn].key),
                               &errProto);
     if (!ok)
         goto out;

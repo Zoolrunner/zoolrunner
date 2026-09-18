@@ -1281,3 +1281,11 @@ UCD exhaustive `test-casing.py` runner. Preserve legacy-global tables and explic
 embedding locale callbacks. Keep full mappings, supplementary code points,
 original-text Final_Sigma context, interruptible loops and checked UTF-16 growth.
 Do not silently change identifier, regexp or platform-wide Unicode tables.
+
+For Function call/apply changes, run `function-invoke.js` and
+`TestFunctionInvoke.c`. Modern apply uses ToLength without 32-bit wrapping, rejects
+noncallable receivers before conversions, and keeps argument-list loops
+interruptible. Preserve raw target receivers, partial-list rooting, legacy methods
+and cloned modern methods. Native modern exceptions use the executing function's
+realm; exceptions thrown by user callbacks retain their own realm. Keep native
+caller scopes intact for classic embedding/eval behavior.

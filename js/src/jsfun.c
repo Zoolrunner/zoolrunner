@@ -1972,17 +1972,23 @@ fun_call(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 }
 
 static JSBool
-fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+Apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSBool modern)
 {
     jsval fval, *sp, *oldsp;
     JSString *str;
     JSObject *aobj;
     jsuint length;
+    jsdouble modernLength;
     JSBool ok;
     void *mark;
     uintN i;
     JSStackFrame *fp;
 
+    if (modern && !js_IsCallable(cx, argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "Function.prototype.apply receiver");
+        return JS_FALSE;
+    }
     if (argc == 0) {
         /* Will get globalObject as 'this' and no other arguments. */
         return fun_call(cx, obj, argc, argv, rval);
@@ -2014,8 +2020,16 @@ fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                 return JS_FALSE;
             }
             aobj = JSVAL_TO_OBJECT(argv[1]);
-            if (!js_GetLengthProperty(cx, aobj, &length))
+            if (modern) {
+                if (!js_ArrayLikeLength(cx, aobj, &modernLength)) return JS_FALSE;
+                if (modernLength >= ARRAY_INIT_LIMIT) {
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_ARGUMENT_LIST_LIMIT);
+                    return JS_FALSE;
+                }
+                length = (jsuint)modernLength;
+            } else if (!js_GetLengthProperty(cx, aobj, &length)) {
                 return JS_FALSE;
+            }
         }
     }
 
@@ -2034,6 +2048,10 @@ fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     *sp++ = fval;
     *sp++ = argv[0];
     for (i = 0; i < argc; i++) {
+        if (modern && (i & 127) == 0 && cx->branchCallback && !cx->branchCallback(cx, NULL)) {
+            ok = JS_FALSE;
+            goto out;
+        }
         ok = JS_GetElement(cx, aobj, (jsint)i, sp);
         if (!ok)
             goto out;
@@ -2052,6 +2070,30 @@ fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 out:
     js_FreeStack(cx, mark);
     return ok;
+}
+
+static JSBool
+fun_apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return Apply(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+ModernApply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return Apply(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+ModernCall(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    /* A noncallable receiver is rejected without invoking its conversion hooks. */
+    if (!js_IsCallable(cx, argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "Function.prototype.call receiver");
+        return JS_FALSE;
+    }
+    return fun_call(cx, obj, argc, argv, rval);
 }
 
 #ifdef NARCISSUS
@@ -2670,6 +2712,10 @@ js_InitFunctionClass(JSContext *cx, JSObject *obj)
                                   JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
         goto bad;
     if (!InitHasInstance(cx, obj, proto))
+        goto bad;
+    if (JS_VERSION_IS_ES2015(cx) &&
+        (!JS_DefineFunction(cx, proto, "apply", ModernApply, 2, JSFUN_STRICT | JSFUN_NO_CONSTRUCT) ||
+         !JS_DefineFunction(cx, proto, "call", ModernCall, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT)))
         goto bad;
     return proto;
 

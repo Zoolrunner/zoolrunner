@@ -533,11 +533,19 @@ incomplete. See [binary-data validation notes](js/tests/es6/README.md#arraybuffe
 
 Modern String casing uses Unicode 18.0.0 full mappings and context-sensitive
 sigma while preserving legacy methods and embedding locale callbacks. All 204
-diagnostic cases and 4,456,448 UCD comparisons pass. The latest full macOS arm64
+diagnostic cases and 4,456,448 UCD comparisons pass. The casing full macOS arm64
 ES2015 run passes **26,648 cases**, with **1,918 failures**, 14 unsupported module
 cases and two harness errors: 18 gained, zero lost. All 11,540 ES5.1 cases and all
 four build, package and desktop checks pass. Full ES6 and other-platform validation
 remain incomplete. See [casing validation notes](js/tests/es6/README.md#modern-unicode-casing).
+
+The invocation follow-up fixes modern apply length conversion, call/apply
+receiver checks and foreign native exception realms while preserving legacy
+methods. All 715 Function cases pass. The latest full macOS arm64 ES2015 run
+preserves **26,648 passes**, **1,918 failures**, 14 unsupported module cases and
+two harness errors, with zero lost passes. All 11,540 ES5.1 cases and all four
+build, package and desktop checks pass. Full ES6 and other-platform validation
+remain incomplete. See [invocation validation notes](js/tests/es6/README.md#modern-function-invocation).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

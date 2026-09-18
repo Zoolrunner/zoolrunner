@@ -1795,3 +1795,38 @@ Calendar passes eight unit suites and four views; Browser passes 169 navigation/
 layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/casing-runtime`. Other platforms and full ES6 remain incomplete.
+
+### Modern Function invocation
+
+Modern call/apply reject noncallable receivers without invoking their conversion
+hooks. Apply uses ToLength instead of wrapping argument-list lengths to 32 bits,
+preserves raw target receivers and ordered element reads, and permits native-loop
+interruption. Exceeding the existing argument-storage limit raises RangeError
+before allocation; legacy apply retains its original ToUint32 behavior. Modern
+methods retain their behavior when cloned into a legacy global.
+
+Native modern errors now use the executing function's realm. The historical
+caller scope remains intact for embedding/eval behavior; callback-thrown errors
+retain the callback's realm. An initial native test exposed caller-realm errors;
+the exception prototype lookup was corrected with foreign TypeError/RangeError
+and callback regressions.
+
+Focused checks pass 24 script and 29 native assertions under MallocScribble; C89
+checks pass. The diagnostic Function subset passes 715/715 cases.
+
+The full pinned ES2015 run preserves **26,648 passes**, **1,918 failures**,
+14 unsupported module cases and two harness errors: **zero gained, zero lost**
+relative to casing. These fixes cover additional semantics beyond the pinned
+suite's failing cases. No crashes/timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/function-invoke-full.json` and `function-invoke-es5.json`;
+snapshot: `/tmp/zr-function-invoke-conformance-20260918`. It combines the preceding
+frozen runtime with the completed invocation engine. Its libmozjs SHA-256
+`3f81e339d2679060864da2053abe4ecb3377aeb2d9a1c6132d5b14af4b6e6c05`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/function-invoke-runtime`. Other platforms and full ES6 remain incomplete.

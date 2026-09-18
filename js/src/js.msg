@@ -315,3 +315,4 @@ MSG_DEF(JSMSG_BAD_NORMALIZATION_FORM,232, 0, JSEXN_RANGEERR, "invalid Unicode no
 MSG_DEF(JSMSG_SYMBOL_REQUIRED,      233, 0, JSEXN_TYPEERR, "Symbol value required")
 MSG_DEF(JSMSG_SYMBOL_CONVERSION,    234, 1, JSEXN_TYPEERR, "cannot convert a Symbol value to {0}")
 MSG_DEF(JSMSG_SYMBOL_XDR,           235, 0, JSEXN_TYPEERR, "cannot serialize a Symbol value")
+MSG_DEF(JSMSG_ARGUMENT_LIST_LIMIT,  236, 0, JSEXN_RANGEERR, "argument list exceeds the implementation limit")
