@@ -175,6 +175,8 @@ window regressions. Portable `Math.sign`, `trunc`, `clz32` and `imul` additions
 and corrected `Math.round` boundaries have focused regression coverage. The
 remaining ES2015 numeric Math methods use selected bundled fdlibm kernels and
 portable rounding/summation code; Math's Symbol-based tag remains unfinished.
+New String code-point, repetition, literal-search and raw-assembly methods have
+UTF-16 and callback/GC checks; normalization and Symbol protocols are unfinished.
 Anonymous ordinary functions infer names from variable
 initializers, identifier assignments and static object properties; modern
 accessors have prefixed names and cannot be constructed. Inferred names remain

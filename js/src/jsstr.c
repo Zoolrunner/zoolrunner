@@ -2260,7 +2260,176 @@ str_trim(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+static JSBool
+str_codePointAt(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                jsval *rval)
+{
+    JSString *str;
+    jsdouble position;
+    size_t index, length;
+    const jschar *chars;
+    jschar first, second;
+    jsint code;
+
+    str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
+    if (!str)
+        return JS_FALSE;
+    argv[-1] = STRING_TO_JSVAL(str);
+    if (!js_ValueToNumber(cx, argv[0], &position))
+        return JS_FALSE;
+    position = js_DoubleToInteger(position);
+    length = JSSTRING_LENGTH(str);
+    if (position < 0 || position >= length) {
+        *rval = JSVAL_VOID;
+        return JS_TRUE;
+    }
+    index = (size_t)position;
+    chars = JSSTRING_CHARS(str);
+    first = chars[index];
+    code = first;
+    if (first >= 0xd800 && first <= 0xdbff && index + 1 < length) {
+        second = chars[index + 1];
+        if (second >= 0xdc00 && second <= 0xdfff)
+            code = 0x10000 + ((first - 0xd800) << 10) + (second - 0xdc00);
+    }
+    *rval = INT_TO_JSVAL(code);
+    return JS_TRUE;
+}
+
+static JSBool
+str_repeat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str, *result;
+    jsdouble count;
+    size_t length, total, filled, amount;
+    jschar *chars;
+
+    str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
+    if (!str)
+        return JS_FALSE;
+    argv[-1] = STRING_TO_JSVAL(str);
+    if (!js_ValueToNumber(cx, argv[0], &count))
+        return JS_FALSE;
+    count = js_DoubleToInteger(count);
+    if (count < 0 || !JSDOUBLE_IS_FINITE(count)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_REPEAT_COUNT);
+        return JS_FALSE;
+    }
+    length = JSSTRING_LENGTH(str);
+    if (count == 0 || length == 0) {
+        *rval = JS_GetEmptyStringValue(cx);
+        return JS_TRUE;
+    }
+    /* String lengths must fit the historical immediate-integer length API.
+     * Check before conversion/multiplication on both 32- and 64-bit hosts. */
+    if (length > (size_t)JSVAL_INT_MAX ||
+        count > (jsdouble)((size_t)JSVAL_INT_MAX / length)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_REPEAT_COUNT);
+        return JS_FALSE;
+    }
+    total = length * (size_t)count;
+    chars = (jschar *)JS_malloc(cx, (total + 1) * sizeof(jschar));
+    if (!chars)
+        return JS_FALSE;
+    memcpy(chars, JSSTRING_CHARS(str), length * sizeof(jschar));
+    filled = length;
+    while (filled < total) {
+        amount = JS_MIN(filled, total - filled);
+        memcpy(chars + filled, chars, amount * sizeof(jschar));
+        filled += amount;
+    }
+    chars[total] = 0;
+    result = js_NewString(cx, chars, total, 0);
+    if (!result) {
+        JS_free(cx, chars);
+        return JS_FALSE;
+    }
+    *rval = STRING_TO_JSVAL(result);
+    return JS_TRUE;
+}
+
+/* kind: 0 = startsWith, 1 = endsWith, 2 = includes. */
+static JSBool
+str_literalSearch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                  jsval *rval, uintN kind)
+{
+    JSString *str, *search;
+    size_t length, searchLength, position, last;
+    jsdouble number;
+    const jschar *chars, *needle;
+
+    str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
+    if (!str)
+        return JS_FALSE;
+    argv[-1] = STRING_TO_JSVAL(str);
+    /* Symbol.match customization is added with the Symbol property protocol. */
+    if (JSVAL_IS_REGEXP(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_REGEXP_SEARCH);
+        return JS_FALSE;
+    }
+    search = js_ValueToString(cx, argv[0]);
+    if (!search)
+        return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(search);
+    length = JSSTRING_LENGTH(str);
+    if (kind == 1 && (argc < 2 || JSVAL_IS_VOID(argv[1]))) {
+        position = length;
+    } else {
+        number = 0;
+        if (argc > 1 && !js_ValueToNumber(cx, argv[1], &number))
+            return JS_FALSE;
+        number = js_DoubleToInteger(number);
+        position = number <= 0 ? 0 : number >= length ? length : (size_t)number;
+    }
+    searchLength = JSSTRING_LENGTH(search);
+    *rval = JSVAL_FALSE;
+    if (kind == 1) {
+        if (searchLength > position)
+            return JS_TRUE;
+        position -= searchLength;
+        last = position;
+    } else {
+        if (searchLength > length - position)
+            return JS_TRUE;
+        last = kind == 0 ? position : length - searchLength;
+    }
+    /* Obtain character pointers only after every observable conversion. */
+    chars = JSSTRING_CHARS(str);
+    needle = JSSTRING_CHARS(search);
+    do {
+        if (!memcmp(chars + position, needle, searchLength * sizeof(jschar))) {
+            *rval = JSVAL_TRUE;
+            break;
+        }
+    } while (position++ < last);
+    return JS_TRUE;
+}
+
+static JSBool
+str_startsWith(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return str_literalSearch(cx, obj, argc, argv, rval, 0);
+}
+
+static JSBool
+str_endsWith(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return str_literalSearch(cx, obj, argc, argv, rval, 1);
+}
+
+static JSBool
+str_includes(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return str_literalSearch(cx, obj, argc, argv, rval, 2);
+}
+
 static JSFunctionSpec string_methods[] = {
+    {"codePointAt", str_codePointAt, 1, JSFUN_THISP_PRIMITIVE, 0},
+    {"repeat", str_repeat, 1, JSFUN_THISP_PRIMITIVE, 0},
+    {"startsWith", str_startsWith, 1, JSFUN_THISP_PRIMITIVE, 0},
+    {"endsWith", str_endsWith, 1, JSFUN_THISP_PRIMITIVE, 0},
+    {"includes", str_includes, 1, JSFUN_THISP_PRIMITIVE, 0},
+
     {"trim", str_trim, 0, JSFUN_GENERIC_NATIVE | JSFUN_THISP_PRIMITIVE, 0},
 #if JS_HAS_TOSOURCE
     {"quote",               str_quote,              0,JSFUN_GENERIC_NATIVE|
@@ -2383,7 +2552,169 @@ str_fromCharCode(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     return JS_TRUE;
 }
 
+static JSBool
+str_fromCodePoint(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                  jsval *rval)
+{
+    jschar *chars;
+    JSString *str;
+    jsdouble number;
+    uint32 code;
+    uintN i;
+    size_t length;
+
+    if (argc > (uintN)((JSVAL_INT_MAX - 1) / 2)) {
+        JS_ReportOutOfMemory(cx);
+        return JS_FALSE;
+    }
+    chars = (jschar *)JS_malloc(cx, ((size_t)argc * 2 + 1) * sizeof(jschar));
+    if (!chars)
+        return JS_FALSE;
+    length = 0;
+    for (i = 0; i < argc; ++i) {
+        if (!js_ValueToNumber(cx, argv[i], &number))
+            goto bad;
+        if (!JSDOUBLE_IS_FINITE(number) || number < 0 || number > 0x10ffff ||
+            number != js_DoubleToInteger(number)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_CODE_POINT);
+            goto bad;
+        }
+        code = (uint32)number;
+        if (code <= 0xffff) {
+            chars[length++] = (jschar)code;
+        } else {
+            code -= 0x10000;
+            chars[length++] = (jschar)(0xd800 + (code >> 10));
+            chars[length++] = (jschar)(0xdc00 + (code & 0x3ff));
+        }
+    }
+    chars[length] = 0;
+    str = js_NewString(cx, chars, length, 0);
+    if (!str)
+        goto bad;
+    *rval = STRING_TO_JSVAL(str);
+    return JS_TRUE;
+  bad:
+    JS_free(cx, chars);
+    return JS_FALSE;
+}
+
+static JSBool
+AppendRawString(JSContext *cx, jschar **chars, size_t *length,
+                size_t *capacity, JSString *part)
+{
+    size_t amount, required, grown;
+    jschar *storage;
+
+    amount = JSSTRING_LENGTH(part);
+    if (amount > (size_t)JSVAL_INT_MAX - *length) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_STRING_LENGTH);
+        return JS_FALSE;
+    }
+    required = *length + amount + 1;
+    if (required > *capacity) {
+        grown = *capacity ? *capacity * 2 : 32;
+        if (grown < required)
+            grown = required;
+        if (grown > (size_t)JSVAL_INT_MAX + 1)
+            grown = (size_t)JSVAL_INT_MAX + 1;
+        storage = (jschar *)JS_realloc(cx, *chars, grown * sizeof(jschar));
+        if (!storage)
+            return JS_FALSE;
+        *chars = storage;
+        *capacity = grown;
+    }
+    memcpy(*chars + *length, JSSTRING_CHARS(part), amount * sizeof(jschar));
+    *length += amount;
+    (*chars)[*length] = 0;
+    return JS_TRUE;
+}
+
+static JSBool
+str_raw(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *raw;
+    JSString *part, *result;
+    JSAtom *atom;
+    jsval value;
+    jsid id;
+    JSTempValueRooter tvr;
+    jsdouble segments, index;
+    jschar *chars;
+    size_t length, capacity;
+    JSBool ok;
+
+    raw = js_ValueToNonNullObject(cx, argv[0]);
+    if (!raw)
+        return JS_FALSE;
+    argv[0] = OBJECT_TO_JSVAL(raw);
+    value = JSVAL_NULL;
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, value, &tvr);
+    chars = NULL;
+    length = capacity = 0;
+    ok = JS_FALSE;
+    if (!JS_GetProperty(cx, raw, "raw", &tvr.u.value))
+        goto out;
+    raw = js_ValueToNonNullObject(cx, tvr.u.value);
+    if (!raw)
+        goto out;
+    argv[0] = OBJECT_TO_JSVAL(raw);
+    if (!OBJ_GET_PROPERTY(cx, raw,
+                          ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                          &tvr.u.value) ||
+        !js_ValueToNumber(cx, tvr.u.value, &segments))
+        goto out;
+    segments = js_DoubleToInteger(segments);
+    if (segments <= 0) {
+        *rval = JS_GetEmptyStringValue(cx);
+        ok = JS_TRUE;
+        goto out;
+    }
+    if (segments > 9007199254740991.0)
+        segments = 9007199254740991.0;
+    for (index = 0; index < segments; index += 1.0) {
+        if (index <= JSVAL_INT_MAX) {
+            id = INT_TO_JSID((jsint)index);
+        } else {
+            part = js_NumberToString(cx, index);
+            if (!part || !(atom = js_AtomizeString(cx, part, 0)))
+                goto out;
+            id = ATOM_TO_JSID(atom);
+        }
+        if (!OBJ_GET_PROPERTY(cx, raw, id, &tvr.u.value))
+            goto out;
+        part = js_ValueToString(cx, tvr.u.value);
+        if (!part)
+            goto out;
+        tvr.u.value = STRING_TO_JSVAL(part);
+        if (!AppendRawString(cx, &chars, &length, &capacity, part))
+            goto out;
+        if (index + 1 == segments)
+            break;
+        if (index + 1 < argc) {
+            part = js_ValueToString(cx, argv[(uintN)index + 1]);
+            if (!part)
+                goto out;
+            tvr.u.value = STRING_TO_JSVAL(part);
+            if (!AppendRawString(cx, &chars, &length, &capacity, part))
+                goto out;
+        }
+    }
+    result = js_NewString(cx, chars, length, 0);
+    if (result) {
+        chars = NULL;
+        *rval = STRING_TO_JSVAL(result);
+        ok = JS_TRUE;
+    }
+  out:
+    JS_free(cx, chars);
+    JS_POP_TEMP_ROOT(cx, &tvr);
+    return ok;
+}
+
 static JSFunctionSpec string_static_methods[] = {
+    {"raw", str_raw, 1, 0, 0},
+    {"fromCodePoint", str_fromCodePoint, 1, 0, 0},
     {"fromCharCode",    str_fromCharCode,       1,0,0},
     {0,0,0,0,0}
 };

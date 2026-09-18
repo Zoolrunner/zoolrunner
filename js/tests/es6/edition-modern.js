@@ -26,7 +26,11 @@ function modernWindowEdition() {
            Math.round(0.49999999999999994) === 0 && Math.hypot(3, 4) === 5 &&
            Math.log2(Number.MIN_VALUE) === -1074 && Math.cbrt(-8) === -2 &&
            1 / Math.fround(-Number.MIN_VALUE) === -Infinity &&
-           Math.expm1(Number.MIN_VALUE) === Number.MIN_VALUE && modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
+           Math.expm1(Number.MIN_VALUE) === Number.MIN_VALUE &&
+           String.fromCodePoint(0x1f600).codePointAt(0) === 0x1f600 &&
+           "ab".repeat(2) === "abab" && "abc".startsWith("b", 1) &&
+           "abc".endsWith("b", 2) && "abc".includes("bc") &&
+           String.raw({raw:["a", "b"]}, "!") === "a!b" && modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
            eval("({value:1,value:2}).value") === 2 &&
            typeof /a/ === "object";
 }

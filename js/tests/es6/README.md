@@ -551,3 +551,40 @@ On macOS arm64 this passes **2,000,510 comparisons** with ASan and UBSan. The
 application JavaScript fixture remains the portable runtime regression; the
 host diagnostic requires a compiler and C99 libm supporting the reference
 functions, which MSVC 2005 itself does not provide.
+
+
+## String code points, repetition, literal search and raw assembly
+
+The engine now implements `String.fromCodePoint`, `String.raw`, and prototype
+`codePointAt`, `repeat`, `startsWith`, `endsWith` and `includes`. These additions
+are available in legacy globals too; existing `indexOf`, `substr`, `substring`
+and other historical methods retain their behavior. Template-literal parsing,
+Unicode normalization, Symbol conversion and `Symbol.match` customization
+remain separate unfinished work. The literal search methods currently reject
+actual RegExp objects; their complete IsRegExp protocol requires Symbols.
+
+New string-producing methods check lengths before allocation and retain the
+historical immediate-integer length limit of 1,073,741,823 UTF-16 code units.
+`repeat` doubles initialized buffer regions, and `raw` grows its buffer
+geometrically. Raw assembly observes length once, retrieves segments in order,
+preserves abrupt completions and ignores excess substitutions. Character
+pointers are acquired after observable argument conversions; converted strings
+and temporary raw values stay rooted across callbacks and GC.
+
+`string-additions.js` passes **175 checks**, including descriptors, constructors,
+receiver validation, surrogate pairs/lone surrogates, embedded NULs, conversion
+order, GC, reentrant raw calls, exceptions and legacy behavior. The upstream
+String subset passes **1,725/1,857 test/mode cases**.
+
+The full ES2015 run records **23,232 passes, 5,334 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. This adds 204
+passes with no previously passing case lost and unchanged runtime hashes. The
+complete required-mode ES5 run passes all **11,540 cases**. Reports are
+`artifacts/es6/string-additions-full.json` and
+`artifacts/es6/string-additions-es5.json`.
+
+All four macOS arm64 engines rebuilt and passed package/relocated runtime checks,
+including Suite Composer/ChatZilla, 169 Browser navigation/layout assertions,
+Calendar's eight unit suites/four views and standalone ChatZilla in XULRunner.
+Other operating systems and architectures have not been revalidated for this
+batch; complete ES2015 compliance remains unfinished.

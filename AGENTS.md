@@ -435,6 +435,10 @@ private target-endianness adapter. Keep their historical licenses, existing
 ES3/ES5 math policy and subnormal/overflow fixes. Run `math-transcendental.js`
 and the optional host `test-math-kernels.py` diagnostic for numerical changes;
 a host libm comparison is not target-OS runtime validation.
+Run `string-additions.js` for the new String methods. Preserve UTF-16 code units,
+observable conversion order, rooting across callbacks/GC, reentrant raw assembly
+and checked allocation lengths. Do not equate literal RegExp rejection with the
+complete Symbol.match protocol.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve
