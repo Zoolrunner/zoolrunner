@@ -1008,3 +1008,28 @@ Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
 for this batch. This does not implement for-of, spread, generators or iterable
 consumers such as Array.from.
+
+
+### Array.from
+
+Array.from supports iterable and array-like inputs, generic construction,
+mapping with raw receivers, own indexed data properties and throwing length
+writes. Its fallback arrays use the built-in's defining realm. IteratorClose
+follows the ES2015 edition: return-getter failures replace the original throw;
+after successful method lookup the original throw takes precedence over the
+return call's outcome. Failures in next, done or value do not close the iterator.
+Callback state and index atoms remain rooted through collection.
+
+On macOS arm64, 36 focused checks and 17 native realm checks pass. The pinned
+Array.from subset passes 72/78; the remaining cases require ArrayBuffer or
+computed method syntax. The full pinned ES2015 run passes **23,975 cases**,
+with **4,591 failures**, 14 unsupported module cases and two harness errors.
+This gains 66 passes without losing any; there are no crashes or timeouts and
+runtime hashes remain unchanged. All **11,540 required ES5 cases** pass.
+Reports are `artifacts/es6/array-from-full.json` and `array-from-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.

@@ -1110,3 +1110,11 @@ surrogate pairs, permanent exhaustion, defining-realm result prototypes, weak
 realm-cache lifetime and JS_ClearScope. Modern arguments must use the original
 Array values function even if its public property was replaced. Iterator
 interfaces do not establish support for iteration syntax or consumers.
+
+
+For Array.from changes, run `js/tests/es6/array-from.js` and `TestArrayFrom.c`.
+Preserve primitive receivers, defining-realm fallback arrays, generic constructor
+argument counts, own property creation and ES2015 IteratorClose exception
+precedence. Next/done/value failures and final length failures do not close
+the iterator; mapper and indexed-definition failures do. Root index atoms and
+pending exceptions through callback collection.

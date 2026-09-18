@@ -298,6 +298,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-MODERN-ITERATORS checks=62 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed modern iterators")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/array-from.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-ARRAY-FROM checks=36 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Array.from")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -320,7 +328,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestSymbolEmbedding.c", "ES6-SYMBOL-EMBEDDING checks=42 failures=0"),
                 ("es6/TestHasInstanceEmbedding.c", "ES6-HAS-INSTANCE-EMBEDDING checks=13 failures=0"),
                 ("es6/TestBuiltinTags.c", "ES6-BUILTIN-TAGS-EMBEDDING checks=13 failures=0"),
-                ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0")):
+                ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
+                ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0")):
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",

@@ -360,3 +360,11 @@ cases, with 4,657 failures, 14 unsupported cases and two harness errors; all
 11,540 ES5 cases pass. All four applications pass packaged compatibility checks.
 Iteration syntax and consumers remain separate work. Other platforms have not
 been revalidated for this batch.
+
+
+Array.from is implemented for iterable and array-like sources, with generic
+constructors, mapping and iterator cleanup. On macOS arm64, 36 focused checks
+and 17 embedding checks pass. The full ES2015 run passes 23,975 cases, with
+4,591 failures, 14 unsupported cases and two harness errors; all 11,540 ES5
+cases pass. All four applications pass packaged compatibility checks. Other
+platforms have not been revalidated for this batch.

@@ -42,6 +42,8 @@ function modernWindowEdition() {
                          return "/x/".includes(rx); })() &&
            String.raw({raw:["a", "b"]}, "!") === "a!b" &&
            Array.of(1, 2).join() === "1,2" &&
+           Array.from("a\ud83d\ude00").length === 2 &&
+           Array.from({0:3,length:1}, function(v) { return v + 1; })[0] === 4 &&
            [1, 2].find(function(v) { return v > 1; }) === 2 &&
            [1, 2].findIndex(function(v) { return v > 1; }) === 1 &&
            [1, 2, 3].fill(9, 1, 2).join() === "1,9,3" &&
