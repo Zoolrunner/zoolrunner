@@ -158,6 +158,19 @@ MarkIds(JSContext *cx, JSTempValueRooter *root)
 }
 
 static JSBool ProxyObjectKeys(JSContext *cx, JSObject *target, jsval *rval);
+static JSBool OrderOwnKeys(JSContext *cx, JSIdArray *ids);
+
+/* Object.keys is also called internally by JSON with no argv[-2] slot.
+ * Derive the active operation's realm from its frame, not those internal args. */
+static JSObject *
+ReflectionArray(JSContext *cx, jsuint length)
+{
+    JSObject *global, *proto;
+    if (!JS_VERSION_IS_ES2015(cx)) return js_NewArrayObject(cx, length, NULL);
+    global = js_ProxyOperationGlobal(cx);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    return proto ? js_NewArrayObjectWithProto(cx, length, NULL, proto, global) : NULL;
+}
 
 JSBool
 js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
@@ -177,11 +190,14 @@ js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
     if (!ids.ids)
         return JS_FALSE;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
-    result = js_NewArrayObject(cx, ids.ids->length, NULL);
+    if (JS_VERSION_IS_ES2015(cx) && OBJ_IS_NATIVE(target) && !OrderOwnKeys(cx, ids.ids))
+        goto out;
+    result = ReflectionArray(cx, ids.ids->length);
     if (!result)
         goto out;
     *rval = OBJECT_TO_JSVAL(result);
     for (i = 0; i < ids.ids->length; ++i) {
+        if (JS_VERSION_IS_ES2015(cx) && (i & 127) == 0 && cx->branchCallback && !cx->branchCallback(cx, NULL)) goto out;
         str = js_ValueToString(cx, ID_TO_VALUE(ids.ids->vector[i]));
         if (!str)
             goto out;
@@ -1102,10 +1118,11 @@ obj_getOwnPropertyNames(JSContext *cx, JSObject *obj, uintN argc,
     if (JS_VERSION_IS_ES2015(cx) && OBJ_IS_NATIVE(target) &&
         !OrderOwnKeys(cx, ids.ids))
         goto out;
-    array = js_NewArrayObject(cx, 0, NULL);
+    array = ReflectionArray(cx, 0);
     if (!array) goto out;
     *rval = OBJECT_TO_JSVAL(array);
     for (i = 0; i < ids.ids->length; ++i) {
+        if (JS_VERSION_IS_ES2015(cx) && (i & 127) == 0 && cx->branchCallback && !cx->branchCallback(cx, NULL)) goto out;
         if (JSVAL_IS_SYMBOL(ID_TO_VALUE(ids.ids->vector[i])))
             continue;
         str = js_ValueToString(cx, ID_TO_VALUE(ids.ids->vector[i]));
@@ -1141,11 +1158,12 @@ obj_getOwnPropertySymbols(JSContext *cx, JSObject *obj, uintN argc,
     if (!ids.ids)
         return JS_FALSE;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
-    array = js_NewArrayObject(cx, 0, NULL);
+    array = ReflectionArray(cx, 0);
     if (!array)
         goto out;
     *rval = OBJECT_TO_JSVAL(array);
     for (i = 0; i < ids.ids->length; ++i) {
+        if (JS_VERSION_IS_ES2015(cx) && (i & 127) == 0 && cx->branchCallback && !cx->branchCallback(cx, NULL)) goto out;
         value = ID_TO_VALUE(ids.ids->vector[i]);
         if (JSVAL_IS_SYMBOL(value) &&
             !JS_DefineElement(cx, array, output++, value, NULL, NULL, JSPROP_ENUMERATE))

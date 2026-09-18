@@ -541,11 +541,19 @@ remain incomplete. See [casing validation notes](js/tests/es6/README.md#modern-u
 
 The invocation follow-up fixes modern apply length conversion, call/apply
 receiver checks and foreign native exception realms while preserving legacy
-methods. All 715 Function cases pass. The latest full macOS arm64 ES2015 run
+methods. All 715 Function cases pass. The invocation full macOS arm64 ES2015 run
 preserves **26,648 passes**, **1,918 failures**, 14 unsupported module cases and
 two harness errors, with zero lost passes. All 11,540 ES5.1 cases and all four
 build, package and desktop checks pass. Full ES6 and other-platform validation
 remain incomplete. See [invocation validation notes](js/tests/es6/README.md#modern-function-invocation).
+
+The reflection follow-up fixes modern key ordering and foreign result-array
+realms while preserving legacy script behavior and proxy order. All 5,984 Object
+and 208 JSON cases pass. The latest full macOS arm64 ES2015 run passes **26,654
+cases**, with **1,912 failures**, 14 unsupported module cases and two harness
+errors: six gained, zero lost. All 11,540 ES5.1 cases and all four build, package
+and desktop checks pass. Full ES6 and other-platform validation remain incomplete.
+See [reflection validation notes](js/tests/es6/README.md#reflection-key-ordering-and-array-realms).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

@@ -371,7 +371,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("error-modern.js", "ES6-ERROR-MODERN checks=72 failures=0"),
                 ("binary-data.js", "ES6-BINARY-DATA checks=68 failures=0"),
                 ("casing.js", "ES6-CASING checks=23 failures=0"),
-                ("function-invoke.js", "ES6-FUNCTION-INVOKE checks=24 failures=0")):
+                ("function-invoke.js", "ES6-FUNCTION-INVOKE checks=24 failures=0"),
+                ("reflection-keys.js", "ES6-REFLECTION-KEYS checks=16 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -419,6 +420,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestBinaryData.c", "ES6-BINARY-DATA-EMBEDDING checks=41 failures=0"),
                 ("es6/TestCasing.c", "ES6-CASING-EMBEDDING checks=26 failures=0"),
                 ("es6/TestFunctionInvoke.c", "ES6-FUNCTION-INVOKE-EMBEDDING checks=29 failures=0"),
+                ("es6/TestReflectionKeys.c", "ES6-REFLECTION-KEYS-EMBEDDING checks=28 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

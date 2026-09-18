@@ -1289,3 +1289,9 @@ interruptible. Preserve raw target receivers, partial-list rooting, legacy metho
 and cloned modern methods. Native modern exceptions use the executing function's
 realm; exceptions thrown by user callbacks retain their own realm. Keep native
 caller scopes intact for classic embedding/eval behavior.
+
+For reflection key ordering/array changes, run `reflection-keys.js` and
+`TestReflectionKeys.c`. Preserve selected legacy script ordering and primitive
+TypeErrors, proxy-supplied key order, and JSON's internal key-enumeration callers.
+Those callers do not supply argv[-2]; obtain result-array realms from the active
+operation frame. Keep copied identifiers rooted across GC/interrupt callbacks.

@@ -1830,3 +1830,36 @@ Calendar passes eight unit suites and four views; Browser passes 169 navigation/
 layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/function-invoke-runtime`. Other platforms and full ES6 remain incomplete.
+
+### Reflection key ordering and array realms
+
+Modern Object.keys sorts ordinary native keys by the original ES2015 integer-
+index rule, then string creation order. Object.keys, getOwnPropertyNames and
+getOwnPropertySymbols allocate result arrays in the executing built-in's realm.
+Proxy-supplied ordering remains unchanged. Selected ES5/legacy script ordering
+and primitive TypeErrors remain unchanged, including calls into modern globals.
+
+JSON's internal calls into the shared key collector do not have a native argv
+callee slot. The array helper derives its realm from the active operation frame,
+so JSON stringify/reviver enumeration follows modern ordering safely. Copied key
+identifiers stay rooted across garbage collection and native-loop interrupts.
+
+Focused checks pass 16 script and 28 native assertions under MallocScribble; C89
+checks pass. Diagnostic subsets pass Object 5,984/5,984 and JSON 208/208. Native
+checks cover foreign ordinary/proxy results, cloned methods, interruption and
+recovery, internal JSON calls, and explicitly selected legacy script behavior.
+The full pinned ES2015 run passes **26,654 cases**, with **1,912 failures**,
+14 unsupported module cases and two harness errors: **six gained, zero lost**
+relative to invocation changes. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/reflection-keys-full.json` and
+`reflection-keys-es5.json`; snapshot: `/tmp/zr-reflection-keys-conformance-20260918`.
+It combines the preceding frozen runtime with the completed reflection engine;
+libmozjs SHA-256 `56cd289961ae4c8fbdf9d7f4e84aeded103f024f3cba844650942982300b710c`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/reflection-keys-runtime`. Other platforms and full ES6 remain incomplete.
