@@ -718,3 +718,40 @@ checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
 assertions, Calendar's eight unit suites/four views and standalone ChatZilla
 in XULRunner. Other operating systems and architectures remain unvalidated for
 this batch, and complete ES2015 conformance remains unfinished.
+
+
+## Prototype mutation
+
+`Object.setPrototypeOf` validates arguments, rejects cycles and changes to
+nonextensible objects, permits unchanged prototypes and returns primitive
+targets unchanged after validating the requested prototype. It uses the existing
+inner/outer-object boundary and embedding access checks, without invoking a user
+property named __proto__. A callback's in/out value has a separate root from the
+requested prototype. The trusted JS_SetPrototype API keeps its historical policy.
+
+The classic engine shares certain own String/RegExp/Function fields with their
+class prototypes. The new operation materializes equivalent native descriptors
+before detaching such prototypes, preserving private-data getters/setters and
+short ids rather than copying mutable state such as RegExp.lastIndex into a
+stale data property. Property caches continue to track prototype changes.
+
+`prototype-mutation.js` passes **100 checks** and `TestPrototypeMutation.c`
+passes **15 native embedding checks** on macOS arm64. They cover cycles,
+nonextensibility, cached lookups, private fields, GC, access denial, callback
+value replacement/reentrancy and the unchanged trusted native API. The pinned
+setPrototypeOf subset passes **14/20 execution cases**; the six remaining cases
+require Symbol or Proxy. The modern XUL/content fixture and packaged native
+embedding checks include this operation.
+
+The complete pinned ES2015 run passes **23,528** cases, with **5,038 failures**,
+14 unsupported module cases and two harness errors; there are no timeouts or
+crashes. This adds eight passes without losing any previous passes. Runtime
+hashes were unchanged throughout the run. All **11,540 required ES5 cases**
+pass. Reports are `artifacts/es6/prototype-mutation-full.json` and
+`artifacts/es6/prototype-mutation-es5.json`.
+
+All four macOS arm64 applications build, package and pass the packaged shell,
+embedding and desktop checks. Additional checks pass for Calendar's eight unit
+suites and all four views, Browser's 169 navigation/layout assertions, Suite
+Composer/ChatZilla and standalone XULRunner ChatZilla. These results do not
+establish validation on other operating systems or architectures.

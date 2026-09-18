@@ -907,6 +907,118 @@ INTEGRITY_METHOD(obj_isSealed, JS_FALSE, JS_TRUE)
 INTEGRITY_METHOD(obj_isFrozen, JS_TRUE, JS_TRUE)
 #undef INTEGRITY_METHOD
 
+/* The classic engine stores some own built-in fields on same-class
+ * prototypes. Give them equivalent native descriptors on the instance before
+ * a new prototype would detach them. Preserve private-data accessors and
+ * short ids (not just a snapshot of RegExp.lastIndex, for example). */
+static JSBool
+MaterializeOwnFields(JSContext *cx, JSObject *target)
+{
+    RootedIds ids;
+    JSTempValueRooter value;
+    JSObject *owner;
+    JSProperty *property;
+    JSScopeProperty *sprop;
+    JSPropertyOp getter, setter;
+    uintN attrs, flags;
+    intN shortid;
+    jsint i;
+    jsid id;
+    JSBool ok = JS_FALSE;
+
+    owner = OBJ_GET_PROTO(cx, target);
+    if (!owner || OBJ_GET_CLASS(cx, target) == &js_ObjectClass ||
+        OBJ_GET_CLASS(cx, owner) != OBJ_GET_CLASS(cx, target))
+        return JS_TRUE;
+    ids.ids = OwnNames(cx, target);
+    if (!ids.ids)
+        return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, JSVAL_VOID, &value);
+    for (i = 0; i < ids.ids->length; ++i) {
+        id = ids.ids->vector[i];
+        if (!OBJ_LOOKUP_PROPERTY(cx, target, id, &owner, &property))
+            goto out;
+        if (!property)
+            continue;
+        if (owner == target || !IsVirtualOwn(cx, target, owner, property)) {
+            OBJ_DROP_PROPERTY(cx, owner, property);
+            continue;
+        }
+        sprop = (JSScopeProperty *)property;
+        getter = sprop->getter;
+        setter = sprop->setter;
+        attrs = sprop->attrs & ~JSPROP_SHARED;
+        flags = sprop->flags & SPROP_HAS_SHORTID;
+        shortid = sprop->shortid;
+        OBJ_DROP_PROPERTY(cx, owner, property);
+        if (!OBJ_GET_PROPERTY(cx, target, id, &value.u.value) ||
+            !js_DefineNativeProperty(cx, target, id, value.u.value,
+                                     getter, setter, attrs, flags, shortid,
+                                     NULL))
+            goto out;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &value);
+    JS_POP_TEMP_ROOT(cx, &ids.root);
+    JS_DestroyIdArray(cx, ids.ids);
+    return ok;
+}
+
+static JSBool
+obj_setPrototypeOf(JSContext *cx, JSObject *obj, uintN argc,
+                   jsval *argv, jsval *rval)
+{
+    JSObject *target, *prototype, *cursor;
+    uintN attrs;
+    JSTempValueRooter accessValue;
+    JSBool allowed;
+
+    if (JSVAL_IS_NULL(argv[0]) || JSVAL_IS_VOID(argv[0]) ||
+        !JSVAL_IS_OBJECT(argv[1]))
+        return DescriptorError(cx);
+    *rval = argv[0];
+    if (JSVAL_IS_PRIMITIVE(argv[0]))
+        return JS_TRUE;
+    target = JSVAL_TO_OBJECT(argv[0]);
+    prototype = JSVAL_TO_OBJECT(argv[1]);
+    /* Preserve the classic embedding's inner/outer object and access checks,
+     * without looking up or invoking a user property named __proto__. */
+    if (prototype) {
+        OBJ_TO_INNER_OBJECT(cx, prototype);
+        if (!prototype)
+            return JS_FALSE;
+        argv[1] = OBJECT_TO_JSVAL(prototype);
+    }
+    /* Access hooks may replace their value and collect. Keep the requested
+     * prototype rooted in argv independently of that in/out parameter. */
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, argv[1], &accessValue);
+    allowed = OBJ_CHECK_ACCESS(cx, target,
+                              ATOM_TO_JSID(cx->runtime->atomState.protoAtom),
+                              JSACC_PROTO | JSACC_WRITE, &accessValue.u.value,
+                              &attrs);
+    JS_POP_TEMP_ROOT(cx, &accessValue);
+    if (!allowed)
+        return JS_FALSE;
+    if (OBJ_GET_PROTO(cx, target) == prototype)
+        return JS_TRUE;
+    if (!IsExtensible(cx, target))
+        return DescriptorError(cx);
+    /* Report the new operation's TypeError without changing the historical
+     * JSAPI/legacy setter diagnostic. The underlying setter also serializes
+     * and checks the chain when installing the new prototype. */
+    for (cursor = prototype; cursor; cursor = OBJ_GET_PROTO(cx, cursor)) {
+        if (cursor == target)
+            return DescriptorError(cx);
+    }
+    if (OBJ_IS_NATIVE(target) && !MaterializeOwnFields(cx, target))
+        return JS_FALSE;
+    if (OBJ_GET_PROTO(cx, target) != prototype && !IsExtensible(cx, target))
+        return DescriptorError(cx);
+    return JS_SetPrototype(cx, target, prototype);
+}
+
 static JSBool
 obj_is(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -1065,6 +1177,7 @@ obj_assign(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
  * a lazily initialized DOM window has finished bootstrapping its classes.
  */
 JSFunctionSpec js_object_static_methods[] = {
+    {"setPrototypeOf", obj_setPrototypeOf, 2, 0, 0},
     {"is", obj_is, 2, 0, 0},
     {"assign", obj_assign, 2, 0, 0},
     {"getOwnPropertyNames", obj_getOwnPropertyNames, 1, 0, 0},

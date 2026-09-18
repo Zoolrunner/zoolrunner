@@ -226,6 +226,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-OBJECT-ADDITIONS checks=145 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed Object additions")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/prototype-mutation.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-PROTOTYPE-MUTATION checks=100 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed prototype mutation")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -239,7 +247,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
                 ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=13 failures=0"),
                 ("es6/TestFunctionMetadata.c",
-                 "ES6-FUNCTION-METADATA-EMBEDDING checks=20 failures=0")):
+                 "ES6-FUNCTION-METADATA-EMBEDDING checks=20 failures=0"),
+                ("es6/TestPrototypeMutation.c",
+                 "ES6-PROTOTYPE-EMBEDDING checks=15 failures=0")):
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",

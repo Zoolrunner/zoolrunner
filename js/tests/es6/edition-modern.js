@@ -40,6 +40,8 @@ function modernWindowEdition() {
            Object.getPrototypeOf(3) === Number.prototype &&
            Object.keys("ab").join() === "0,1" && Object.isFrozen(1) &&
            Object.freeze(1) === 1 && !({}).hasOwnProperty("__proto__") &&
+           (function() { var box = new String("ab"); Object.setPrototypeOf(box, null);
+                         return box.length === 2 && box[1] === "b"; })() &&
            "e\u0301".normalize() === "\u00e9" && "\uac01".normalize("NFD").length === 3 &&
            modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
            eval("({value:1,value:2}).value") === 2 &&

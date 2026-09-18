@@ -458,6 +458,11 @@ JSFunctionSpec flag field remains eight bits for embedding compatibility.
 Keep ES2015 reflection boxing and primitive integrity behavior gated by the
 selected script edition. Preserve ES5/legacy primitive TypeErrors and own-name
 ordering, alongside modern __proto__ ownership and integer-index ordering.
+Run `prototype-mutation.js` and `TestPrototypeMutation.c` for the new
+Object.setPrototypeOf path. Preserve access checks and inner/outer objects,
+keep requested prototypes rooted independently of callback in/out values, and
+retain classic own fields and their native private-data hooks when detaching
+same-class prototypes. Do not change the trusted JS_SetPrototype API contract.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve
