@@ -1251,3 +1251,8 @@ For Array callback-method changes, run `array-iteration.js` and
 `TestArrayIteration.c`. Preserve legacy ToUint32 behavior in legacy globals,
 modern ToLength and species ordering, sparse/live property traversal, raw callback
 receivers, native-loop interruption and foreign/JSAPI-cloned method realms.
+
+For indexed Array method changes, run `array-indexed.js` and `TestArrayIndexed.c`.
+Preserve positive-zero length/index results, safe-integer bounds, observable
+Has/Get/Set/Delete ordering, species results and interruptible native loops.
+Keep legacy ToUint32 methods and JSAPI cloning behavior covered.

@@ -493,11 +493,19 @@ incomplete. See [concat validation notes](js/tests/es6/README.md#array-concat-an
 
 The callback-array follow-up adds ES2015 ToLength, map/filter species results,
 sparse/live traversal and native-loop interruption while preserving legacy
-methods. All 3,048 cases across seven methods pass. The latest full macOS arm64
+methods. All 3,048 cases across seven methods pass. The callback-method full macOS arm64
 ES2015 run passes **26,394 cases**, with **2,172 failures**, 14 unsupported module
 cases and two harness errors: 64 gained, zero lost. All 11,540 ES5.1 cases and all
 four build, package and desktop checks pass. Full ES6 and other-platform
 validation remain incomplete. See [iteration validation notes](js/tests/es6/README.md#array-callback-methods).
+
+The indexed-array follow-up modernizes push/pop, shift/unshift, reverse,
+slice/splice and indexOf/lastIndexOf while retaining the legacy implementations.
+All 1,144 diagnostic cases pass. The latest full macOS arm64 ES2015 run passes
+**26,452 cases**, with **2,114 failures**, 14 unsupported module cases and two
+harness errors: 58 gained, zero lost. All 11,540 ES5.1 cases and all four build,
+package and desktop checks pass. Full ES6 and other-platform validation remain
+incomplete. See [indexed-method validation notes](js/tests/es6/README.md#array-indexed-methods).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

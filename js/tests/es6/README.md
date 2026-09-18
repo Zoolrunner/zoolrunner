@@ -1608,3 +1608,34 @@ layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalon
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/array-iteration-runtime`. Other platforms remain unvalidated;
 full ES6 remains incomplete.
+
+### Array indexed methods
+
+Modern push, pop, shift, unshift, reverse, slice, splice, indexOf and lastIndexOf
+use ToLength and safe-integer indices, throwing writes/deletes and observable
+property ordering. Slice/splice create species results, preserve holes and set
+the result length before returning or mutating the source. Native loops remain
+interruptible; boxed receivers/results use the executing method's realm. Legacy
+globals retain their previous methods. Length conversion and search results
+normalize negative zero to positive zero where required.
+
+The nine diagnostic subsets pass 1,144/1,144 cases; focused checks pass 59 script
+and 48 native embedding assertions under MallocScribble. The first subsets found
+eight signed-zero failures in pop/shift/indexOf/lastIndexOf; corrected subsets
+pass without upstream changes. C89 checks pass.
+
+The full pinned ES2015 run passes **26,452 cases**, with **2,114 failures**,
+14 unsupported module cases and two harness errors: **58 gained, zero lost**
+relative to callback methods. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/array-indexed-full.json` and
+`array-indexed-es5.json`; snapshot: `/tmp/zr-array-indexed-conformance-20260918`.
+Its libmozjs SHA-256 `a02956086d6cd0320988edb64c8e3abf9d806ac8908f939d896caf3f9357c95a`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/array-indexed-runtime`. Other platforms and full ES6 remain
+incomplete.

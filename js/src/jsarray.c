@@ -54,7 +54,6 @@
 #include "jsconfig.h"
 #include "jsfun.h"
 #include "jsiteres6.h"
-#include "jsbool.h"
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jslock.h"
@@ -2107,7 +2106,7 @@ js_ArrayLikeLength(JSContext *cx, JSObject *obj, jsdouble *length)
          js_ValueToNumber(cx, root.u.value, length);
     if (ok) {
         *length = js_DoubleToInteger(*length);
-        if (*length < 0)
+        if (*length <= 0)
             *length = 0;
         else if (*length > 9007199254740991.0)
             *length = 9007199254740991.0;
@@ -2152,6 +2151,266 @@ js_ArrayLikeIndex(JSContext *cx, jsdouble index, jsid *idp)
     *idp = ATOM_TO_JSID(atom);
     return JS_TRUE;
 }
+
+/* Modern indexed operations use double indices through the safe-integer range.
+ * Keep the legacy implementations separate, including their ToUint32 policy. */
+static JSBool
+ArrayDeleteOrThrow(JSContext *cx, JSObject *obj, jsid id)
+{
+    jsval deleted;
+    if (!OBJ_DELETE_PROPERTY(cx, obj, id, &deleted)) return JS_FALSE;
+    if (deleted != JSVAL_FALSE) return JS_TRUE;
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+    return JS_FALSE;
+}
+
+static JSBool
+ArrayHas(JSContext *cx, JSObject *obj, jsid id, JSBool *present)
+{
+    JSObject *holder;
+    JSProperty *property;
+    if (!OBJ_LOOKUP_PROPERTY(cx, obj, id, &holder, &property)) return JS_FALSE;
+    *present = property != NULL;
+    if (property) OBJ_DROP_PROPERTY(cx, holder, property);
+    return JS_TRUE;
+}
+
+typedef enum ArrayIndexedMode {
+    ARRAY_PUSH, ARRAY_POP, ARRAY_SHIFT, ARRAY_UNSHIFT, ARRAY_REVERSE,
+    ARRAY_SLICE, ARRAY_SPLICE, ARRAY_INDEX_OF, ARRAY_LAST_INDEX_OF
+} ArrayIndexedMode;
+
+static JSBool
+ArrayModernIndexed(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
+                   ArrayIndexedMode mode)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *output;
+    jsdouble length, index, target, end, count, start;
+    jsid id, to;
+    JSBool present, upper, ok = JS_FALSE;
+    uintN i;
+    uint32 iterations = 0;
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    obj = ArrayMethodObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (mode == ARRAY_INDEX_OF || mode == ARRAY_LAST_INDEX_OF) {
+        *rval = INT_TO_JSVAL(-1);
+        if (length == 0) { ok = JS_TRUE; goto out; }
+        start = mode == ARRAY_LAST_INDEX_OF ? length - 1 : 0;
+        if (argc > 1) {
+            if (!js_ValueToNumber(cx, argv[1], &start)) goto out;
+            start = js_DoubleToInteger(start);
+            if (start == 0) start = 0; /* Index results use positive zero. */
+        }
+        if (mode == ARRAY_INDEX_OF) {
+            index = start < 0 ? JS_MAX(length + start, 0) : start;
+        } else {
+            index = start < 0 ? length + start : JS_MIN(start, length - 1);
+        }
+        for (; index >= 0 && index < length; index += mode == ARRAY_INDEX_OF ? 1 : -1) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present) {
+                if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2])) goto out;
+                if (js_StrictlyEqual(values[2], argv[0])) {
+                    ok = js_NewNumberValue(cx, index, rval); goto out;
+                }
+            }
+        }
+        ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_SLICE) {
+        if (!ArrayRelativeIndex(cx, argv[0], length, &index)) goto out;
+        end = length;
+        if (argc > 1 && !JSVAL_IS_VOID(argv[1]) && !ArrayRelativeIndex(cx, argv[1], length, &end)) goto out;
+        count = JS_MAX(end - index, 0);
+        if (!ArraySpeciesCreate(cx, obj, global, count, &values[5])) goto out;
+        output = JSVAL_TO_OBJECT(values[5]);
+        for (target = 0; index < end; ++index, ++target) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present) {
+                if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_ArrayLikeIndex(cx, target, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!js_CreateDataPropertyOrThrow(cx, output, to, values[2])) goto out;
+            }
+        }
+        if (!js_NewNumberValue(cx, count, &values[2]) ||
+            !js_SetPropertyOrThrow(cx, output, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+        *rval = values[5]; ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_SPLICE) {
+        if (!ArrayRelativeIndex(cx, argv[0], length, &start)) goto out;
+        count = 0;
+        i = argc > 2 ? argc - 2 : 0;
+        if (argc == 1) count = length - start;
+        else if (argc > 1) {
+            if (!js_ValueToNumber(cx, argv[1], &count)) goto out;
+            count = JS_MIN(JS_MAX(js_DoubleToInteger(count), 0), length - start);
+        }
+        if ((jsdouble)i > 9007199254740991.0 - (length - count)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR); goto out;
+        }
+        if (!ArraySpeciesCreate(cx, obj, global, count, &values[5])) goto out;
+        output = JSVAL_TO_OBJECT(values[5]);
+        for (index = 0; index < count; ++index) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, start + index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present) {
+                if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_ArrayLikeIndex(cx, index, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!js_CreateDataPropertyOrThrow(cx, output, to, values[2])) goto out;
+            }
+        }
+        if (!js_NewNumberValue(cx, count, &values[2]) ||
+            !js_SetPropertyOrThrow(cx, output, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+        if ((jsdouble)i < count) {
+            for (index = start; index < length - count; ++index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index + count, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!js_ArrayLikeIndex(cx, index + i, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!ArrayHas(cx, obj, id, &present)) goto out;
+                if (present) {
+                    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+            }
+            for (index = length; index > length - count + i; --index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index - 1, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!ArrayDeleteOrThrow(cx, obj, id)) goto out;
+            }
+        } else if ((jsdouble)i > count) {
+            for (index = length - count; index > start; --index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index + count - 1, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!js_ArrayLikeIndex(cx, index + i - 1, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!ArrayHas(cx, obj, id, &present)) goto out;
+                if (present) {
+                    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+            }
+        }
+        for (index = 0; index < i; ++index) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, start + index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id); values[2] = argv[(uintN)index + 2];
+            if (!js_SetPropertyOrThrow(cx, obj, id, &values[2])) goto out;
+        }
+        if (!js_NewNumberValue(cx, length - count + i, &values[2]) ||
+            !js_SetPropertyOrThrow(cx, obj, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+        *rval = values[5]; ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_PUSH || mode == ARRAY_UNSHIFT) {
+        if ((jsdouble)argc > 9007199254740991.0 - length) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR); goto out;
+        }
+    }
+    if (mode == ARRAY_REVERSE) {
+        for (index = 0; index < js_DoubleToInteger(length / 2); ++index) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!js_ArrayLikeIndex(cx, length - index - 1, &to)) goto out;
+            values[3] = ID_TO_VALUE(to);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present && !OBJ_GET_PROPERTY(cx, obj, id, &values[2])) goto out;
+            if (!ArrayHas(cx, obj, to, &upper)) goto out;
+            if (upper && !OBJ_GET_PROPERTY(cx, obj, to, &values[4])) goto out;
+            if (upper) {
+                if (!js_SetPropertyOrThrow(cx, obj, id, &values[4])) goto out;
+            } else if (present && !ArrayDeleteOrThrow(cx, obj, id)) goto out;
+            if (present) {
+                if (!js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+            } else if (upper && !ArrayDeleteOrThrow(cx, obj, to)) goto out;
+        }
+        *rval = values[0]; ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_POP || mode == ARRAY_SHIFT) {
+        *rval = JSVAL_VOID;
+        if (length > 0) {
+            if (!js_ArrayLikeIndex(cx, mode == ARRAY_POP ? length - 1 : 0, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!OBJ_GET_PROPERTY(cx, obj, id, &values[5])) goto out;
+            if (mode == ARRAY_SHIFT) {
+                for (index = 1; index < length; ++index) {
+                    if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                    if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+                    values[1] = ID_TO_VALUE(id);
+                    if (!js_ArrayLikeIndex(cx, index - 1, &to)) goto out;
+                    values[3] = ID_TO_VALUE(to);
+                    if (!ArrayHas(cx, obj, id, &present)) goto out;
+                    if (present) {
+                        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                    } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+                }
+            }
+            --length;
+            if (!js_ArrayLikeIndex(cx, length, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayDeleteOrThrow(cx, obj, id)) goto out;
+        }
+    } else {
+        if (mode == ARRAY_UNSHIFT && argc) {
+            for (index = length; index > 0; --index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index - 1, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!js_ArrayLikeIndex(cx, index + argc - 1, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!ArrayHas(cx, obj, id, &present)) goto out;
+                if (present) {
+                    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+            }
+        }
+        for (i = 0; i < argc; ++i) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, mode == ARRAY_PUSH ? length + i : i, &id)) goto out;
+            values[1] = ID_TO_VALUE(id); values[2] = argv[i];
+            if (!js_SetPropertyOrThrow(cx, obj, id, &values[2])) goto out;
+        }
+        length += argc;
+    }
+    if (!js_NewNumberValue(cx, length, &values[2])) goto out;
+    values[4] = values[2];
+    if (!js_SetPropertyOrThrow(cx, obj, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+    *rval = mode == ARRAY_POP || mode == ARRAY_SHIFT ? values[5] : values[4];
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+#define ARRAY_MODERN_INDEXED(name, mode) \
+static JSBool name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) \
+{ return ArrayModernIndexed(cx, argc, argv, rval, mode); }
+ARRAY_MODERN_INDEXED(ArrayModernPush, ARRAY_PUSH)
+ARRAY_MODERN_INDEXED(ArrayModernPop, ARRAY_POP)
+ARRAY_MODERN_INDEXED(ArrayModernShift, ARRAY_SHIFT)
+ARRAY_MODERN_INDEXED(ArrayModernUnshift, ARRAY_UNSHIFT)
+ARRAY_MODERN_INDEXED(ArrayModernReverse, ARRAY_REVERSE)
+ARRAY_MODERN_INDEXED(ArrayModernSlice, ARRAY_SLICE)
+ARRAY_MODERN_INDEXED(ArrayModernSplice, ARRAY_SPLICE)
+#if JS_HAS_ARRAY_EXTRAS
+ARRAY_MODERN_INDEXED(ArrayModernIndexOf, ARRAY_INDEX_OF)
+ARRAY_MODERN_INDEXED(ArrayModernLastIndexOf, ARRAY_LAST_INDEX_OF)
+#endif
+#undef ARRAY_MODERN_INDEXED
 
 static JSBool
 array_findHelper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
@@ -2673,7 +2932,12 @@ InitArraySpecies(JSContext *cx, JSObject *global, JSObject *ctor, JSObject *prot
 {
     static struct { const char *name; JSNative native; } methods[] = {
         {"concat", ArrayModernConcat},
+        {"push", ArrayModernPush}, {"pop", ArrayModernPop},
+        {"shift", ArrayModernShift}, {"unshift", ArrayModernUnshift},
+        {"reverse", ArrayModernReverse}, {"slice", ArrayModernSlice},
+        {"splice", ArrayModernSplice},
 #if JS_HAS_ARRAY_EXTRAS
+        {"indexOf", ArrayModernIndexOf}, {"lastIndexOf", ArrayModernLastIndexOf},
         {"forEach", ArrayModernForEach}, {"map", ArrayModernMap},
         {"filter", ArrayModernFilter}, {"some", ArrayModernSome},
         {"every", ArrayModernEvery}, {"reduce", ArrayModernReduce},
