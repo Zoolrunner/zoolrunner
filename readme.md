@@ -595,3 +595,11 @@ setter receivers. All four macOS arm64 applications pass build, package and
 desktop checks, including Calendar views, browser navigation and ChatZilla.
 Cache version 41 invalidates older serialized code. See the [property reference notes](js/tests/es6/README.md#property-assignment-references)
 for scope and validation status.
+
+ES2015 identifier-reference retention and wide-name operations raise the full
+macOS arm64 result to **27,100 ES6 passes**, with **1,466 failures**, 14 unsupported
+module cases and two harness errors: 36 gained, zero lost. All 11,540 ES5 cases
+pass, and the compound-assignment group passes all 703 cases. All four
+applications pass build, package and desktop checks with the additional
+large-script native assignment/debugger correction. Its 38 native checks and
+existing debugger lifecycle checks pass. See the [identifier reference notes](js/tests/es6/README.md#identifier-assignment-references).

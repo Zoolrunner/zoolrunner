@@ -1774,6 +1774,11 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
 #endif
                         op == JSOP_SETCONST || op == JSOP_CONSTASSIGN ||
                         op == JSOP_SETPROP || op == JSOP_INITPROP ||
+                        op == JSOP_BINDREF || op == JSOP_GETREF ||
+                        op == JSOP_SETREF ||
+                        op == JSOP_NAME || op == JSOP_INCNAME ||
+                        op == JSOP_DECNAME || op == JSOP_NAMEINC ||
+                        op == JSOP_NAMEDEC ||
                         op == JSOP_FORNAME || op == JSOP_FORPROP)
                        ? JSOP_LITOPX
                        : (mode == JOF_NAME)
@@ -1787,19 +1792,22 @@ EmitAtomIndexOp(JSContext *cx, JSOp op, jsatomid atomIndex, JSCodeGenerator *cg)
         }
 
         switch (op) {
-          case JSOP_DECNAME:    op = JSOP_DECELEM; break;
+          case JSOP_DECNAME:    break;
           case JSOP_DECPROP:    op = JSOP_DECELEM; break;
           case JSOP_DELNAME:    op = JSOP_DELELEM; break;
           case JSOP_DELPROP:    op = JSOP_DELELEM; break;
           case JSOP_GETPROP:    op = JSOP_GETELEM; break;
           case JSOP_GETXPROP:   op = JSOP_GETXELEM; break;
           case JSOP_IMPORTPROP: op = JSOP_IMPORTELEM; break;
-          case JSOP_INCNAME:    op = JSOP_INCELEM; break;
+          case JSOP_INCNAME:    break;
           case JSOP_INCPROP:    op = JSOP_INCELEM; break;
+          case JSOP_BINDREF:
+          case JSOP_GETREF:
+          case JSOP_SETREF:
           case JSOP_INITPROP:   break;
-          case JSOP_NAME:       op = JSOP_GETELEM; break;
-          case JSOP_NAMEDEC:    op = JSOP_ELEMDEC; break;
-          case JSOP_NAMEINC:    op = JSOP_ELEMINC; break;
+          case JSOP_NAME:       break;
+          case JSOP_NAMEDEC:    break;
+          case JSOP_NAMEINC:    break;
           case JSOP_PROPDEC:    op = JSOP_ELEMDEC; break;
           case JSOP_PROPINC:    op = JSOP_ELEMINC; break;
           case JSOP_BINDNAME:   return JS_TRUE;
@@ -3792,7 +3800,12 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 
                 if (op == JSOP_SETNAME) {
                     JS_ASSERT(!let);
-                    EMIT_ATOM_INDEX_OP(JSOP_BINDNAME, atomIndex);
+                    if (JS_VERSION_IS_ES2015(cx)) {
+                        op = JSOP_SETREF;
+                        EMIT_ATOM_INDEX_OP(JSOP_BINDREF, atomIndex);
+                    } else {
+                        EMIT_ATOM_INDEX_OP(JSOP_BINDNAME, atomIndex);
+                    }
                 }
                 if (pn->pn_op == JSOP_DEFCONST &&
                     !js_DefineCompileTimeConstant(cx, cg, pn2->pn_atom,
@@ -5322,7 +5335,12 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 if (!ale)
                     return JS_FALSE;
                 atomIndex = ALE_INDEX(ale);
-                EMIT_ATOM_INDEX_OP(JSOP_BINDNAME, atomIndex);
+                if (JS_VERSION_IS_ES2015(cx)) {
+                    pn2->pn_op = JSOP_SETREF;
+                    EMIT_ATOM_INDEX_OP(JSOP_BINDREF, atomIndex);
+                } else {
+                    EMIT_ATOM_INDEX_OP(JSOP_BINDNAME, atomIndex);
+                }
             }
             break;
           case TOK_DOT:
@@ -5398,6 +5416,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         if (op != JSOP_NOP) {
             switch (pn2->pn_type) {
               case TOK_NAME:
+                if (pn2->pn_op == JSOP_SETREF) {
+                    EMIT_ATOM_INDEX_OP(JSOP_GETREF, atomIndex);
+                    break;
+                }
                 if (pn2->pn_op != JSOP_SETNAME) {
                     EMIT_UINT16_IMM_OP((pn2->pn_op == JSOP_SETGVAR)
                                        ? JSOP_GETGVAR

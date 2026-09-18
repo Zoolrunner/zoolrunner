@@ -152,9 +152,12 @@ js_EnablePropertyCache(JSContext *cx)
  * to a subroutine that interprets a piece of the current script.
  * ASSERT_SAVED_SP_AND_PC checks that SAVE_SP_AND_PC was called.
  */
-#define SAVE_SP_AND_PC(fp)      (SAVE_SP(fp), (fp)->pc = pc)
+/* LITOPX temporarily biases pc to share narrow-opcode dispatch lengths.
+ * External frames and operand provenance must retain the real prefix address. */
+#define CURRENT_PC             (prefixPC ? prefixPC : pc)
+#define SAVE_SP_AND_PC(fp)      (SAVE_SP(fp), (fp)->pc = CURRENT_PC)
 #define RESTORE_SP_AND_PC(fp)   (RESTORE_SP(fp), pc = (fp)->pc)
-#define ASSERT_SAVED_SP_AND_PC(fp) JS_ASSERT((fp)->sp == sp && (fp)->pc == pc);
+#define ASSERT_SAVED_SP_AND_PC(fp) JS_ASSERT((fp)->sp == sp && (fp)->pc == CURRENT_PC);
 
 /*
  * Push the generating bytecode's pc onto the parallel pc stack that runs
@@ -163,8 +166,8 @@ js_EnablePropertyCache(JSContext *cx)
  * NB: PUSH_OPND uses sp, depth, and pc from its lexical environment.  See
  * js_Interpret for these local variables' declarations and uses.
  */
-#define PUSH_OPND(v)    (sp[-depth] = (jsval)pc, PUSH(v))
-#define STORE_OPND(n,v) (sp[(n)-depth] = (jsval)pc, sp[n] = (v))
+#define PUSH_OPND(v)    (sp[-depth] = (jsval)CURRENT_PC, PUSH(v))
+#define STORE_OPND(n,v) (sp[(n)-depth] = (jsval)CURRENT_PC, sp[n] = (v))
 #define POP_OPND()      POP()
 #define FETCH_OPND(n)   (sp[n])
 
@@ -2353,7 +2356,7 @@ js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
     jsint depth, len;
     jsval *sp, *newsp;
     void *mark;
-    jsbytecode *endpc, *pc2;
+    jsbytecode *endpc, *pc2, *prefixPC = NULL;
     JSOp op, op2;
     jsatomid atomIndex;
     JSAtom *atom;
@@ -2410,7 +2413,7 @@ js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
     register void **jumpTable = normalJumpTable;
 
 # define DO_OP()            JS_EXTENSION_(goto *jumpTable[op])
-# define DO_NEXT_OP(n)      do { op = *(pc += (n)); DO_OP(); } while (0)
+# define DO_NEXT_OP(n)      do { prefixPC = NULL; op = *(pc += (n)); DO_OP(); } while (0)
 # define BEGIN_CASE(OP)     L_##OP:
 # define END_CASE(OP)       DO_NEXT_OP(OP##_LENGTH);
 # define END_VARLEN_CASE    DO_NEXT_OP(len);
@@ -3303,6 +3306,63 @@ interrupt:
             PUSH_OPND(OBJECT_TO_JSVAL(obj));
           END_LITOPX_CASE(JSOP_BINDNAME)
 
+          /* Retain the environment and resolution result separately. Both
+           * values remain on the traced operand stack through RHS callbacks. */
+          BEGIN_LITOPX_CASE(JSOP_BINDREF, 0)
+            SAVE_SP_AND_PC(fp);
+            ok = js_FindProperty(cx, ATOM_TO_JSID(atom), &obj, &obj2, &prop);
+            if (!ok)
+                goto out;
+            rval = BOOLEAN_TO_JSVAL(prop != NULL);
+            if (prop)
+                OBJ_DROP_PROPERTY(cx, obj2, prop);
+            PUSH_OPND(OBJECT_TO_JSVAL(obj));
+            PUSH_OPND(rval);
+            obj = NULL;
+          END_LITOPX_CASE(JSOP_BINDREF)
+
+          BEGIN_LITOPX_CASE(JSOP_GETREF, 0)
+            SAVE_SP_AND_PC(fp);
+            if (FETCH_OPND(-1) == JSVAL_FALSE)
+                goto atom_not_defined;
+            obj = JSVAL_TO_OBJECT(FETCH_OPND(-2));
+            id = ATOM_TO_JSID(atom);
+            /* GetBindingValue checks existence without repeating HasBinding's
+             * unscopables lookup. A callback may have removed the property. */
+            ok = OBJ_LOOKUP_PROPERTY(cx, obj, id, &obj2, &prop);
+            if (!ok)
+                goto out;
+            if (!prop) {
+                if (script->strictMode)
+                    goto atom_not_defined;
+                rval = JSVAL_VOID;
+            } else {
+                OBJ_DROP_PROPERTY(cx, obj2, prop);
+                ok = OBJ_GET_PROPERTY(cx, obj, id, &rval);
+                if (!ok)
+                    goto out;
+            }
+            PUSH_OPND(rval);
+            obj = NULL;
+          END_LITOPX_CASE(JSOP_GETREF)
+
+          BEGIN_LITOPX_CASE(JSOP_SETREF, 0)
+            SAVE_SP_AND_PC(fp);
+            if (script->strictMode && FETCH_OPND(-2) == JSVAL_FALSE)
+                goto atom_not_defined;
+            obj = JSVAL_TO_OBJECT(FETCH_OPND(-3));
+            id = ATOM_TO_JSID(atom);
+            rval = FETCH_OPND(-1);
+            /* ES2015 ObjectEnvironment.SetMutableBinding calls Set directly.
+             * Do not resolve the identifier again after evaluating its RHS. */
+            CACHED_SET(OBJ_SET_PROPERTY(cx, obj, id, &rval));
+            if (!ok)
+                goto out;
+            sp -= 2;
+            STORE_OPND(-1, rval);
+            obj = NULL;
+          END_LITOPX_CASE(JSOP_SETREF)
+
           BEGIN_CASE(JSOP_SETNAME)
             atom = GET_ATOM(cx, script, pc);
             id   = ATOM_TO_JSID(atom);
@@ -3837,7 +3897,9 @@ interrupt:
           BEGIN_CASE(JSOP_DECNAME)
           BEGIN_CASE(JSOP_NAMEINC)
           BEGIN_CASE(JSOP_NAMEDEC)
-            atom = GET_ATOM(cx, script, pc);
+            atomIndex = GET_ATOM_INDEX(pc);
+          do_nameinc:
+            atom = js_GetAtom(cx, &script->atomMap, atomIndex);
             id   = ATOM_TO_JSID(atom);
 
             SAVE_SP_AND_PC(fp);
@@ -4441,8 +4503,7 @@ interrupt:
             obj = NULL;
           END_CASE(JSOP_INTRINSIC)
 
-          BEGIN_CASE(JSOP_NAME)
-            atom = GET_ATOM(cx, script, pc);
+          BEGIN_LITOPX_CASE(JSOP_NAME, 0)
             id   = ATOM_TO_JSID(atom);
 
             SAVE_SP_AND_PC(fp);
@@ -4542,6 +4603,7 @@ interrupt:
             atomIndex = GET_LITERAL_INDEX(pc);
             pc2 = pc + 1 + LITERAL_INDEX_LEN;
             op = *pc2;
+            prefixPC = pc;
             pc += JSOP_LITOPX_LENGTH - (1 + ATOM_INDEX_LEN);
 #ifndef JS_THREADED_INTERP
             len = js_CodeSpec[op].length;
@@ -4549,6 +4611,14 @@ interrupt:
             switch (op) {
               case JSOP_ANONFUNOBJ:   goto do_JSOP_ANONFUNOBJ;
               case JSOP_BINDNAME:     goto do_JSOP_BINDNAME;
+              case JSOP_NAME:         goto do_JSOP_NAME;
+              case JSOP_INCNAME:
+              case JSOP_DECNAME:
+              case JSOP_NAMEINC:
+              case JSOP_NAMEDEC:      goto do_nameinc;
+              case JSOP_BINDREF:      goto do_JSOP_BINDREF;
+              case JSOP_GETREF:       goto do_JSOP_GETREF;
+              case JSOP_SETREF:       goto do_JSOP_SETREF;
               case JSOP_CLOSURE:      goto do_JSOP_CLOSURE;
               case JSOP_CONSTASSIGN:  goto do_JSOP_CONSTASSIGN;
               case JSOP_FORNAME:      goto do_JSOP_FORNAME;
@@ -5601,6 +5671,7 @@ interrupt:
                 atom = js_GetAtom(cx, &script->atomMap, atomIndex);
                 op2 = (JSOp) pc[1 + LITERAL_INDEX_LEN];
                 JS_ASSERT(op2 == JSOP_SETPROP || op2 == JSOP_INITPROP);
+                prefixPC = pc;
                 pc += JSOP_LITOPX_LENGTH - (1 + ATOM_INDEX_LEN);
             }
             switch (op2) {
@@ -6636,6 +6707,7 @@ interrupt:
         } /* switch (op) */
 
     advance_pc:
+        prefixPC = NULL;
         pc += len;
 
 #ifdef DEBUG
@@ -6671,6 +6743,10 @@ interrupt:
 #endif /* !JS_THREADED_INTERP */
 
 out:
+    if (prefixPC) {
+        pc = prefixPC;
+        prefixPC = NULL;
+    }
     if (!ok) {
         /*
          * Has an exception been raised?  Also insist that we are not in an

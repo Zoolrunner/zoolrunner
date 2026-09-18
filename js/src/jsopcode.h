@@ -235,6 +235,11 @@ struct JSCodeSpec {
 };
 
 extern const JSCodeSpec js_CodeSpec[];
+
+/* Decode a frame's canonical instruction, including debugger/atom prefixes. */
+extern JSOp
+js_GetEffectiveOpcode(JSContext *cx, JSScript *script, jsbytecode *pc,
+                      jsint *length, jsatomid *atomIndex);
 extern uintN            js_NumCodeSpecs;
 extern const jschar     js_EscapeMap[];
 

@@ -41,6 +41,18 @@ function modernWindowEdition() {
                          object[key] = (order.push('rhs'), 7);
                          object[key] += (order.push('rhs'), 3);
                          return object.value === 10 && order.join() === 'key,rhs,key,rhs'; })() &&
+           (function() { var global = Function('return this')();
+                         Object.defineProperty(global, 'editionBindingProbe', {
+                             value:3, writable:true, configurable:true
+                         });
+                         try {
+                             editionBindingProbe += (delete global.editionBindingProbe, 2);
+                             if (global.editionBindingProbe !== 5) return false;
+                             delete global.editionBindingProbe;
+                             try { editionBindingProbe = (global.editionBindingProbe = 1, 2); }
+                             catch (e) { return e instanceof ReferenceError && global.editionBindingProbe === 1; }
+                             return false;
+                         } finally { delete global.editionBindingProbe; } })() &&
            metadata && inferredMetadata && immutable && symbolChecks &&
            modernObject.radixValue === 20 && modernObject[windowSymbol]() === modernObject &&
            modernObject[windowSymbol].name === "[window]" && modernObject.computedAccessor === 27 &&

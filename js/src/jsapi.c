@@ -4535,7 +4535,8 @@ JS_IsAssigning(JSContext *cx)
         continue;
     if (!fp || !(pc = fp->pc))
         return JS_FALSE;
-    return (js_CodeSpec[*pc].format & JOF_ASSIGNING) != 0;
+    return (js_CodeSpec[js_GetEffectiveOpcode(cx, fp->script, pc, NULL, NULL)].format
+            & JOF_ASSIGNING) != 0;
 }
 
 JS_PUBLIC_API(void)

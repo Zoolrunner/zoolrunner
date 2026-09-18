@@ -1341,3 +1341,18 @@ Exercise extended atom indices, compound writes, legacy accessors, catch blocks
 and function decompilation. Extended property stores retain their original
 operand order; catch/block source notes belong to the extended opcode prefix.
 Cache version 41 adds reference checks and extended property-store dispatch.
+
+Identifier-reference changes must retain the resolved environment and resolution
+success across RHS callbacks. Check resolved bindings deleted during evaluation,
+initially unresolved strict writes whose RHS adds a global, proxy traps,
+`unscopables`, callback GC and source/XDR round trips. Run
+`identifier-reference.js`, `identifier-reference-wide.js`, embedding and window
+checks. Wide reads/increments must preserve name ReferenceErrors and `typeof`
+semantics. Cache version 42 adds traced identifier reference pairs; keep selected
+legacy edition behavior separate from the ES2015 binding algorithms.
+
+Keep frame PCs and operand provenance at real instruction boundaries when
+executing extended atom opcodes. Native assignment/resolve hints must decode
+both extended operands and debugger traps. Run `TestReferenceEmbedding.c` with
+small and large atom tables, callback GC and nested evaluation, plus debugger
+lifecycle checks when changing this path.

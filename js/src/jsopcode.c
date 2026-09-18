@@ -95,6 +95,27 @@ const JSCodeSpec FAR js_CodeSpec[] = {
 #undef OPDEF
 };
 
+JSOp
+js_GetEffectiveOpcode(JSContext *cx, JSScript *script, jsbytecode *pc,
+                      jsint *length, jsatomid *atomIndex)
+{
+    JSOp op = (JSOp)*pc;
+    JSBool extended;
+    if (op == JSOP_TRAP && script)
+        op = JS_GetTrapOpcode(cx, script, pc);
+    extended = op == JSOP_LITOPX;
+    if (extended)
+        op = (JSOp)pc[1 + LITERAL_INDEX_LEN];
+    JS_ASSERT((uintN)op < JSOP_LIMIT);
+    if (length)
+        *length = js_CodeSpec[op].length +
+                  (extended ? JSOP_LITOPX_LENGTH - (1 + ATOM_INDEX_LEN) : 0);
+    if (atomIndex)
+        *atomIndex = extended ? GET_LITERAL_INDEX(pc) : GET_ATOM_INDEX(pc);
+    return op;
+}
+
+
 uintN js_NumCodeSpecs = sizeof (js_CodeSpec) / sizeof js_CodeSpec[0];
 
 /************************************************************************/
@@ -1915,6 +1936,14 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 }
                 break;
 
+              case JSOP_BINDREF:
+              do_bindref:
+                todo = SprintCString(&ss->sprinter, "");
+                if (todo < 0 || !PushOff(ss, todo, op))
+                    return NULL;
+                todo = SprintCString(&ss->sprinter, "");
+                break;
+
               case JSOP_PUSH:
 #if JS_HAS_DESTRUCTURING
                 sn = js_GetSrcNote(jp->script, pc);
@@ -2968,6 +2997,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               case JSOP_SETCONST:
               case JSOP_CONSTASSIGN:
               case JSOP_SETNAME:
+              case JSOP_SETREF:
               case JSOP_SETGVAR:
                 atomIndex = GET_ATOM_INDEX(pc);
 
@@ -2979,7 +3009,9 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 if (!lval)
                     return NULL;
                 rval = POP_STR();
-                if (op == JSOP_SETNAME)
+                if (op == JSOP_SETNAME || op == JSOP_SETREF)
+                    (void) PopOff(ss, op);
+                if (op == JSOP_SETREF)
                     (void) PopOff(ss, op);
 
               do_setlval:
@@ -3406,6 +3438,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 atom = cx->runtime->atomState.classAtoms[GET_UINT16(pc)];
                 goto do_name;
 
+              case JSOP_GETREF:
               case JSOP_NAME:
               case JSOP_GETGVAR:
                 atom = GET_ATOM(cx, jp->script, pc);
@@ -3474,6 +3507,25 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     if (op == JSOP_SETPROP)
                         goto do_setprop;
                     goto do_initprop_atom;
+                }
+                if (op == JSOP_NAME || op == JSOP_INCNAME ||
+                    op == JSOP_DECNAME || op == JSOP_NAMEINC ||
+                    op == JSOP_NAMEDEC) {
+                    atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
+                    cs = &js_CodeSpec[op];
+                    if (op == JSOP_NAME)
+                        goto do_name;
+                    if (cs->format & JOF_POST)
+                        goto do_atominc;
+                    goto do_incatom;
+                }
+                if (op == JSOP_BINDREF)
+                    goto do_bindref;
+                if (op == JSOP_GETREF || op == JSOP_SETREF) {
+                    atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
+                    if (op == JSOP_GETREF)
+                        goto do_name;
+                    goto do_setname;
                 }
                 pc += len - (1 + ATOM_INDEX_LEN);
                 cs = &js_CodeSpec[op];
@@ -4676,7 +4728,7 @@ js_DecompileValueGenerator(JSContext *cx, intN spindex, jsval v,
      * js_DecompileValueGenerator, the name being bound is irrelevant.  Just
      * fall back to the base object.
      */
-    if (op == JSOP_BINDNAME)
+    if (op == JSOP_BINDNAME || op == JSOP_BINDREF)
         goto do_fallback;
 
     /* NAME ops are self-contained, others require left or right context. */

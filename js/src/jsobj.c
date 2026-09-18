@@ -3570,13 +3570,15 @@ Detecting(JSContext *cx, jsbytecode *pc)
     jsbytecode *endpc;
     JSOp op;
     JSAtom *atom;
+    jsint length;
+    jsatomid atomIndex;
 
     if (!cx->fp)
         return JS_FALSE;
     script = cx->fp->script;
     for (endpc = script->code + script->length; pc < endpc; pc++) {
         /* General case: a branch or equality op follows the access. */
-        op = (JSOp) *pc;
+        op = js_GetEffectiveOpcode(cx, script, pc, &length, NULL);
         if (js_CodeSpec[op].format & JOF_DETECTING)
             return JS_TRUE;
 
@@ -3595,10 +3597,11 @@ Detecting(JSContext *cx, jsbytecode *pc)
          * binding may shadow the ES5 read-only global undefined property.
          */
         if (op == JSOP_NAME) {
-            atom = GET_ATOM(cx, script, pc);
+            js_GetEffectiveOpcode(cx, script, pc, NULL, &atomIndex);
+            atom = js_GetAtom(cx, &script->atomMap, atomIndex);
             if (atom == cx->runtime->atomState.typeAtoms[JSTYPE_VOID] &&
-                (pc += js_CodeSpec[op].length) < endpc) {
-                op = (JSOp) *pc;
+                (pc += length) < endpc) {
+                op = js_GetEffectiveOpcode(cx, script, pc, &length, NULL);
                 return op == JSOP_EQ || op == JSOP_NE ||
                        op == JSOP_NEW_EQ || op == JSOP_NEW_NE;
             }
@@ -3707,7 +3710,11 @@ LookupPropertyInternal(JSContext *cx, JSObject *obj, jsid id, uintN flags,
                     if (!(flags & JSRESOLVE_CLASSNAME) &&
                         cx->fp &&
                         (pc = cx->fp->pc)) {
-                        cs = &js_CodeSpec[*pc];
+                        jsint opcodeLength;
+                        JSOp effectiveOp;
+                        effectiveOp = js_GetEffectiveOpcode(cx, cx->fp->script,
+                                                             pc, &opcodeLength, NULL);
+                        cs = &js_CodeSpec[effectiveOp];
                         format = cs->format;
                         if ((format & JOF_MODEMASK) != JOF_NAME)
                             flags |= JSRESOLVE_QUALIFIED;
@@ -3715,7 +3722,7 @@ LookupPropertyInternal(JSContext *cx, JSObject *obj, jsid id, uintN flags,
                             (cx->fp->flags & JSFRAME_ASSIGNING)) {
                             flags |= JSRESOLVE_ASSIGNING;
                         } else {
-                            pc += cs->length;
+                            pc += opcodeLength;
                             if (Detecting(cx, pc))
                                 flags |= JSRESOLVE_DETECTING;
                         }
@@ -4103,8 +4110,10 @@ GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
             JSOp op;
             uintN flags;
             JSString *str;
+            jsint opcodeLength;
 
-            op = *pc;
+            op = js_GetEffectiveOpcode(cx, cx->fp->script, pc,
+                                       &opcodeLength, NULL);
             if (op == JSOP_GETXPROP || op == JSOP_GETXELEM) {
                 flags = JSREPORT_ERROR;
             } else {
@@ -4122,7 +4131,7 @@ GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
 
                 /* Kludge to allow (typeof foo == "undefined") tests. */
                 JS_ASSERT(cx->fp->script);
-                pc += js_CodeSpec[op].length;
+                pc += opcodeLength;
                 if (Detecting(cx, pc))
                     return JS_TRUE;
 

@@ -2058,3 +2058,60 @@ Calendar's four views, browser navigation/layout and actual XULRunner ChatZilla
 initialization/input. Logs and reports use the `assignment-reference-` prefix
 under `artifacts/es6`. C89 compatibility checks pass. Other platforms and full
 ES2015 compliance remain unverified.
+
+### Identifier assignment references
+
+ES2015 unoptimized identifier assignments now retain both their resolved scope
+and whether resolution succeeded before the RHS. Strict unresolved writes still
+throw if the RHS introduces that global name. Resolved object bindings remain
+the target even if a callback deletes the property or changes `unscopables`.
+Compound assignments perform GetBindingValue before the RHS, including its
+existence check, without repeating scope resolution at the write. Older selected
+language modes keep their existing assignment path. This implements the
+[ES2015 environment binding algorithms](https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s).
+
+The reference pair is traced on the operand stack, avoiding hidden heap objects
+and preserving embedding scope receivers. Three new bytecodes and cache version
+42 preserve the pair through callbacks. Wide identifier reads and increments
+retain their name opcodes, rather than becoming element operations that could
+return undefined/NaN for unresolved names. Extended operands retain source notes
+and decompilation behavior.
+
+`identifier-reference.js` passes 33 focused checks and
+`identifier-reference-wide.js` passes 14 execution/decompilation checks above
+the 16-bit atom-index boundary. Native XDR and chrome/content checks include
+resolved-deleted and initially unresolved writes. The complete pinned macOS
+arm64 run passes **27,100 ES2015 cases**, with **1,466 failures**, 14 unsupported
+module cases, two harness errors and no crashes/timeouts: **36 gained, zero
+lost** versus the property-reference baseline. All **11,540 ES5.1 cases** and
+23 runner integration checks pass. The complete compound-assignment group now
+passes **703/703** cases. Both full suites used the frozen runtime
+`/tmp/zr-identifier-reference-conformance-20260918`; its hashes stayed unchanged.
+Reports use the `identifier-reference-` prefix under `artifacts/es6`.
+
+That first run also passed all four application build/package/desktop checks,
+Calendar's four views, browser navigation and ChatZilla. An additional native
+probe then found that extended opcodes exposed a PC inside their atom operand
+to embedding hooks: `JS_IsAssigning` returned false for a large-script write.
+Frames and operand provenance now retain the actual prefix address. Assignment
+and resolve hints decode extended/debugger opcodes, including their full length;
+BINDREF preserves the classic assignment hint to native resolve hooks.
+
+`TestReferenceEmbedding.c` adds 38 checks across JS 1.7 and ES2015, small scripts,
+66,000/131,000 atom tables, setter/resolve callbacks, nested evaluation, GC and
+traps on the extended writes. The final corrected run preserves all **27,100
+ES2015 passes** and **11,540 ES5.1 passes**, with the same 1,466 failures,
+14 unsupported modules, two harness errors and no crashes/timeouts. There are
+**36 gained, zero lost** versus the property-reference baseline. All four
+macOS arm64 applications pass root build, package and relocated desktop checks;
+Calendar's four views, browser navigation/layout and Suite/XULRunner ChatZilla
+also pass. The 23 runner checks, C89 checks, debugger lifecycle and six additional
+large-script error/decompilation diagnostics pass.
+
+Final reports use `artifacts/es6/identifier-reference-final-*`; the frozen
+runtime is `/tmp/zr-identifier-reference-final-conformance-20260918`. Hashes
+remain unchanged through both suites and match all four application engines
+(SHA-256 `1bb529de9a08dda7bb994c6f434797f9e82e46d8e966aff5a268b5c546d8342e`).
+Earlier `identifier-reference-*` reports precede the native prefix correction.
+Destructuring, lexical TDZ, arrow/class semantics, other platforms and full
+ES2015 compliance remain unfinished.
