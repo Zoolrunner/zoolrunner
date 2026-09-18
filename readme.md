@@ -703,3 +703,14 @@ preserving classic generator APIs. The complete macOS arm64 run passes
 harness errors (**379 gained, zero lost**). All **11,540 ES5 cases** and all
 four application build/package/runtime checks pass. Full ES2015 compliance
 remains unfinished. See [the generator validation record](js/tests/es6/README.md#modern-generators).
+
+
+All nine ES2015 typed-array types now provide integer-indexed views, native
+methods, species construction and shared ArrayBuffer storage. The latest full
+macOS arm64 result is **27,940 passing ES2015 modes**, **628 failures** and
+**14 unsupported modules**, with no harness errors, crashes or timeouts
+(**62 gained, zero lost**). All **11,540 ES5 cases** and all four application
+build/package/runtime checks pass. Native tests exercise GC, detachment and
+reflection during allocation callbacks. Full ES2015 compliance remains
+unfinished; other platforms have not been revalidated for this batch. See
+[the typed-array validation record](js/tests/es6/README.md#typed-arrays).

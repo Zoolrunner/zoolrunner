@@ -3,6 +3,7 @@
 #include <string.h>
 #include "jsapi.h"
 #include "jsarray.h"
+#include "jsbinarydata.h"
 #include "jsatom.h"
 #include "jsbool.h"
 #include "jscntxt.h"
@@ -218,7 +219,9 @@ ArrayNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     if (!JS_GetReservedSlot(cx, iterator, 1, &roots[2]) ||
         !js_ValueToNumber(cx, roots[2], &index) ||
         !JS_GetReservedSlot(cx, iterator, 2, &kind) ||
-        !js_ArrayLikeLength(cx, target, &length)) goto out;
+        !(js_IsTypedArray(cx, target)
+            ? js_TypedArrayLength(cx, target, &length)
+            : js_ArrayLikeLength(cx, target, &length))) goto out;
     if (index >= length) {
         if (!JS_SetReservedSlot(cx, iterator, 0, JSVAL_VOID)) goto out;
         done = JS_TRUE;
@@ -323,8 +326,8 @@ NewIterator(JSContext *cx, jsval *argv, jsval target, JSRealmIntrinsic key,
     return ok;
 }
 
-static JSBool
-ArrayIterator(JSContext *cx, jsval *argv, jsval *rval, uintN kind)
+JSBool
+js_CreateArrayIterator(JSContext *cx, jsval *argv, jsval *rval, uintN kind)
 {
     JSObject *target = js_ValueToNonNullObject(cx, argv[-1]);
     if (!target) return JS_FALSE;
@@ -332,11 +335,11 @@ ArrayIterator(JSContext *cx, jsval *argv, jsval *rval, uintN kind)
                        JS_INTRINSIC_ARRAY_ITERATOR_PROTO, kind, rval);
 }
 static JSBool ArrayKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{ return ArrayIterator(cx, argv, rval, 0); }
+{ return js_CreateArrayIterator(cx, argv, rval, 0); }
 static JSBool ArrayValues(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{ return ArrayIterator(cx, argv, rval, 1); }
+{ return js_CreateArrayIterator(cx, argv, rval, 1); }
 static JSBool ArrayEntries(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
-{ return ArrayIterator(cx, argv, rval, 2); }
+{ return js_CreateArrayIterator(cx, argv, rval, 2); }
 static JSBool
 StringIterator(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {

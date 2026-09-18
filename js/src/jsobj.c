@@ -53,6 +53,7 @@
 #include "jsprf.h"
 #include "jsapi.h"
 #include "jsarray.h"
+#include "jsbinarydata.h"
 #include "jsatom.h"
 #include "jsbool.h"
 #include "jscntxt.h"
@@ -2979,6 +2980,9 @@ js_NewObject(JSContext *cx, JSClass *clasp, JSObject *proto, JSObject *parent)
     /* Store newslots after initializing all of 'em, just in case. */
     obj->slots = newslots;
 
+    if (js_IsTypedArray(cx, obj) && !js_InitTypedArrayObject(cx, obj))
+        goto bad;
+
     if (cx->runtime->objectHook) {
         JS_KEEP_ATOMS(cx->runtime);
         cx->runtime->objectHook(cx, obj, JS_TRUE, cx->runtime->objectHookData);
@@ -3877,10 +3881,15 @@ LookupPropertyInternal(JSContext *cx, JSObject *obj, jsid id, uintN flags,
         JS_UNLOCK_OBJ(cx, obj);
         if (!proto)
             break;
-        if (ownOnly && js_IsProxy(cx, proto)) break;
+        if (ownOnly && (js_IsProxy(cx, proto) || js_IsTypedArray(cx, proto))) break;
         if (!OBJ_IS_NATIVE(proto)) {
             JSBool ret;
             JS_PUSH_SINGLE_TEMP_ROOT(cx, OBJECT_TO_JSVAL(proto), &tvr2);
+            if (access && js_IsTypedArray(cx, proto)) {
+                *objp = proto; *propp = (JSProperty *)proto;
+                JS_POP_TEMP_ROOT(cx, &tvr2);
+                return JS_TRUE;
+            }
             ret = access && js_IsProxy(cx, proto)
                   ? js_ProxyLookupForAccess(cx, proto, id, objp, propp)
                   : OBJ_LOOKUP_PROPERTY(cx, proto, id, objp, propp);
@@ -4153,6 +4162,7 @@ GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
      */
     CHECK_FOR_STRING_INDEX(id);
 
+    if (js_IsTypedArray(cx, obj)) return js_TypedArrayGet(cx, obj, id, receiver, vp);
     if (js_IsProxy(cx, obj)) return js_ProxyGet(cx, obj, id, receiver, vp);
     if (!LookupPropertyInternal(cx, obj, id, 0, &obj2, &prop, JS_TRUE, JS_FALSE))
         return JS_FALSE;
@@ -4216,6 +4226,7 @@ GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
 
     if (!OBJ_IS_NATIVE(obj2)) {
         OBJ_DROP_PROPERTY(cx, obj2, prop);
+        if (js_IsTypedArray(cx, obj2)) return js_TypedArrayGet(cx, obj2, id, receiver, vp);
         if (js_IsProxy(cx, obj2)) return js_ProxyGet(cx, obj2, id, receiver, vp);
         return OBJ_GET_PROPERTY(cx, obj2, id, vp);
     }
@@ -4248,6 +4259,16 @@ js_SetPrimitiveProperty(JSContext *cx, JSObject *obj, jsval receiver,
          : OBJ_LOOKUP_PROPERTY(cx, obj, id, &owner, &prop);
     if (!ok)
         goto out;
+    if (prop && js_IsTypedArray(cx, owner)) {
+        JSBool accepted;
+        OBJ_DROP_PROPERTY(cx, owner, prop);
+        ok = js_TypedArraySet(cx, owner, id, *vp, receiver, &accepted);
+        if (ok && !accepted && strict) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            ok = JS_FALSE;
+        }
+        goto out;
+    }
     if (prop && js_IsProxy(cx, owner)) {
         JSBool accepted;
         OBJ_DROP_PROPERTY(cx, owner, prop);
@@ -4301,6 +4322,16 @@ SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp, JSBool strict)
     if (!LookupPropertyInternal(cx, obj, id, 0, &pobj, &prop, JS_TRUE, JS_FALSE))
         return JS_FALSE;
 
+    if (prop && js_IsTypedArray(cx, pobj)) {
+        JSBool accepted;
+        OBJ_DROP_PROPERTY(cx, pobj, prop);
+        if (!js_TypedArraySet(cx, pobj, id, *vp, OBJECT_TO_JSVAL(obj), &accepted)) return JS_FALSE;
+        if (!accepted && strict) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            return JS_FALSE;
+        }
+        return JS_TRUE;
+    }
     if (prop && js_IsProxy(cx, pobj)) {
         JSBool accepted;
         OBJ_DROP_PROPERTY(cx, pobj, prop);
@@ -4538,6 +4569,15 @@ js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 JSBool
 js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 {
+    if (js_IsTypedArray(cx, obj)) {
+        JSBool accepted;
+        if (!js_TypedArraySet(cx, obj, id, *vp, OBJECT_TO_JSVAL(obj), &accepted)) return JS_FALSE;
+        if (!accepted) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            return JS_FALSE;
+        }
+        return JS_TRUE;
+    }
     if (js_IsProxy(cx, obj)) {
         JSBool accepted;
         if (!js_ProxySet(cx, obj, id, *vp, OBJECT_TO_JSVAL(obj), &accepted)) return JS_FALSE;

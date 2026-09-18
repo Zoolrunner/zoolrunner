@@ -152,6 +152,10 @@ function modernWindowEdition() {
                                 i.next().value===5 && i.next().done; })() &&
            (function() { var i=(function*(){try{yield 1}finally{yield 2}})();
                          i.next();return i.return(9).value===2 && i.next().value===9; })() &&
+           (function() { var a=new Uint8Array([1,2,3]);
+                         var b=a.subarray(1);b[0]=7;
+                         return a.join()==="1,7,3" && a.map(v=>v+1).join()==="2,8,4" &&
+                                ArrayBuffer.isView(a) && a.values().next().value===1; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

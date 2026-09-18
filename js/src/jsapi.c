@@ -1302,6 +1302,15 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitArrayBufferClass(cx, obj) &&
            js_InitDataViewClass(cx, obj) &&
            js_InitPromiseClass(cx, obj) &&
+           js_InitInt8ArrayClass(cx, obj) &&
+           js_InitUint8ArrayClass(cx, obj) &&
+           js_InitUint8ClampedArrayClass(cx, obj) &&
+           js_InitInt16ArrayClass(cx, obj) &&
+           js_InitUint16ArrayClass(cx, obj) &&
+           js_InitInt32ArrayClass(cx, obj) &&
+           js_InitUint32ArrayClass(cx, obj) &&
+           js_InitFloat32ArrayClass(cx, obj) &&
+           js_InitFloat64ArrayClass(cx, obj) &&
 #if JS_HAS_SCRIPT_OBJECT
            js_InitScriptClass(cx, obj) &&
 #endif
@@ -1382,6 +1391,15 @@ static JSStdName standard_class_atoms[] = {
     {js_InitArrayBufferClass,           EAGER_ATOM_AND_CLASP(ArrayBuffer)},
     {js_InitDataViewClass,              EAGER_ATOM_AND_CLASP(DataView)},
     {js_InitPromiseClass,               EAGER_ATOM_AND_CLASP(Promise)},
+    {js_InitInt8ArrayClass, EAGER_ATOM_AND_CLASP(Int8Array)},
+    {js_InitUint8ArrayClass, EAGER_ATOM_AND_CLASP(Uint8Array)},
+    {js_InitUint8ClampedArrayClass, EAGER_ATOM_AND_CLASP(Uint8ClampedArray)},
+    {js_InitInt16ArrayClass, EAGER_ATOM_AND_CLASP(Int16Array)},
+    {js_InitUint16ArrayClass, EAGER_ATOM_AND_CLASP(Uint16Array)},
+    {js_InitInt32ArrayClass, EAGER_ATOM_AND_CLASP(Int32Array)},
+    {js_InitUint32ArrayClass, EAGER_ATOM_AND_CLASP(Uint32Array)},
+    {js_InitFloat32ArrayClass, EAGER_ATOM_AND_CLASP(Float32Array)},
+    {js_InitFloat64ArrayClass, EAGER_ATOM_AND_CLASP(Float64Array)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
     {js_InitExceptionClasses,           EAGER_ATOM_AND_CLASP(Error)},
     {js_InitRegExpClass,                EAGER_ATOM_AND_CLASP(RegExp)},
@@ -1573,7 +1591,16 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
              stdnm->clasp == &js_WeakMapClass || stdnm->clasp == &js_WeakSetClass ||
              stdnm->clasp == &js_ReflectClass || stdnm->clasp == &js_ProxyClass ||
              stdnm->clasp == &js_ArrayBufferClass || stdnm->clasp == &js_DataViewClass ||
-             stdnm->clasp == &js_PromiseClass) &&
+             stdnm->clasp == &js_PromiseClass ||
+             stdnm->clasp == &js_Int8ArrayClass ||
+             stdnm->clasp == &js_Uint8ArrayClass ||
+             stdnm->clasp == &js_Uint8ClampedArrayClass ||
+             stdnm->clasp == &js_Int16ArrayClass ||
+             stdnm->clasp == &js_Uint16ArrayClass ||
+             stdnm->clasp == &js_Int32ArrayClass ||
+             stdnm->clasp == &js_Uint32ArrayClass ||
+             stdnm->clasp == &js_Float32ArrayClass ||
+             stdnm->clasp == &js_Float64ArrayClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(stdnm->clasp))) {
             return JS_TRUE;
@@ -1635,7 +1662,16 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
              standard_class_atoms[i].clasp == &js_ProxyClass ||
              standard_class_atoms[i].clasp == &js_ArrayBufferClass ||
              standard_class_atoms[i].clasp == &js_DataViewClass ||
-             standard_class_atoms[i].clasp == &js_PromiseClass) &&
+             standard_class_atoms[i].clasp == &js_PromiseClass ||
+             standard_class_atoms[i].clasp == &js_Int8ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint8ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint8ClampedArrayClass ||
+             standard_class_atoms[i].clasp == &js_Int16ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint16ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Int32ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint32ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Float32ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Float64ArrayClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(standard_class_atoms[i].clasp)))
             continue;

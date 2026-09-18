@@ -43,6 +43,7 @@
 #include <string.h>
 #include "jsapi.h"
 #include "jsarray.h"
+#include "jsbinarydata.h"
 #include "jsatom.h"
 #include "jscntxt.h"
 #include "jsfun.h"
@@ -264,6 +265,12 @@ GetOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
     ids.ids = &idStorage;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
     JS_PUSH_TEMP_ROOT(cx, 3, values, &roots);
+    if (js_IsTypedArray(cx, target)) {
+        JSBool numeric;
+        jsdouble index;
+        if (!js_TypedArrayIndex(cx, id, &numeric, &index)) goto out;
+        if (!numeric) target = js_TypedArrayExpando(cx, target);
+    }
     if (js_IsProxy(cx, target)) {
         if (!global) global = js_ProxyOperationGlobal(cx);
         ok = js_ProxyGetOwnDescriptor(cx, target, id, global, rval);
@@ -591,6 +598,7 @@ static JSBool
 IsExtensible(JSContext *cx, JSObject *target)
 {
     JSBool extensible;
+    if (js_IsTypedArray(cx, target)) target = js_TypedArrayExpando(cx, target);
     if (!OBJ_IS_NATIVE(target)) return JS_TRUE;
     JS_LOCK_OBJ(cx, target);
     extensible = OBJ_SCOPE(target)->object != target ||
@@ -692,6 +700,24 @@ DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
             else ok = DescriptorError(cx);
         }
         goto out;
+    }
+    if (js_IsTypedArray(cx, target)) {
+        JSBool numeric, wrote;
+        jsdouble typedIndex;
+        if (!js_TypedArrayIndex(cx, id, &numeric, &typedIndex)) goto out;
+        if (numeric) {
+            if (!js_TypedArrayIndexValid(cx, target, typedIndex) ||
+                (d->present & D_ACCESS) ||
+                ((d->present & D_BIT(D_CONFIG)) && d->v[D_CONFIG] == JSVAL_TRUE) ||
+                ((d->present & D_BIT(D_ENUM)) && d->v[D_ENUM] == JSVAL_FALSE) ||
+                ((d->present & D_BIT(D_WRITE)) && d->v[D_WRITE] == JSVAL_FALSE)) goto reject;
+            if (d->present & D_BIT(D_VALUE)) {
+                if (!js_TypedArrayWrite(cx, target, typedIndex, d->v[D_VALUE], &wrote)) goto out;
+                if (!wrote) goto reject;
+            }
+            ok = JS_TRUE; goto out;
+        }
+        target = js_TypedArrayExpando(cx, target);
     }
     callargs[0] = OBJECT_TO_JSVAL(target);
     callargs[1] = ID_TO_VALUE(id);
@@ -1014,6 +1040,7 @@ obj_preventExtensions(JSContext *cx, JSObject *obj, uintN argc,
         *rval = argv[0];
         return JS_TRUE;
     }
+    if (js_IsTypedArray(cx, target)) target = js_TypedArrayExpando(cx, target);
     /* Materialize lazy own properties before closing the object. */
     ids = JS_Enumerate(cx, target);
     if (!ids) return JS_FALSE;
@@ -1024,7 +1051,7 @@ obj_preventExtensions(JSContext *cx, JSObject *obj, uintN argc,
     if (scope && !SCOPE_IS_SEALED(scope)) scope->flags |= SCOPE_NONEXTENSIBLE;
     JS_UNLOCK_OBJ(cx, target);
     if (!scope) return JS_FALSE;
-    *rval = OBJECT_TO_JSVAL(target);
+    *rval = argv[0];
     return JS_TRUE;
 }
 
@@ -1039,6 +1066,26 @@ OwnNames(JSContext *cx, JSObject *target)
     JSScopeProperty *sprop;
     jsint i, n, capacity = 0, nextCapacity;
     jsid swap;
+    if (js_IsTypedArray(cx, target)) {
+        RootedIds ordinary;
+        jsuint count = js_TypedArrayRawLength(cx, target), j;
+        ordinary.ids = OwnNames(cx, js_TypedArrayExpando(cx, target));
+        if (!ordinary.ids) return NULL;
+        JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ordinary.root);
+        ids = NULL;
+        if (!OrderOwnKeys(cx, ordinary.ids)) goto typed_out;
+        if (count > (jsuint)JSVAL_INT_MAX - (jsuint)ordinary.ids->length) {
+            JS_ReportOutOfMemory(cx); goto typed_out;
+        }
+        ids = js_NewIdArray(cx, (jsint)count + ordinary.ids->length);
+        if (!ids) goto typed_out;
+        for (j = 0; j < count; ++j) ids->vector[j] = INT_TO_JSID(j);
+        for (i = 0; i < ordinary.ids->length; ++i) ids->vector[count + i] = ordinary.ids->vector[i];
+      typed_out:
+        JS_POP_TEMP_ROOT(cx, &ordinary.root);
+        JS_DestroyIdArray(cx, ordinary.ids);
+        return ids;
+    }
     if (js_IsProxy(cx, target)) return js_ProxyOwnKeys(cx, target);
     if ((target == cx->globalObject ||
          (OBJ_GET_CLASS(cx, target)->flags & JSCLASS_IS_GLOBAL)) &&
@@ -1240,6 +1287,8 @@ ObjectIntegrity(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
     target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
     if (js_IsProxy(cx, target)) return ProxyIntegrity(cx, target, rval, freeze, query);
+    if (!query && js_IsTypedArray(cx, target) &&
+        !obj_preventExtensions(cx, NULL, argc, argv, rval)) return JS_FALSE;
     if (query && IsExtensible(cx, target)) {
         *rval = JSVAL_FALSE;
         return JS_TRUE;
@@ -1680,7 +1729,7 @@ js_ReflectPreventExtensions(JSContext *cx, JSObject *obj, uintN argc, jsval *arg
         *rval = BOOLEAN_TO_JSVAL(accepted);
         return JS_TRUE;
     }
-    if (!OBJ_IS_NATIVE(target)) { *rval = JSVAL_FALSE; return JS_TRUE; }
+    if (!OBJ_IS_NATIVE(target) && !js_IsTypedArray(cx, target)) { *rval = JSVAL_FALSE; return JS_TRUE; }
     if (!obj_preventExtensions(cx, obj, argc, argv, rval)) return JS_FALSE;
     *rval = JSVAL_TRUE;
     return JS_TRUE;
@@ -1744,6 +1793,17 @@ js_ReflectSet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
         JS_POP_TEMP_ROOT(cx, &ids.root);
         return ok;
     }
+    if (js_IsTypedArray(cx, target) && (argc <= 3 || argv[3] == argv[0])) {
+        JSBool numeric;
+        jsdouble index;
+        ok = js_TypedArrayIndex(cx, storage.vector[0], &numeric, &index);
+        if (!ok || numeric) {
+            if (ok) ok = js_TypedArrayWrite(cx, target, index, argv[2], &accepted);
+            if (ok) *rval = BOOLEAN_TO_JSVAL(accepted);
+            JS_POP_TEMP_ROOT(cx, &ids.root);
+            return ok;
+        }
+    }
     for (i = 0; i < 5; ++i) roots[i] = JSVAL_VOID;
     roots[0] = argv[0]; roots[1] = argc > 3 ? argv[3] : argv[0]; roots[2] = argv[2];
     JS_PUSH_TEMP_ROOT(cx, 5, roots, &root);
@@ -1786,7 +1846,7 @@ js_ReflectSet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
             JSObject *owner;
             JSProperty *property;
             JSClass *clasp = OBJ_GET_CLASS(cx, receiver);
-            JSBool nativeHook = !OBJ_IS_NATIVE(receiver);
+            JSBool nativeHook = !OBJ_IS_NATIVE(receiver) && !js_IsTypedArray(cx, receiver);
             if (!nativeHook && clasp != &js_ArrayClass &&
                 clasp != &js_ArgumentsClass && clasp != &js_RegExpClass) {
                 if (!OBJ_LOOKUP_PROPERTY(cx, receiver, storage.vector[0], &owner, &property)) goto out;

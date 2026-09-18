@@ -1467,3 +1467,21 @@ kind and delegated-yield instruction. The validated macOS arm64 baseline passes
 27,878 ES2015 modes and all 11,540 ES5 modes; 688 failures, 14 unsupported modules
 and two harness errors remain. All four macOS arm64 applications pass packaged
 runtime checks; other platforms remain unvalidated for this batch.
+
+
+For typed-array changes, run `js/tests/es6/typed-arrays.js` and
+`TestTypedArrays.c` alongside complete conformance and all four application
+checks. Preserve canonical numeric index handling, ordinary property receivers,
+buffer detachment, overlapping copies and original ES2015 species semantics.
+Root callback state and reacquire byte storage after JavaScript calls. Initialize
+the ordinary property store before native allocation hooks can reflect on the
+view, and preserve restrictions those hooks install. Test throwing writes as
+well as Reflect's boolean results. Original ES2015 fill converts per write;
+constructor handling of explicit undefined differs from later editions.
+The validated macOS arm64 baseline passes 27,940 ES2015 modes and all 11,540
+ES5 modes; 628 failures and 14 unsupported modules remain, with no harness
+errors, crashes or timeouts in the completed runs. All four applications pass
+packaged runtime checks; other platforms remain unvalidated for this batch.
+Warm relocated runtimes once before starting concurrent conformance processes,
+so XPCOM component-cache regeneration is serialized. Retain failed startup
+logs and report complete reruns honestly.

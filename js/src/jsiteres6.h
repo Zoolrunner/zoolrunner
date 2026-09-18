@@ -17,5 +17,6 @@ extern void js_IteratorCloseThrow(JSContext *cx, JSObject *iterator);
 extern JSObject *js_ForOfStart(JSContext *cx, jsval value);
 extern JSBool js_ForOfNext(JSContext *cx, JSObject *state, JSBool *more);
 extern JSBool js_ForOfClose(JSContext *cx, JSObject *state, JSBool throwing);
+extern JSBool js_CreateArrayIterator(JSContext *, jsval *, jsval *, uintN);
 JS_END_EXTERN_C
 #endif

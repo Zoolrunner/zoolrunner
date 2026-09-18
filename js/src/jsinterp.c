@@ -2141,7 +2141,8 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
     }
     if (fun && (FUN_NATIVE(fun) == js_ArrayBufferConstructor ||
                 FUN_NATIVE(fun) == js_DataViewConstructor ||
-                FUN_NATIVE(fun) == js_PromiseConstructor)) {
+                FUN_NATIVE(fun) == js_PromiseConstructor ||
+                js_IsTypedArrayConstructor(FUN_NATIVE(fun)))) {
         /* These constructors validate or convert arguments before observing
          * newTarget.prototype, and allocate their own internal slots. */
         vp[1] = JSVAL_NULL;

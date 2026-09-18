@@ -2517,3 +2517,42 @@ unchanged through both complete suites. Its engine SHA-256 is
 matching all four application engines. Other platforms remain unvalidated for
 this batch. Typed arrays, classes, modules, Unicode regular expressions and
 broader parameter/destructuring/global lexical semantics still require work.
+
+
+### Typed arrays
+
+All nine ES2015 typed-array types now use integer-indexed object operations
+over shared ArrayBuffer storage. Numeric properties remain separate from
+ordinary string/symbol properties. Array iteration reads internal lengths;
+reflection, inherited receivers and buffer detachment follow the original
+ES2015 rules. Native methods implement conversion, callbacks, species, shared
+views and byte-preserving copies, without changing classic embedding APIs.
+
+`typed-arrays.js` passes 252 checks and `TestTypedArrays.c` passes 29 native
+checks, including reflection and collection during allocation, property-store
+initialization before embedding hooks, and detachment inside callbacks.
+The frozen foundation subset reports (`typedarray-foundation-*`) pass the
+typed-array, typed-array concat, ArrayIteratorPrototype, for-of and Symbol
+number-coercion groups. Those subsets are diagnostics, not full conformance.
+The complete pinned run passes **27,940 modes**, with **628 failures**, 14
+unsupported modules, no harness errors, crashes or timeouts: **62 gained, zero
+lost** against the generator baseline. All **11,540 ES5.1 cases** pass. The
+initial parallel ES5 startup failed during XPCOM component registration; the
+unchanged frozen runtime completed the full suite on rerun. Its initial startup
+log is retained separately. Future relocated snapshots initialize their
+component registry before concurrent conformance processes.
+
+All four macOS arm64 applications pass root builds, packaging and desktop
+checks, including Calendar's four views, 169 Browser navigation/layout checks
+and Suite/XULRunner ChatZilla. C89 checks pass. Reports use
+`typedarray-allocation-final-*`; the engine SHA-256 is
+`0fa3c91c88d04260de966b17e3c4f91cd48340ce62362bf57d4315151fc354d1`,
+matching all four applications. An initial Browser package check exposed a
+stale object after staging files with preserved timestamps; rebuilding it with
+current timestamps restored the matching engine. The failed log is retained.
+Review also fixed throwing writes to invalid
+indices and a native allocation-hook crash: each view's ordinary property
+store now exists before the hook can inspect or restrict it. No bytecode change
+is needed for this batch. Other platforms remain unvalidated for these changes.
+Classes, modules, Unicode regular expressions and broader parameter,
+destructuring and lexical-environment semantics remain unfinished.
