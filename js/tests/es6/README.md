@@ -1639,3 +1639,42 @@ layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalon
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/array-indexed-runtime`. Other platforms and full ES6 remain
 incomplete.
+
+### Array string conversion and sorting
+
+Modern join/toLocaleString use ToLength, checked UTF-16 accumulation and direct
+Get operations without the historical sharp-map enumeration. A per-context,
+stack-owned cycle guard is unwound on failure and interruption; its object stays
+rooted independently. Modern Array.toString invokes an observed callable join or
+the intrinsic Object tag operation. Modern Object.toLocaleString preserves raw
+primitive receivers in both property lookup and invocation. Boxing uses the
+executing built-in's realm through a shared private helper. Legacy methods remain
+separate, including legacy toString and boxed locale forwarding.
+
+Modern sort collects sparse properties with a dynamically grown rooted vector,
+orders values/undefined/holes, performs throwing writes/deletes, and remains
+interruptible during traversal and comparison. Even identical objects undergo
+observable default string conversions. The private join state is appended to
+JSContext and all embedding builds must be refreshed.
+
+Focused checks pass 36 script and 44 native embedding assertions under
+MallocScribble, including comparison-phase interruption, foreign realms,
+cloned methods, primitive receivers, cycle recovery and GC. C89 checks pass.
+Initial subsets exposed inherited locale boxing and identical-value comparison
+shortcuts; the modern paths were corrected with added regressions. Corrected
+subsets pass **141/141** cases: join 42, toLocaleString 20, toString 24 and sort 55.
+
+The full pinned ES2015 run passes **26,462 cases**, with **2,104 failures**,
+14 unsupported module cases and two harness errors: **10 gained, zero lost**
+relative to indexed methods. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/array-text-full.json` and
+`array-text-es5.json`; snapshot: `/tmp/zr-array-text-conformance-20260918`.
+Its libmozjs SHA-256 `f7b7a8c29a8c50134818f9f0f7bbd06b393b34347762b483bdbae6f382f3a37b`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/array-text-runtime`. Other platforms and full ES6 remain incomplete.

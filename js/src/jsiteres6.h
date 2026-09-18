@@ -7,6 +7,7 @@ JS_BEGIN_EXTERN_C
 extern JSBool js_InitArrayIteratorMethods(JSContext *cx, JSObject *global, JSObject *proto);
 extern JSBool js_InitStringIteratorMethod(JSContext *cx, JSObject *global, JSObject *proto);
 extern JSBool js_InitArgumentsIterator(JSContext *cx, JSObject *global, JSObject *args);
+extern JSObject *js_BuiltinToObject(JSContext *cx, JSObject *global, jsval value);
 extern JSObject *js_BuiltinGlobal(JSContext *cx, jsval *argv);
 extern JSObject *js_BuiltinPrototype(JSContext *cx, JSObject *global, JSProtoKey key);
 extern JSObject *js_GetIteratorPrototype(JSContext *cx, JSObject *global);

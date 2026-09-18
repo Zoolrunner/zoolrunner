@@ -747,6 +747,9 @@ struct JSContext {
     /* Top of the GC mark stack. */
     void                *gcCurrentMarkNode;
 #endif
+
+    /* Active native join guards; their objects have independent stack roots. */
+    struct JSArrayJoinState *arrayJoinStack;
 };
 
 #ifdef JS_THREADSAFE

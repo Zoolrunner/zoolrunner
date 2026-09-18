@@ -1239,9 +1239,9 @@ js_obj_toSource(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 }
 #endif /* JS_HAS_TOSOURCE */
 
-JSBool
-js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
-                jsval *rval)
+static JSBool
+ObjectToString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                jsval *rval, JSBool modern)
 {
     jschar *chars;
     size_t length, i;
@@ -1258,7 +1258,7 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         clazz = "Undefined";
     else if (JSVAL_IS_NULL(argv[-1]))
         clazz = "Null";
-    else if (JS_VERSION_IS_ES2015(cx) || js_IsProxy(cx, obj)) {
+    else if (modern || js_IsProxy(cx, obj)) {
         if (!js_IsArray(cx, obj, &array)) return JS_FALSE;
         clasp = OBJ_GET_CLASS(cx, obj);
         if (array)
@@ -1316,6 +1316,40 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     }
     *rval = STRING_TO_JSVAL(str);
     ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ObjectToString(cx, obj, argc, argv, rval, JS_VERSION_IS_ES2015(cx));
+}
+
+JSBool
+js_ObjectToStringES2015(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ObjectToString(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+ObjectLocaleStringES2015(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *obj;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    obj = js_BuiltinToObject(cx, js_BuiltinGlobal(cx, argv), argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_GetPropertyValue(cx, obj, argv[-1],
+                             ATOM_TO_JSID(cx->runtime->atomState.toStringAtom), &values[1])) goto out;
+    if (!js_IsCallable(cx, values[1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "toString"); goto out;
+    }
+    ok = js_InternalInvokeValue(cx, argv[-1], values[1], 0, 0, NULL, rval);
   out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
@@ -2608,6 +2642,7 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
     jsval method;
     JSFunction *fun;
     JSPropertySpec *properties = object_props;
+    JSBool modern = JS_VERSION_IS_ES2015(cx);
 
 #if JS_HAS_OBJ_PROTO_PROP
     if (JS_VERSION_IS_ES2015(cx)) properties = object_props + 1;
@@ -2623,6 +2658,13 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
         return NULL;
     fun = (JSFunction *) JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
     fun->flags &= ~JSFUN_REQUIRE_THIS;
+    if (modern) {
+        if (!JS_GetProperty(cx, proto, "toLocaleString", &method)) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
+        fun->u.n.native = ObjectLocaleStringES2015;
+        fun->flags |= JSFUN_STRICT;
+    }
+
 
 #if JS_HAS_OBJ_PROTO_PROP
     if (JS_VERSION_IS_ES2015(cx) && !InitProtoAccessors(cx, obj, proto))

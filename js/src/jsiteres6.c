@@ -4,6 +4,7 @@
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
+#include "jsbool.h"
 #include "jscntxt.h"
 #include "jsfun.h"
 #include "jsgc.h"
@@ -55,6 +56,32 @@ js_BuiltinPrototype(JSContext *cx, JSObject *global, JSProtoKey key)
         return NULL;
     }
     return JSVAL_TO_OBJECT(value);
+}
+
+/* ToObject wrappers and default result arrays belong to the method's realm. */
+JSObject *
+js_BuiltinToObject(JSContext *cx, JSObject *global, jsval value)
+{
+    JSProtoKey key;
+    JSClass *clasp;
+    JSObject *proto, *obj;
+    if (!JSVAL_IS_PRIMITIVE(value)) return JSVAL_TO_OBJECT(value);
+    if (JSVAL_IS_NULL(value) || JSVAL_IS_VOID(value)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return NULL;
+    }
+    if (JSVAL_IS_SYMBOL(value)) { key = JSProto_Symbol; clasp = &js_SymbolClass; }
+    else if (JSVAL_IS_STRING(value)) { key = JSProto_String; clasp = &js_StringClass; }
+    else if (JSVAL_IS_BOOLEAN(value)) { key = JSProto_Boolean; clasp = &js_BooleanClass; }
+    else { key = JSProto_Number; clasp = &js_NumberClass; }
+    proto = js_BuiltinPrototype(cx, global, key);
+    if (!proto) return NULL;
+    obj = js_NewObject(cx, clasp, proto, global);
+    if (!obj) return NULL;
+    if (key == JSProto_Symbol) {
+        if (!JS_SetReservedSlot(cx, obj, 0, value)) return NULL;
+    } else OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, value);
+    return obj;
 }
 
 static JSBool

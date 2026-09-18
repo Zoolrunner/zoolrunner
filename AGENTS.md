@@ -1256,3 +1256,9 @@ For indexed Array method changes, run `array-indexed.js` and `TestArrayIndexed.c
 Preserve positive-zero length/index results, safe-integer bounds, observable
 Has/Get/Set/Delete ordering, species results and interruptible native loops.
 Keep legacy ToUint32 methods and JSAPI cloning behavior covered.
+
+For Array string/sort changes, run `array-text.js` and `TestArrayText.c`.
+Modern join cycle detection must not enumerate properties. Unwind its per-context
+state on errors/interrupts, root sorted vectors across comparison callbacks, and
+preserve primitive receivers through Object.toLocaleString forwarding. Keep
+legacy string/sort behavior isolated and rebuild embeddings after context changes.

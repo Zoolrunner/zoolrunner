@@ -325,6 +325,10 @@ js_obj_toSource(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 jsval *rval);
 
 extern JSBool
+js_ObjectToStringES2015(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                       jsval *rval);
+
+extern JSBool
 js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 jsval *rval);
 

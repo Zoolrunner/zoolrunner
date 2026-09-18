@@ -1362,32 +1362,6 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 /*
  * Python-esque sequence operations.
  */
-/* ToObject wrappers and default result arrays belong to the method's realm. */
-static JSObject *
-ArrayMethodObject(JSContext *cx, JSObject *global, jsval value)
-{
-    JSProtoKey key;
-    JSClass *clasp;
-    JSObject *proto, *obj;
-    if (!JSVAL_IS_PRIMITIVE(value)) return JSVAL_TO_OBJECT(value);
-    if (JSVAL_IS_NULL(value) || JSVAL_IS_VOID(value)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
-        return NULL;
-    }
-    if (JSVAL_IS_SYMBOL(value)) { key = JSProto_Symbol; clasp = &js_SymbolClass; }
-    else if (JSVAL_IS_STRING(value)) { key = JSProto_String; clasp = &js_StringClass; }
-    else if (JSVAL_IS_BOOLEAN(value)) { key = JSProto_Boolean; clasp = &js_BooleanClass; }
-    else { key = JSProto_Number; clasp = &js_NumberClass; }
-    proto = js_BuiltinPrototype(cx, global, key);
-    if (!proto) return NULL;
-    obj = js_NewObject(cx, clasp, proto, global);
-    if (!obj) return NULL;
-    if (key == JSProto_Symbol) {
-        if (!JS_SetReservedSlot(cx, obj, 0, value)) return NULL;
-    } else OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, value);
-    return obj;
-}
-
 static JSBool
 ArraySpeciesCreate(JSContext *cx, JSObject *original, JSObject *global,
                     jsdouble length, jsval *rval)
@@ -1455,7 +1429,7 @@ ArrayModernConcat(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsv
     uint32 iterations = 0;
     jsid symbol, id;
     JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
-    obj = ArrayMethodObject(cx, global, argv[-1]);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
     if (!obj) goto out;
     values[0] = OBJECT_TO_JSVAL(obj);
     if (!ArraySpeciesCreate(cx, obj, global, 0, &values[1]) ||
@@ -1738,7 +1712,7 @@ ArrayModernExtra(JSContext *cx, uintN argc, jsval *argv, jsval *rval, ArrayExtra
     jsid id;
     JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
     JS_PUSH_TEMP_ROOT(cx, 4, args, &argumentRoot);
-    obj = ArrayMethodObject(cx, global, argv[-1]);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
     if (!obj) goto out;
     values[0] = OBJECT_TO_JSVAL(obj);
     if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
@@ -2193,7 +2167,7 @@ ArrayModernIndexed(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
     uintN i;
     uint32 iterations = 0;
     JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
-    obj = ArrayMethodObject(cx, global, argv[-1]);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
     if (!obj) goto out;
     values[0] = OBJECT_TO_JSVAL(obj);
     if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
@@ -2411,6 +2385,241 @@ ARRAY_MODERN_INDEXED(ArrayModernIndexOf, ARRAY_INDEX_OF)
 ARRAY_MODERN_INDEXED(ArrayModernLastIndexOf, ARRAY_LAST_INDEX_OF)
 #endif
 #undef ARRAY_MODERN_INDEXED
+
+typedef struct ArraySortArgs {
+    CompareArgs compare;
+    uint32 iterations;
+} ArraySortArgs;
+
+static JSBool
+ArrayModernCompare(void *data, const void *a, const void *b, int *result)
+{
+    ArraySortArgs *args = (ArraySortArgs *)data;
+    JSContext *cx = args->compare.context;
+    JSString *left, *right;
+    if (cx->branchCallback && !(args->iterations++ & 127) &&
+        !cx->branchCallback(cx, NULL)) return JS_FALSE;
+    if (args->compare.fval == JSVAL_NULL) {
+        /* Even identical objects have observable ToString calls. */
+        left = js_ValueToString(cx, *(const jsval *)a);
+        if (!left) return JS_FALSE;
+        *args->compare.localroot = STRING_TO_JSVAL(left);
+        right = js_ValueToString(cx, *(const jsval *)b);
+        if (!right) return JS_FALSE;
+        *result = js_CompareStrings(left, right);
+        return JS_TRUE;
+    }
+    return sort_compare(&args->compare, a, b, result);
+}
+
+static JSBool
+ArrayModernSort(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[5] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval *vector = NULL, *newVector;
+    JSTempValueRooter root, vectorRoot;
+    JSObject *obj;
+    jsdouble length, index, undefinedCount = 0, end;
+    size_t count = 0, capacity = 0, newCapacity;
+    uint32 iterations = 0;
+    jsid id;
+    JSBool present, ok = JS_FALSE;
+    ArraySortArgs args;
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    JS_PUSH_TEMP_ROOT(cx, 0, vector, &vectorRoot);
+    obj = js_BuiltinToObject(cx, js_BuiltinGlobal(cx, argv), argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (!JSVAL_IS_VOID(argv[0]) && !js_IsCallable(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_SORT_ARG); goto out;
+    }
+    for (index = 0; index < length; ++index) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[1] = ID_TO_VALUE(id);
+        if (!ArrayHas(cx, obj, id, &present)) goto out;
+        if (!present) continue;
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2])) goto out;
+        if (JSVAL_IS_VOID(values[2])) { ++undefinedCount; continue; }
+        if (count == capacity) {
+            newCapacity = capacity ? capacity * 2 : 32;
+            if (newCapacity < capacity || newCapacity > 0x7fffffff ||
+                newCapacity > ((size_t)-1) / sizeof(jsval)) {
+                JS_ReportOutOfMemory(cx); goto out;
+            }
+            newVector = (jsval *)JS_realloc(cx, vector, newCapacity * sizeof(jsval));
+            if (!newVector) goto out;
+            vector = newVector; capacity = newCapacity; vectorRoot.u.array = vector;
+        }
+        vector[count++] = values[2]; vectorRoot.count = (jsint)count;
+    }
+    args.compare.context = cx;
+    args.compare.fval = JSVAL_IS_VOID(argv[0]) ? JSVAL_NULL : argv[0];
+    args.compare.localroot = &values[3]; args.iterations = 0;
+    if (!js_HeapSort(vector, count, &values[4], sizeof(jsval), ArrayModernCompare, &args)) goto out;
+    end = count + undefinedCount;
+    for (index = 0; index < length; ++index) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[1] = ID_TO_VALUE(id);
+        if (index < end) {
+            values[2] = index < count ? vector[(size_t)index] : JSVAL_VOID;
+            if (!js_SetPropertyOrThrow(cx, obj, id, &values[2])) goto out;
+        } else if (!ArrayDeleteOrThrow(cx, obj, id)) goto out;
+    }
+    *rval = values[0]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &vectorRoot);
+    JS_POP_TEMP_ROOT(cx, &root);
+    JS_free(cx, vector);
+    return ok;
+}
+
+/* Active joins are stack-owned and their objects are rooted by the callers.
+ * Unlike the historical sharp map, this cycle guard never enumerates properties. */
+typedef struct JSArrayJoinState {
+    JSObject *object;
+    struct JSArrayJoinState *previous;
+} JSArrayJoinState;
+
+typedef struct ArrayText {
+    jschar *chars;
+    size_t length, capacity;
+} ArrayText;
+
+static JSBool
+ArrayAppendText(JSContext *cx, ArrayText *text, const jschar *chars, size_t length)
+{
+    size_t needed, capacity;
+    jschar *newChars;
+    if (length > JSSTRING_LENGTH_MASK - text->length ||
+        text->length + length >= ((size_t)-1) / sizeof(jschar)) {
+        JS_ReportOutOfMemory(cx); return JS_FALSE;
+    }
+    needed = text->length + length + 1;
+    if (needed > text->capacity) {
+        capacity = text->capacity ? text->capacity : 64;
+        while (capacity < needed) {
+            if (capacity > ((size_t)-1) / sizeof(jschar) / 2) { capacity = needed; break; }
+            capacity *= 2;
+        }
+        newChars = (jschar *)JS_realloc(cx, text->chars, capacity * sizeof(jschar));
+        if (!newChars) return JS_FALSE;
+        text->chars = newChars; text->capacity = capacity;
+    }
+    if (length) memcpy(text->chars + text->length, chars, length * sizeof(jschar));
+    text->length += length; text->chars[text->length] = 0;
+    return JS_TRUE;
+}
+
+static JSBool
+ArrayModernString(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSBool locale)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *element;
+    JSArrayJoinState state, *active;
+    ArrayText text = {NULL, 0, 0};
+    JSString *str;
+    const jschar comma = ',';
+    jsdouble length, index;
+    jsid id;
+    uint32 iterations = 0;
+    JSBool entered = JS_FALSE, ok = JS_FALSE;
+    int stackDummy;
+    if (!JS_CHECK_STACK_SIZE(cx, stackDummy)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED); return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (!locale && !JSVAL_IS_VOID(argv[0])) {
+        str = js_ValueToString(cx, argv[0]);
+        if (!str) goto out;
+        values[1] = STRING_TO_JSVAL(str);
+    }
+    for (active = cx->arrayJoinStack; active; active = active->previous) {
+        if (active->object == obj) {
+            *rval = JS_GetEmptyStringValue(cx); ok = JS_TRUE; goto out;
+        }
+    }
+    state.object = obj; state.previous = cx->arrayJoinStack;
+    cx->arrayJoinStack = &state; entered = JS_TRUE;
+    for (index = 0; index < length; ++index) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (index != 0) {
+            if (JSVAL_IS_VOID(values[1])) {
+                if (!ArrayAppendText(cx, &text, &comma, 1)) goto out;
+            } else {
+                str = JSVAL_TO_STRING(values[1]);
+                if (!ArrayAppendText(cx, &text, JSSTRING_CHARS(str), JSSTRING_LENGTH(str))) goto out;
+            }
+        }
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[2] = ID_TO_VALUE(id);
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[3])) goto out;
+        if (JSVAL_IS_NULL(values[3]) || JSVAL_IS_VOID(values[3])) continue;
+        if (locale) {
+            element = js_BuiltinToObject(cx, global, values[3]);
+            if (!element) goto out;
+            values[4] = OBJECT_TO_JSVAL(element);
+            if (!js_GetPropertyValue(cx, element, values[3], ATOM_TO_JSID(cx->runtime->atomState.toLocaleStringAtom), &values[5])) goto out;
+            if (!js_IsCallable(cx, values[5])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "toLocaleString"); goto out;
+            }
+            if (!js_InternalInvokeValue(cx, values[3], values[5], 0, 0, NULL, &values[4])) goto out;
+        } else values[4] = values[3];
+        str = js_ValueToString(cx, values[4]);
+        if (!str) goto out;
+        values[4] = STRING_TO_JSVAL(str);
+        if (!ArrayAppendText(cx, &text, JSSTRING_CHARS(str), JSSTRING_LENGTH(str))) goto out;
+    }
+    if (!text.chars) { *rval = JS_GetEmptyStringValue(cx); ok = JS_TRUE; goto out; }
+    str = js_NewString(cx, text.chars, text.length, 0);
+    if (!str) goto out;
+    text.chars = NULL; *rval = STRING_TO_JSVAL(str); ok = JS_TRUE;
+  out:
+    if (entered) cx->arrayJoinStack = state.previous;
+    JS_free(cx, text.chars);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayModernJoin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernString(cx, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+ArrayModernLocaleString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernString(cx, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+ArrayModernToString(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *obj;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    obj = js_BuiltinToObject(cx, js_BuiltinGlobal(cx, argv), argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!JS_GetProperty(cx, obj, "join", &values[1])) goto out;
+    if (js_IsCallable(cx, values[1]))
+        ok = js_InternalInvokeValue(cx, values[0], values[1], 0, 0, NULL, rval);
+    else
+        ok = js_ObjectToStringES2015(cx, obj, 0, values + 1, rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
 
 static JSBool
 array_findHelper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
@@ -2932,6 +3141,8 @@ InitArraySpecies(JSContext *cx, JSObject *global, JSObject *ctor, JSObject *prot
 {
     static struct { const char *name; JSNative native; } methods[] = {
         {"concat", ArrayModernConcat},
+        {"join", ArrayModernJoin}, {"toLocaleString", ArrayModernLocaleString},
+        {"toString", ArrayModernToString}, {"sort", ArrayModernSort},
         {"push", ArrayModernPush}, {"pop", ArrayModernPop},
         {"shift", ArrayModernShift}, {"unshift", ArrayModernUnshift},
         {"reverse", ArrayModernReverse}, {"slice", ArrayModernSlice},
