@@ -88,6 +88,7 @@ CSRCS		= \
 		jslog2.c \
 		jslong.c \
 		jsmath.c \
+		jsnormalization.c \
 		jsnum.c \
 		jsobj.c \
 		jsobjes5.c \

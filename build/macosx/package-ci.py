@@ -182,6 +182,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("../es6/number.js", "ES6-NUMBER checks=156 failures=0"),
                 ("../es6/math-integer.js", "ES6-MATH-INTEGER checks=169 failures=0"),
                 ("../es6/string-additions.js", "ES6-STRING-ADDITIONS checks=175 failures=0"),
+                ("../es6/normalization.js", "ES6-NORMALIZATION checks=50 failures=0"),
                 ("../es6/math-transcendental.js", "ES6-MATH-NUMERIC checks=4206 failures=0"),
                 ("../es6/radix-literals.js", "ES6-RADIX-LITERALS checks=130 failures=0"),
                 ("../es6/editions.js", "ES6-EDITIONS checks=36 failures=0"),

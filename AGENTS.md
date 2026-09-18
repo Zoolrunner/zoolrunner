@@ -439,6 +439,12 @@ Run `string-additions.js` for the new String methods. Preserve UTF-16 code units
 observable conversion order, rooting across callbacks/GC, reentrant raw assembly
 and checked allocation lengths. Do not equate literal RegExp rejection with the
 complete Symbol.match protocol.
+Keep the private Unicode normalization data checksum-pinned and reproducible;
+preserve Unicode licensing in source and packaged license pages. Run
+`normalization.js` and the full pinned `test-normalization.py` check when changing
+normalization. Preserve lone surrogates, composition exclusions, Hangul, stable
+canonical ordering, callback rooting and checked allocation sizes. The separate
+XPCOM normalizer and legacy identifier/casing tables remain unchanged.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve

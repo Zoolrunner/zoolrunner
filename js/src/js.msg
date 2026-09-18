@@ -311,3 +311,4 @@ MSG_DEF(JSMSG_BAD_CODE_POINT,        228, 0, JSEXN_RANGEERR, "invalid Unicode co
 MSG_DEF(JSMSG_BAD_REPEAT_COUNT,      229, 0, JSEXN_RANGEERR, "invalid string repetition count or length")
 MSG_DEF(JSMSG_REGEXP_SEARCH,         230, 0, JSEXN_TYPEERR, "literal string search does not accept a regular expression")
 MSG_DEF(JSMSG_BAD_STRING_LENGTH,     231, 0, JSEXN_RANGEERR, "invalid string length")
+MSG_DEF(JSMSG_BAD_NORMALIZATION_FORM,232, 0, JSEXN_RANGEERR, "invalid Unicode normalization form")

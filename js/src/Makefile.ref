@@ -239,6 +239,7 @@ JS_CFILES =		\
 	jslog2.c	\
 	jslong.c	\
 	jsmath.c	\
+	jsnormalization.c \
 	jsnum.c		\
 	jsobj.c		\
 	jsobjes5.c	\
@@ -272,7 +273,7 @@ endif
 vpath %.c fdlibm
 JS_CFILES += s_expm1.c s_log1p.c s_cbrt.c s_asinh.c s_tanh.c e_acosh.c e_atanh.c e_cosh.c e_sinh.c e_log10.c
 DEFINES += -DZR_ES2015_FDLIBM
-JS_HFILES += jsmathfd.h fdlibm/zoolrunner.h
+JS_HFILES += jsmathfd.h fdlibm/zoolrunner.h jsnormalization.h jsnormalization-data.h
 
 LIB_CFILES  = $(JS_CFILES)
 LIB_ASFILES := $(wildcard *_$(OS_ARCH).s)

@@ -588,3 +588,62 @@ including Suite Composer/ChatZilla, 169 Browser navigation/layout assertions,
 Calendar's eight unit suites/four views and standalone ChatZilla in XULRunner.
 Other operating systems and architectures have not been revalidated for this
 batch; complete ES2015 compliance remains unfinished.
+
+
+## Unicode normalization
+
+`String.prototype.normalize` implements NFC, NFD, NFKC and NFKD using private,
+checksum-pinned Unicode 18.0.0 tables. It preserves lone UTF-16 surrogates,
+canonical ordering/composition exclusions and algorithmic Hangul behavior.
+The existing XPCOM normalizer and historical casing/identifier tables are not
+changed. See [data provenance and regeneration](../../src/unicode/README.md).
+Unicode License V3 is retained in source and both application license pages.
+
+`normalization.js` passes **50 checks**, including receiver/form coercion,
+exceptions, GC/reentrancy, canonical ordering, composition and supplementary
+compatibility mappings. The Test262 normalization subset passes **22/26
+execution cases**; the four remaining failures require Symbol support.
+
+```sh
+python3 js/tests/es6/test-normalization.py \
+  --data /path/to/ucd-18.0.0/NormalizationTest.txt \
+  --shell obj-zoolrunner-macos-arm64-suite/dist/bin/xpcshell \
+  --report artifacts/es6/normalization-unicode.json
+```
+
+The full Unicode check passes **4,791,252 assertions** on macOS arm64: all
+20,171 rows and identity checks for the 1,096,958 code points outside Part 1.
+The runner transports strings as ASCII source escapes, preserving UTF-16 code
+units through the historical loader. It checks the upstream data checksum and
+requires the final completion marker, not just the shell exit status.
+
+The same 4,791,252 assertions pass in `TestNormalizationKernel.c` when compiling
+the actual normalization kernel with ASan and UBSan against the native engine.
+This instruments the new kernel and diagnostic, not the complete engine:
+
+```sh
+xcrun clang -arch arm64 -isysroot "$ZR_MACOS_SDK" -std=gnu89 -O1 -g \
+  -DXP_UNIX -DJS_THREADSAFE -DMOZILLA_1_8_BRANCH \
+  -Ijs/src -Iobj-zoolrunner-macos-arm64-suite/js/src \
+  -Iobj-zoolrunner-macos-arm64-suite/dist/include/nspr \
+  -fsanitize=address,undefined -fno-sanitize-recover=all \
+  js/tests/es6/TestNormalizationKernel.c js/src/jsnormalization.c \
+  -Lobj-zoolrunner-macos-arm64-suite/dist/bin -lmozjs -o /tmp/zool-normalization
+DYLD_LIBRARY_PATH="$PWD/obj-zoolrunner-macos-arm64-suite/dist/bin" \
+  /tmp/zool-normalization /path/to/ucd-18.0.0/NormalizationTest.txt
+```
+
+Use SDK 11.3 and a matching native arm64 object directory for that host command.
+The full ES2015 run records **23,250 passes, 5,316 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**, with unchanged
+runtime hashes. It adds 18 passes without losing any previously passing case.
+The required-mode ES5 run passes all **11,540 cases**. Reports are
+`artifacts/es6/normalization-full.json` and
+`artifacts/es6/normalization-es5.json`.
+
+All four macOS arm64 applications rebuilt and passed package/relocated desktop
+checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
+assertions, Calendar's eight unit suites/four views and standalone ChatZilla
+in XULRunner. Each packaged chrome archive includes the Unicode license notice.
+Other operating systems and architectures have not been revalidated for this
+batch; complete ES2015 compliance remains unfinished.

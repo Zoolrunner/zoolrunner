@@ -66,6 +66,7 @@
 #include "jsinterp.h"
 #include "jslock.h"
 #include "jsnum.h"
+#include "jsnormalization.h"
 #include "jsobj.h"
 #include "jsopcode.h"
 #include "jsregexp.h"
@@ -2423,7 +2424,42 @@ str_includes(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return str_literalSearch(cx, obj, argc, argv, rval, 2);
 }
 
+static JSBool
+str_normalize(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str, *name;
+    const jschar *chars;
+    size_t length;
+    uintN form = 1;
+
+    str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
+    if (!str)
+        return JS_FALSE;
+    argv[-1] = STRING_TO_JSVAL(str);
+    if (argc && !JSVAL_IS_VOID(argv[0])) {
+        name = js_ValueToString(cx, argv[0]);
+        if (!name)
+            return JS_FALSE;
+        argv[0] = STRING_TO_JSVAL(name);
+        length = JSSTRING_LENGTH(name);
+        chars = JSSTRING_CHARS(name);
+        if ((length != 3 && length != 4) || chars[0] != 'N' || chars[1] != 'F' ||
+            (length == 4 && chars[2] != 'K') ||
+            (chars[length - 1] != 'C' && chars[length - 1] != 'D')) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_NORMALIZATION_FORM);
+            return JS_FALSE;
+        }
+        form = (length == 4 ? 2 : 0) | (chars[length - 1] == 'C' ? 1 : 0);
+    }
+    str = js_NormalizeString(cx, str, form);
+    if (!str)
+        return JS_FALSE;
+    *rval = STRING_TO_JSVAL(str);
+    return JS_TRUE;
+}
+
 static JSFunctionSpec string_methods[] = {
+    {"normalize", str_normalize, 0, JSFUN_THISP_PRIMITIVE, 0},
     {"codePointAt", str_codePointAt, 1, JSFUN_THISP_PRIMITIVE, 0},
     {"repeat", str_repeat, 1, JSFUN_THISP_PRIMITIVE, 0},
     {"startsWith", str_startsWith, 1, JSFUN_THISP_PRIMITIVE, 0},

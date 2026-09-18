@@ -30,7 +30,9 @@ function modernWindowEdition() {
            String.fromCodePoint(0x1f600).codePointAt(0) === 0x1f600 &&
            "ab".repeat(2) === "abab" && "abc".startsWith("b", 1) &&
            "abc".endsWith("b", 2) && "abc".includes("bc") &&
-           String.raw({raw:["a", "b"]}, "!") === "a!b" && modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
+           String.raw({raw:["a", "b"]}, "!") === "a!b" &&
+           "e\u0301".normalize() === "\u00e9" && "\uac01".normalize("NFD").length === 3 &&
+           modernWindowEdition.bind(null).name === "bound modernWindowEdition" &&
            eval("({value:1,value:2}).value") === 2 &&
            typeof /a/ === "object";
 }
