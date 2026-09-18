@@ -1268,3 +1268,10 @@ error reports and stack GC, legacy constructor/prototype behavior, and error
 construction during conversion callbacks. Modern deleted message properties must
 not be recreated by lazy resolution. Test engine-generated errors and foreign/
 cloned constructors as well as explicit JavaScript construction.
+
+For ArrayBuffer/DataView changes, run `binary-data.js` and `TestBinaryData.c`.
+Exercise buffer detachment during coercion, species/newTarget getters and native
+copy-loop callbacks. Views retain the buffer object, never a raw storage pointer.
+Preserve corrected ES2015 optional DataView offsets and setter conversion order;
+keep the pinned edition's stricter ArrayBuffer length and view access indices.
+Use explicit float32 rounding, endian-neutral byte access and checked bounds.

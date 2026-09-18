@@ -539,16 +539,14 @@ math_log2(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return js_NewNumberValue(cx, result, rval);
 }
 
-static JSBool
-math_fround(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+jsdouble
+js_RoundToFloat32(JSContext *cx, jsdouble x)
 {
-    jsdouble x, magnitude, fraction, scaled, integral, result;
+    jsdouble magnitude, fraction, scaled, integral, result;
     int exponent, shift;
 
-    if (!js_ValueToNumber(cx, argv[0], &x))
-        return JS_FALSE;
     if (!JSDOUBLE_IS_FINITE(x) || x == 0)
-        return js_NewNumberValue(cx, x, rval);
+        return x;
     magnitude = fd_fabs(x);
     fraction = frexp(magnitude, &exponent);
     if (exponent > 128) {
@@ -571,7 +569,16 @@ math_fround(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (result >= 340282366920938463463374607431768211456.0) /* 2^128 */
             result = *cx->runtime->jsPositiveInfinity;
     }
-    return js_NewNumberValue(cx, fd_copysign(result, x), rval);
+    return fd_copysign(result, x);
+}
+
+static JSBool
+math_fround(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x;
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    return js_NewNumberValue(cx, js_RoundToFloat32(cx, x), rval);
 }
 
 static JSBool

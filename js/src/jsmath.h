@@ -52,6 +52,9 @@ extern JSClass js_MathClass;
 extern JSObject *
 js_InitMathClass(JSContext *cx, JSObject *obj);
 
+extern jsdouble
+js_RoundToFloat32(JSContext *cx, jsdouble value);
+
 JS_END_EXTERN_C
 
 #endif /* jsmath_h___ */

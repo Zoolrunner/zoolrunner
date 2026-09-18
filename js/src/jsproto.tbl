@@ -121,3 +121,5 @@ JS_PROTO(Reflect,               36,     js_InitReflectClass)
 #undef GENERATOR_INIT
 #undef FILE_INIT
 JS_PROTO(Proxy,                 37,     js_InitProxyClass)
+JS_PROTO(ArrayBuffer,           38,     js_InitArrayBufferClass)
+JS_PROTO(DataView,              39,     js_InitDataViewClass)

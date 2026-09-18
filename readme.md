@@ -517,11 +517,19 @@ incomplete. See [string/sort validation notes](js/tests/es6/README.md#array-stri
 
 The Error follow-up implements modern constructor/prototype relationships,
 message deletion and conversion order while preserving native reports and legacy
-behavior. All 148 diagnostic cases pass. The latest full macOS arm64 ES2015 run
+behavior. All 148 diagnostic cases pass. The Error full macOS arm64 ES2015 run
 passes **26,482 cases**, with **2,084 failures**, 14 unsupported module cases and
 two harness errors: 20 gained, zero lost. All 11,540 ES5.1 cases and all four
 build, package and desktop checks pass. Full ES6 and other-platform validation
 remain incomplete. See [Error validation notes](js/tests/es6/README.md#error-construction-and-prototypes).
+
+The binary-data follow-up adds ArrayBuffer and DataView, including species,
+endian-aware numeric access and detachment-safe callbacks. All 146 diagnostic
+cases pass. The latest full macOS arm64 ES2015 run passes **26,630 cases**, with
+**1,936 failures**, 14 unsupported module cases and two harness errors: 148
+gained, zero lost. All 11,540 ES5.1 cases and all four build, package and desktop
+checks pass. Typed arrays, full ES6 and other-platform validation remain
+incomplete. See [binary-data validation notes](js/tests/es6/README.md#arraybuffer-and-dataview).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

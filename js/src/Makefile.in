@@ -89,6 +89,7 @@ CSRCS		= \
 		jsweakcollection.c \
 		jsreflect.c \
 		jsproxy.c \
+		jsbinarydata.c \
 		jsjson.c \
 		jslock.c \
 		jslog2.c \

@@ -1716,3 +1716,47 @@ Calendar passes eight unit suites and four views; Browser passes 169 navigation/
 layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/error-modern-runtime`. Other platforms and full ES6 remain incomplete.
+
+### ArrayBuffer and DataView
+
+Native ArrayBuffer storage is zero initialized and limited to 2^31-1 bytes per
+buffer on all targets; allocation failure raises RangeError. DataView implements
+all eight integer/floating-point accessor pairs with unaligned, endian-neutral
+byte operations. Float32 writes share Math.fround's explicit ties-to-even rounding
+rather than relying on overflowing host casts. Views retain their buffer object;
+coercion, species/newTarget callbacks and chunked-copy interrupts recheck detached
+storage. An internal native detachment hook supports embedding lifetime tests.
+
+Constructors follow the pinned ES2015 edition, including its stricter ArrayBuffer
+length/index conversion rules. Optional DataView offsets follow the
+[TC39 #4516 correction](https://tc39.es/archives/bugzilla/4516/); setters convert
+values before final bounds checks, following the
+[TC39 #4536 correction](https://tc39.es/archives/bugzilla/4536/) in the pinned suite.
+NewTarget prototype lookup occurs after argument conversion. ArrayBuffer slicing
+honors species, copies independent storage, and rejects detached/undersized/same
+result buffers. Deleted global bindings stay deleted without losing intrinsics.
+
+Initial diagnostic subsets pass all 146 cases (ArrayBuffer 90, DataView 56).
+Focused checks pass 68 script and 41 native assertions under MallocScribble,
+including float boundaries, GC, foreign realms, JSAPI cloning, detachment of both
+copy buffers, interruption/recovery and constructor observation order. C89 checks
+pass. The initial compiler pass exposed a missing Boolean helper declaration;
+its header was added before full validation.
+
+The full pinned ES2015 run passes **26,630 cases**, with **1,936 failures**,
+14 unsupported module cases and two harness errors: **148 gained, zero lost**
+relative to Error changes. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/binary-data-full.json` and
+`binary-data-es5.json`; snapshot: `/tmp/zr-binary-data-conformance-20260918`.
+Its libmozjs SHA-256 is
+`11e151f7465868bfd03d94464205a31a8ae6a580d8e499d06ceb0fb1d2284c52`.
+The snapshot was copied from the completed Suite build before casing changes.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/binary-data-runtime`. Typed arrays remain unimplemented;
+ArrayBuffer.isView currently recognizes DataView only. Other platforms and full
+ES6 remain incomplete.
