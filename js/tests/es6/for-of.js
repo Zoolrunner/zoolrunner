@@ -1,0 +1,83 @@
+/* Modern iteration and abrupt-completion cleanup. MPL 1.1/GPL 2.0/LGPL 2.1. */
+(function () {
+    var checks=0, failures=0;
+    function test(label,source) {
+        ++checks;
+        try {if(eval(source)===true)return;}catch(e){print('DETAIL '+label+': '+e);}
+        ++failures;print('FAIL for-of: '+label);
+    }
+    function iterable(next, close) {
+        var iterator={next:next}, value={};
+        if(close!==undefined)iterator.return=close;
+        value[Symbol.iterator]=function(){return iterator};
+        return value;
+    }
+    test('array values','(function(){var a=[];for(var x of [3,4])a.push(x);return a.join()==="3,4"})()');
+    test('Unicode string values','(function(){var a=[];for(var x of "a\\ud83d\\ude00")a.push(x);return a.length===2&&a[1].length===2})()');
+    test('Map iteration','(function(){var a=[];for(var x of new Map([[1,2],[3,4]]))a.push(x.join());return a.join(";")==="1,2;3,4"})()');
+    test('Set iteration','(function(){var a=[];for(var x of new Set([3,4]))a.push(x);return a.join()==="3,4"})()');
+    test('fresh let bindings','(function(){var a=[];for(let x of [3,4])a.push(()=>x);return a[0]()===3&&a[1]()===4})()');
+    test('fresh const bindings','(function(){var a=[];for(const x of [3,4])a.push(()=>x);return a[0]()===3&&a[1]()===4})()');
+    test('lexical RHS TDZ','(function(){var x=[3,4];try{for(let x of x){}return false}catch(e){return e instanceof ReferenceError}})()');
+    test('RHS closure retains TDZ','(function(){var f;for(let x of (f=()=>x,[3])){}try{f();return false}catch(e){return e instanceof ReferenceError}})()');
+    test('normal exhaustion does not close','(function(){var closed=0;for(var x of iterable(function(){return {done:true}},function(){closed++;return {}})){}return closed===0})()');
+    test('break closes once','(function(){var closed=0;for(var x of iterable(function(){return {value:3}},function(){closed++;return {}}))break;return closed===1})()');
+    test('return closes','(function(){var closed=0;var value=(function(){for(var x of iterable(function(){return {value:3}},function(){closed++;return {}}))return x})();return value===3&&closed===1})()');
+    test('throw closes','(function(){var closed=0,error={};try{for(var x of iterable(function(){return {value:3}},function(){closed++;return {}}))throw error}catch(e){return e===error&&closed===1}return false})()');
+    test('continue does not close','(function(){var count=0,closed=0;for(var x of iterable(function(){return {value:count++,done:count>3}},function(){closed++;return {}}))continue;return closed===0&&count===4})()');
+    test('next errors do not close','(function(){var closed=0,error={};try{for(var x of iterable(function(){throw error},function(){closed++;return {}})){} }catch(e){return e===error&&closed===0}return false})()');
+    test('done errors do not close','(function(){var closed=0,error={};try{for(var x of iterable(function(){return {get done(){throw error}}},function(){closed++;return {}})){} }catch(e){return e===error&&closed===0}return false})()');
+    test('value errors do not close','(function(){var closed=0,error={};try{for(var x of iterable(function(){return {get value(){throw error}}},function(){closed++;return {}})){} }catch(e){return e===error&&closed===0}return false})()');
+    test('primitive next result fails safely','(function(){try{for(var x of iterable(function(){return 7})){}return false}catch(e){return e instanceof TypeError}})()');
+    test('primitive close result rejects break','(function(){try{for(var x of iterable(function(){return {value:3}},function(){return 7}))break;return false}catch(e){return e instanceof TypeError}})()');
+    test('throw outranks return-call failure','(function(){var original={},secondary={};try{for(var x of iterable(function(){return {value:3}},function(){throw secondary}))throw original}catch(e){return e===original}return false})()');
+    test('return-call failure replaces normal return','(function(){var error={};try{(function(){for(var x of iterable(function(){return {value:3}},function(){throw error}))return 7})();return false}catch(e){return e===error}})()');
+    test('LHS failure closes','(function(){var error={},closed=0,obj={};Object.defineProperty(obj,"x",{set:function(){throw error}});try{for(obj.x of iterable(function(){return {value:3}},function(){closed++;return {}})){} }catch(e){return e===error&&closed===1}return false})()');
+    test('LHS evaluated after value','(function(){var order=[],obj={},count=0;function base(){order.push("lhs");return obj}for(base().x of iterable(function(){order.push("next");return count++?{done:true}:{get value(){order.push("value");return 3}}})){}return order.join()==="next,value,lhs,next"})()');
+    test('user finally precedes close','(function(){var order=[];for(var x of iterable(function(){return {value:3}},function(){order.push("close");return {}})){try{break}finally{order.push("finally")}}return order.join()==="finally,close"})()');
+    test('inner catch avoids close','(function(){var closed=0,count=0;for(var x of iterable(function(){return {value:count++,done:count>2}},function(){closed++;return {}})){try{throw 7}catch(e){}}return closed===0})()');
+    test('source roundtrip','(function(){var f=function(){var out=[];for(let x of [3,4])out.push(()=>x);return out[0]()+out[1]()};return eval("("+f.toString()+")")()===7})()');
+    test('return getter failure replaces throw','(function(){var original={},secondary={},it={next:function(){return {value:3}},get return(){throw secondary}},obj={};obj[Symbol.iterator]=function(){return it};try{for(var x of obj)throw original}catch(e){return e===secondary}return false})()');
+    test('return noncallable replaces throw','(function(){var original={};try{for(var x of iterable(function(){return {value:3}},7))throw original}catch(e){return e instanceof TypeError}return false})()');
+    test('primitive return ignored for original throw','(function(){var original={};try{for(var x of iterable(function(){return {value:3}},function(){return 7}))throw original}catch(e){return e===original}return false})()');
+    test('labelled continue closes only inner iterator','(function(){var outerCount=0,innerClosed=0,outerClosed=0;outer:for(var x of iterable(function(){return {value:outerCount++,done:outerCount>2}},function(){outerClosed++;return {}})){for(var y of iterable(function(){return {value:1}},function(){innerClosed++;return {}}))continue outer}return innerClosed===2&&outerClosed===0})()');
+    test('labelled break closes inner then outer','(function(){var order=[];outer:for(var x of iterable(function(){return {value:1}},function(){order.push("outer");return {}})){for(var y of iterable(function(){return {value:1}},function(){order.push("inner");return {}}))break outer}return order.join()==="inner,outer"})()');
+    test('finally continue cancels break close','(function(){var n=0,closed=0;for(var x of iterable(function(){return {done:++n>2}},function(){closed++;return {}})){try{break}finally{continue}}return n===3&&closed===0})()');
+    test('close failure does not close twice','(function(){var n=0,error={};try{for(var x of iterable(function(){return {value:1}},function(){n++;throw error}))break}catch(e){return e===error&&n===1}return false})()');
+    test('GC during next and close','(function(){var closed=0;for(var x of iterable(function(){gc();return {value:{a:7}}},function(){gc();closed++;return {}})){gc();if(x.a!==7)return false;break}return closed===1})()');
+    test('iterator method receiver','(function(){var obj={},called=0;obj[Symbol.iterator]=function(){if(this!==obj)throw Error("receiver");called++;return {next:function(){return {done:true}}}};for(var x of obj){}return called===1})()');
+    test('read next anew each iteration','(function(){var gets=0,it={get next(){gets++;return function(){return {value:gets,done:gets>2}}}},obj={};obj[Symbol.iterator]=function(){return it};var out=[];for(var x of obj)out.push(x);return out.join()==="1,2"&&gets===3})()');
+    test('unparenthesized RHS comma rejected','(function(){try{eval("for(var x of [],[]){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('initializer rejected','(function(){try{eval("for(var x=1 of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('assigned local','(function(){var x,n=0;for(x of [3,4])n+=x;return n===7&&x===4})()');
+    test('assigned argument','(function(x){for(x of [3,4]){}return x===4})(0)');
+    test('strict assigned local','(function(){"use strict";var x,n=0;for(x of [3,4])n+=x;return n===7})()');
+    test('var cells remain shared','(function(){var a=[];for(var x of [3,4])a.push(()=>x);return a[0]()===4&&a[1]()===4})()');
+    test('const assignment closes','(function(){const x=1;var closed=0;try{for(x of iterable(function(){return {value:3}},function(){closed++;return {}})){} }catch(e){return e instanceof TypeError&&closed===1}return false})()');
+    test('head shadows outer variable','(function(){var x=9,a=[];for(let x of [3,4])a.push(x);return x===9&&a.join()==="3,4"})()');
+    test('binding named of','(function(){var n=0;for(var of of [3,4])n+=of;return n===7})()');
+    test('multiple bindings rejected','(function(){try{eval("for(var x,y of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('call target rejected','(function(){try{eval("for(f() of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('escaped separator rejected','(function(){try{eval("for(var x o"+String.fromCharCode(92)+"u0066 []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('strict eval target rejected','(function(){try{Function(String.fromCharCode(34)+"use strict"+String.fromCharCode(34)+";for(eval of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('strict arguments target rejected','(function(){try{Function(String.fromCharCode(34)+"use strict"+String.fromCharCode(34)+";for(arguments of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('nested close failure bypasses exited inner loop','(function(){var order=[],error={};try{outer:for(var x of iterable(function(){return {value:1}},function(){gc();order.push("outer");throw error})){for(var y of iterable(function(){return {value:1}},function(){order.push("inner");return {}}))break outer}}catch(e){return e===error&&order.join()==="inner,outer"}return false})()');
+    test('outer finally runs after close','(function(){var order=[];try{for(var x of iterable(function(){return {value:1}},function(){order.push("close");return {}}))break}finally{order.push("finally")}return order.join()==="close,finally"})()');
+    test('fresh bindings with finally continue','(function(){var a=[],b=[];for(let x of [3,4]){try{a.push(()=>x);continue}finally{b.push(()=>x);gc()}}return a[0]()===3&&a[1]()===4&&b[0]()===3&&b[1]()===4})()');
+    test('property target source roundtrip','(function(){var f=function(){var o={},a=[];for(o.x of [3,4])a.push(o.x);return a.join()};return eval("("+f.toString()+")")()==="3,4"})()');
+    test('element target source roundtrip','(function(){var f=function(){var o={},a=[];for(o["x"] of [3,4])a.push(o.x);return a.join()};return eval("("+f.toString()+")")()==="3,4"})()');
+    test('const source roundtrip','(function(){var f=function(){var a=[];for(const x of [3,4])a.push(()=>x);return a[0]()+a[1]()};return eval("("+f.toString()+")")()===7})()');
+    test('legacy for-in destructuring preserved','(function(){var old=version();try{version(170);return evaluate("(function(){var out=[];for(var [k,v] in {a:1,b:2})out.push(k+v);return out.join()})()","legacy-for-in")==="a1,b2"}finally{version(old)}})()');
+    test('legacy for-each preserved','(function(){var old=version();try{version(170);return evaluate("(function(){var out=[];for each(var x in {a:1,b:2})out.push(x);return out.join()})()","legacy-for-each")==="1,2"}finally{version(old)}})()');
+    test('for-of remains edition selected','(function(){var old=version();try{version(170);try{evaluate("for(var x of []){}","legacy-for-of");return false}catch(e){return e instanceof SyntaxError}}finally{version(old)}})()');
+    test('modern for-in ignores iterator protocol','(function(){var source={a:1},calls=0;source[Symbol.iterator]=function(){calls++;throw Error("wrong protocol")};var out=[];for(var x in source)out.push(x);return calls===0&&out.join()==="a"})()');
+    test('bare let property target rejected','(function(){try{Function("for(let.x of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('parenthesized let property target accepted','typeof Function("for((let).x of []){}") === "function"');
+    test('bare function body rejected','(function(){try{Function("for(var x of []) function f(){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('labelled function body rejected','(function(){try{Function("for(var x of []) first: second: function f(){}");return false}catch(e){return e instanceof SyntaxError}})()');
+    test('let target source roundtrip','(function(){var f=function(){var let={};for((let).x of [3,4]){}return let.x===4};return eval("("+f.toString()+")")()})()');
+    test('comma RHS source roundtrip','(function(){var f=function(){var n=0;for(var x of (n++,[3,4]))n+=x;return n===8};return eval("("+f.toString()+")")()})()');
+    test('legacy XML wildcard preserved','(function(){var old=version();try{version(170);return evaluate("(function(){var x=<root><a>3</a><b>4</b></root>;return x.*.length()===2 && x.*[1].toString()===\\\"4\\\"})()","legacy-xml-wildcard")}finally{version(old)}})()');
+    if (failures) throw Error('for-of regressions: '+failures);
+    print('ES6-FOR-OF checks='+checks+' failures='+failures);
+})();

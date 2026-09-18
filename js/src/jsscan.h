@@ -147,6 +147,7 @@ typedef enum JSTokenType {
     TOK_TEMPLATE,                       /* template expression AST list */
     TOK_TEMPLATE_OBJECT,                /* tagged-template record */
     TOK_TEMPLATE_SEGMENT,               /* cooked/raw AST atom pair */
+    TOK_FOROFVALUE,                     /* internal for-of binding RHS */
     TOK_LIMIT                           /* domain size */
 } JSTokenType;
 

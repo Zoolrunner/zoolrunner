@@ -1416,8 +1416,8 @@ Keep the old environment live while allocating its replacement and the new one
 on the unwind chain if detachment fails. Exercise native GC/debugger callbacks
 that capture bindings during this transition. Preserve const in reconstructed
 source and omit internal transitions from printed loop updaters. Cache version
-47 adds const metadata and iteration instructions. Global lexical environments,
-for-of and broader iterator/destructuring semantics remain unfinished.
+47 adds const metadata and iteration instructions. Global lexical environments
+and broader iterator/destructuring semantics remain unfinished.
 
 
 For declaration-position grammar changes, run
@@ -1426,3 +1426,21 @@ remain distinct from single statement bodies; preserve valid function/block/
 switch declarations, inherited strictness and selected historical syntax.
 Check both eval and Function construction. Parser-only fixes do not establish
 that block-function binding and redeclaration semantics are complete.
+
+
+For modern for-of changes, run `js/tests/es6/for-of.js`,
+`for-of-boundaries.js`, `TestLexicalEmbedding.c` and modern chrome/content probes.
+Keep the ES2015 Symbol.iterator path separate from classic for-in/for-each.
+Preserve the legacy XML wildcard emitter case and exercise selected-edition E4X.
+Acquire the value before evaluating the target, trace iterator/value state across
+callbacks, and distinguish stepping failures from abrupt binding/body completion.
+Preserve original ES2015 IteratorClose exception precedence and nested finally/
+label cleanup order. Exclude outer cleanup and its final jump from an already
+exited loop's exception ranges; never restore a popped iterator slot after an
+outer close fails. Treat the legacy generator-return sentinel as return, not
+ordinary throw. Source reconstruction must retain AssignmentExpression RHS
+parentheses and protect normalized let targets. Exercise wide source notes,
+extended atoms, XDR and debugger/GC reentry, and reject overflowing handler
+depths. Cache version 48 adds private iterator state instructions. Missing ES6
+generators, typed arrays and broader destructuring remain separate conformance
+gaps, not reasons to exclude failing upstream cases.

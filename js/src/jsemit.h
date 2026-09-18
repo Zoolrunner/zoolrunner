@@ -77,6 +77,7 @@ typedef enum JSStmtType {
     STMT_DO_LOOP,               /* do/while loop statement */
     STMT_FOR_LOOP,              /* for loop statement */
     STMT_FOR_IN_LOOP,           /* for/in loop statement */
+    STMT_FOR_OF_LOOP,           /* modern iterator loop */
     STMT_WHILE_LOOP             /* while loop statement */
 } JSStmtType;
 
@@ -121,6 +122,11 @@ typedef enum JSStmtType {
 
 typedef struct JSStmtInfo JSStmtInfo;
 
+typedef struct JSForOfHole {
+    ptrdiff_t start, end;
+    struct JSForOfHole *next;
+} JSForOfHole;
+
 struct JSStmtInfo {
     uint16          type;           /* statement type */
     uint16          flags;          /* flags, see below */
@@ -132,6 +138,7 @@ struct JSStmtInfo {
     JSStmtInfo      *downScope;     /* next enclosing lexical scope */
     JSAtomList      lexicalDecls;  /* ES2015 declarations in this scope */
     JSAtomList      varDecls;      /* var names crossing this scope */
+    JSForOfHole     *forOfHoles, *forOfLastHole; /* exited-loop cleanup ranges */
 };
 
 #define SIF_SCOPE        0x0001     /* statement has its own lexical scope */

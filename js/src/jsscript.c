@@ -1715,7 +1715,8 @@ js_FindFinallyHandler(JSScript *script, jsbytecode *pc)
             JS_ASSERT(*pc == JSOP_SETSP);
             op2 = pc[JSOP_SETSP_LENGTH];
             if (op2 != JSOP_ENTERBLOCK) {
-                JS_ASSERT(op2 == JSOP_GOSUB || op2 == JSOP_EXCEPTION);
+                JS_ASSERT(op2 == JSOP_GOSUB || op2 == JSOP_EXCEPTION ||
+                          op2 == JSOP_THROWOF);
                 return pc;
             }
         }

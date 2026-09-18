@@ -668,3 +668,19 @@ valid block declarations and selected legacy syntax remain available. All four
 macOS arm64 applications pass build, package and desktop checks, including
 Calendar views, Browser navigation/layout and ChatZilla. Other platforms remain
 unvalidated for this change. See the [validation record](js/tests/es6/README.md#strict-function-declaration-positions).
+
+
+Modern `for…of` now supports the Symbol.iterator protocol, named per-iteration
+`let`/`const` bindings, assignment targets and iterator cleanup through abrupt
+completion. Historical for-in/for-each and selected-edition XML wildcard syntax
+remain available. The implementation preserves source reconstruction and cached
+bytecode round-trips. See [the for-of validation record](js/tests/es6/README.md#for-of-iteration)
+for conformance totals, compatibility checks and remaining dependencies.
+
+The complete corrected macOS arm64 run passes **27,485 ES2015 cases**, with
+**1,081 failures**, 14 unsupported modules and two harness errors:
+**102 gained, zero lost**, with no crashes or timeouts. All **11,540 ES5.1 cases**
+pass. All four applications pass build, package and desktop checks, including
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+This is progress toward full ES2015 compliance, not completion. Other platforms
+have not been revalidated for this batch.

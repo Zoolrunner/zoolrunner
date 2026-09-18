@@ -2388,3 +2388,71 @@ GC. Other platforms have not been revalidated for this parser change.
 Grammar reference: https://262.ecma-international.org/6.0/#sec-block
 and the strict restrictions in sections 13.13 and B.3.4. This does not complete
 block function binding/redeclaration semantics.
+
+
+### For-of iteration
+
+Modern `for…of` now uses the ES2015 Symbol.iterator protocol separately from
+historical for-in/for-each enumeration. It supports ordinary assignment targets,
+var declarations and named let/const iteration bindings. Iterator values are
+acquired before evaluating assignment targets; lexical RHS captures retain their
+uninitialized head environment, and body captures receive distinct bindings.
+Existing destructuring patterns work in loop heads, but complete ES2015
+pattern/default/rest/iterator semantics remain unfinished.
+
+A private traced state object retains the iterator and current value across
+callbacks and GC. Failures in next/done/value do not close the iterator. Abrupt
+binding/body completion closes it, with distinct throw and normal-return error
+precedence. Same-loop continue and normal exhaustion do not close. Nested
+labels and finally clauses retain cleanup order. Exception-handler ranges
+exclude later outer cleanup after an inner loop has already been closed and
+popped; an outer close failure must not resurrect an invalid inner stack slot.
+The legacy generator-return sentinel is treated as a return completion by the
+cleanup helper, without implementing ES2015 generator syntax.
+
+Grammar keeps `of` contextual and unescaped, rejects initializers/multiple
+bindings and invalid statement bodies, and preserves the head's `let` lookahead
+restriction. Printed source protects comma RHS expressions and normalized `let`
+assignment targets with parentheses. Source notes, large jumps, extended atom
+indices and XDR preserve the loop. Cache version **48** adds the iterator
+instructions; stack limits reject an unrepresentable handler depth before it
+can wrap. The statement-name table is aligned with its internal enum.
+
+Focused validation passes **66 iteration checks**, **seven boundary checks**
+and the expanded **19-check native lexical embedding probe**. The native probe
+collects during allocations, captures head bindings through debugger reentry,
+and executes XDR-decoded and decompiled scripts. Modern chrome/content probes
+exercise iteration and break cleanup. Explicit legacy checks retain for-in
+key/value destructuring and for-each behavior; for-of remains edition selected.
+C89 syntax checks pass. Final review corrected the XML wildcard emitter case
+placement; a selected-legacy E4X regression now covers it.
+
+The corrected complete ES2015 run passes **27,485 modes**, with **1,081 failures**,
+14 unsupported modules, two harness errors and no crashes or timeouts:
+**102 gained, zero lost** against the preceding strict-declaration baseline.
+It uses the frozen runtime at `/tmp/zr-for-of-reviewed-conformance-20260918`,
+with engine SHA-256
+`4fe74a0cf894edfc7383b43816adfaa1800642e4cab65df716409b381e1e8a1f`.
+All **11,540 ES5.1 cases** pass. Engine hashes remained unchanged through both
+full runs, and all four application engines match the frozen runtime. All four
+macOS arm64 applications pass root builds, packaging and desktop checks,
+including Calendar startup/four views, 169 Browser navigation/layout checks
+and Suite/XULRunner ChatZilla. Reports use `for-of-reviewed-*`.
+The preceding `for-of-validated-*` run had the same ES2015 totals and passed
+all ES5 cases and four application checks, but predates the XML case correction.
+
+The initial pinned for-of diagnostic passes **96/206 modes**; the remaining
+110 require missing generator syntax (74) or typed arrays (36). This subset
+is not a full-suite result. Earlier `for-of-final-*` and
+`for-of-corrected-final-*` matrix/conformance attempts were stopped for grammar
+and source-round-trip follow-ups; retain their partial logs as diagnostics.
+The first large-array source-printing probe exceeded its time limit; a follow-up
+completed, and the unchanged baseline also exhibited slow large-array printing.
+The registered atom-boundary probe uses separate assignments to exercise the
+same extended atom indices without that unrelated quadratic array formatting.
+
+Global lexical environments, modules, generators, typed arrays and broader
+parameter/destructuring semantics still require work. The implementation follows
+[the ES2015 iteration algorithms](https://262.ecma-international.org/6.0/#sec-for-in-and-for-of-statements)
+and [IteratorClose](https://262.ecma-international.org/6.0/#sec-iteratorclose).
+Other-platform and minimum-OS validation remains outstanding for this batch.

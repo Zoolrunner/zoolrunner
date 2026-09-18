@@ -3017,6 +3017,26 @@ LetBlock(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSBool statement)
 
 #endif /* JS_HAS_BLOCK_SCOPE */
 
+/* The of separator is contextual and may not contain escapes. */
+static JSBool
+PeekForOf(JSContext *cx, JSTokenStream *ts)
+{
+    JSTokenType tt;
+    JSString *str;
+    const jschar *chars;
+    JSBool match = JS_FALSE;
+    if (!JS_VERSION_IS_ES2015(cx))
+        return JS_FALSE;
+    tt = js_GetToken(cx, ts);
+    if (tt == TOK_NAME && !(CURRENT_TOKEN(ts).flags & TOKF_ESCAPE)) {
+        str = ATOM_TO_STRING(CURRENT_TOKEN(ts).t_atom);
+        chars = JSSTRING_CHARS(str);
+        match = JSSTRING_LENGTH(str) == 2 && chars[0] == 'o' && chars[1] == 'f';
+    }
+    js_UngetToken(ts);
+    return match;
+}
+
 /* ES2015 let is contextual; legacy editions retain their keyword grammar. */
 static JSBool
 IsLexicalLet(JSContext *cx, JSTokenStream *ts)
@@ -3325,6 +3345,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
       case TOK_FOR:
       {
+        JSBool forOf, startsWithLet;
 #if JS_HAS_BLOCK_SCOPE
         JSParseNode *pnlet;
         JSStmtInfo blockInfo;
@@ -3350,6 +3371,14 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         ts->flags |= TSF_OPERAND;
         tt = js_GetToken(cx, ts);
         ts->flags &= ~TSF_OPERAND;
+        startsWithLet = JS_FALSE;
+        if (JS_VERSION_IS_ES2015(cx) && tt == TOK_NAME &&
+            !(CURRENT_TOKEN(ts).flags & TOKF_ESCAPE)) {
+            JSString *name = ATOM_TO_STRING(CURRENT_TOKEN(ts).t_atom);
+            const jschar *chars = JSSTRING_CHARS(name);
+            startsWithLet = JSSTRING_LENGTH(name) == 3 && chars[0] == 'l' &&
+                            chars[1] == 'e' && chars[2] == 't';
+        }
         if (IsLexicalLet(cx, ts)) {
             tt = CURRENT_TOKEN(ts).type = TOK_LET;
             CURRENT_TOKEN(ts).t_op = JSOP_NOP;
@@ -3418,10 +3447,22 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
          * as we've excluded 'in' from being parsed in RelExpr by setting
          * the TCF_IN_FOR_INIT flag in our JSTreeContext.
          */
-        if (pn1 && js_MatchToken(cx, ts, TOK_IN)) {
-            stmtInfo.type = STMT_FOR_IN_LOOP;
+        forOf = pn1 && PeekForOf(cx, ts);
+        if (pn1 && (forOf || js_MatchToken(cx, ts, TOK_IN))) {
+            if (forOf) {
+                if (startsWithLet && tt != TOK_LET) {
+                    LexicalSyntaxError(cx, ts);
+                    return NULL;
+                }
+                js_GetToken(cx, ts);
+                if (pn->pn_op == JSOP_FOREACH)
+                    goto bad_for_each;
+                pn->pn_op = JSOP_FOROF;
+            }
+            stmtInfo.type = forOf ? STMT_FOR_OF_LOOP : STMT_FOR_IN_LOOP;
 
-            if (JS_VERSION_IS_ES2015(cx) && tt == TOK_LET &&
+            if (JS_VERSION_IS_ES2015(cx) &&
+                (tt == TOK_LET || (forOf && tt == TOK_VAR)) &&
                 ((pn1->pn_head->pn_type == TOK_NAME &&
                   pn1->pn_head->pn_expr) ||
                  pn1->pn_head->pn_type == TOK_ASSIGN)) {
@@ -3488,6 +3529,16 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif
             }
 
+            if (forOf && !TOKEN_TYPE_IS_DECL(tt) &&
+                (pn2->pn_type == TOK_LP || pn2->pn_type == TOK_UNARYOP)) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
+            if (forOf && pn2->pn_type == TOK_NAME &&
+                (tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, pn2->pn_atom)) {
+                StrictSyntaxError(cx, ts);
+                return NULL;
+            }
             switch (pn2->pn_type) {
               case TOK_NAME:
                 /* Beware 'for (arguments in ...)' with or without a 'var'. */
@@ -3507,7 +3558,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     return NULL;
 
                 /* Destructuring for-in requires [key, value] enumeration. */
-                if (pn->pn_op != JSOP_FOREACH)
+                if (!forOf && pn->pn_op != JSOP_FOREACH)
                     pn->pn_op = JSOP_FOREACHKEYVAL;
                 break;
 #endif
@@ -3516,7 +3567,8 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             }
 
             /* Parse the object expression as the right operand of 'in'. */
-            pn2 = NewBinary(cx, TOK_IN, JSOP_NOP, pn1, Expr(cx, ts, tc), tc);
+            pn2 = NewBinary(cx, TOK_IN, JSOP_NOP, pn1,
+                            forOf ? AssignExpr(cx, ts, tc) : Expr(cx, ts, tc), tc);
             if (!pn2)
                 return NULL;
             pn->pn_left = pn2;
@@ -3570,6 +3622,14 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         if (!pn2)
             return NULL;
         pn->pn_right = pn2;
+        if (forOf) {
+            pn3 = pn2;
+            while (pn3->pn_type == TOK_COLON) pn3 = pn3->pn_expr;
+            if (pn3->pn_type == TOK_FUNCTION) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
+        }
 
         /* Record the absolute line number for source note emission. */
         pn->pn_pos.end = pn2->pn_pos.end;
@@ -4310,7 +4370,7 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                 return NULL;
 
             if ((tc->flags & TCF_IN_FOR_INIT) &&
-                js_PeekToken(cx, ts) == TOK_IN) {
+                (js_PeekToken(cx, ts) == TOK_IN || PeekForOf(cx, ts))) {
                 if (!CheckDestructuring(cx, &data, pn2, NULL, tc))
                     return NULL;
                 PN_APPEND(pn, pn2);
@@ -4369,7 +4429,7 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                 tc->flags |= TCF_FUN_HEAVYWEIGHT;
         } else if (JS_VERSION_IS_ES2015(cx) && data.op == JSOP_DEFCONST &&
                    !((tc->flags & TCF_IN_FOR_INIT) &&
-                     js_PeekToken(cx, ts) == TOK_IN)) {
+                     (js_PeekToken(cx, ts) == TOK_IN || PeekForOf(cx, ts)))) {
             LexicalSyntaxError(cx, ts);
             return NULL;
         }

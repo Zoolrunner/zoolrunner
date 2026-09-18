@@ -13,6 +13,7 @@ static JSClass globalClass = {
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
 static unsigned checks, allocationCalls, reentries, constReentries, iterationReentries;
+static unsigned forOfReentries;
 static JSBool inAllocation, hookFailed;
 #define CHECK(v) do { ++checks; if (!(v)) { \
     fprintf(stderr,"FAIL lexical embedding check %u\n",checks); goto out; \
@@ -69,6 +70,16 @@ Allocation(JSContext *cx, JSObject *obj, JSBool creating, void *data)
             hookFailed = JS_TRUE;
         JS_GC(cx);
     }
+    if (clasp && !strcmp(clasp->name, "For Of State") && name &&
+        !strcmp(JS_GetStringBytes(name), "forOfProbe")) {
+        const char *capture = "headCaptures.push(()=>x);true";
+        ++forOfReentries;
+        if (!JS_EvaluateInStackFrame(cx, frame, capture, strlen(capture),
+                                    "for-of-reentry", 1, &result) ||
+            result != JSVAL_TRUE)
+            hookFailed = JS_TRUE;
+        JS_GC(cx);
+    }
     inAllocation = JS_FALSE;
 }
 
@@ -111,7 +122,13 @@ int main(void)
         "var loopValues=loopProbe();"
         "function values(r){return r.map(function(f){return f()}).join()}"
         "var keys=[];for(const key in {a:1,b:2})keys.push(()=>key);"
+        "var headCaptures=[],forOfValues=[];"
+        "function forOfProbe(){for(let x of [3,4])forOfValues.push(()=>x)}"
+        "forOfProbe();"
+        "function headPending(){try{headCaptures[0]();return false}"
+        "catch(e){return e instanceof ReferenceError}}"
         "caught() && caughtConst() && immutable() && live()===11 && "
+        "values(forOfValues)==='3,4' && "
         "values(loopValues)==='0,1,2' && values(keys)==='a,b'";
 
     rt = JS_NewRuntime(4 * 1024 * 1024);
@@ -137,6 +154,8 @@ int main(void)
     JS_SetObjectHook(rt, NULL, NULL);
     CHECK(allocationCalls > 0 && reentries > 0 && !hookFailed);
     CHECK(constReentries > 0 && iterationReentries == 3);
+    CHECK(forOfReentries == 1);
+    CHECK(Evaluate(cx, global, "headPending()", &result) && result == JSVAL_TRUE);
     CHECK(Evaluate(cx, global, "values(saved)==='0,1,2'", &result) && result == JSVAL_TRUE);
     JS_GC(cx);
     CHECK(Evaluate(cx, global, "caught() && live()===11", &result) && result == JSVAL_TRUE);

@@ -240,8 +240,9 @@ static const char *statementName[] = {
     "label statement",       /* LABEL */
     "if statement",          /* IF */
     "else statement",        /* ELSE */
-    "switch statement",      /* SWITCH */
+    "function body",         /* BODY */
     "block",                 /* BLOCK */
+    "switch statement",      /* SWITCH */
     js_with_statement_str,   /* WITH */
     "catch block",           /* CATCH */
     "try block",             /* TRY */
@@ -250,6 +251,7 @@ static const char *statementName[] = {
     "do loop",               /* DO_LOOP */
     "for loop",              /* FOR_LOOP */
     "for/in loop",           /* FOR_IN_LOOP */
+    "for/of loop",           /* FOR_OF_LOOP */
     "while loop",            /* WHILE_LOOP */
 };
 
@@ -1238,6 +1240,7 @@ js_PushStatement(JSTreeContext *tc, JSStmtInfo *stmt, JSStmtType type,
 {
     stmt->type = type;
     stmt->flags = 0;
+    stmt->forOfHoles = stmt->forOfLastHole = NULL;
     ATOM_LIST_INIT(&stmt->lexicalDecls);
     ATOM_LIST_INIT(&stmt->varDecls);
     SET_STATEMENT_TOP(stmt, top);
@@ -1324,7 +1327,7 @@ EmitNonLocalJumpFixup(JSContext *cx, JSCodeGenerator *cg, JSStmtInfo *toStmt,
         JS_ASSERT(*returnop == JSOP_RETURN);
         for (stmt = cg->treeContext.topStmt; stmt != toStmt;
              stmt = stmt->down) {
-            if (stmt->type == STMT_FINALLY ||
+            if (stmt->type == STMT_FINALLY || stmt->type == STMT_FOR_OF_LOOP ||
                 ((cg->treeContext.flags & TCF_FUN_HEAVYWEIGHT) &&
                  STMT_MAYBE_SCOPE(stmt))) {
                 if (js_Emit1(cx, cg, JSOP_SETRVAL) < 0)
@@ -1368,6 +1371,23 @@ EmitNonLocalJumpFixup(JSContext *cx, JSCodeGenerator *cg, JSStmtInfo *toStmt,
                 return JS_FALSE;
             break;
 
+          case STMT_FOR_OF_LOOP:
+          {
+            JSForOfHole *hole;
+            if (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                js_Emit1(cx, cg, JSOP_ENDOF) < 0)
+                return JS_FALSE;
+            JS_ARENA_ALLOCATE_TYPE(hole, JSForOfHole, cg->codePool);
+            if (!hole) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
+            hole->start = CG_OFFSET(cg);
+            hole->end = -1;
+            hole->next = NULL;
+            if (stmt->forOfLastHole) stmt->forOfLastHole->next = hole;
+            else stmt->forOfHoles = hole;
+            stmt->forOfLastHole = hole;
+            break;
+          }
+
           case STMT_FOR_IN_LOOP:
             /*
              * The iterator and the object being iterated need to be popped.
@@ -1403,6 +1423,14 @@ EmitNonLocalJumpFixup(JSContext *cx, JSCodeGenerator *cg, JSStmtInfo *toStmt,
         }
     }
 
+    /* Once a loop is closed and its state popped, later outer cleanup must
+     * not dispatch through that loop's handler or resurrect its stack slot. */
+    for (stmt = cg->treeContext.topStmt; stmt != toStmt; stmt = stmt->down) {
+        if (stmt->forOfLastHole && stmt->forOfLastHole->end == -1)
+            stmt->forOfLastHole->end = CG_OFFSET(cg) +
+                                         (returnop ? JSOP_RETRVAL_LENGTH
+                                                   : JSOP_GOTO_LENGTH);
+    }
     cg->stackDepth = depth;
     return JS_TRUE;
 }
@@ -3974,6 +4002,103 @@ GettableNoteForNextOp(JSCodeGenerator *cg)
 }
 #endif
 
+/* For-of uses ordinary reference/binding emission after acquiring the value.
+ * Its handler covers the active iteration, excluding cleanup after loop exit. */
+static JSBool
+EmitForOf(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
+{
+    JSStmtInfo stmt;
+    JSParseNode *head = pn->pn_left->pn_left;
+    JSParseNode value, binding, item;
+    JSForOfHole *hole;
+    ptrdiff_t base, top, branch, headEnd, bodyEnd, end, handler, skip, note, segment;
+    intN depth = cg->stackDepth;
+    JSBool declaration = TOKEN_TYPE_IS_DECL(head->pn_type);
+    js_PushStatement(&cg->treeContext, &stmt, STMT_FOR_OF_LOOP, CG_OFFSET(cg));
+    if (declaration && !js_EmitTree(cx, cg, head)) return JS_FALSE;
+    if (!js_EmitTree(cx, cg, pn->pn_left->pn_right)) return JS_FALSE;
+    base = CG_OFFSET(cg);
+    note = js_NewSrcNote(cx, cg, SRC_FOR);
+    if (note < 0 || js_Emit1(cx, cg, JSOP_FOROF) < 0) return JS_FALSE;
+    top = CG_OFFSET(cg);
+    SET_STATEMENT_TOP(&stmt, top);
+    if (js_Emit1(cx, cg, JSOP_NEXTOF) < 0) return JS_FALSE;
+    branch = EmitJump(cx, cg, JSOP_IFEQ, 0);
+    if (branch < 0) return JS_FALSE;
+    if (head->pn_type == TOK_LET && js_Emit1(cx, cg, JSOP_FRESHENBLOCK) < 0)
+        return JS_FALSE;
+    /* Both the iterator slot and the handler's slot-plus-one must fit. */
+    if ((uintN)depth >= JS_BIT(16) - 1) {
+        ReportStatementTooLarge(cx, cg);
+        return JS_FALSE;
+    }
+    memset(&value, 0, sizeof value);
+    value.pn_type = TOK_FOROFVALUE;
+    value.pn_arity = PN_NULLARY;
+    value.pn_pos = head->pn_pos;
+    value.pn_num = depth;
+    if (declaration) {
+        binding = *head;
+        item = *head->pn_head;
+        binding.pn_head = &item;
+        binding.pn_extra &= ~(PNX_FORINVAR | PNX_POPVAR);
+        if (item.pn_type == TOK_NAME) {
+            item.pn_expr = &value;
+            item.pn_op = JSOP_SETNAME;
+            item.pn_slot = -1;
+            item.pn_attrs = 0;
+        } else {
+            item.pn_type = TOK_ASSIGN;
+            item.pn_arity = PN_BINARY;
+            item.pn_op = JSOP_NOP;
+            item.pn_left = head->pn_head;
+            item.pn_right = &value;
+        }
+        item.pn_next = NULL;
+    } else {
+        memset(&binding, 0, sizeof binding);
+        binding.pn_type = TOK_ASSIGN;
+        binding.pn_arity = PN_BINARY;
+        binding.pn_op = JSOP_NOP;
+        binding.pn_pos = head->pn_pos;
+        binding.pn_left = head;
+        binding.pn_right = &value;
+        if (head->pn_type == TOK_NAME) head->pn_op = JSOP_SETNAME;
+        else if (head->pn_type == TOK_DOT) head->pn_op = JSOP_SETPROP;
+        else if (head->pn_type == TOK_LB) head->pn_op = JSOP_SETELEM;
+    }
+    if (!js_EmitTree(cx, cg, &binding)) return JS_FALSE;
+    headEnd = CG_OFFSET(cg);
+    if (js_Emit1(cx, cg, JSOP_POP) < 0 || !js_EmitTree(cx, cg, pn->pn_right))
+        return JS_FALSE;
+    bodyEnd = CG_OFFSET(cg);
+    if (EmitJump(cx, cg, JSOP_GOTO, top - CG_OFFSET(cg)) < 0) return JS_FALSE;
+    end = CG_OFFSET(cg);
+    CHECK_AND_SET_JUMP_OFFSET_AT(cx, cg, branch);
+    if (!js_PopStatementCG(cx, cg) || js_Emit1(cx, cg, JSOP_ENDOF) < 0)
+        return JS_FALSE;
+    skip = EmitJump(cx, cg, JSOP_GOTO, 0);
+    if (skip < 0) return JS_FALSE;
+    handler = CG_OFFSET(cg);
+    EMIT_UINT16_IMM_OP(JSOP_SETSP, depth + 1);
+    cg->stackDepth = depth + 1;
+    if (js_Emit1(cx, cg, JSOP_THROWOF) < 0) return JS_FALSE;
+    CHECK_AND_SET_JUMP_OFFSET_AT(cx, cg, skip);
+    segment = top;
+    for (hole = stmt.forOfHoles; hole; hole = hole->next) {
+        ++cg->treeContext.tryCount;
+        if (!js_AllocTryNotes(cx, cg) ||
+            !js_NewTryNote(cx, cg, segment, hole->start, handler)) return JS_FALSE;
+        segment = hole->end;
+    }
+    ++cg->treeContext.tryCount;
+    if (!js_AllocTryNotes(cx, cg) ||
+        !js_NewTryNote(cx, cg, segment, end, handler)) return JS_FALSE;
+    return js_SetSrcNoteOffset(cx, cg, (uintN)note, 0, headEnd - base - 1) &&
+           js_SetSrcNoteOffset(cx, cg, (uintN)note, 1, bodyEnd - base - 1) &&
+           js_SetSrcNoteOffset(cx, cg, (uintN)note, 2, CG_OFFSET(cg) - base - 1);
+}
+
 JSBool
 js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 {
@@ -4321,6 +4446,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         break;
 
       case TOK_FOR:
+        if (pn->pn_op == JSOP_FOROF) {
+            ok = EmitForOf(cx, cg, pn);
+            break;
+        }
         freshIteration = JS_VERSION_IS_ES2015(cx) &&
                          pn->pn_left->pn_type != TOK_IN &&
                          pn->pn_left->pn_kid1 &&
@@ -6433,6 +6562,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 
       case TOK_NUMBER:
         ok = EmitNumberOp(cx, pn->pn_dval, cg);
+        break;
+
+      case TOK_FOROFVALUE:
+        EMIT_UINT16_IMM_OP(JSOP_VALUEOF, pn->pn_num);
         break;
 
 #if JS_HAS_XML_SUPPORT

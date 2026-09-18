@@ -139,6 +139,14 @@ function modernWindowEdition() {
                          catch (e) { return e instanceof TypeError; } })() &&
            (function() { var items = []; for (let i=0;i<2;i++) items.push(() => i);
                          return items[0]() === 0 && items[1]() === 1; })() &&
+           (function() { var items=[]; for(const x of [3,4]) items.push(()=>x);
+                         return items[0]()===3 && items[1]()===4; })() &&
+           (function() { var closed=0, source={};
+                         source[Symbol.iterator]=function(){return {
+                             next:function(){return {value:7}},
+                             return:function(){closed++;return {}}};};
+                         for(var value of source) break;
+                         return value===7 && closed===1; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

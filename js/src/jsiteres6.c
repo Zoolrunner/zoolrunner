@@ -9,6 +9,7 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsiteres6.h"
+#include "jsinterp.h"
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsrealm.h"
@@ -444,4 +445,140 @@ js_IteratorCloseThrow(JSContext *cx, JSObject *iterator)
     JS_SetPendingException(cx, roots[0]);
   out:
     JS_POP_TEMP_ROOT(cx, &root);
+}
+
+/* Private for-of state: underlying iterator, retained value, close eligibility.
+ * Reserved slots trace values across callbacks without exposing mutable state. */
+static JSClass forOfClass = {
+    "For Of State", JSCLASS_HAS_RESERVED_SLOTS(3),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+JSObject *
+js_ForOfStart(JSContext *cx, jsval input)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    JSObject *source, *state = NULL;
+    jsid id;
+    uintN i;
+    for (i = 0; i < 4; ++i) roots[i] = JSVAL_VOID;
+    roots[0] = input;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    source = js_ValueToNonNullObject(cx, input);
+    if (!source) goto out;
+    roots[1] = OBJECT_TO_JSVAL(source);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_ITERATOR, &id) ||
+        !js_GetPropertyValue(cx, source, input, id, &roots[2])) goto out;
+    if (!js_IsCallable(cx, roots[2])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "Symbol.iterator");
+        goto out;
+    }
+    if (!js_InternalInvokeValue(cx, input, roots[2], 0, 0, NULL, &roots[3])) goto out;
+    if (JSVAL_IS_PRIMITIVE(roots[3])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_BAD_ITERATOR_RETURN, "iterator", "Symbol.iterator");
+        goto out;
+    }
+    state = js_NewObject(cx, &forOfClass, NULL, NULL);
+    if (!state) goto out;
+    JS_SetReservedSlot(cx, state, 0, roots[3]);
+    JS_SetReservedSlot(cx, state, 1, JSVAL_VOID);
+    JS_SetReservedSlot(cx, state, 2, JSVAL_FALSE);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return state;
+}
+
+JSBool
+js_ForOfNext(JSContext *cx, JSObject *state, JSBool *more)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    JSObject *iterator, *result;
+    JSBool done, ok = JS_FALSE;
+    uintN i;
+    JS_ASSERT(OBJ_GET_CLASS(cx, state) == &forOfClass);
+    for (i = 0; i < 4; ++i) roots[i] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    JS_GetReservedSlot(cx, state, 0, &roots[0]);
+    iterator = JSVAL_TO_OBJECT(roots[0]);
+    JS_SetReservedSlot(cx, state, 2, JSVAL_FALSE);
+    JS_SetReservedSlot(cx, state, 1, JSVAL_VOID);
+    if (!JS_GetProperty(cx, iterator, "next", &roots[1])) goto out;
+    if (!js_IsCallable(cx, roots[1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "iterator next");
+        goto out;
+    }
+    if (!js_InternalCall(cx, iterator, roots[1], 0, NULL, &roots[2])) goto out;
+    if (JSVAL_IS_PRIMITIVE(roots[2])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_BAD_ITERATOR_RETURN, "iterator", "next");
+        goto out;
+    }
+    result = JSVAL_TO_OBJECT(roots[2]);
+    if (!JS_GetProperty(cx, result, "done", &roots[3]) ||
+        !JS_ValueToBoolean(cx, roots[3], &done)) goto out;
+    *more = !done;
+    if (!done) {
+        if (!JS_GetProperty(cx, result, "value", &roots[3])) goto out;
+        JS_SetReservedSlot(cx, state, 1, roots[3]);
+        JS_SetReservedSlot(cx, state, 2, JSVAL_TRUE);
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_ForOfClose(JSContext *cx, JSObject *state, JSBool throwing)
+{
+    jsval roots[3], active;
+    JSTempValueRooter root;
+    JSObject *iterator;
+    JSBool ok = JS_TRUE, generatorReturn;
+    JS_ASSERT(OBJ_GET_CLASS(cx, state) == &forOfClass);
+    JS_GetReservedSlot(cx, state, 2, &active);
+    if (active != JSVAL_TRUE) return JS_TRUE;
+    roots[0] = roots[1] = roots[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
+    JS_GetReservedSlot(cx, state, 0, &roots[0]);
+    iterator = JSVAL_TO_OBJECT(roots[0]);
+    /* Closing may reenter. Never invoke return a second time. */
+    JS_SetReservedSlot(cx, state, 2, JSVAL_FALSE);
+    JS_SetReservedSlot(cx, state, 1, JSVAL_VOID);
+    generatorReturn = throwing && cx->exception == JSVAL_ARETURN;
+    if (throwing && !generatorReturn) {
+        js_IteratorCloseThrow(cx, iterator);
+        goto out;
+    }
+    if (generatorReturn) JS_ClearPendingException(cx);
+    ok = JS_GetProperty(cx, iterator, "return", &roots[1]);
+    if (!ok) goto out;
+    if (!JSVAL_IS_VOID(roots[1]) && !JSVAL_IS_NULL(roots[1])) {
+        if (!js_IsCallable(cx, roots[1])) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_NOT_FUNCTION, "iterator return");
+            ok = JS_FALSE;
+            goto out;
+        }
+        ok = js_InternalCall(cx, iterator, roots[1], 0, NULL, &roots[2]);
+        if (!ok) goto out;
+        if (JSVAL_IS_PRIMITIVE(roots[2])) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_BAD_ITERATOR_RETURN, "iterator", "return");
+            ok = JS_FALSE;
+            goto out;
+        }
+    }
+    if (generatorReturn) JS_SetPendingException(cx, JSVAL_ARETURN);
+  out:
+    JS_SetReservedSlot(cx, state, 0, JSVAL_VOID);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
 }

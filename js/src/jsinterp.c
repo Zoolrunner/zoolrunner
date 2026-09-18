@@ -6776,6 +6776,38 @@ interrupt:
 
 #undef FAST_LOCAL_INCREMENT_OP
 
+          BEGIN_CASE(JSOP_FOROF)
+            SAVE_SP_AND_PC(fp);
+            obj = js_ForOfStart(cx, sp[-1]);
+            if (!obj) { ok = JS_FALSE; goto out; }
+            sp[-1] = OBJECT_TO_JSVAL(obj);
+          END_CASE(JSOP_FOROF)
+
+          BEGIN_CASE(JSOP_NEXTOF)
+            SAVE_SP_AND_PC(fp);
+            ok = js_ForOfNext(cx, JSVAL_TO_OBJECT(sp[-1]), &cond);
+            if (!ok) goto out;
+            PUSH_OPND(BOOLEAN_TO_JSVAL(cond));
+          END_CASE(JSOP_NEXTOF)
+
+          BEGIN_CASE(JSOP_VALUEOF)
+            slot = GET_UINT16(pc);
+            obj = JSVAL_TO_OBJECT(fp->spbase[slot]);
+            JS_GetReservedSlot(cx, obj, 1, &rval);
+            PUSH_OPND(rval);
+          END_CASE(JSOP_VALUEOF)
+
+          BEGIN_CASE(JSOP_ENDOF)
+          BEGIN_CASE(JSOP_THROWOF)
+            SAVE_SP_AND_PC(fp);
+            ok = js_ForOfClose(cx, JSVAL_TO_OBJECT(sp[-1]), op == JSOP_THROWOF);
+            /* Keep the wrapper in its stack slot until cleanup succeeds. An
+             * exception from an inline close can still enter this loop's
+             * handler; its closed flag makes that second visit harmless. */
+            if (!ok || op == JSOP_THROWOF) { ok = JS_FALSE; goto out; }
+            --sp;
+          END_CASE(JSOP_ENDOF)
+
           BEGIN_CASE(JSOP_ENDITER)
             JS_ASSERT(!JSVAL_IS_PRIMITIVE(sp[-1]));
             iterobj = JSVAL_TO_OBJECT(sp[-1]);

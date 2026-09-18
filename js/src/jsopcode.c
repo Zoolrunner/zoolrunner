@@ -1946,6 +1946,67 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 #define END_LITOPX_CASE                                                       \
                 break;
 
+              case JSOP_VALUEOF:
+                todo = Sprint(&ss->sprinter, "");
+                break;
+
+              case JSOP_ENDOF:
+              case JSOP_THROWOF:
+                todo = -2;
+                break;
+
+              case JSOP_FOROF:
+              {
+                char *iterText = NULL, *headText = NULL;
+                jsbytecode *loopBase = pc + JSOP_FOROF_LENGTH;
+                jsbytecode *headStart = loopBase + JSOP_NEXTOF_LENGTH;
+                ptrdiff_t headStop, bodyStop, loopStop;
+                size_t headLength;
+                sn = js_GetSrcNote(jp->script, pc);
+                LOCAL_ASSERT(sn && SN_TYPE(sn) == SRC_FOR);
+                headStop = js_GetSrcNoteOffset(sn, 0);
+                bodyStop = js_GetSrcNoteOffset(sn, 1);
+                loopStop = js_GetSrcNoteOffset(sn, 2);
+                headStart += js_CodeSpec[*headStart].length;
+                iterText = JS_strdup(cx, POP_STR());
+                if (!iterText) return NULL;
+                /* Preserve the runtime iterator slot below lexical locals. */
+                todo = Sprint(&ss->sprinter, "");
+                if (todo < 0 || !PushOff(ss, todo, JSOP_FOROF) ||
+                    !Decompile(ss, headStart, loopBase + headStop - headStart))
+                    goto forof_decompile_error;
+                headText = JS_strdup(cx, POP_STR());
+                if (!headText) goto forof_decompile_error;
+                headLength = strlen(headText);
+                if (headLength < 3 || strcmp(headText + headLength - 3, " = "))
+                    goto forof_decompile_error;
+                headText[headLength - 3] = 0;
+                /* Parentheses retain AssignmentExpression RHS grammar. A
+                 * normalized identifier named let also needs protection from
+                 * the for-of head's contextual lookahead restriction. */
+                if (!strncmp(headText, "let", 3) &&
+                    (!headText[3] || headText[3] == '.' || headText[3] == '['))
+                    js_printf(SET_MAYBE_BRACE(jp), "\tfor ((%s) of (%s)) {\n", headText, iterText);
+                else
+                    js_printf(SET_MAYBE_BRACE(jp), "\tfor (%s of (%s)) {\n", headText, iterText);
+                JS_free(cx, headText); headText = NULL;
+                JS_free(cx, iterText); iterText = NULL;
+                jp->indent += 4;
+                if (!Decompile(ss, loopBase + headStop + JSOP_POP_LENGTH,
+                               bodyStop - headStop - JSOP_POP_LENGTH)) return NULL;
+                jp->indent -= 4;
+                js_printf(jp, "\t}\n");
+                (void)PopOff(ss, JSOP_FOROF);
+                pc = loopBase + loopStop;
+                len = 0;
+                todo = -2;
+                break;
+              forof_decompile_error:
+                JS_free(cx, headText);
+                JS_free(cx, iterText);
+                return NULL;
+              }
+
               case JSOP_FRESHENBLOCK:
               case JSOP_RESTARG:
                 todo = -2;

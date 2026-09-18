@@ -14,5 +14,8 @@ extern JSObject *js_GetIteratorPrototype(JSContext *cx, JSObject *global);
 extern JSBool js_IteratorResult(JSContext *cx, JSObject *global, jsval value,
                                 JSBool done, jsval *rval);
 extern void js_IteratorCloseThrow(JSContext *cx, JSObject *iterator);
+extern JSObject *js_ForOfStart(JSContext *cx, jsval value);
+extern JSBool js_ForOfNext(JSContext *cx, JSObject *state, JSBool *more);
+extern JSBool js_ForOfClose(JSContext *cx, JSObject *state, JSBool throwing);
 JS_END_EXTERN_C
 #endif
