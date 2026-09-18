@@ -310,3 +310,9 @@ lookup. Bytecode cache version 36 invalidates earlier caches. All four macOS arm
 the full ES5 run passes 11,540 cases, and ES2015 remains at 23,528 passes with
 5,038 failures, 14 unsupported cases and two harness errors. Other platforms
 have not been revalidated for this change. See `js/tests/es6/README.md`.
+
+`Array.of` is implemented with generic construction, intrinsic fallback and
+throwing own-property creation. All four macOS arm64 applications pass the
+packaged compatibility checks. ES2015 is at 23,550 passes, 5,016 failures,
+14 unsupported cases and two harness errors; all 11,540 ES5 cases pass. Other
+platforms have not been revalidated for this change.

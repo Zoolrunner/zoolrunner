@@ -88,6 +88,9 @@ extern JSBool
 js_IsCallable(JSContext *cx, jsval v);
 
 extern JSBool
+js_IsConstructor(JSContext *cx, jsval v);
+
+extern JSBool
 js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
                 JSBool construct, jsval *rval);
 

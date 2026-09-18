@@ -1758,6 +1758,32 @@ js_IsCallable(JSContext *cx, jsval v)
            (obj->map->ops != &js_ObjectOps && obj->map->ops->call);
 }
 
+/* [[Construct]] presence does not read the observable prototype property. */
+JSBool
+js_IsConstructor(JSContext *cx, jsval v)
+{
+    JSObject *obj;
+    JSClass *clasp;
+    JSFunction *fun;
+    for (;;) {
+        if (JSVAL_IS_PRIMITIVE(v))
+            return JS_FALSE;
+        obj = JSVAL_TO_OBJECT(v);
+        clasp = OBJ_GET_CLASS(cx, obj);
+        if (clasp != &js_FunctionClass)
+            return (obj->map->ops == &js_ObjectOps)
+                   ? clasp->construct != NULL
+                   : obj->map->ops->construct != NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, obj);
+        if (!fun || (fun->flags & JSFUN_NO_CONSTRUCT))
+            return JS_FALSE;
+        if (!(fun->flags & JSFUN_BOUND_FUNCTION))
+            return JS_TRUE;
+        if (!JS_GetReservedSlot(cx, obj, 2, &v))
+            return JS_FALSE;
+    }
+}
+
 static const char call_str[] = "call";
 
 static JSBool

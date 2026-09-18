@@ -792,3 +792,29 @@ desktop checks. Additional checks pass for Calendar's eight unit suites and four
 views, Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 standalone XULRunner ChatZilla. Other platforms have not been revalidated for
 this batch.
+
+
+### Array.of
+
+`Array.of` constructs with a numeric argument count when its receiver has
+[[Construct]], including bound constructors. Otherwise it creates an intrinsic
+array in the built-in's defining global, even when called from a legacy script
+or another embedding global. Own index descriptors bypass inherited setters;
+nonconfigurable properties and nonextensibility reject writes. The final length
+assignment uses ordinary setter dispatch with throwing failure semantics.
+
+`array-of.js` passes 50 checks and `TestArrayOf.c` passes 15 cross-global native
+embedding checks on macOS arm64. The pinned method subset passes 26/28 cases;
+the remaining two need Proxy support.
+
+The complete pinned ES2015 run passes **23,550 cases**, with **5,016 failures**,
+14 unsupported module cases and two harness errors. There are no timeouts or
+crashes, and runtime hashes remain unchanged. This adds 22 passes with no lost
+passes. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/array-of-full.json` and `array-of-es5.json`.
+
+All four macOS arm64 applications build, package and pass the shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. These are macOS arm64 results; other
+platforms have not been revalidated for this batch.

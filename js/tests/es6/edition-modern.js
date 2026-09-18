@@ -32,6 +32,7 @@ function modernWindowEdition() {
            "ab".repeat(2) === "abab" && "abc".startsWith("b", 1) &&
            "abc".endsWith("b", 2) && "abc".includes("bc") &&
            String.raw({raw:["a", "b"]}, "!") === "a!b" &&
+           Array.of(1, 2).join() === "1,2" &&
            [1, 2].find(function(v) { return v > 1; }) === 2 &&
            [1, 2].findIndex(function(v) { return v > 1; }) === 1 &&
            [1, 2, 3].fill(9, 1, 2).join() === "1,9,3" &&

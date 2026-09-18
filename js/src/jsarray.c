@@ -58,6 +58,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsrealm.h"
 #include "jsstr.h"
 
 /* 2^32 - 1 as a number and a string */
@@ -2114,6 +2115,77 @@ array_isArray(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     return JS_TRUE;
 }
 
+static JSBool
+array_of(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *array, *global, *parent, *ctor;
+    JSStackFrame *fp = cx->fp;
+    jsval *base, *oldsp, value;
+    JSTempValueRooter root;
+    jsid id;
+    void *mark;
+    uintN i;
+    JSBool ok, initialize = JS_FALSE;
+
+    if (js_IsConstructor(cx, argv[-1])) {
+        base = js_AllocStack(cx, 3, &mark);
+        if (!base)
+            return JS_FALSE;
+        base[0] = argv[-1];
+        base[1] = JSVAL_NULL;
+        base[2] = INT_TO_JSVAL(argc);
+        oldsp = fp->sp;
+        fp->sp = base + 3;
+        ok = js_InvokeConstructor(cx, base, 1);
+        if (ok)
+            *rval = base[0];
+        fp->sp = oldsp;
+        js_FreeStack(cx, mark);
+        if (!ok)
+            return JS_FALSE;
+        array = JSVAL_TO_OBJECT(*rval);
+    } else {
+        /* ArrayCreate uses this built-in's realm even when the caller chose
+         * a legacy language version or replaced the global Array binding. */
+        global = JSVAL_TO_OBJECT(argv[-2]);
+        while ((parent = OBJ_GET_PARENT(cx, global)) != NULL)
+            global = parent;
+        ctor = js_GetCachedClassObject(cx, global, JSProto_Array);
+        if (!ctor) {
+            if (!js_InitArrayClass(cx, global))
+                return JS_FALSE;
+            ctor = js_GetCachedClassObject(cx, global, JSProto_Array);
+        }
+        if (!OBJ_GET_PROPERTY(cx, ctor,
+                              ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom),
+                              &value))
+            return JS_FALSE;
+        JS_PUSH_SINGLE_TEMP_ROOT(cx, value, &root);
+        array = js_NewObject(cx, &js_ArrayClass, JSVAL_TO_OBJECT(value), global);
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!array)
+            return JS_FALSE;
+        *rval = OBJECT_TO_JSVAL(array);
+        initialize = JS_TRUE;
+    }
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, array, &root);
+    ok = JS_FALSE;
+    if (initialize && !InitArrayObject(cx, array, argc, NULL))
+        goto out;
+    for (i = 0; i < argc; ++i) {
+        id = INT_TO_JSID(i);
+        if (!js_CreateDataPropertyOrThrow(cx, array, id, argv[i]))
+            goto out;
+    }
+    value = INT_TO_JSVAL(argc);
+    ok = js_SetPropertyOrThrow(cx, array,
+                              ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                              &value);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSObject *
 js_InitArrayClass(JSContext *cx, JSObject *obj)
 {
@@ -2131,7 +2203,9 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
     /* JSFunctionSpec keeps its historical 8-bit flags field. */
     ctor = JS_GetConstructor(cx, proto);
     if (!ctor || !JS_DefineFunction(cx, ctor, "isArray", array_isArray, 1,
-                                    JSFUN_NO_CONSTRUCT))
+                                    JSFUN_NO_CONSTRUCT) ||
+        !JS_DefineFunction(cx, ctor, "of", array_of, 0,
+                           JSFUN_NO_CONSTRUCT | JSFUN_STRICT))
         return NULL;
     return proto;
 }
