@@ -580,3 +580,9 @@ checks pass. Application testing also fixed job principal lookup for sandbox
 callbacks while preserving content security restrictions. Full ES6 and
 other-platform validation remain incomplete. See the
 [Promise validation notes](js/tests/es6/README.md#promise-and-application-checkpoints).
+
+ES2015 ordinary-function `new.target` supports strict/direct eval, alternate
+constructors and serialized scripts. The final macOS arm64 checks preserve all
+27,036 ES6 passes and 11,540 ES5 passes, with all four application build, package
+and desktop checks passing. Bytecode cache version 40 invalidates older component
+caches. Arrow functions and classes remain unfinished; see the [new.target notes](js/tests/es6/README.md#function-environment-newtarget).

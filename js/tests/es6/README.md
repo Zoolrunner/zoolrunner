@@ -1978,3 +1978,44 @@ selection fix that path while preserving content/component and cross-principal
 access restrictions. Foreign-window result arrays and both privilege levels are
 covered by the final fixture. Earlier failures and diagnostic runs are retained
 in `artifacts/es6/promise-*`; focused diagnostics are not full application passes.
+
+### Function-environment new.target
+
+ES2015 ordinary functions now parse and evaluate `new.target`. Ordinary calls
+return undefined; constructor calls retain the actual newTarget, including
+Reflect.construct, bound functions and proxies. Direct eval inherits this
+binding through strict and nested evaluations. Global and indirect eval reject
+the syntax, and a nested ordinary function has its own binding. Selected legacy
+language versions retain their old grammar. Arrow/class environments remain
+unfinished; this is a prerequisite, not completion of those features.
+
+The new opcode decompiles as `new.target` and advances the bytecode cache to
+version 40. `new-target.js` passes 38 checks covering call/construction, eval
+boundaries, syntax, GC and decompilation. `TestEditionEmbedding.c` includes the operation in its
+serialized, decoded and decompiled program. `edition-modern.js` exercises it
+in actual chrome and content windows.
+
+The final macOS arm64/SDK 11.3 run preserves all **27,036 ES2015 passes**, with
+**1,530 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts. Exact pass-set comparison shows zero gains and zero losses: the
+remaining syntax features are still needed to pass their complete cases.
+All **11,540 ES5.1 cases** pass. Reports are
+`artifacts/es6/new-target-final-es6.json`, `new-target-final-es5.json` and
+`new-target-final-pass-comparison.json`. The frozen runtime at
+`/tmp/zr-new-target-final-conformance-20260918` remained unchanged through both
+runs. Its libmozjs SHA-256 is
+`f76069069ec87817aed9bdec65d31366b539fbfc5db834775047fba7fc33862f`.
+
+All four applications pass root builds, packages and relocated desktop checks;
+their engine hashes match the frozen runtime. Calendar passes its unit suites
+and four views; Browser passes 169 navigation/layout checks; Suite passes
+lifecycle and ChatZilla checks; standalone XULRunner ChatZilla initializes with
+its input widget. C89 checks and 23 runner integration checks pass. Desktop
+reports are under `artifacts/es6/new-target-final-runtime`. Other platforms have
+not been revalidated for this batch.
+
+The first full run caught two regressions: lookahead after `new` incorrectly
+scanned a regexp as division. Operand scanning and a dedicated regression now
+preserve the required runtime TypeError for `new /pattern/()`. Invalid
+new.target assignment and destructuring targets report SyntaxError. Earlier
+`new-target-*` reports precede these corrections and are diagnostic only.

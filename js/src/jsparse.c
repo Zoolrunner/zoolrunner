@@ -2230,6 +2230,12 @@ BindDestructuringLHS(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
 #endif
 
       default:
+        if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_PRIMARY &&
+            pn->pn_op == JSOP_NEWTARGET) {
+            js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
+                                        JSMSG_SYNTAX_ERROR);
+            return JS_FALSE;
+        }
         js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
                                     JSMSG_BAD_LEFTSIDE_OF_ASS);
         return JS_FALSE;
@@ -4199,6 +4205,11 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         /* FALL THROUGH */
 #endif
       default:
+        if (JS_VERSION_IS_ES2015(cx) && pn2->pn_type == TOK_PRIMARY &&
+            pn2->pn_op == JSOP_NEWTARGET) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
         js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                     JSMSG_BAD_LEFTSIDE_OF_ASS);
         return NULL;
@@ -4619,6 +4630,7 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 {
     JSParseNode *pn, *pn2, *pn3;
     JSTokenType tt;
+    JSBool metaProperty;
 
     CHECK_RECURSION();
 
@@ -4630,6 +4642,36 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         pn = NewParseNode(cx, ts, PN_LIST, tc);
         if (!pn)
             return NULL;
+        /* A lookahead after new must scan regexp literals as operands. */
+        ts->flags |= TSF_OPERAND;
+        metaProperty = JS_VERSION_IS_ES2015(cx) &&
+                       js_MatchToken(cx, ts, TOK_DOT);
+        ts->flags &= ~TSF_OPERAND;
+        if (metaProperty) {
+            JSString *name;
+            const jschar *chars;
+
+            tt = js_GetToken(cx, ts);
+            if (tt != TOK_NAME || (CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) ||
+                (!(tc->flags & TCF_IN_FUNCTION) &&
+                 !(cx->fp->flags & JSFRAME_EVAL_FUNCTION))) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
+            name = ATOM_TO_STRING(CURRENT_TOKEN(ts).t_atom);
+            chars = JSSTRING_CHARS(name);
+            if (JSSTRING_LENGTH(name) != 6 || chars[0] != 't' ||
+                chars[1] != 'a' || chars[2] != 'r' || chars[3] != 'g' ||
+                chars[4] != 'e' || chars[5] != 't') {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
+            pn->pn_type = TOK_PRIMARY;
+            pn->pn_arity = PN_NULLARY;
+            pn->pn_op = JSOP_NEWTARGET;
+            pn->pn_pos.end = CURRENT_TOKEN(ts).pos.end;
+            goto member_suffix;
+        }
         pn2 = MemberExpr(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
@@ -4668,6 +4710,7 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         }
     }
 
+  member_suffix:
     while ((tt = js_GetToken(cx, ts)) > TOK_EOF) {
         if (tt == TOK_DOT) {
             pn2 = NewParseNode(cx, ts, PN_NAME, tc);

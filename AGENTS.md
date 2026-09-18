@@ -1319,3 +1319,15 @@ unprivileged sandbox callbacks so safe-context differences cannot grant chrome
 privileges or prevent legitimate handlers from running.
 Promise metadata follows ES2015 even in legacy globals; other legacy built-ins
 and application syntax must retain their selected-version behavior.
+
+For `new.target` and lexical function-environment changes, run `new-target.js`,
+`TestEditionEmbedding.c` and the mixed-edition chrome/content window checks.
+Preserve direct-eval constructor identity, including strict and nested eval;
+indirect eval and global scripts must not acquire a caller's function binding.
+Lookahead after `new` must retain operand scanning: `new /pattern/()` parses
+and then throws TypeError in modern mode, rather than becoming a syntax error.
+Retain ordinary, bound, proxy and alternate constructor identities across GC,
+decompilation and XDR. Bytecode cache version 40 adds the new.target opcode;
+keep cache-version assertions synchronized when adding later opcodes. Selected
+legacy script versions retain their grammar. Ordinary-function support alone
+is not arrow-function or class support.

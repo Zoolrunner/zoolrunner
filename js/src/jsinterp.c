@@ -1704,6 +1704,10 @@ js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
     frame.spbase = NULL;
     frame.sharpDepth = 0;
     frame.flags = flags;
+    if (down && (down->flags & JSFRAME_NEW_TARGET)) {
+        frame.newTarget = down->newTarget;
+        frame.flags |= JSFRAME_NEW_TARGET;
+    }
     frame.dormantNext = NULL;
     frame.xmlNamespace = NULL;
     frame.blockChain = NULL;
@@ -4751,6 +4755,12 @@ interrupt:
             PUSH_OPND(JSVAL_NULL);
             obj = NULL;
           END_CASE(JSOP_NULL)
+
+          BEGIN_CASE(JSOP_NEWTARGET)
+            PUSH_OPND((fp->flags & JSFRAME_NEW_TARGET)
+                      ? OBJECT_TO_JSVAL(fp->newTarget) : JSVAL_VOID);
+            obj = NULL;
+          END_CASE(JSOP_NEWTARGET)
 
           BEGIN_CASE(JSOP_THIS)
             if (script->strictMode && fp->fun && fp->argv &&

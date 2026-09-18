@@ -1519,6 +1519,7 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     compilation.vars = direct ? caller->vars : NULL;
     compilation.nvars = direct ? caller->nvars : 0;
     compilation.flags = JSFRAME_EVAL | JSFRAME_EVAL_COMPILER |
+                        (direct && caller->fun ? JSFRAME_EVAL_FUNCTION : 0) |
                         (inheritedStrict ? JSFRAME_STRICT_EVAL : 0);
     compilation.rval = JSVAL_VOID;
     compilation.sp = fp->sp;

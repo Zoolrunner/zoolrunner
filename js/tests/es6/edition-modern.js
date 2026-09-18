@@ -28,7 +28,13 @@ function modernWindowEdition() {
     const fixed = 1;
     var immutable = false;
     try { fixed++; } catch (error) { immutable = error instanceof TypeError; }
+    function WindowConstructor() {
+        return {target:new.target, evaluated:eval('new.target')};
+    }
+    var constructed = new WindowConstructor();
     return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
+           constructed.target === WindowConstructor && constructed.evaluated === WindowConstructor &&
+           WindowConstructor().target === undefined &&
            metadata && inferredMetadata && immutable && symbolChecks &&
            modernObject.radixValue === 20 && modernObject[windowSymbol]() === modernObject &&
            modernObject[windowSymbol].name === "[window]" && modernObject.computedAccessor === 27 &&
