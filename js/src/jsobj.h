@@ -518,6 +518,9 @@ extern JSBool
 js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
 
 extern JSBool
+js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
+
+extern JSBool
 js_GetAttributes(JSContext *cx, JSObject *obj, jsid id, JSProperty *prop,
                  uintN *attrsp);
 

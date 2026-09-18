@@ -445,6 +445,10 @@ preserve Unicode licensing in source and packaged license pages. Run
 normalization. Preserve lone surrogates, composition exclusions, Hangul, stable
 canonical ordering, callback rooting and checked allocation sizes. The separate
 XPCOM normalizer and legacy identifier/casing tables remain unchanged.
+Run `array-operations.js` for Array find/findIndex/fill/copyWithin changes.
+Keep ToLength indices above uint32, snapshot lengths, live property reads,
+sparse copying/deletion and callback rooting. Throw-on-rejection writes must
+not leak strictness into setter callbacks or change ordinary legacy assignments.
 Test real applications separately: a Test262 pass cannot establish that every
 historical application remains compatible.
 Run `js/tests/es6/const-writes.js` when changing immutable bindings. Preserve

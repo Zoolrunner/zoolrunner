@@ -647,3 +647,33 @@ assertions, Calendar's eight unit suites/four views and standalone ChatZilla
 in XULRunner. Each packaged chrome archive includes the Unicode license notice.
 Other operating systems and architectures have not been revalidated for this
 batch; complete ES2015 compliance remains unfinished.
+
+
+## Array-like operations
+
+`Array.prototype.find`, `findIndex`, `fill` and `copyWithin` use ES2015 ToLength
+(up to 2^53-1) and generic object receivers. Find visits holes and captures the
+length before callbacks; copyWithin checks property presence, preserves holes
+and handles overlap in the appropriate direction. Fill/copyWithin reject failed
+native property writes and undeletable targets independently of caller strictness.
+Setter callbacks retain their own strictness and historical embedding hooks
+retain their existing dispatch. Existing Array methods retain their length policy.
+Symbol-based unscopables and the other Array additions remain unfinished.
+
+`array-operations.js` passes 89 focused checks on macOS arm64, including large
+indices, coercion/access order, inherited properties, sparse arrays, frozen and
+nonextensible objects, exceptions, reentrancy, GC and setter strictness isolation.
+The same methods are included in the modern-edition XUL/content window probe.
+The Array Test262 subset passes 4,609/4,968 execution cases, gaining 124 passes
+without losing a previously passing case. For the four new methods, the only
+remaining subset failures require Symbol or Proxy. The full ES2015 run records
+**23,374 passes, 5,192 failures, 14 unsupported modules, zero timeouts, zero
+crashes and two harness errors**, gaining 124 passes with no losses and unchanged
+runtime hashes. Reports are `artifacts/es6/array-operations-full.json` and
+`artifacts/es6/array-operations-es5.json`. The complete required-mode ES5 run
+passes all 11,540 cases.
+All four macOS arm64 applications rebuilt and passed package/relocated desktop
+checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
+assertions, Calendar's eight unit suites/four views and standalone ChatZilla
+in XULRunner. Other operating systems and architectures remain unvalidated for
+this batch.

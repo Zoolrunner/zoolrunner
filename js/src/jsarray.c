@@ -1819,6 +1819,219 @@ array_every(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 }
 #endif
 
+/* These new methods use ToLength, not the historical methods' ToUint32.
+ * Doubles represent every integer in the required [0, 2^53-1] range exactly. */
+static JSBool
+ArrayLikeLength(JSContext *cx, JSObject *obj, jsdouble *length)
+{
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, JSVAL_VOID, &root);
+    ok = OBJ_GET_PROPERTY(cx, obj,
+                         ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                         &root.u.value) &&
+         js_ValueToNumber(cx, root.u.value, length);
+    if (ok) {
+        *length = js_DoubleToInteger(*length);
+        if (*length < 0)
+            *length = 0;
+        else if (*length > 9007199254740991.0)
+            *length = 9007199254740991.0;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayRelativeIndex(JSContext *cx, jsval value, jsdouble length,
+                   jsdouble *index)
+{
+    if (!js_ValueToNumber(cx, value, index))
+        return JS_FALSE;
+    *index = js_DoubleToInteger(*index);
+    if (*index < 0) {
+        *index += length;
+        if (*index < 0)
+            *index = 0;
+    } else if (*index > length) {
+        *index = length;
+    }
+    return JS_TRUE;
+}
+
+/* The caller roots ID_TO_VALUE(*idp) before any subsequent allocation. */
+static JSBool
+ArrayLikeIndex(JSContext *cx, jsdouble index, jsid *idp)
+{
+    JSString *str;
+    JSAtom *atom;
+    if (index <= JSVAL_INT_MAX) {
+        *idp = INT_TO_JSID((jsint)index);
+        return JS_TRUE;
+    }
+    str = js_NumberToString(cx, index);
+    if (!str)
+        return JS_FALSE;
+    atom = js_AtomizeString(cx, str, 0);
+    if (!atom)
+        return JS_FALSE;
+    *idp = ATOM_TO_JSID(atom);
+    return JS_TRUE;
+}
+
+static JSBool
+array_findHelper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                 jsval *rval, JSBool returnIndex)
+{
+    jsdouble length, index;
+    jsval values[5], thisv;
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE, selected;
+    uintN i;
+
+    if (!ArrayLikeLength(cx, obj, &length))
+        return JS_FALSE;
+    if (!js_IsCallable(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "predicate");
+        return JS_FALSE;
+    }
+    thisv = argc > 1 ? argv[1] : JSVAL_VOID;
+    for (i = 0; i < 5; ++i)
+        values[i] = JSVAL_VOID;
+    values[2] = OBJECT_TO_JSVAL(obj);
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    *rval = returnIndex ? INT_TO_JSVAL(-1) : JSVAL_VOID;
+    for (index = 0; index < length; ++index) {
+        if (!ArrayLikeIndex(cx, index, &id))
+            goto out;
+        values[4] = ID_TO_VALUE(id);
+        /* Get every index, including holes. Unlike filter/some, find does
+         * not perform HasProperty or skip an absent property. */
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[0]) ||
+            !js_NewNumberValue(cx, index, &values[1]) ||
+            !js_InternalInvokeValue(cx, thisv, argv[0], 0, 3, values,
+                                    &values[3]) ||
+            !js_ValueToBoolean(cx, values[3], &selected))
+            goto out;
+        if (selected) {
+            *rval = values[returnIndex ? 1 : 0];
+            break;
+        }
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+array_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return array_findHelper(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+array_findIndex(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return array_findHelper(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+array_fill(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble length, index, end;
+    jsval values[2];
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+
+    if (!ArrayLikeLength(cx, obj, &length) ||
+        !ArrayRelativeIndex(cx, argc > 1 ? argv[1] : JSVAL_VOID, length, &index))
+        return JS_FALSE;
+    end = length;
+    if (argc > 2 && !JSVAL_IS_VOID(argv[2]) &&
+        !ArrayRelativeIndex(cx, argv[2], length, &end))
+        return JS_FALSE;
+    values[0] = values[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    for (; index < end; ++index) {
+        if (!ArrayLikeIndex(cx, index, &id))
+            goto out;
+        values[0] = ID_TO_VALUE(id);
+        /* A native setter can replace its vp without changing fill's value. */
+        values[1] = argv[0];
+        if (!js_SetPropertyOrThrow(cx, obj, id, &values[1]))
+            goto out;
+    }
+    *rval = OBJECT_TO_JSVAL(obj);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+array_copyWithin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble length, target, start, end, count, direction;
+    jsval values[3], deleted;
+    jsid from, to;
+    JSObject *holder;
+    JSProperty *property;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE, present;
+
+    if (!ArrayLikeLength(cx, obj, &length) ||
+        !ArrayRelativeIndex(cx, argv[0], length, &target) ||
+        !ArrayRelativeIndex(cx, argv[1], length, &start))
+        return JS_FALSE;
+    end = length;
+    if (argc > 2 && !JSVAL_IS_VOID(argv[2]) &&
+        !ArrayRelativeIndex(cx, argv[2], length, &end))
+        return JS_FALSE;
+    count = JS_MIN(end - start, length - target);
+    direction = 1;
+    if (start < target && target < start + count) {
+        direction = -1;
+        start += count - 1;
+        target += count - 1;
+    }
+    values[0] = values[1] = values[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    for (; count > 0; --count, start += direction, target += direction) {
+        if (!ArrayLikeIndex(cx, start, &from))
+            goto out;
+        values[0] = ID_TO_VALUE(from);
+        if (!ArrayLikeIndex(cx, target, &to))
+            goto out;
+        values[1] = ID_TO_VALUE(to);
+        if (!OBJ_LOOKUP_PROPERTY(cx, obj, from, &holder, &property))
+            goto out;
+        present = property != NULL;
+        if (present) {
+            OBJ_DROP_PROPERTY(cx, holder, property);
+            if (!OBJ_GET_PROPERTY(cx, obj, from, &values[2]) ||
+                !js_SetPropertyOrThrow(cx, obj, to, &values[2]))
+                goto out;
+        } else {
+            if (!OBJ_DELETE_PROPERTY(cx, obj, to, &deleted))
+                goto out;
+            if (deleted == JSVAL_FALSE) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_BAD_DESCRIPTOR);
+                goto out;
+            }
+        }
+    }
+    *rval = OBJECT_TO_JSVAL(obj);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static JSFunctionSpec array_methods[] = {
 #if JS_HAS_TOSOURCE
     {js_toSource_str,       array_toSource,         0,0,0},
@@ -1835,6 +2048,12 @@ static JSFunctionSpec array_methods[] = {
     {"shift",               array_shift,            0,JSFUN_GENERIC_NATIVE,1},
     {"unshift",             array_unshift,          1,JSFUN_GENERIC_NATIVE,1},
     {"splice",              array_splice,           2,JSFUN_GENERIC_NATIVE,1},
+
+    /* ES2015 array-like operations (no legacy static generic aliases). */
+    {"find",                array_find,             1,0,0},
+    {"findIndex",           array_findIndex,        1,0,0},
+    {"fill",                array_fill,             1,0,0},
+    {"copyWithin",          array_copyWithin,       2,0,0},
 
     /* Python-esque sequence methods. */
     {"concat",              array_concat,           1,JSFUN_GENERIC_NATIVE,1},

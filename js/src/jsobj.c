@@ -3871,15 +3871,14 @@ out:
     return ok;
 }
 
-JSBool
-js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
+static JSBool
+SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp, JSBool strict)
 {
     JSObject *pobj;
     JSProperty *prop;
     JSScopeProperty *sprop;
     JSScope *scope;
     uintN attrs, flags;
-    JSBool strict = cx->fp && cx->fp->script && cx->fp->script->strictMode;
     intN shortid;
     JSClass *clasp;
     JSPropertyOp getter, setter;
@@ -4098,6 +4097,24 @@ js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
                                           NULL, JSMSG_READ_ONLY,
                                           JS_GetStringChars(str));
   }
+}
+
+JSBool
+js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
+{
+    JSBool strict = cx->fp && cx->fp->script && cx->fp->script->strictMode;
+    return SetProperty(cx, obj, id, vp, strict);
+}
+
+/* ES2015 Set(O, P, V, true). Keep Throw local to this operation: a setter's
+ * own non-strict assignments must not inherit it. Embedding object hooks
+ * retain their existing dispatch and error reporting contract. */
+JSBool
+js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
+{
+    if (obj->map->ops->setProperty == js_SetProperty)
+        return SetProperty(cx, obj, id, vp, JS_TRUE);
+    return OBJ_SET_PROPERTY(cx, obj, id, vp);
 }
 
 JSBool
