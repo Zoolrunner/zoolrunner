@@ -2593,6 +2593,8 @@ js_MarkStackFrame(JSContext *cx, JSStackFrame *fp)
 
     if (fp->callee)
         GC_MARK(cx, fp->callee, "callee object");
+    if (fp->flags & JSFRAME_NEW_TARGET)
+        GC_MARK(cx, fp->newTarget, "constructor newTarget");
 
     /*
      * Mark fp->argv, even though in the common case it will be marked via our

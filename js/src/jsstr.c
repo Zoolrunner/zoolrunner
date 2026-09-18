@@ -2561,6 +2561,9 @@ String(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return JS_TRUE;
     }
     OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, STRING_TO_JSVAL(str));
+    if ((cx->fp->flags & JSFRAME_NEW_TARGET) && cx->fp->newTarget != cx->fp->callee)
+        return JS_DefinePropertyWithTinyId(cx, obj, "length", STRING_LENGTH,
+                    JSVAL_VOID, str_getProperty, NULL, JSPROP_READONLY | JSPROP_PERMANENT);
     return JS_TRUE;
 }
 

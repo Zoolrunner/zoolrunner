@@ -338,6 +338,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-WEAK-COLLECTIONS checks=60 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed weak collections")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/reflect.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-REFLECT checks=53 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Reflect")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -361,6 +369,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestHasInstanceEmbedding.c", "ES6-HAS-INSTANCE-EMBEDDING checks=13 failures=0"),
                 ("es6/TestBuiltinTags.c", "ES6-BUILTIN-TAGS-EMBEDDING checks=13 failures=0"),
                 ("es6/TestWeakCollectionGC.c", "ES6-WEAK-COLLECTION-GC checks=57 failures=0"),
+                ("es6/TestReflect.c", "ES6-REFLECT-EMBEDDING checks=43 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

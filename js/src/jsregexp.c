@@ -4161,7 +4161,11 @@ RegExp(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
          */
         *rval = OBJECT_TO_JSVAL(obj);
     }
-    return regexp_compile(cx, obj, argc, argv, rval);
+    if (!regexp_compile(cx, obj, argc, argv, rval)) return JS_FALSE;
+    if ((cx->fp->flags & JSFRAME_NEW_TARGET) && cx->fp->newTarget != cx->fp->callee)
+        return JS_DefinePropertyWithTinyId(cx, obj, "lastIndex", REGEXP_LAST_INDEX,
+                    JSVAL_ZERO, regexp_getProperty, regexp_setProperty, JSPROP_PERMANENT);
+    return JS_TRUE;
 }
 
 JSObject *

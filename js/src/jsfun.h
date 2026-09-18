@@ -96,6 +96,10 @@ js_IsConstructor(JSContext *cx, jsval v);
 extern JSBool
 js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
                 JSBool construct, jsval *rval);
+extern JSBool
+js_InvokeBoundWithNewTarget(JSContext *cx, JSObject *bound, uintN argc,
+                            jsval *argv, JSBool construct, jsval *rval,
+                            JSObject *newTarget);
 
 /* Mark built-in methods without widening the public JSFunctionSpec flags. */
 extern JSBool

@@ -110,6 +110,7 @@ JS_PROTO(Map,                   32,     js_InitMapClass)
 JS_PROTO(Set,                   33,     js_InitSetClass)
 JS_PROTO(WeakMap,               34,     js_InitWeakMapClass)
 JS_PROTO(WeakSet,               35,     js_InitWeakSetClass)
+JS_PROTO(Reflect,               36,     js_InitReflectClass)
 
 #undef SCRIPT_INIT
 #undef XML_INIT

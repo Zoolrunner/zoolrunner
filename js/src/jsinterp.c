@@ -59,6 +59,8 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
+#include "jsexn.h"
 #include "jsiter.h"
 #include "jslock.h"
 #include "jsnum.h"
@@ -1085,8 +1087,8 @@ LogCall(JSContext *cx, jsval callee, uintN argc, jsval *argv)
  * required arguments, allocate declared local variables, and pop everything
  * when done.  Then push the return value.
  */
-JS_FRIEND_API(JSBool)
-js_Invoke(JSContext *cx, uintN argc, uintN flags)
+static JSBool
+InvokeWithNewTarget(JSContext *cx, uintN argc, uintN flags, JSObject *newTarget)
 {
     void *mark;
     JSStackFrame *fp, frame;
@@ -1317,6 +1319,10 @@ have_fun:
     frame.sharpDepth = 0;
     frame.sharpArray = NULL;
     frame.flags = flags;
+    if (flags & JSINVOKE_CONSTRUCT) {
+        frame.newTarget = newTarget ? newTarget : frame.callee;
+        frame.flags |= JSFRAME_NEW_TARGET;
+    }
     frame.dormantNext = NULL;
     frame.xmlNamespace = NULL;
     frame.blockChain = NULL;
@@ -1494,6 +1500,12 @@ bad:
     js_ReportIsNotFunction(cx, vp, flags & JSINVOKE_FUNFLAGS);
     ok = JS_FALSE;
     goto out2;
+}
+
+JS_FRIEND_API(JSBool)
+js_Invoke(JSContext *cx, uintN argc, uintN flags)
+{
+    return InvokeWithNewTarget(cx, argc, flags, NULL);
 }
 
 JSBool
@@ -1994,8 +2006,25 @@ js_StrictlyEqual(jsval lval, jsval rval)
     return lval == rval;
 }
 
+/* The realm used by GetPrototypeFromConstructor follows bound targets. */
+static JSObject *
+ConstructorGlobal(JSContext *cx, JSObject *constructor)
+{
+    jsval target;
+    JSObject *parent;
+    while (OBJ_GET_CLASS(cx, constructor) == &js_FunctionClass &&
+           (((JSFunction *)JS_GetPrivate(cx, constructor))->flags & JSFUN_BOUND_FUNCTION)) {
+        if (!JS_GetReservedSlot(cx, constructor, 2, &target)) return NULL;
+        constructor = JSVAL_TO_OBJECT(target);
+    }
+    while ((parent = OBJ_GET_PARENT(cx, constructor)) != NULL)
+        constructor = parent;
+    return constructor;
+}
+
 JSBool
-js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
+js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                  JSObject *newTarget)
 {
     JSFunction *fun;
     JSObject *obj, *obj2, *proto, *parent;
@@ -2027,7 +2056,8 @@ js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
     }
 
     if (fun && (fun->flags & JSFUN_BOUND_FUNCTION)) {
-        JSBool ok = js_InvokeBound(cx, obj2, argc, vp + 2, JS_TRUE, vp);
+        JSBool ok = js_InvokeBoundWithNewTarget(cx, obj2, argc, vp + 2,
+                                                    JS_TRUE, vp, newTarget);
         cx->fp->sp = vp + 1;
         return ok;
     }
@@ -2043,7 +2073,7 @@ js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
          * root to protect this prototype, in case it has no other
          * strong refs.
          */
-        if (!OBJ_GET_PROPERTY(cx, obj2,
+        if (!OBJ_GET_PROPERTY(cx, newTarget ? newTarget : obj2,
                               ATOM_TO_JSID(cx->runtime->atomState
                                            .classPrototypeAtom),
                               &vp[1])) {
@@ -2059,13 +2089,24 @@ js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
                 clasp = funclasp;
         }
     }
+    if (newTarget && !proto) {
+        JSProtoKey key = (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(clasp);
+        parent = ConstructorGlobal(cx, newTarget);
+        if (!parent) return JS_FALSE;
+        if (clasp == &js_ErrorClass && fun && !FUN_INTERPRETED(fun))
+            key = js_GetExceptionProtoKey(fun->u.n.native);
+        if (key == JSProto_Null) key = JSProto_Object;
+        proto = js_BuiltinPrototype(cx, parent, key);
+        if (!proto) return JS_FALSE;
+        vp[1] = OBJECT_TO_JSVAL(proto);
+    }
     obj = js_NewObject(cx, clasp, proto, parent);
     if (!obj)
         return JS_FALSE;
 
     /* Now we have an object with a constructor method; call it. */
     vp[1] = OBJECT_TO_JSVAL(obj);
-    if (!js_Invoke(cx, argc, JSINVOKE_CONSTRUCT)) {
+    if (!InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget)) {
         cx->weakRoots.newborn[GCX_OBJECT] = NULL;
         return JS_FALSE;
     }
@@ -2085,6 +2126,12 @@ js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
 
     JS_RUNTIME_METER(cx->runtime, constructs);
     return JS_TRUE;
+}
+
+JSBool
+js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc)
+{
+    return js_InvokeConstructorWithNewTarget(cx, vp, argc, NULL);
 }
 
 static JSBool

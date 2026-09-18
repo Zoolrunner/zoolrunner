@@ -1994,6 +1994,12 @@ static JSFunctionSpec object_methods[] = {
 static JSBool
 Object(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
+    /* Object's derived-constructor path ignores its value argument. */
+    if ((cx->fp->flags & JSFRAME_NEW_TARGET) &&
+        cx->fp->newTarget != cx->fp->callee) {
+        *rval = OBJECT_TO_JSVAL(obj);
+        return JS_TRUE;
+    }
     if (argc == 0) {
         /* Trigger logic below to construct a blank object. */
         obj = NULL;

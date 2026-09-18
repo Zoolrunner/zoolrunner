@@ -72,6 +72,7 @@
 #include "jssymbol.h"
 #include "jscollection.h"
 #include "jsweakcollection.h"
+#include "jsreflect.h"
 #include "jsrealm.h"
 #include "jsopcode.h"
 #include "jsparse.h"
@@ -1293,6 +1294,7 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitSetClass(cx, obj) &&
            js_InitWeakMapClass(cx, obj) &&
            js_InitWeakSetClass(cx, obj) &&
+           js_InitReflectClass(cx, obj) &&
 #if JS_HAS_SCRIPT_OBJECT
            js_InitScriptClass(cx, obj) &&
 #endif
@@ -1368,6 +1370,7 @@ static JSStdName standard_class_atoms[] = {
     {js_InitSetClass,                   EAGER_ATOM_AND_CLASP(Set)},
     {js_InitWeakMapClass,               EAGER_ATOM_AND_CLASP(WeakMap)},
     {js_InitWeakSetClass,               EAGER_ATOM_AND_CLASP(WeakSet)},
+    {js_InitReflectClass,               EAGER_ATOM_AND_CLASP(Reflect)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
     {js_InitExceptionClasses,           EAGER_ATOM_AND_CLASP(Error)},
     {js_InitRegExpClass,                EAGER_ATOM_AND_CLASP(RegExp)},
@@ -1556,7 +1559,8 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
         /* A deleted configurable collection binding must stay deleted. Its
          * intrinsic remains available through the private global cache. */
         if ((stdnm->clasp == &js_MapClass || stdnm->clasp == &js_SetClass ||
-             stdnm->clasp == &js_WeakMapClass || stdnm->clasp == &js_WeakSetClass) &&
+             stdnm->clasp == &js_WeakMapClass || stdnm->clasp == &js_WeakSetClass ||
+             stdnm->clasp == &js_ReflectClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(stdnm->clasp))) {
             return JS_TRUE;
@@ -1608,7 +1612,8 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
         if ((standard_class_atoms[i].clasp == &js_MapClass ||
              standard_class_atoms[i].clasp == &js_SetClass ||
              standard_class_atoms[i].clasp == &js_WeakMapClass ||
-             standard_class_atoms[i].clasp == &js_WeakSetClass) &&
+             standard_class_atoms[i].clasp == &js_WeakSetClass ||
+             standard_class_atoms[i].clasp == &js_ReflectClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(standard_class_atoms[i].clasp)))
             continue;

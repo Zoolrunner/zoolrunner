@@ -2108,8 +2108,8 @@ out:
 /* Bound function state occupies per-instance reserved slots, after the two
  * slots reserved for XPConnect. It is invisible to property enumeration. */
 JSBool
-js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
-                JSBool construct, jsval *rval)
+js_InvokeBoundWithNewTarget(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
+                            JSBool construct, jsval *rval, JSObject *newTarget)
 {
     jsval state[3], *sp, *base, *oldsp;
     JSTempValueRooter root;
@@ -2127,6 +2127,8 @@ js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
     for (i = 0; i < 3; i++) {
         if (!JS_GetReservedSlot(cx, bound, i + 2, &state[i])) goto out;
     }
+    if (construct && newTarget == bound)
+        newTarget = JSVAL_TO_OBJECT(state[0]);
     if (!js_GetLengthProperty(cx, JSVAL_TO_OBJECT(state[2]), &count)) goto out;
     if (count >= ARRAY_INIT_LIMIT || argc >= ARRAY_INIT_LIMIT - count) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS);
@@ -2145,7 +2147,7 @@ js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
     for (i = 0; i < argc; i++) *sp++ = argv[i];
     oldsp = fp->sp;
     fp->sp = sp;
-    ok = construct ? js_InvokeConstructor(cx, base, count + argc) :
+    ok = construct ? js_InvokeConstructorWithNewTarget(cx, base, count + argc, newTarget) :
          js_Invoke(cx, count + argc, JSINVOKE_INTERNAL | JSINVOKE_SKIP_CALLER);
     if (ok) *rval = base[0];
     fp->sp = oldsp;
@@ -2153,6 +2155,13 @@ js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
 out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
+}
+
+JSBool
+js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
+                JSBool construct, jsval *rval)
+{
+    return js_InvokeBoundWithNewTarget(cx, bound, argc, argv, construct, rval, NULL);
 }
 
 static JSBool

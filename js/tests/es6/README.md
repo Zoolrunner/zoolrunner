@@ -1157,3 +1157,35 @@ Calendar passes eight unit suites and all four views; Browser passes 169
 navigation/layout checks; Suite passes Composer lifecycle and ChatZilla checks;
 packaged standalone XULRunner passes ChatZilla initialization/input. Other
 platforms have not been revalidated for this batch.
+
+
+### Reflect
+
+The native ES2015 Reflect namespace implements all 14 operations, including
+`enumerate` from the 2015 edition. Property operations preserve raw accessor
+receivers and return false for ordinary descriptor, extensibility and deletion
+rejections; user exceptions still propagate. Construction supports alternate
+`newTarget` prototypes, bound constructors and intrinsic fallback from the
+new target's realm without replacing the historical embedding APIs.
+
+The focused script currently passes 53 checks. `TestReflect.c` passes 43 native
+checks covering foreign globals after their context is destroyed, intrinsic
+fallback, legacy callers, native setter hooks with collection during callbacks,
+enumerator reentry, security callback rejection, namespace deletion and cache
+reset. The pinned Reflect subset passes 266 of 288 cases; all 22 remaining cases
+depend on the unimplemented Proxy.
+The complete pinned ES2015 run passes **25,330 cases**, with **3,236 failures**,
+14 unsupported module cases and two harness errors. This adds 266 passes and
+loses none relative to the weak-collection baseline. The runtime hashes remained
+unchanged during the run, with no crashes or timeouts. All **11,540 ES5.1 cases**
+pass. All four macOS arm64 applications compile and pass packaged shell/native
+and relocated desktop checks, including Reflect in chrome/content globals.
+Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout checks; Suite passes all 24 lifecycle checks and ChatZilla;
+packaged standalone XULRunner passes ChatZilla initialization and input checks.
+Other platforms have not been revalidated for this batch.
+
+Nonstandard embedding object operations retain their classic
+hooks; a distinct receiver cannot be forwarded through a historical get hook
+that has no receiver parameter. These checks do not establish Proxy support
+or complete host-object receiver semantics.

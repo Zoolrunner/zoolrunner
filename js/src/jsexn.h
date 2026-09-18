@@ -91,6 +91,8 @@ extern const JSErrorFormatString *
 js_GetLocalizedErrorMessage(JSContext* cx, void *userRef, const char *locale,
                             const uintN errorNumber);
 
+extern JSProtoKey js_GetExceptionProtoKey(JSNative native);
+
 JS_END_EXTERN_C
 
 #endif /* jsexn_h___ */

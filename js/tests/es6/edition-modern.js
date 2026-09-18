@@ -76,6 +76,9 @@ function modernWindowEdition() {
            Array.from(new Set([1, 1, 2])).join() === "1,2" &&
            new WeakMap([[symbolTarget, windowSymbol]]).get(symbolTarget) === windowSymbol &&
            new WeakSet([symbolTarget]).has(symbolTarget) &&
+           Reflect.get(symbolTarget, windowSymbol) === symbolTarget[windowSymbol] &&
+           Reflect.ownKeys({reflectWindow: 1})[0] === "reflectWindow" &&
+           Reflect.enumerate({reflectWindow: 1}).next().value === "reflectWindow" &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

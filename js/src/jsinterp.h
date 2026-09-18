@@ -82,6 +82,7 @@ struct JSStackFrame {
     JSStackFrame    *dormantNext;   /* next dormant frame chain */
     JSObject        *xmlNamespace;  /* null or default xml namespace in E4X */
     JSObject        *blockChain;    /* active compile-time block scopes */
+    JSObject        *newTarget;     /* valid only with JSFRAME_NEW_TARGET */
 };
 
 typedef struct JSInlineFrame {
@@ -114,6 +115,8 @@ typedef struct JSInlineFrame {
 
 #define JSFRAME_EVAL_COMPILER 0x4000 /* explicit eval compilation environment */
 #define JSFRAME_STRICT_EVAL   0x8000 /* inherit strictness for direct eval */
+
+#define JSFRAME_NEW_TARGET    0x10000 /* constructor frame has newTarget */
 
 #define JSFRAME_OVERRIDE_SHIFT 24   /* override bit-set params; see jsfun.c */
 #define JSFRAME_OVERRIDE_BITS  8
@@ -365,6 +368,10 @@ js_StrictlyEqual(jsval lval, jsval rval);
 
 extern JSBool
 js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc);
+
+extern JSBool
+js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                  JSObject *newTarget);
 
 extern JSBool
 js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result);

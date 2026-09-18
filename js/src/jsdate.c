@@ -2275,7 +2275,7 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 JSObject *
 js_InitDateClass(JSContext *cx, JSObject *obj)
 {
-    JSObject *proto;
+    JSObject *proto, *ctor;
     jsdouble *proto_date;
 
     /* set static LocalTZA */
@@ -2283,6 +2283,10 @@ js_InitDateClass(JSContext *cx, JSObject *obj)
     proto = JS_InitClass(cx, obj, NULL, &js_DateClass, Date, MAXARGS,
                          NULL, date_methods, NULL, date_static_methods);
     if (!proto)
+        return NULL;
+
+    ctor = JS_GetConstructor(cx, proto);
+    if (!ctor || !js_SetBuiltinMethodFlags(cx, ctor, date_static_methods, JSFUN_NO_CONSTRUCT))
         return NULL;
 
     /* Internal function flags do not fit the legacy JSFunctionSpec table. */

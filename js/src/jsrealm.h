@@ -11,6 +11,7 @@ typedef enum JSRealmIntrinsic {
     JS_INTRINSIC_ARRAY_VALUES,
     JS_INTRINSIC_MAP_ITERATOR_PROTO,
     JS_INTRINSIC_SET_ITERATOR_PROTO,
+    JS_INTRINSIC_ENUMERATOR_PROTO,
     JS_INTRINSIC_LIMIT
 } JSRealmIntrinsic;
 extern JSObject *js_GetCachedIntrinsic(JSContext *cx, JSObject *global,

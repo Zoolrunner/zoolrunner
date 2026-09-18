@@ -566,6 +566,16 @@ static struct JSExnSpec exceptions[] = {
     {0,          NULL,                  JSProto_Null,           NULL}
 };
 
+JSProtoKey
+js_GetExceptionProtoKey(JSNative native)
+{
+    uintN i;
+    for (i = 0; exceptions[i].name; ++i) {
+        if (exceptions[i].native == native) return exceptions[i].key;
+    }
+    return JSProto_Error;
+}
+
 static JSString *
 ValueToShortSource(JSContext *cx, jsval v)
 {

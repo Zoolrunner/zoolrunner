@@ -392,8 +392,19 @@ Map and Set support ordered storage, iterable construction, mutation-safe
 iteration and callback/GC handling. On macOS arm64, the full ES2015 run passes
 24,708 cases, with 3,858 failures, 14 unsupported module cases and two harness
 errors. All 11,540 ES5 cases and all four packaged application checks pass.
-Weak collections and arrow functions remain separate work; other platforms have
-not been revalidated for this batch.
+Arrow functions remain separate work; other platforms have not been revalidated
+for this batch. Weak collections are covered below.
+
+Reflect implements the 2015 operations,
+including `enumerate` and alternate-target construction, pass 53 focused
+checks and 43 native embedding checks on macOS arm64. The pinned Reflect
+subset passes 266/288 cases; the remaining 22 require Proxy. The full ES2015
+run passes 25,330 cases, with 3,236 failures, 14 unsupported module cases and
+two harness errors, gaining 266 passes without regressions. All 11,540 ES5.1
+cases pass. All four macOS arm64 applications pass build, package and desktop
+checks, including Calendar views, Composer and ChatZilla. Other platforms have
+not been revalidated for this batch; see the
+[ES6 validation notes](js/tests/es6/README.md).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS
