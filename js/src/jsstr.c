@@ -68,6 +68,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsnormalization.h"
+#include "jscasing.h"
 #include "jsobj.h"
 #include "jssymbol.h"
 #include "jsopcode.h"
@@ -3031,6 +3032,7 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
     if (!js_InitStringIteratorMethod(cx, obj, proto))
         return NULL;
     if (js_IsModernGlobal(cx, obj)) {
+        if (!js_InitModernCasing(cx, proto)) return NULL;
         for (i = 0; i < sizeof(protocols) / sizeof(protocols[0]); ++i) {
             if (!JS_GetProperty(cx, proto, protocols[i], &v)) return NULL;
             fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(v));

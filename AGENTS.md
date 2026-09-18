@@ -1275,3 +1275,9 @@ copy-loop callbacks. Views retain the buffer object, never a raw storage pointer
 Preserve corrected ES2015 optional DataView offsets and setter conversion order;
 keep the pinned edition's stricter ArrayBuffer length and view access indices.
 Use explicit float32 rounding, endian-neutral byte access and checked bounds.
+
+For modern Unicode casing changes, run `casing.js`, `TestCasing.c` and the pinned
+UCD exhaustive `test-casing.py` runner. Preserve legacy-global tables and explicit
+embedding locale callbacks. Keep full mappings, supplementary code points,
+original-text Final_Sigma context, interruptible loops and checked UTF-16 growth.
+Do not silently change identifier, regexp or platform-wide Unicode tables.

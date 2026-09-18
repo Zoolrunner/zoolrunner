@@ -1760,3 +1760,38 @@ XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/binary-data-runtime`. Typed arrays remain unimplemented;
 ArrayBuffer.isView currently recognizes DataView only. Other platforms and full
 ES6 remain incomplete.
+
+### Modern Unicode casing
+
+ES2015 globals use separate native upper/lowercase methods backed by checksum-
+pinned Unicode 18.0.0 data. Full mappings cover expansions and supplementary
+characters; Final_Sigma uses original-text Cased and Case_Ignorable context,
+including characters with both properties. Native loops are interruptible and
+UTF-16 growth is checked. Legacy globals retain historical methods; cloned modern
+methods retain modern mappings even when installed into a legacy global. Explicit embedding locale
+callbacks remain authoritative; default modern locale casing uses the full tables.
+Platform-wide Unicode tables and regexp case folding remain unchanged.
+
+Focused checks pass 23 script and 26 native assertions under MallocScribble;
+C89 checks pass. The String `prototype/to*` diagnostic subset passes 204/204.
+The pinned UCD runner checks every code point through four methods: all
+4,456,448 comparisons pass, including identity mappings and lone surrogates.
+Native tests exercise GC, long ignored runs, interruption/recovery, foreign
+contexts, JSAPI cloning and legacy isolation. The initial compile required adding
+the private function-flags header.
+
+The full pinned ES2015 run passes **26,648 cases**, with **1,918 failures**,
+14 unsupported module cases and two harness errors: **18 gained, zero lost**
+relative to binary data. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/casing-full.json` and
+`casing-es5.json`; snapshot: `/tmp/zr-casing-conformance-20260918`.
+It combines the preceding frozen runtime with the completed casing engine;
+libmozjs SHA-256 `4c8b2ab27b15cde35d732b2f11f33a0f85bfc6c64958d16bac921b001ce2f9f2`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/casing-runtime`. Other platforms and full ES6 remain incomplete.

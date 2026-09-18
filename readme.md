@@ -525,11 +525,19 @@ remain incomplete. See [Error validation notes](js/tests/es6/README.md#error-con
 
 The binary-data follow-up adds ArrayBuffer and DataView, including species,
 endian-aware numeric access and detachment-safe callbacks. All 146 diagnostic
-cases pass. The latest full macOS arm64 ES2015 run passes **26,630 cases**, with
+cases pass. The binary-data full macOS arm64 ES2015 run passes **26,630 cases**, with
 **1,936 failures**, 14 unsupported module cases and two harness errors: 148
 gained, zero lost. All 11,540 ES5.1 cases and all four build, package and desktop
 checks pass. Typed arrays, full ES6 and other-platform validation remain
 incomplete. See [binary-data validation notes](js/tests/es6/README.md#arraybuffer-and-dataview).
+
+Modern String casing uses Unicode 18.0.0 full mappings and context-sensitive
+sigma while preserving legacy methods and embedding locale callbacks. All 204
+diagnostic cases and 4,456,448 UCD comparisons pass. The latest full macOS arm64
+ES2015 run passes **26,648 cases**, with **1,918 failures**, 14 unsupported module
+cases and two harness errors: 18 gained, zero lost. All 11,540 ES5.1 cases and all
+four build, package and desktop checks pass. Full ES6 and other-platform validation
+remain incomplete. See [casing validation notes](js/tests/es6/README.md#modern-unicode-casing).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS
