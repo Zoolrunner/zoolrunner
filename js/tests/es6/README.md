@@ -2359,3 +2359,32 @@ and callback/unwind follow-ups and is diagnostic only.
 Global lexical environments, module environments, default/destructured parameters,
 and the broader iterator/destructuring semantics remain unfinished. This batch
 does not implement for-of. Non-macOS-arm64 validation remains outstanding.
+
+### Strict function declaration positions
+
+Modern strict code now rejects function declarations used directly as a single
+statement body, including `if`, loops and labels. Declarations in blocks,
+switch clauses and function bodies remain accepted. The check applies to strict
+eval, Function construction and inherited strictness while leaving selected
+historical grammar and existing sloppy extensions intact. This is a parser
+change with no bytecode-format change.
+
+The focused `function-statement-grammar.js` regression passes 32 checks and is
+registered in packaged validation. C89 syntax checks pass. The targeted upstream
+function-declaration group passes 9/9 modes. The complete ES2015 run passes
+**27,383 modes**, with **1,183 failures**, 14 unsupported modules, two harness
+errors and no crashes or timeouts: **six gained, zero lost** from the preceding
+lexical-scope baseline. The six gains include strict labelled declarations.
+All **11,540 ES5.1 cases** pass. Both full suites used the frozen runtime at
+`/tmp/zr-function-grammar-final-conformance-20260918`, with engine SHA-256
+`fc537655b5d3567f21a7d5a897b4d6b186ab254a80a529e790c63ba64976912e`,
+unchanged through both runs. All four application engines match it. Reports use
+`function-grammar-final-*`. All four macOS arm64 applications pass root builds,
+packaging and desktop checks, including Calendar's four views, 169 Browser
+navigation/layout checks and Suite/XULRunner ChatZilla. Eight additional lexical
+unwind checks pass, covering labelled continue, finally, with/eval closures and
+GC. Other platforms have not been revalidated for this parser change.
+
+Grammar reference: https://262.ecma-international.org/6.0/#sec-block
+and the strict restrictions in sections 13.13 and B.3.4. This does not complete
+block function binding/redeclaration semantics.

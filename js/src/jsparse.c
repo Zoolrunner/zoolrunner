@@ -3124,6 +3124,13 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         if (tt == TOK_DBLCOLON)
             goto expression;
 #endif
+        /* Declarations are StatementListItems, not strict Statement bodies.
+         * Keep the selected historical grammar and sloppy extensions intact. */
+        if (JS_VERSION_IS_ES2015(cx) && (tc->flags & TCF_STRICT_MODE) &&
+            !allowLexical) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
         return FunctionStmt(cx, ts, tc);
 
       case TOK_IF:

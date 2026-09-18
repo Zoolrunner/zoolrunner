@@ -649,7 +649,7 @@ ChatZilla. Other platforms have not been revalidated for these changes; see
 [the ES6 validation record](js/tests/es6/README.md#block-lexical-initialization).
 
 
-The latest lexical-scope batch implements modern block/function-body `const`
+The lexical-scope batch implements modern block/function-body `const`
 and fresh named `let`/`const` loop bindings while preserving selected legacy
 semantics. The complete macOS arm64 run passes **27,377 ES2015 cases**, with
 **1,189 failures**, 14 unsupported modules and two harness errors
@@ -658,3 +658,13 @@ environments, `for-of` and broader destructuring remain unfinished. All four
 macOS arm64 applications pass build, package and desktop checks, including
 Calendar views, Browser navigation/layout and ChatZilla. Other platforms have
 not been revalidated for this batch; see [the detailed validation record](js/tests/es6/README.md#block-const-and-per-iteration-bindings).
+
+
+The subsequent strict declaration-position fix brings the complete macOS arm64
+run to **27,383 ES2015 passes**, with **1,183 failures**, 14 unsupported module
+cases and two harness errors (**six gained, zero lost**). All **11,540 ES5.1
+cases** pass. Strict statement bodies reject bare function declarations while
+valid block declarations and selected legacy syntax remain available. All four
+macOS arm64 applications pass build, package and desktop checks, including
+Calendar views, Browser navigation/layout and ChatZilla. Other platforms remain
+unvalidated for this change. See the [validation record](js/tests/es6/README.md#strict-function-declaration-positions).

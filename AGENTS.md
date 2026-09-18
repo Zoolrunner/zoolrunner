@@ -1418,3 +1418,11 @@ that capture bindings during this transition. Preserve const in reconstructed
 source and omit internal transitions from printed loop updaters. Cache version
 47 adds const metadata and iteration instructions. Global lexical environments,
 for-of and broader iterator/destructuring semantics remain unfinished.
+
+
+For declaration-position grammar changes, run
+`js/tests/es6/function-statement-grammar.js`. Modern strict declarations must
+remain distinct from single statement bodies; preserve valid function/block/
+switch declarations, inherited strictness and selected historical syntax.
+Check both eval and Function construction. Parser-only fixes do not establish
+that block-function binding and redeclaration semantics are complete.
