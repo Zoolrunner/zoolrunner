@@ -329,6 +329,13 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 jsval *rval);
 
 extern JSBool
+js_LookupOwnProperty(JSContext *cx, JSObject *obj, jsid id,
+                     JSObject **owner, JSProperty **property);
+extern JSBool
+js_CheckOwnAccess(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
+                   jsval *vp, uintN *attrs);
+
+extern JSBool
 js_HasOwnPropertyHelper(JSContext *cx, JSObject *obj, JSLookupPropOp lookup,
                         uintN argc, jsval *argv, jsval *rval);
 

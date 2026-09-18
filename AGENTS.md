@@ -1157,3 +1157,19 @@ dead keys before sweeping. Preserve the classic MARK_END callback guarantee:
 a host mark call returns with transitive marking, including weak values,
 complete. Validate native finalizer counts, transitive weak chains, callback-only
 roots, legacy generator cleanup and destroyed contexts, not just API names.
+
+
+For Reflect and Proxy changes, run `js/tests/es6/reflect.js`, `proxy.js`,
+`TestReflect.c` and `TestProxy.c`, together with the full ES5/ES2015 gates and
+real application globals. Preserve raw receivers, alternate newTarget realms,
+boolean rejection versus user exceptions, and ES2015 trap ordering/invariants.
+The 2015 enumerate operation, revoked-Proxy creation rules and anonymous
+revoker metadata differ from later editions: use the pinned 2015 specification
+and tests. Do not substitute current-engine behavior as the only oracle.
+Capture and root Proxy target/handler state before trap getters; revocation
+inside a callback must release stored references without invalidating the
+operation already in progress. Keep revoker state separate from function
+metadata and preserve it through JSAPI cloning. Exercise native finalizers and
+opaque lookup-handle release. Do not treat Proxy object maps/properties as
+native scopes or pass them to native object-lock fast paths. Preserve public
+JSClass/JSObjectOps layouts and the existing non-Proxy embedding hooks.

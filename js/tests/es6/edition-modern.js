@@ -79,6 +79,11 @@ function modernWindowEdition() {
            Reflect.get(symbolTarget, windowSymbol) === symbolTarget[windowSymbol] &&
            Reflect.ownKeys({reflectWindow: 1})[0] === "reflectWindow" &&
            Reflect.enumerate({reflectWindow: 1}).next().value === "reflectWindow" &&
+           new Proxy({proxyWindow: 23}, {}).proxyWindow === 23 &&
+           JSON.stringify(new Proxy([1, 2], {})) === "[1,2]" &&
+           (function() { var p = Proxy.revocable({}, {}); p.revoke();
+                         try { Reflect.ownKeys(p.proxy); return false; }
+                         catch (e) { return e instanceof TypeError; } })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

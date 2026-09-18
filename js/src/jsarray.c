@@ -59,6 +59,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsproxy.h"
 #include "jsrealm.h"
 #include "jsstr.h"
 #include "jssymbol.h"
@@ -1368,7 +1369,7 @@ array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSObject *nobj, *aobj;
     jsuint length, alength, slot;
     uintN i;
-    JSBool hole;
+    JSBool hole, array;
 
     /* Hoist the explicit local root address computation. */
     vp = argv + argc;
@@ -1389,7 +1390,8 @@ array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         v = argv[i];
         if (JSVAL_IS_OBJECT(v)) {
             aobj = JSVAL_TO_OBJECT(v);
-            if (aobj && OBJ_GET_CLASS(cx, aobj) == &js_ArrayClass) {
+            if (aobj && !js_IsArray(cx, aobj, &array)) return JS_FALSE;
+            if (aobj && array) {
                 if (!OBJ_GET_PROPERTY(cx, aobj,
                                       ATOM_TO_JSID(cx->runtime->atomState
                                                    .lengthAtom),
@@ -1429,7 +1431,7 @@ array_slice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSObject *nobj;
     jsuint length, begin, end, slot;
     jsdouble d;
-    JSBool hole;
+    JSBool hole, array;
 
     /* Hoist the explicit local root address computation. */
     vp = argv + argc;
@@ -2108,12 +2110,25 @@ Array(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return InitArrayObject(cx, obj, length, vector);
 }
 
+JSBool
+js_IsArray(JSContext *cx, JSObject *obj, JSBool *answer)
+{
+    while (js_IsProxy(cx, obj)) {
+        if (!js_ProxyTarget(cx, obj, &obj)) return JS_FALSE;
+    }
+    *answer = OBJ_GET_CLASS(cx, obj) == &js_ArrayClass;
+    return JS_TRUE;
+}
+
 static JSBool
 array_isArray(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
               jsval *rval)
 {
-    *rval = BOOLEAN_TO_JSVAL(argc != 0 && !JSVAL_IS_PRIMITIVE(argv[0]) &&
-                            OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) == &js_ArrayClass);
+    JSBool answer;
+    *rval = JSVAL_FALSE;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) return JS_TRUE;
+    if (!js_IsArray(cx, JSVAL_TO_OBJECT(argv[0]), &answer)) return JS_FALSE;
+    *rval = BOOLEAN_TO_JSVAL(answer);
     return JS_TRUE;
 }
 

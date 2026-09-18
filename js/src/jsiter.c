@@ -60,6 +60,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsproxy.h"
 #include "jsopcode.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -470,6 +471,7 @@ CallEnumeratorNext(JSContext *cx, JSObject *iterobj, uintN flags, jsval *rval)
         goto stop;
 
     foreach = (flags & JSITER_FOREACH) != 0;
+
 #if JS_HAS_XML_SUPPORT
     /*
      * Treat an XML object specially only when it starts the prototype chain.
@@ -494,6 +496,30 @@ CallEnumeratorNext(JSContext *cx, JSObject *iterobj, uintN flags, jsval *rval)
 #endif
     {
       restart:
+        if (!foreach && js_IsProxy(cx, obj)) {
+            JSBool done, shadowed;
+            JSObject *cursor;
+            if (!js_ProxyIteratorNext(cx, state, &done, rval)) return JS_FALSE;
+            if (done) {
+                iterobj->slots[JSSLOT_ITER_STATE] = JSVAL_NULL;
+                goto stop;
+            }
+            if (obj == origobj) return JS_TRUE;
+            if (!JS_ValueToId(cx, *rval, &id)) return JS_FALSE;
+            shadowed = JS_FALSE;
+            for (cursor = origobj; cursor && cursor != obj;
+                 cursor = OBJ_GET_PROTO(cx, cursor)) {
+                if (!js_LookupOwnProperty(cx, cursor, id, &obj2, &prop))
+                    return JS_FALSE;
+                if (prop) {
+                    shadowed = obj2 == cursor;
+                    OBJ_DROP_PROPERTY(cx, obj2, prop);
+                    if (shadowed) break;
+                }
+            }
+            if (shadowed) goto restart;
+            return JS_TRUE;
+        }
         if (!OBJ_ENUMERATE(cx, obj, JSENUMERATE_NEXT, &state, &id))
             return JS_TRUE;
 

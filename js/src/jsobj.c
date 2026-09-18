@@ -65,6 +65,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsproxy.h"
 #include "jssymbol.h"
 #include "jsrealm.h"
 #include "jsregexp.h"
@@ -1167,14 +1168,16 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     JSTempValueRooter root;
     JSBool ok = JS_FALSE;
     JSClass *clasp;
+    JSBool array;
 
     if (JSVAL_IS_VOID(argv[-1]))
         clazz = "Undefined";
     else if (JSVAL_IS_NULL(argv[-1]))
         clazz = "Null";
-    else if (JS_VERSION_IS_ES2015(cx)) {
+    else if (JS_VERSION_IS_ES2015(cx) || js_IsProxy(cx, obj)) {
+        if (!js_IsArray(cx, obj, &array)) return JS_FALSE;
         clasp = OBJ_GET_CLASS(cx, obj);
-        if (clasp == &js_ArrayClass)
+        if (array)
             clazz = "Array";
         else if (clasp == &js_StringClass)
             clazz = "String";
@@ -1725,6 +1728,13 @@ js_HasOwnPropertyHelper(JSContext *cx, JSObject *obj, JSLookupPropOp lookup,
 
     if (!JS_ValueToId(cx, argv[0], &id))
         return JS_FALSE;
+    if (js_IsProxy(cx, obj)) {
+        JSObject *global = js_ProxyOperationGlobal(cx);
+        if (!js_ProxyGetOwnDescriptor(cx, obj, id, global, rval)) return JS_FALSE;
+        *rval = BOOLEAN_TO_JSVAL(!JSVAL_IS_VOID(*rval));
+        return JS_TRUE;
+    }
+    if (lookup == js_LookupProperty) lookup = js_LookupOwnProperty;
     if (!lookup(cx, obj, id, &obj2, &prop))
         return JS_FALSE;
     if (!prop) {
@@ -1804,7 +1814,15 @@ obj_propertyIsEnumerable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     if (!JS_ValueToId(cx, argv[0], &id))
         return JS_FALSE;
 
-    if (!OBJ_LOOKUP_PROPERTY(cx, obj, id, &obj2, &prop))
+    if (js_IsProxy(cx, obj)) {
+        JSObject *global = js_ProxyOperationGlobal(cx);
+        if (!js_ProxyGetOwnDescriptor(cx, obj, id, global, rval)) return JS_FALSE;
+        if (JSVAL_IS_VOID(*rval)) { *rval = JSVAL_FALSE; return JS_TRUE; }
+        return JS_GetProperty(cx, JSVAL_TO_OBJECT(*rval), "enumerable", rval);
+    }
+    if (!(obj->map->ops->lookupProperty == js_LookupProperty
+          ? js_LookupOwnProperty(cx, obj, id, &obj2, &prop)
+          : OBJ_LOOKUP_PROPERTY(cx, obj, id, &obj2, &prop)))
         return JS_FALSE;
 
     if (!prop) {
@@ -3450,9 +3468,26 @@ js_LookupProperty(JSContext *cx, JSObject *obj, jsid id, JSObject **objp,
     return js_LookupPropertyWithFlags(cx, obj, id, 0, objp, propp);
 }
 
+static JSBool
+LookupPropertyInternal(JSContext *cx, JSObject *obj, jsid id, uintN flags,
+                         JSObject **objp, JSProperty **propp, JSBool access, JSBool ownOnly);
+
 JSBool
 js_LookupPropertyWithFlags(JSContext *cx, JSObject *obj, jsid id, uintN flags,
                            JSObject **objp, JSProperty **propp)
+{
+    return LookupPropertyInternal(cx, obj, id, flags, objp, propp, JS_FALSE, JS_FALSE);
+}
+
+JSBool
+js_LookupOwnProperty(JSContext *cx, JSObject *obj, jsid id, JSObject **owner, JSProperty **property)
+{
+    return LookupPropertyInternal(cx, obj, id, 0, owner, property, JS_FALSE, JS_TRUE);
+}
+
+static JSBool
+LookupPropertyInternal(JSContext *cx, JSObject *obj, jsid id, uintN flags,
+                         JSObject **objp, JSProperty **propp, JSBool access, JSBool ownOnly)
 {
     JSObject *start, *obj2, *proto;
     JSScope *scope;
@@ -3622,10 +3657,13 @@ js_LookupPropertyWithFlags(JSContext *cx, JSObject *obj, jsid id, uintN flags,
         JS_UNLOCK_OBJ(cx, obj);
         if (!proto)
             break;
+        if (ownOnly && js_IsProxy(cx, proto)) break;
         if (!OBJ_IS_NATIVE(proto)) {
             JSBool ret;
             JS_PUSH_SINGLE_TEMP_ROOT(cx, OBJECT_TO_JSVAL(proto), &tvr2);
-            ret = OBJ_LOOKUP_PROPERTY(cx, proto, id, objp, propp);
+            ret = access && js_IsProxy(cx, proto)
+                  ? js_ProxyLookupForAccess(cx, proto, id, objp, propp)
+                  : OBJ_LOOKUP_PROPERTY(cx, proto, id, objp, propp);
             JS_POP_TEMP_ROOT(cx, &tvr2);
             return ret;
         }
@@ -3895,7 +3933,8 @@ GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
      */
     CHECK_FOR_STRING_INDEX(id);
 
-    if (!js_LookupProperty(cx, obj, id, &obj2, &prop))
+    if (js_IsProxy(cx, obj)) return js_ProxyGet(cx, obj, id, receiver, vp);
+    if (!LookupPropertyInternal(cx, obj, id, 0, &obj2, &prop, JS_TRUE, JS_FALSE))
         return JS_FALSE;
     if (!prop) {
         jsbytecode *pc;
@@ -3955,6 +3994,7 @@ GetPropertyValue(JSContext *cx, JSObject *obj, jsval receiver,
 
     if (!OBJ_IS_NATIVE(obj2)) {
         OBJ_DROP_PROPERTY(cx, obj2, prop);
+        if (js_IsProxy(cx, obj2)) return js_ProxyGet(cx, obj2, id, receiver, vp);
         return OBJ_GET_PROPERTY(cx, obj2, id, vp);
     }
 
@@ -3981,9 +4021,21 @@ js_SetPrimitiveProperty(JSContext *cx, JSObject *obj, jsval receiver,
     JSBool ok;
 
     JS_PUSH_TEMP_ROOT(cx, 1, &receiver, &receiverRoot);
-    ok = OBJ_LOOKUP_PROPERTY(cx, obj, id, &owner, &prop);
+    ok = obj->map->ops->lookupProperty == js_LookupProperty
+         ? LookupPropertyInternal(cx, obj, id, 0, &owner, &prop, JS_TRUE, JS_FALSE)
+         : OBJ_LOOKUP_PROPERTY(cx, obj, id, &owner, &prop);
     if (!ok)
         goto out;
+    if (prop && js_IsProxy(cx, owner)) {
+        JSBool accepted;
+        OBJ_DROP_PROPERTY(cx, owner, prop);
+        ok = js_ProxySet(cx, owner, id, *vp, receiver, &accepted);
+        if (ok && !accepted && strict) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            ok = JS_FALSE;
+        }
+        goto out;
+    }
     if (prop) {
         if (OBJ_IS_NATIVE(owner)) {
             sprop = (JSScopeProperty *)prop;
@@ -4024,9 +4076,19 @@ SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp, JSBool strict)
      */
     CHECK_FOR_STRING_INDEX(id);
 
-    if (!js_LookupProperty(cx, obj, id, &pobj, &prop))
+    if (!LookupPropertyInternal(cx, obj, id, 0, &pobj, &prop, JS_TRUE, JS_FALSE))
         return JS_FALSE;
 
+    if (prop && js_IsProxy(cx, pobj)) {
+        JSBool accepted;
+        OBJ_DROP_PROPERTY(cx, pobj, prop);
+        if (!js_ProxySet(cx, pobj, id, *vp, OBJECT_TO_JSVAL(obj), &accepted)) return JS_FALSE;
+        if (!accepted && strict) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            return JS_FALSE;
+        }
+        return JS_TRUE;
+    }
     if (prop && !OBJ_IS_NATIVE(pobj)) {
         OBJ_DROP_PROPERTY(cx, pobj, prop);
         prop = NULL;
@@ -4247,6 +4309,15 @@ js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 JSBool
 js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 {
+    if (js_IsProxy(cx, obj)) {
+        JSBool accepted;
+        if (!js_ProxySet(cx, obj, id, *vp, OBJECT_TO_JSVAL(obj), &accepted)) return JS_FALSE;
+        if (!accepted) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+            return JS_FALSE;
+        }
+        return JS_TRUE;
+    }
     if (obj->map->ops->setProperty == js_SetProperty)
         return SetProperty(cx, obj, id, vp, JS_TRUE);
     return OBJ_SET_PROPERTY(cx, obj, id, vp);
@@ -4733,9 +4804,27 @@ js_MarkNativeIteratorStates(JSContext *cx)
     } while ((state = state->next) != NULL);
 }
 
+static JSBool
+CheckAccessInternal(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
+                      jsval *vp, uintN *attrsp, JSBool ownOnly);
+
 JSBool
 js_CheckAccess(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
                jsval *vp, uintN *attrsp)
+{
+    return CheckAccessInternal(cx, obj, id, mode, vp, attrsp, JS_FALSE);
+}
+
+JSBool
+js_CheckOwnAccess(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
+                   jsval *vp, uintN *attrsp)
+{
+    return CheckAccessInternal(cx, obj, id, mode, vp, attrsp, JS_TRUE);
+}
+
+static JSBool
+CheckAccessInternal(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
+                      jsval *vp, uintN *attrsp, JSBool ownOnly)
 {
     JSBool writing;
     JSObject *pobj;
@@ -4761,7 +4850,7 @@ js_CheckAccess(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
         break;
 
       default:
-        if (!js_LookupProperty(cx, obj, id, &pobj, &prop))
+        if (!LookupPropertyInternal(cx, obj, id, 0, &pobj, &prop, JS_FALSE, ownOnly))
             return JS_FALSE;
         if (!prop) {
             if (!writing)
@@ -4990,19 +5079,23 @@ js_HasInstance(JSContext *cx, JSObject *obj, jsval v, JSBool *bp)
 JSBool
 js_IsDelegate(JSContext *cx, JSObject *obj, jsval v, JSBool *bp)
 {
-    JSObject *obj2;
-
+    JSObject *cursor;
+    JSTempValueRooter root;
+    JSBool ok = JS_TRUE;
     *bp = JS_FALSE;
-    if (JSVAL_IS_PRIMITIVE(v))
-        return JS_TRUE;
-    obj2 = JSVAL_TO_OBJECT(v);
-    while ((obj2 = OBJ_GET_PROTO(cx, obj2)) != NULL) {
-        if (obj2 == obj) {
-            *bp = JS_TRUE;
-            break;
-        }
+    if (JSVAL_IS_PRIMITIVE(v)) return JS_TRUE;
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, v, &root);
+    cursor = JSVAL_TO_OBJECT(v);
+    for (;;) {
+        if (js_IsProxy(cx, cursor)) {
+            if (!js_ProxyGetPrototype(cx, cursor, &cursor)) { ok = JS_FALSE; break; }
+        } else cursor = OBJ_GET_PROTO(cx, cursor);
+        if (!cursor) break;
+        root.u.value = OBJECT_TO_JSVAL(cursor);
+        if (cursor == obj) { *bp = JS_TRUE; break; }
     }
-    return JS_TRUE;
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
 }
 
 JSBool

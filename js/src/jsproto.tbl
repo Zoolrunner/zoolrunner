@@ -120,3 +120,4 @@ JS_PROTO(Reflect,               36,     js_InitReflectClass)
 #undef ATTRIBUTE_INIT
 #undef GENERATOR_INIT
 #undef FILE_INIT
+JS_PROTO(Proxy,                 37,     js_InitProxyClass)

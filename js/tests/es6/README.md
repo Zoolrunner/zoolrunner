@@ -1172,8 +1172,8 @@ The focused script currently passes 53 checks. `TestReflect.c` passes 43 native
 checks covering foreign globals after their context is destroyed, intrinsic
 fallback, legacy callers, native setter hooks with collection during callbacks,
 enumerator reentry, security callback rejection, namespace deletion and cache
-reset. The pinned Reflect subset passes 266 of 288 cases; all 22 remaining cases
-depend on the unimplemented Proxy.
+reset. Before the Proxy implementation, the pinned Reflect subset passed
+266 of 288 cases; all 22 remaining cases depended on Proxy.
 The complete pinned ES2015 run passes **25,330 cases**, with **3,236 failures**,
 14 unsupported module cases and two harness errors. This adds 266 passes and
 loses none relative to the weak-collection baseline. The runtime hashes remained
@@ -1187,5 +1187,52 @@ Other platforms have not been revalidated for this batch.
 
 Nonstandard embedding object operations retain their classic
 hooks; a distinct receiver cannot be forwarded through a historical get hook
-that has no receiver parameter. These checks do not establish Proxy support
-or complete host-object receiver semantics.
+that has no receiver parameter. The Reflect batch alone did not establish
+Proxy support or complete host-object receiver semantics.
+
+
+### Proxy
+
+The native Proxy implementation adds forwarding and traps for property reads,
+writes, own descriptors, definition/deletion, keys, prototype/extensibility,
+call/construction and the ES2015 `enumerate` operation. Trap results are checked
+against target invariants, including non-configurable properties and
+non-extensible targets. Property receivers and alternate construction targets
+are retained. Callable/constructible capabilities survive revocation, while
+operations on revoked proxies throw. Captured target/handler roots survive
+revocation and collection inside trap getters; revocation releases their strong
+references. Revoker closures also retain their state when cloned through JSAPI.
+
+The public JSClass/JSObjectOps layouts are unchanged. Private dispatch prevents
+native scope/property-cache paths from interpreting Proxy property handles as
+native properties. Historical objects retain their existing embedding hooks.
+Proxy array recognition is shared by Array.isArray, JSON, concat, Object tags
+and JS_IsArrayObject. Object integrity/assignment and own-property queries
+use the corresponding traps, and inherited enumeration delegates to the
+prototype Proxy without calling its `has` trap.
+
+The focused script passes 65 checks; TestProxy.c passes 55 checks, including
+foreign realms after context destruction, cloned revokers, GC during callbacks,
+finalization of target/handler pairs, 1,000 opaque JSAPI lookups without retained
+roots, and intrinsic-cache reset. The final pinned run passes all 398 Proxy
+cases and all 288 Reflect cases. It records **25,767 passes**, **2,799 failures**,
+14 unsupported module cases and two harness errors: **437 gained, zero lost**
+relative to Reflect. Runtime hashes remained unchanged, with no crashes or
+timeouts. All **11,540 required-mode ES5.1 cases** pass. Conformance ran on the
+validated XULRunner shell with America/Los_Angeles as the test timezone.
+
+All four macOS arm64 applications pass root compilation, package shell/native
+checks and relocated desktop checks with SDK 11.3. Calendar passes eight unit
+suites and all four views; Browser passes 169 navigation/layout assertions;
+Suite passes its 24 lifecycle assertions and ChatZilla; standalone packaged
+XULRunner initializes ChatZilla and its input. No other platform or architecture
+has been revalidated for this batch.
+
+
+Native C getter/setter hooks installed directly on a Proxy through JSAPI are
+not represented by ES property descriptors and currently reject that operation;
+existing native objects are unchanged. The historical native `__proto__`
+accessor also still needs receiver adaptation when reached through a Proxy;
+Reflect.getPrototypeOf and Object.getPrototypeOf use the Proxy trap directly.
+These results do not establish full ES6
+conformance or all host-object wrapping semantics.

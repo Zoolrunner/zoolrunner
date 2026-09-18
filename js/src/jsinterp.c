@@ -60,6 +60,7 @@
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jsiteres6.h"
+#include "jsproxy.h"
 #include "jsexn.h"
 #include "jsiter.h"
 #include "jslock.h"
@@ -1149,6 +1150,14 @@ InvokeWithNewTarget(JSContext *cx, uintN argc, uintN flags, JSObject *newTarget)
     funobj = JSVAL_TO_OBJECT(v);
     parent = OBJ_GET_PARENT(cx, funobj);
     clasp = OBJ_GET_CLASS(cx, funobj);
+    if (js_IsProxy(cx, funobj)) {
+        if ((flags & JSINVOKE_CONSTRUCT) ? !js_IsConstructor(cx, v) : !js_IsCallable(cx, v))
+            goto bad;
+        ok = (flags & JSINVOKE_CONSTRUCT)
+             ? js_ProxyConstruct(cx, funobj, argc, vp + 2, newTarget ? newTarget : funobj, &frame.rval)
+             : js_ProxyCall(cx, funobj, thisv, argc, vp + 2, &frame.rval);
+        goto out2;
+    }
     if (clasp == &js_RegExpClass &&
         (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT || JS_VERSION_IS_ES2015(cx)))
         goto bad;
@@ -2012,8 +2021,13 @@ ConstructorGlobal(JSContext *cx, JSObject *constructor)
 {
     jsval target;
     JSObject *parent;
-    while (OBJ_GET_CLASS(cx, constructor) == &js_FunctionClass &&
-           (((JSFunction *)JS_GetPrivate(cx, constructor))->flags & JSFUN_BOUND_FUNCTION)) {
+    for (;;) {
+        if (js_IsProxy(cx, constructor)) {
+            if (!js_ProxyTarget(cx, constructor, &constructor)) return NULL;
+            continue;
+        }
+        if (OBJ_GET_CLASS(cx, constructor) != &js_FunctionClass ||
+            !(((JSFunction *)JS_GetPrivate(cx, constructor))->flags & JSFUN_BOUND_FUNCTION)) break;
         if (!JS_GetReservedSlot(cx, constructor, 2, &target)) return NULL;
         constructor = JSVAL_TO_OBJECT(target);
     }
@@ -2044,6 +2058,12 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
             return JS_FALSE;
         }
     }
+    if (obj2 && js_IsProxy(cx, obj2)) {
+        JSBool ok = js_ProxyConstruct(cx, obj2, argc, vp + 2, newTarget ? newTarget : obj2, &rval);
+        if (ok) *vp = rval;
+        cx->fp->sp = vp + 1;
+        return ok;
+    }
     if (!JSVAL_IS_OBJECT(lval) ||
         (obj2 = JSVAL_TO_OBJECT(lval)) == NULL ||
         /* XXX clean up to avoid special cases above ObjectOps layer */
@@ -2062,6 +2082,12 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
         return ok;
     }
 
+    if (fun && FUN_NATIVE(fun) == js_ProxyConstructor) {
+        /* ProxyCreate does not read newTarget.prototype or allocate an
+         * ordinary receiver. The native constructor returns its own object. */
+        vp[1] = JSVAL_NULL;
+        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
+    }
     clasp = &js_ObjectClass;
     if (!obj2) {
         proto = parent = NULL;

@@ -57,6 +57,7 @@
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jsiteres6.h"
+#include "jsproxy.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
@@ -1293,7 +1294,8 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
         JSObject *proto, *parentProto;
         jsval pval;
 
-        if (fun->flags & (JSFUN_NO_CONSTRUCT | JSFUN_BOUND_FUNCTION))
+        if ((fun->flags & (JSFUN_NO_CONSTRUCT | JSFUN_BOUND_FUNCTION)) ||
+            FUN_NATIVE(fun) == js_ProxyConstructor)
             return JS_TRUE;
 
         proto = parentProto = NULL;
@@ -1789,7 +1791,7 @@ fun_reserveSlots(JSContext *cx, JSObject *obj)
         /* Function.prototype owns the realm's shared ThrowTypeError. */
         return fun->u.i.nregexps + ((fun->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0);
     }
-    return 0;
+    return fun->u.n.spare;
 }
 
 /*
@@ -2777,7 +2779,16 @@ js_CloneFunctionObject(JSContext *cx, JSObject *funobj, JSObject *parent)
         return NULL;
     }
     JS_PUSH_TEMP_ROOT_OBJECT(cx, newfunobj, &metadataRoot);
-    metadataOK = js_InitFunctionProperties(cx, newfunobj);
+    metadataOK = JS_TRUE;
+    if (!FUN_INTERPRETED(fun) && fun->u.n.spare) {
+        uintN i;
+        jsval value;
+        for (i = 0; metadataOK && i < fun->u.n.spare; ++i) {
+            metadataOK = JS_GetReservedSlot(cx, funobj, i + 2, &value) &&
+                         JS_SetReservedSlot(cx, newfunobj, i + 2, value);
+        }
+    }
+    if (metadataOK) metadataOK = js_InitFunctionProperties(cx, newfunobj);
     JS_POP_TEMP_ROOT(cx, &metadataRoot);
     if (!metadataOK)
         return NULL;

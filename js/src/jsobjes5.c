@@ -50,6 +50,7 @@
 #include "jsinterp.h"
 #include "jsiteres6.h"
 #include "jsreflect.h"
+#include "jsproxy.h"
 #include "jsrealm.h"
 #include "jsobj.h"
 #include "jsnum.h"
@@ -95,6 +96,11 @@ obj_getPrototypeOf(JSContext *cx, JSObject *obj, uintN argc,
     target = ReflectionObject(cx, argc, argv);
     if (!target)
         return JS_FALSE;
+    if (js_IsProxy(cx, target)) {
+        if (!js_ProxyGetPrototype(cx, target, &proto)) return JS_FALSE;
+        *rval = OBJECT_TO_JSVAL(proto);
+        return JS_TRUE;
+    }
     /* Use the same access checks and outer-object boundary as __proto__,
      * without looking up a user property of that name. */
     if (!OBJ_CHECK_ACCESS(cx, target,
@@ -151,6 +157,8 @@ MarkIds(JSContext *cx, JSTempValueRooter *root)
     }
 }
 
+static JSBool ProxyObjectKeys(JSContext *cx, JSObject *target, jsval *rval);
+
 JSBool
 js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -164,6 +172,7 @@ js_ObjectKeys(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
     target = ReflectionObject(cx, argc, argv);
     if (!target)
         return JS_FALSE;
+    if (js_IsProxy(cx, target)) return ProxyObjectKeys(cx, target, rval);
     ids.ids = JS_Enumerate(cx, target);
     if (!ids.ids)
         return JS_FALSE;
@@ -239,9 +248,18 @@ GetOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
     ids.ids = &idStorage;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
     JS_PUSH_TEMP_ROOT(cx, 3, values, &roots);
-    if (!OBJ_CHECK_ACCESS(cx, target, id, JSACC_READ, &values[0], &checkedAttrs))
+    if (js_IsProxy(cx, target)) {
+        if (!global) global = js_ProxyOperationGlobal(cx);
+        ok = js_ProxyGetOwnDescriptor(cx, target, id, global, rval);
         goto out;
-    if (!OBJ_LOOKUP_PROPERTY(cx, target, id, &owner, &prop))
+    }
+    if (!(target->map->ops->checkAccess == js_CheckAccess
+          ? js_CheckOwnAccess(cx, target, id, JSACC_READ, &values[0], &checkedAttrs)
+          : OBJ_CHECK_ACCESS(cx, target, id, JSACC_READ, &values[0], &checkedAttrs)))
+        goto out;
+    if (!(target->map->ops->lookupProperty == js_LookupProperty
+          ? js_LookupOwnProperty(cx, target, id, &owner, &prop)
+          : OBJ_LOOKUP_PROPERTY(cx, target, id, &owner, &prop)))
         goto out;
     if (!prop || (owner != target && !IsVirtualOwn(cx, target, owner, prop))) {
         if (prop)
@@ -302,6 +320,83 @@ obj_getOwnPropertyDescriptor(JSContext *cx, JSObject *obj, uintN argc,
                              jsval *argv, jsval *rval)
 {
     return GetOwnPropertyDescriptor(cx, obj, argc, argv, rval, NULL);
+}
+
+static JSBool
+ProxyOwnAttributes(JSContext *cx, JSObject *target, jsid id, JSBool *found, uintN *attrs)
+{
+    jsval values[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_ProxyOperationGlobal(cx);
+    JSBool ok = JS_FALSE, has;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    *found = JS_FALSE; *attrs = 0;
+    if (!js_ProxyGetOwnDescriptor(cx, target, id, global, &values[0])) goto out;
+    if (!JSVAL_IS_VOID(values[0])) {
+        *found = JS_TRUE;
+        if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(values[0]), "enumerable", &values[1])) goto out;
+        if (values[1] == JSVAL_TRUE) *attrs |= JSPROP_ENUMERATE;
+        if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(values[0]), "configurable", &values[1])) goto out;
+        if (values[1] == JSVAL_FALSE) *attrs |= JSPROP_PERMANENT;
+        /* Complete engine descriptors have either an own writable or own
+         * get/set fields. Do not inspect inherited descriptor fields. */
+        has = JS_FALSE;
+        {
+            JSAtom *atom = js_Atomize(cx, "writable", 8, 0);
+            JSScope *scope;
+            if (!atom) goto out;
+            JS_LOCK_OBJ(cx, JSVAL_TO_OBJECT(values[0]));
+            scope = OBJ_SCOPE(JSVAL_TO_OBJECT(values[0]));
+            has = scope->object == JSVAL_TO_OBJECT(values[0]) && SCOPE_GET_PROPERTY(scope, ATOM_TO_JSID(atom));
+            JS_UNLOCK_OBJ(cx, JSVAL_TO_OBJECT(values[0]));
+        }
+        if (has) {
+            if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(values[0]), "writable", &values[1])) goto out;
+            if (values[1] == JSVAL_FALSE) *attrs |= JSPROP_READONLY;
+        } else *attrs |= JSPROP_GETTER | JSPROP_SETTER;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ProxyObjectKeys(JSContext *cx, JSObject *target, jsval *rval)
+{
+    RootedIds ids;
+    JSObject *result, *global, *proto;
+    JSString *str;
+    JSTempValueRooter root;
+    jsval value = JSVAL_VOID;
+    jsint i;
+    jsuint count = 0;
+    uintN attrs;
+    JSBool ok = JS_FALSE, found;
+    ids.ids = js_ProxyOwnKeys(cx, target);
+    if (!ids.ids) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, value, &root);
+    global = js_ProxyOperationGlobal(cx);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    result = proto ? js_NewArrayObjectWithProto(cx, 0, NULL, proto, global) : NULL;
+    if (!result) goto out;
+    *rval = OBJECT_TO_JSVAL(result);
+    for (i = 0; i < ids.ids->length; ++i) {
+        if (JSVAL_IS_SYMBOL(ID_TO_VALUE(ids.ids->vector[i]))) continue;
+        if (!ProxyOwnAttributes(cx, target, ids.ids->vector[i], &found, &attrs)) goto out;
+        if (!found || !(attrs & JSPROP_ENUMERATE)) continue;
+        str = js_ValueToString(cx, ID_TO_VALUE(ids.ids->vector[i]));
+        if (!str) goto out;
+        root.u.value = STRING_TO_JSVAL(str);
+        if (!JS_DefineElement(cx, result, count++, root.u.value, NULL, NULL, JSPROP_ENUMERATE)) goto out;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    JS_POP_TEMP_ROOT(cx, &ids.root);
+    JS_DestroyIdArray(cx, ids.ids);
+    return ok;
 }
 
 /* Keep descriptor values rooted while conversion calls user getters. */
@@ -389,6 +484,91 @@ SameValue(jsval a, jsval b)
     if (JSVAL_IS_STRING(a) && JSVAL_IS_STRING(b))
         return js_EqualStrings(JSVAL_TO_STRING(a), JSVAL_TO_STRING(b));
     return a == b;
+}
+
+/* Proxy invariants compare descriptor records without invoking getters on
+ * Object.prototype or mutating the target. The caller roots both records. */
+JSBool
+js_CompatibleProxyDescriptor(JSContext *cx, JSBool extensible,
+                              jsval descriptor, jsval current, JSBool *compatible)
+{
+    ES5Descriptor d, old;
+    JSTempValueRooter root, oldRoot;
+    JSBool ok = JS_FALSE, access, oldAccess;
+    uintN i;
+    for (i = 0; i < D_COUNT; ++i) d.v[i] = old.v[i] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, D_COUNT, d.v, &root);
+    JS_PUSH_TEMP_ROOT(cx, D_COUNT, old.v, &oldRoot);
+    *compatible = JS_FALSE;
+    if (!ReadDescriptor(cx, descriptor, &d, JS_TRUE)) goto out;
+    if (JSVAL_IS_VOID(current)) { *compatible = extensible; ok = JS_TRUE; goto out; }
+    if (!ReadDescriptor(cx, current, &old, JS_TRUE)) goto out;
+    ok = JS_TRUE;
+    if (!d.present) goto accept;
+    if (old.v[D_CONFIG] == JSVAL_FALSE) {
+        if (d.v[D_CONFIG] == JSVAL_TRUE) goto out;
+        if ((d.present & D_BIT(D_ENUM)) && d.v[D_ENUM] != old.v[D_ENUM]) goto out;
+    }
+    if (!(d.present & (D_ACCESS | D_DATA))) goto accept;
+    access = (d.present & D_ACCESS) != 0;
+    oldAccess = (old.present & D_ACCESS) != 0;
+    if (access != oldAccess) {
+        if (old.v[D_CONFIG] == JSVAL_FALSE) goto out;
+    } else if (!access) {
+        if (old.v[D_CONFIG] == JSVAL_FALSE && old.v[D_WRITE] == JSVAL_FALSE) {
+            if (d.v[D_WRITE] == JSVAL_TRUE) goto out;
+            if ((d.present & D_BIT(D_VALUE)) && !SameValue(d.v[D_VALUE], old.v[D_VALUE])) goto out;
+        }
+    } else if (old.v[D_CONFIG] == JSVAL_FALSE) {
+        if ((d.present & D_BIT(D_GET)) && !SameValue(d.v[D_GET], old.v[D_GET])) goto out;
+        if ((d.present & D_BIT(D_SET)) && !SameValue(d.v[D_SET], old.v[D_SET])) goto out;
+    }
+  accept:
+    *compatible = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &oldRoot);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_ConvertProxyDescriptor(JSContext *cx, jsval value, JSBool complete,
+                           JSBool ownOnly, JSObject *global, jsval *rval)
+{
+    static const char *names[D_COUNT] = {
+        "enumerable", "configurable", "value", "writable", "get", "set"
+    };
+    ES5Descriptor d;
+    JSTempValueRooter root;
+    JSObject *obj, *proto;
+    JSBool ok = JS_FALSE;
+    uintN i;
+    for (i = 0; i < D_COUNT; ++i) d.v[i] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, D_COUNT, d.v, &root);
+    if (!ReadDescriptor(cx, value, &d, ownOnly)) goto out;
+    if (complete) {
+        if (!(d.present & D_BIT(D_ENUM))) d.v[D_ENUM] = JSVAL_FALSE;
+        if (!(d.present & D_BIT(D_CONFIG))) d.v[D_CONFIG] = JSVAL_FALSE;
+        d.present |= D_BIT(D_ENUM) | D_BIT(D_CONFIG);
+        if (d.present & D_ACCESS) d.present |= D_ACCESS;
+        else {
+            if (!(d.present & D_BIT(D_WRITE))) d.v[D_WRITE] = JSVAL_FALSE;
+            d.present |= D_DATA;
+        }
+    }
+    proto = global ? js_BuiltinPrototype(cx, global, JSProto_Object) : NULL;
+    if (global && !proto) goto out;
+    obj = js_NewObject(cx, &js_ObjectClass, proto, global);
+    if (!obj) goto out;
+    *rval = OBJECT_TO_JSVAL(obj);
+    if (!global && !JS_SetPrototype(cx, obj, NULL)) goto out;
+    for (i = 0; i < D_COUNT; ++i) {
+        if ((d.present & D_BIT(i)) && !DescriptorField(cx, obj, names[i], d.v[i])) goto out;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
 }
 
 static JSBool
@@ -479,6 +659,24 @@ DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
     for (i = 0; i < D_COUNT; ++i)
         old.v[i] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 1, &oldValue, &valueRoot);
+    if (js_IsProxy(cx, target)) {
+        static const char *names[D_COUNT] = {
+            "enumerable", "configurable", "value", "writable", "get", "set"
+        };
+        JSObject *record = js_NewObject(cx, &js_ObjectClass, NULL, NULL);
+        if (!record) goto out;
+        oldValue = OBJECT_TO_JSVAL(record);
+        if (!JS_SetPrototype(cx, record, NULL)) goto out;
+        for (i = 0; i < D_COUNT; ++i) {
+            if ((d->present & D_BIT(i)) && !DescriptorField(cx, record, names[i], d->v[i])) goto out;
+        }
+        ok = js_ProxyDefineOwn(cx, target, id, oldValue, &exists);
+        if (ok && !exists) {
+            if (accepted) *accepted = JS_FALSE;
+            else ok = DescriptorError(cx);
+        }
+        goto out;
+    }
     callargs[0] = OBJECT_TO_JSVAL(target);
     callargs[1] = ID_TO_VALUE(id);
     JS_PUSH_TEMP_ROOT(cx, 2, callargs, &callRoot);
@@ -770,6 +968,12 @@ obj_isExtensible(JSContext *cx, JSObject *obj, uintN argc,
     }
     target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
+    if (js_IsProxy(cx, target)) {
+        JSBool extensible;
+        if (!js_ProxyIsExtensible(cx, target, &extensible)) return JS_FALSE;
+        *rval = BOOLEAN_TO_JSVAL(extensible);
+        return JS_TRUE;
+    }
     *rval = BOOLEAN_TO_JSVAL(IsExtensible(cx, target));
     return JS_TRUE;
 }
@@ -787,6 +991,13 @@ obj_preventExtensions(JSContext *cx, JSObject *obj, uintN argc,
     }
     target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
+    if (js_IsProxy(cx, target)) {
+        JSBool accepted;
+        if (!js_ProxyPreventExtensions(cx, target, &accepted)) return JS_FALSE;
+        if (!accepted) return DescriptorError(cx);
+        *rval = argv[0];
+        return JS_TRUE;
+    }
     /* Materialize lazy own properties before closing the object. */
     ids = JS_Enumerate(cx, target);
     if (!ids) return JS_FALSE;
@@ -812,6 +1023,7 @@ OwnNames(JSContext *cx, JSObject *target)
     JSScopeProperty *sprop;
     jsint i, n, capacity = 0, nextCapacity;
     jsid swap;
+    if (js_IsProxy(cx, target)) return js_ProxyOwnKeys(cx, target);
     if ((target == cx->globalObject ||
          (OBJ_GET_CLASS(cx, target)->flags & JSCLASS_IS_GLOBAL)) &&
         !JS_EnumerateStandardClasses(cx, target))
@@ -947,6 +1159,51 @@ obj_getOwnPropertySymbols(JSContext *cx, JSObject *obj, uintN argc,
 }
 
 static JSBool
+ProxyIntegrity(JSContext *cx, JSObject *target, jsval *rval, JSBool freeze, JSBool query)
+{
+    RootedIds ids;
+    ES5Descriptor d;
+    JSBool ok = JS_FALSE, answer, found;
+    uintN attrs, field;
+    jsint i;
+    if (query) {
+        if (!js_ProxyIsExtensible(cx, target, &answer)) return JS_FALSE;
+        if (answer) { *rval = JSVAL_FALSE; return JS_TRUE; }
+    } else {
+        if (!js_ProxyPreventExtensions(cx, target, &answer)) return JS_FALSE;
+        if (!answer) return DescriptorError(cx);
+    }
+    ids.ids = js_ProxyOwnKeys(cx, target);
+    if (!ids.ids) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    for (field = 0; field < D_COUNT; ++field) d.v[field] = JSVAL_VOID;
+    d.v[D_CONFIG] = d.v[D_WRITE] = JSVAL_FALSE;
+    for (i = 0; i < ids.ids->length; ++i) {
+        attrs = 0;
+        if (query || freeze) {
+            if (!ProxyOwnAttributes(cx, target, ids.ids->vector[i], &found, &attrs)) goto out;
+            if (!found) continue;
+        }
+        if (query) {
+            if (!(attrs & JSPROP_PERMANENT) ||
+                (freeze && !(attrs & (JSPROP_GETTER | JSPROP_SETTER | JSPROP_READONLY)))) {
+                *rval = JSVAL_FALSE; ok = JS_TRUE; goto out;
+            }
+        } else {
+            d.present = D_BIT(D_CONFIG);
+            if (freeze && !(attrs & (JSPROP_GETTER | JSPROP_SETTER))) d.present |= D_BIT(D_WRITE);
+            if (!DefineOwn(cx, target, ids.ids->vector[i], &d)) goto out;
+        }
+    }
+    *rval = query ? JSVAL_TRUE : OBJECT_TO_JSVAL(target);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &ids.root);
+    JS_DestroyIdArray(cx, ids.ids);
+    return ok;
+}
+
+static JSBool
 ObjectIntegrity(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
                 JSBool freeze, JSBool query)
 {
@@ -964,6 +1221,7 @@ ObjectIntegrity(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
     }
     target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
+    if (js_IsProxy(cx, target)) return ProxyIntegrity(cx, target, rval, freeze, query);
     if (query && IsExtensible(cx, target)) {
         *rval = JSVAL_FALSE;
         return JS_TRUE;
@@ -1092,6 +1350,12 @@ SetPrototypeOf(JSContext *cx, JSObject *obj, uintN argc,
         return JS_TRUE;
     target = JSVAL_TO_OBJECT(argv[0]);
     prototype = JSVAL_TO_OBJECT(argv[1]);
+    if (js_IsProxy(cx, target)) {
+        if (!js_ProxySetPrototype(cx, target, prototype, &allowed)) return JS_FALSE;
+        if (reflect) *rval = BOOLEAN_TO_JSVAL(allowed);
+        else if (!allowed) return DescriptorError(cx);
+        return JS_TRUE;
+    }
     /* Preserve the classic embedding's inner/outer object and access checks,
      * without looking up or invoking a user property named __proto__. */
     if (prototype) {
@@ -1262,20 +1526,25 @@ obj_assign(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             goto source_out;
         for (i = 0; i < ids.ids->length; ++i) {
             id = ids.ids->vector[i];
-            if (!OBJ_LOOKUP_PROPERTY(cx, source, id, &owner, &property))
-                goto source_out;
-            if (!property)
-                continue;
-            own = owner == source || IsVirtualOwn(cx, source, owner, property);
-            if (!own) {
+            if (js_IsProxy(cx, source)) {
+                if (!ProxyOwnAttributes(cx, source, id, &own, &attrs)) goto source_out;
+                if (!own) continue;
+            } else {
+                if (!OBJ_LOOKUP_PROPERTY(cx, source, id, &owner, &property))
+                    goto source_out;
+                if (!property)
+                    continue;
+                own = owner == source || IsVirtualOwn(cx, source, owner, property);
+                if (!own) {
+                    OBJ_DROP_PROPERTY(cx, owner, property);
+                    continue;
+                }
+                ok = OBJ_GET_ATTRIBUTES(cx, owner, id, property, &attrs);
                 OBJ_DROP_PROPERTY(cx, owner, property);
-                continue;
+                if (!ok)
+                    goto source_out;
+                ok = JS_FALSE;
             }
-            ok = OBJ_GET_ATTRIBUTES(cx, owner, id, property, &attrs);
-            OBJ_DROP_PROPERTY(cx, owner, property);
-            if (!ok)
-                goto source_out;
-            ok = JS_FALSE;
             if (!(attrs & JSPROP_ENUMERATE))
                 continue;
             if (!OBJ_GET_PROPERTY(cx, source, id, &values[1]) ||
@@ -1366,6 +1635,12 @@ js_ReflectIsExtensible(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, js
 {
     JSObject *target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
+    if (js_IsProxy(cx, target)) {
+        JSBool extensible;
+        if (!js_ProxyIsExtensible(cx, target, &extensible)) return JS_FALSE;
+        *rval = BOOLEAN_TO_JSVAL(extensible);
+        return JS_TRUE;
+    }
     *rval = BOOLEAN_TO_JSVAL(IsExtensible(cx, target));
     return JS_TRUE;
 }
@@ -1374,6 +1649,12 @@ js_ReflectPreventExtensions(JSContext *cx, JSObject *obj, uintN argc, jsval *arg
 {
     JSObject *target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
+    if (js_IsProxy(cx, target)) {
+        JSBool accepted;
+        if (!js_ProxyPreventExtensions(cx, target, &accepted)) return JS_FALSE;
+        *rval = BOOLEAN_TO_JSVAL(accepted);
+        return JS_TRUE;
+    }
     if (!OBJ_IS_NATIVE(target)) { *rval = JSVAL_FALSE; return JS_TRUE; }
     if (!obj_preventExtensions(cx, obj, argc, argv, rval)) return JS_FALSE;
     *rval = JSVAL_TRUE;
@@ -1432,6 +1713,12 @@ js_ReflectSet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
     if (!js_ValueToPropertyId(cx, argv[1], &storage.vector[0])) return JS_FALSE;
     storage.length = 1; ids.ids = &storage;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    if (js_IsProxy(cx, target)) {
+        ok = js_ProxySet(cx, target, storage.vector[0], argv[2], argc > 3 ? argv[3] : argv[0], &accepted);
+        if (ok) *rval = BOOLEAN_TO_JSVAL(accepted);
+        JS_POP_TEMP_ROOT(cx, &ids.root);
+        return ok;
+    }
     for (i = 0; i < 5; ++i) roots[i] = JSVAL_VOID;
     roots[0] = argv[0]; roots[1] = argc > 3 ? argv[3] : argv[0]; roots[2] = argv[2];
     JS_PUSH_TEMP_ROOT(cx, 5, roots, &root);
@@ -1440,6 +1727,12 @@ js_ReflectSet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
     args[0] = roots[0]; args[1] = ID_TO_VALUE(storage.vector[0]);
     JS_PUSH_TEMP_ROOT(cx, 2, args, &argsRoot);
     for (;;) {
+        if (js_IsProxy(cx, JSVAL_TO_OBJECT(roots[0]))) {
+            ok = js_ProxySet(cx, JSVAL_TO_OBJECT(roots[0]), storage.vector[0],
+                              roots[2], roots[1], &accepted);
+            if (ok) *rval = BOOLEAN_TO_JSVAL(accepted);
+            goto out;
+        }
         args[0] = roots[0];
         if (!obj_getOwnPropertyDescriptor(cx, NULL, 2, args, &roots[3])) goto out;
         if (!JSVAL_IS_VOID(roots[3])) break;
@@ -1523,6 +1816,11 @@ js_ReflectDeleteProperty(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, 
     if (!js_ValueToPropertyId(cx, argv[1], &storage.vector[0])) return JS_FALSE;
     storage.length = 1; ids.ids = &storage;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
+    if (js_IsProxy(cx, target)) {
+        ok = js_ProxyDelete(cx, target, storage.vector[0], &own);
+        if (ok) *rval = BOOLEAN_TO_JSVAL(own);
+        goto out;
+    }
     if (!OBJ_LOOKUP_PROPERTY(cx, target, storage.vector[0], &owner, &property)) goto out;
     if (property) {
         own = owner == target || IsVirtualOwn(cx, target, owner, property);
@@ -1590,6 +1888,27 @@ EnumerateNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
         if (JSVAL_IS_NULL(roots[0])) { done = JS_TRUE; break; }
         target = JSVAL_TO_OBJECT(roots[0]);
         if (!JS_GetReservedSlot(cx, iterator, 1, &roots[1])) goto out;
+        if (js_IsProxy(cx, target)) {
+            /* A prototype's [[Enumerate]] owns the remainder of its chain. */
+            if (JSVAL_IS_VOID(roots[1])) {
+                if (!js_ProxyEnumerate(cx, target, &roots[1]) ||
+                    !JS_SetReservedSlot(cx, iterator, 1, roots[1])) goto out;
+            }
+            if (!js_ProxyIteratorNext(cx, roots[1], &done, &roots[4])) goto out;
+            if (done) {
+                if (!JS_SetReservedSlot(cx, iterator, 0, JSVAL_NULL) ||
+                    !JS_SetReservedSlot(cx, iterator, 1, JSVAL_VOID)) goto out;
+                break;
+            }
+            if (!js_ValueToPropertyId(cx, roots[4], &nameStorage.vector[0]) ||
+                !OBJ_LOOKUP_PROPERTY(cx, visited, nameStorage.vector[0], &owner, &property)) goto out;
+            seen = property != NULL;
+            if (property) OBJ_DROP_PROPERTY(cx, owner, property);
+            if (seen) continue;
+            if (!OBJ_DEFINE_PROPERTY(cx, visited, nameStorage.vector[0], JSVAL_TRUE,
+                                     NULL, NULL, 0, NULL)) goto out;
+            break;
+        }
         if (JSVAL_IS_VOID(roots[1])) {
             ids.ids = OwnNames(cx, target);
             if (!ids.ids) goto out;
@@ -1655,6 +1974,7 @@ js_ReflectEnumerate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
     JSTempValueRooter root;
     JSBool ok;
     if (!target) return JS_FALSE;
+    if (js_IsProxy(cx, target)) return js_ProxyEnumerate(cx, target, rval);
     global = js_BuiltinGlobal(cx, argv);
     proto = js_GetCachedIntrinsic(cx, global, JS_INTRINSIC_ENUMERATOR_PROTO);
     if (!proto) {

@@ -55,7 +55,7 @@ struct JSFunction {
     union {
         struct {
             uint16   extra;     /* number of arg slots for local GC roots */
-            uint16   spare;     /* reserved for future use */
+            uint16   spare;     /* additional private native reserved slots */
             JSNative native;    /* native method pointer or null */
         } n;
         struct {

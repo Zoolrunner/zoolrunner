@@ -8,6 +8,7 @@
 #include "jsinterp.h"
 #include "jsobj.h"
 #include "jsreflect.h"
+#include "jsproxy.h"
 #include "jssymbol.h"
 
 JSClass js_ReflectClass = {
@@ -44,7 +45,9 @@ ReflectGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSBool ok;
     if (!target || !js_ValueToPropertyId(cx, argv[1], &id.id)) return JS_FALSE;
     JS_PUSH_TEMP_ROOT_MARKER(cx, MarkReflectId, &id.root);
-    if (target->map->ops->getProperty == js_GetProperty)
+    if (js_IsProxy(cx, target))
+        ok = js_ProxyGet(cx, target, id.id, argc > 2 ? argv[2] : argv[0], rval);
+    else if (target->map->ops->getProperty == js_GetProperty)
         ok = js_GetPropertyValue(cx, target, argc > 2 ? argv[2] : argv[0], id.id, rval);
     else
         ok = OBJ_GET_PROPERTY(cx, target, id.id, rval);

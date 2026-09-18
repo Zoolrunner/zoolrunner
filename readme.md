@@ -396,15 +396,25 @@ Arrow functions remain separate work; other platforms have not been revalidated
 for this batch. Weak collections are covered below.
 
 Reflect implements the 2015 operations,
-including `enumerate` and alternate-target construction, pass 53 focused
+including `enumerate` and alternate-target construction, and passes 53 focused
 checks and 43 native embedding checks on macOS arm64. The pinned Reflect
-subset passes 266/288 cases; the remaining 22 require Proxy. The full ES2015
+subset passed 266/288 cases before Proxy work; the remaining 22 required Proxy. The full ES2015
 run passes 25,330 cases, with 3,236 failures, 14 unsupported module cases and
 two harness errors, gaining 266 passes without regressions. All 11,540 ES5.1
 cases pass. All four macOS arm64 applications pass build, package and desktop
 checks, including Calendar views, Composer and ChatZilla. Other platforms have
 not been revalidated for this batch; see the
 [ES6 validation notes](js/tests/es6/README.md).
+
+Proxy now supports forwarding, property/prototype/extensibility traps,
+call/construction, revocation and ES2015 enumeration. On macOS arm64, all 398
+pinned Proxy cases and all 288 Reflect cases pass. The full ES2015 run passes
+25,767 cases, with 2,799 failures, 14 unsupported module cases and two harness
+errors; 437 cases were gained without losing earlier passes. All 11,540 ES5.1
+cases and all four packaged application checks pass. This remains partial ES6
+support: the legacy __proto__ accessor's Proxy receiver, native host wrapping,
+other language features and other-platform validation still need work. See the
+[Proxy validation notes](js/tests/es6/README.md#proxy).
 
 WeakMap and WeakSet include garbage-collector support for weak key/value
 reachability, native finalizer checks and legacy generator cleanup. On macOS

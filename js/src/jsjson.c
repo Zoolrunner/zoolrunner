@@ -298,7 +298,7 @@ Walk(JSContext *cx, JSObject *holder, jsval key, jsval reviver, jsval *vp)
         goto out;
     if (!JSVAL_IS_PRIMITIVE(roots[0])) {
         obj = JSVAL_TO_OBJECT(roots[0]);
-        array = OBJ_GET_CLASS(cx, obj) == &js_ArrayClass;
+        if (!js_IsArray(cx, obj, &array)) goto out;
         if (array) {
             if (!js_GetLengthProperty(cx, obj, &length)) goto out;
         } else {
@@ -509,7 +509,7 @@ Serialize(JSONWriter *w, JSObject *holder, jsval key, JSBool *present)
     JSString *str;
     jsid id;
     jsdouble d;
-    JSBool ok = JS_FALSE;
+    JSBool array, ok = JS_FALSE;
 
     if (!JS_CHECK_STACK_SIZE(cx, roots)) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
@@ -560,7 +560,8 @@ Serialize(JSONWriter *w, JSObject *holder, jsval key, JSBool *present)
         }
     } else if (!JSVAL_IS_PRIMITIVE(roots[0]) && !js_IsCallable(cx, roots[0])) {
         obj = JSVAL_TO_OBJECT(roots[0]);
-        ok = Container(w, obj, OBJ_GET_CLASS(cx, obj) == &js_ArrayClass);
+        if (!js_IsArray(cx, obj, &array)) goto out;
+        ok = Container(w, obj, array);
     } else {
         *present = JS_FALSE;
         ok = JS_TRUE;
@@ -581,7 +582,7 @@ json_stringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
     JSString *str;
     jsuint length, i, j, count = 0;
     jsdouble d;
-    JSBool duplicate, present, ok = JS_FALSE;
+    JSBool duplicate, present, isArray = JS_FALSE, ok = JS_FALSE;
 
     memset(&w, 0, sizeof(w));
     w.cx = cx;
@@ -589,8 +590,10 @@ json_stringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
     roots[0] = roots[1] = roots[2] = roots[3] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
     if (argc > 1 && js_IsCallable(cx, argv[1])) w.replacer = argv[1];
-    else if (argc > 1 && !JSVAL_IS_PRIMITIVE(argv[1]) &&
-             OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[1])) == &js_ArrayClass) {
+    else if (argc > 1 && !JSVAL_IS_PRIMITIVE(argv[1])) {
+        if (!js_IsArray(cx, JSVAL_TO_OBJECT(argv[1]), &isArray)) goto out;
+    }
+    if (isArray) {
         array = JSVAL_TO_OBJECT(argv[1]);
         holder = js_NewArrayObject(cx, 0, NULL);
         if (!holder) goto out;
