@@ -1444,3 +1444,11 @@ extended atoms, XDR and debugger/GC reentry, and reject overflowing handler
 depths. Cache version 48 adds private iterator state instructions. Missing ES6
 generators, typed arrays and broader destructuring remain separate conformance
 gaps, not reasons to exclude failing upstream cases.
+
+
+For Unicode identifier changes, preserve selected legacy BMP rules and use
+separate modern property tables. Check raw and escaped supplementary names,
+malformed escapes, token-buffer boundaries and decompiled source. Identifier
+escaping must remain distinct from string/XML text escaping. Run
+`js/tests/es6/identifier-codepoints.js` and `test-identifiers.py` against the
+checksum-pinned UCD inputs; generation is maintenance work, not a build dependency.

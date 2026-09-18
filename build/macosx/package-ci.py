@@ -378,6 +378,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("new-target.js", "ES6-NEW-TARGET checks=38 failures=0"),
                 ("assignment-reference.js", "ES6-ASSIGNMENT-REFERENCE checks=44 failures=0"),
                 ("assignment-reference-wide.js", "ES6-ASSIGNMENT-REFERENCE-WIDE checks=12 failures=0"),
+                ("identifier-codepoints.js", "ES6-IDENTIFIER-CODEPOINTS checks=55 failures=0"),
                 ("identifier-reference.js", "ES6-IDENTIFIER-REFERENCE checks=33 failures=0"),
                 ("identifier-reference-wide.js", "ES6-IDENTIFIER-REFERENCE-WIDE checks=14 failures=0"),
                 ("function-statement-grammar.js", "ES6-FUNCTION-STATEMENT-GRAMMAR checks=32 failures=0"),

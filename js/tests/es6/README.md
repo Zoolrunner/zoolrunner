@@ -2456,3 +2456,28 @@ parameter/destructuring semantics still require work. The implementation follows
 [the ES2015 iteration algorithms](https://262.ecma-international.org/6.0/#sec-for-in-and-for-of-statements)
 and [IteratorClose](https://262.ecma-international.org/6.0/#sec-iteratorclose).
 Other-platform and minimum-OS validation remains outstanding for this batch.
+
+
+### Unicode identifier code points
+
+Modern identifier tokens accept brace Unicode escapes and supplementary raw
+characters using private Unicode 18.0.0 ID_Start/ID_Continue tables. Legacy
+editions retain their historical identifier rules. Source reconstruction emits
+valid Unicode identifier escapes instead of string-only hex escapes or separate
+surrogate escapes. String and XML text escaping remains separate.
+
+`identifier-codepoints.js` passes 55 checks, including malformed/overflowing
+escapes, contextual and reserved words, surrogate boundaries, long tokens,
+source round-trips and legacy XML. The pinned identifier subset passes all
+267 modes; the independent Unicode property-boundary probe passes 15,736 checks.
+The complete run passes **27,499 ES2015 modes**, with **1,067 failures**,
+14 unsupported modules, two harness errors and no crashes/timeouts:
+**14 gained, zero lost** against the for-of baseline. All **11,540 ES5.1 cases**
+pass. All four macOS arm64 applications pass root builds, packaging and desktop
+checks, including Calendar's four views, 169 Browser navigation/layout checks
+and Suite/XULRunner ChatZilla. Reports use `identifier-codepoint-final-*`.
+The frozen runtime `/tmp/zr-identifier-codepoint-final-conformance-20260918`
+remained unchanged through both suites; its engine SHA-256 is
+`47078f7aa13cdd3a766fc22299c27464c7eb0fbf1df87104ea92eb8a764171c4`,
+matching all four application engines. C89 syntax checks pass. No bytecode-format
+change is needed. Other platforms remain unvalidated for this batch.

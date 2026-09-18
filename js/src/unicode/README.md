@@ -72,3 +72,28 @@ remain unchanged. Ordinary builds use the checked-in tables without Python or
 network access. The exhaustive mapping runner checks all 1,114,112 code points
 through four methods (4,456,448 comparisons); separate focused/native tests cover
 context, garbage collection, callbacks, interrupts, clones and legacy behavior.
+
+
+## Modern JavaScript identifiers
+
+ES2015 source uses separate Unicode 18.0.0 ID_Start/ID_Continue properties,
+with ECMAScript's dollar sign, underscore and join-control additions. Explicit
+legacy editions retain their historical BMP tables. The scanner accepts
+supplementary raw characters and `\u{...}` escapes, rejects surrogate escapes
+as identifier characters, and preserves escaped-keyword/contextual-token checks.
+These tables do not change XML, regular expression or platform character classes.
+
+`generate-identifiers.py` verifies DerivedCoreProperties.txt against the checksum
+listed above and writes `../jsidentifier-data.h`. Normal builds use this checked-in
+header. Reproduce generation and the raw/escaped property-boundary checks with:
+
+```sh
+python3 js/src/unicode/generate-identifiers.py --ucd /path/to/ucd-18.0.0 \
+  --output js/src/jsidentifier-data.h
+python3 js/tests/es6/test-identifiers.py --ucd /path/to/ucd-18.0.0 \
+  --shell /path/to/runtime/xpcshell --log identifier-unicode.log
+```
+
+The boundary probe checks 15,736 combinations against upstream properties.
+Source reconstruction uses Unicode escapes for identifier names separately from
+string/XML escaping, including supplementary code-point escapes.

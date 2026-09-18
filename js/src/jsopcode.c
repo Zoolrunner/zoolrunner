@@ -640,6 +640,7 @@ const jschar js_EscapeMap[] = {
 };
 
 #define DONT_ESCAPE     0x10000
+#define IDENTIFIER_ESCAPE 0x20000
 
 static char *
 QuoteString(Sprinter *sp, JSString *str, uint32 quote)
@@ -686,12 +687,18 @@ QuoteString(Sprinter *sp, JSString *str, uint32 quote)
             break;
 
         /* Use js_EscapeMap, \u, or \x only if necessary. */
-        if ((u = js_strchr(js_EscapeMap, c)) != NULL) {
+        if ((quote & IDENTIFIER_ESCAPE) && c >= 0xd800 && c <= 0xdbff &&
+            t + 1 < z && t[1] >= 0xdc00 && t[1] <= 0xdfff) {
+            uint32 point = 0x10000 + ((c - 0xd800) << 10) + t[1] - 0xdc00;
+            ok = Sprint(sp, "\\u{%X}", (unsigned)point) >= 0;
+            ++t;
+        } else if ((u = js_strchr(js_EscapeMap, c)) != NULL) {
             ok = dontEscape
                  ? Sprint(sp, "%c", (char)c) >= 0
                  : Sprint(sp, "\\%c", (char)u[1]) >= 0;
         } else {
-            ok = Sprint(sp, (c >> 8) ? "\\u%04X" : "\\x%02X", c) >= 0;
+            ok = Sprint(sp, ((c >> 8) || (quote & IDENTIFIER_ESCAPE))
+                            ? "\\u%04X" : "\\x%02X", c) >= 0;
         }
         if (!ok)
             return NULL;
@@ -1167,7 +1174,7 @@ DecompileSwitch(SprintStack *ss, TableEntry *table, uintN tableLength,
                         return JS_FALSE;
                 }
                 rval = QuoteString(&ss->sprinter, str,
-                                   (jschar)(JSVAL_IS_STRING(key) ? '"' : 0));
+                                   (JSVAL_IS_STRING(key) ? '"' : IDENTIFIER_ESCAPE));
                 if (!rval)
                     return JS_FALSE;
                 RETRACT(&ss->sprinter, rval);
@@ -1307,7 +1314,7 @@ GetLocal(SprintStack *ss, jsint i)
 
     LOCAL_ASSERT(sprop && JSID_IS_ATOM(sprop->id));
     atom = JSID_TO_ATOM(sprop->id);
-    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
     if (!rval)
         return NULL;
     RETRACT(&ss->sprinter, rval);
@@ -1565,7 +1572,7 @@ DecompileDestructuring(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc)
             atom = GET_ATOM(cx, jp->script, pc);
             str = ATOM_TO_STRING(atom);
             if (!QuoteString(&ss->sprinter, str,
-                             js_IsIdentifier(str) ? 0 : (jschar)'\'')) {
+                             js_IsIdentifier(str) ? IDENTIFIER_ESCAPE : (jschar)'\'')) {
                 return NULL;
             }
             if (SprintPut(&ss->sprinter, ": ", 2) < 0)
@@ -1754,7 +1761,8 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
             quote_ = 0;                                                       \
             fmt = ufmt;                                                       \
         }                                                                     \
-        rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), quote_);      \
+        rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom),                 \
+                           quote_ ? quote_ : IDENTIFIER_ESCAPE);      \
         if (!rval)                                                            \
             return NULL;                                                      \
     JS_END_MACRO
@@ -2076,7 +2084,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     atom = js_GetAtom(cx, &jp->script->atomMap,
                                       (jsatomid) js_GetSrcNoteOffset(sn, 0));
                     jp->indent -= 4;
-                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                     if (!rval)
                         return NULL;
                     RETRACT(&ss->sprinter, rval);
@@ -2087,7 +2095,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                   case SRC_LABELBRACE:
                     atom = js_GetAtom(cx, &jp->script->atomMap,
                                       (jsatomid) js_GetSrcNoteOffset(sn, 0));
-                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                     if (!rval)
                         return NULL;
                     RETRACT(&ss->sprinter, rval);
@@ -2560,7 +2568,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 ok = JS_TRUE;
                 for (i = 0; i < argc; i++) {
                     atom = atomv[i];
-                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                     if (!rval ||
                         !PushOff(ss, STR2OFF(&ss->sprinter, rval), op)) {
                         ok = JS_FALSE;
@@ -2621,7 +2629,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                         pc += JSOP_SETLOCALPOP_LENGTH;
                         atom = atomv[i - OBJ_BLOCK_DEPTH(cx, obj)];
                         str = ATOM_TO_STRING(atom);
-                        if (!QuoteString(&jp->sprinter, str, 0)) {
+                        if (!QuoteString(&jp->sprinter, str, IDENTIFIER_ESCAPE)) {
                             ok = JS_FALSE;
                             goto enterblock_out;
                         }
@@ -2821,7 +2829,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                   case SRC_CONT2LABEL:
                     atom = js_GetAtom(cx, &jp->script->atomMap,
                                       (jsatomid) js_GetSrcNoteOffset(sn, 0));
-                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                     if (!rval)
                         return NULL;
                     RETRACT(&ss->sprinter, rval);
@@ -2833,7 +2841,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                   case SRC_BREAK2LABEL:
                     atom = js_GetAtom(cx, &jp->script->atomMap,
                                       (jsatomid) js_GetSrcNoteOffset(sn, 0));
-                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                    rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                     if (!rval)
                         return NULL;
                     RETRACT(&ss->sprinter, rval);
@@ -3073,7 +3081,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 if (atom) {
                     if (*lval && SprintPut(&ss->sprinter, ".", 1) < 0)
                         return NULL;
-                    xval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                    xval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                     if (!xval)
                         return NULL;
                 } else if (xval) {
@@ -3249,7 +3257,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
 
               do_setname:
-                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!lval)
                     return NULL;
                 rval = POP_STR();
@@ -3374,7 +3382,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 
               case JSOP_DELNAME:
                 atom = GET_ATOM(cx, jp->script, pc);
-                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!lval)
                     return NULL;
                 RETRACT(&ss->sprinter, lval);
@@ -3447,7 +3455,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               case JSOP_DECGVAR:
                 atom = GET_ATOM(cx, jp->script, pc);
               do_incatom:
-                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!lval)
                     return NULL;
                 RETRACT(&ss->sprinter, lval);
@@ -3514,7 +3522,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               case JSOP_GVARDEC:
                 atom = GET_ATOM(cx, jp->script, pc);
               do_atominc:
-                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!lval)
                     return NULL;
                 RETRACT(&ss->sprinter, lval);
@@ -3709,7 +3717,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 lval = "";
               do_qname:
                 sn = js_GetSrcNote(jp->script, pc);
-                rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!rval)
                     return NULL;
                 RETRACT(&ss->sprinter, rval);
@@ -3734,7 +3742,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               case JSOP_FINDNAME:
                 atomIndex = GET_LITERAL_INDEX(pc);
                 atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
-                rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!rval)
                     return NULL;
                 RETRACT(&ss->sprinter, rval);
@@ -4105,7 +4113,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 break;
 
               BEGIN_LITOPX_CASE(JSOP_EXPORTNAME)
-                rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), 0);
+                rval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!rval)
                     return NULL;
                 RETRACT(&ss->sprinter, rval);
@@ -4204,8 +4212,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 atom = GET_ATOM(cx, jp->script, pc);
               do_initprop_atom:
                 xval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom),
-                                   (jschar)
-                                   (ATOM_IS_IDENTIFIER(atom) ? 0 : '\''));
+                                   (ATOM_IS_IDENTIFIER(atom) ? IDENTIFIER_ESCAPE : '\''));
                 if (!xval)
                     return NULL;
                 rval = POP_STR();
@@ -4692,7 +4699,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
 
     if (!FUN_IS_ARROW(fun)) {
         js_printf(jp, "%s ", js_function_str);
-        if (fun->atom && !QuoteString(&jp->sprinter, ATOM_TO_STRING(fun->atom), 0))
+        if (fun->atom && !QuoteString(&jp->sprinter, ATOM_TO_STRING(fun->atom), IDENTIFIER_ESCAPE))
             return JS_FALSE;
     }
     js_puts(jp, "(");
@@ -4789,7 +4796,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
 #undef LOCAL_ASSERT
 #endif
 
-            if (!QuoteString(&jp->sprinter, ATOM_TO_STRING(params[i]), 0)) {
+            if (!QuoteString(&jp->sprinter, ATOM_TO_STRING(params[i]), IDENTIFIER_ESCAPE)) {
                 ok = JS_FALSE;
                 break;
             }
@@ -4816,7 +4823,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
                     if (nargs) js_puts(jp, ", ");
                     js_puts(jp, "...");
                     ok = QuoteString(&jp->sprinter,
-                                     ATOM_TO_STRING(JSID_TO_ATOM(sprop->id)), 0) != NULL;
+                                     ATOM_TO_STRING(JSID_TO_ATOM(sprop->id)), IDENTIFIER_ESCAPE) != NULL;
                 }
             }
         }

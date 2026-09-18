@@ -1034,17 +1034,75 @@ js_PeekTokenSameLine(JSContext *cx, JSTokenStream *ts)
     return tt;
 }
 
-/*
- * We have encountered a '\': check for a Unicode escape sequence after it,
- * returning the character code value if we found a Unicode escape sequence.
- * Otherwise, non-destructively return the original '\'.
- */
+/* Modern identifier properties are independent of the legacy BMP tables. */
+typedef struct IdentifierRange { uint32 first, last; } IdentifierRange;
+#include "jsidentifier-data.h"
+
+static JSBool
+IdentifierChar(JSContext *cx, int32 c, JSBool start)
+{
+    const IdentifierRange *ranges;
+    size_t lo = 0, hi, mid;
+    if (c < 0 || c > 0x10ffff)
+        return JS_FALSE;
+    if (!JS_VERSION_IS_ES2015(cx))
+        return c <= 0xffff && (start ? JS_ISIDSTART(c) : JS_ISIDENT(c));
+    if (c < 128)
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+               c == '$' || c == '_' || (!start && c >= '0' && c <= '9');
+    if (!start && (c == 0x200c || c == 0x200d))
+        return JS_TRUE;
+    ranges = start ? identifierID_Start : identifierID_Continue;
+    hi = start ? JS_ARRAY_LENGTH(identifierID_Start)
+               : JS_ARRAY_LENGTH(identifierID_Continue);
+    while (lo < hi) {
+        mid = lo + (hi - lo) / 2;
+        if ((uint32)c < ranges[mid].first) hi = mid;
+        else if ((uint32)c > ranges[mid].last) lo = mid + 1;
+        else return JS_TRUE;
+    }
+    return JS_FALSE;
+}
+
+/* Consume a raw surrogate pair only when it belongs to this identifier. */
 static int32
-GetUnicodeEscape(JSTokenStream *ts)
+IdentifierCodePoint(JSContext *cx, JSTokenStream *ts, int32 c, JSBool start)
+{
+    int32 low, point;
+    if (JS_VERSION_IS_ES2015(cx) && c >= 0xd800 && c <= 0xdbff) {
+        low = PeekChar(ts);
+        if (low >= 0xdc00 && low <= 0xdfff) {
+            point = 0x10000 + ((c - 0xd800) << 10) + low - 0xdc00;
+            if (IdentifierChar(cx, point, start)) {
+                GetChar(ts);
+                return point;
+            }
+        }
+    }
+    return c;
+}
+
+/* Decode after a backslash; malformed escapes are rejected by the caller.
+ * The modern brace form may consume input on failure. */
+static int32
+GetUnicodeEscape(JSContext *cx, JSTokenStream *ts)
 {
     jschar cp[5];
-    int32 c;
+    int32 c, digit;
+    JSBool any = JS_FALSE;
 
+    if (JS_VERSION_IS_ES2015(cx) && PeekChars(ts, 2, cp) &&
+        cp[0] == 'u' && cp[1] == '{') {
+        SkipChars(ts, 2);
+        c = 0;
+        while ((digit = GetChar(ts)) != '}') {
+            if (!JS7_ISHEX(digit) || c > (0x10ffff - JS7_UNHEX(digit)) / 16)
+                return '\\';
+            c = c * 16 + JS7_UNHEX(digit);
+            any = JS_TRUE;
+        }
+        return any ? c : '\\';
+    }
     if (PeekChars(ts, 5, cp) && cp[0] == 'u' &&
         JS7_ISHEX(cp[1]) && JS7_ISHEX(cp[2]) &&
         JS7_ISHEX(cp[3]) && JS7_ISHEX(cp[4]))
@@ -1453,29 +1511,37 @@ retry:
 
     hadUnicodeEscape = JS_FALSE;
     if (c == '\\') {
-        c = GetUnicodeEscape(ts);
-        if (!JS_ISIDSTART(c)) {
+        c = GetUnicodeEscape(cx, ts);
+        if (!IdentifierChar(cx, c, JS_TRUE)) {
             js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                          JSMSG_ILLEGAL_CHARACTER);
             goto error;
         }
         hadUnicodeEscape = JS_TRUE;
     }
-    if (JS_ISIDSTART(c)) {
+    if (!hadUnicodeEscape)
+        c = IdentifierCodePoint(cx, ts, c, JS_TRUE);
+    if (IdentifierChar(cx, c, JS_TRUE)) {
         INIT_TOKENBUF();
         for (;;) {
-            ADD_TO_TOKENBUF(c);
+            if (c > 0xffff) {
+                ADD_TO_TOKENBUF(0xd800 + ((c - 0x10000) >> 10));
+                ADD_TO_TOKENBUF(0xdc00 + ((c - 0x10000) & 0x3ff));
+            } else {
+                ADD_TO_TOKENBUF(c);
+            }
             c = GetChar(ts);
             if (c == '\\') {
-                c = GetUnicodeEscape(ts);
-                if (!JS_ISIDENT(c)) {
+                c = GetUnicodeEscape(cx, ts);
+                if (!IdentifierChar(cx, c, JS_FALSE)) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                  JSMSG_ILLEGAL_CHARACTER);
                     goto error;
                 }
                 hadUnicodeEscape = JS_TRUE;
             } else {
-                if (!JS_ISIDENT(c))
+                c = IdentifierCodePoint(cx, ts, c, JS_FALSE);
+                if (!IdentifierChar(cx, c, JS_FALSE))
                     break;
             }
         }

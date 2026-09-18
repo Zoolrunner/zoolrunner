@@ -684,3 +684,13 @@ pass. All four applications pass build, package and desktop checks, including
 Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
 This is progress toward full ES2015 compliance, not completion. Other platforms
 have not been revalidated for this batch.
+
+
+Modern Unicode identifier parsing now accepts brace escapes and supplementary
+characters using separate pinned Unicode tables, while legacy editions retain
+their old rules. Identifier source reconstruction also round-trips non-ASCII
+names. The full macOS arm64 run passes **27,499 ES2015 modes**, with **1,067
+failures**, 14 unsupported modules and two harness errors (**14 gained, zero
+lost**). All 11,540 ES5 cases and all four application build/package/runtime
+checks pass. Other platforms have not been revalidated for this batch. See
+[the validation record](js/tests/es6/README.md#unicode-identifier-code-points).
