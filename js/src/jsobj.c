@@ -1269,6 +1269,9 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
             clazz = "Arguments";
         else if (js_IsCallable(cx, OBJECT_TO_JSVAL(obj)))
             clazz = "Function";
+        else if (clasp == &js_DateClass &&
+                 !JSVAL_IS_DOUBLE(OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE)))
+            clazz = "Object";
         else if (clasp == &js_ErrorClass || clasp == &js_BooleanClass ||
                  clasp == &js_NumberClass ||
                  clasp == &js_DateClass || clasp == &js_RegExpClass)
@@ -4638,6 +4641,32 @@ js_ValueToPropertyId(JSContext *cx, jsval value, jsid *idp)
     return ok;
 }
 
+/* OrdinaryToPrimitive never invokes embedding class conversion hooks. */
+JSBool
+js_OrdinaryToPrimitive(JSContext *cx, JSObject *obj, JSBool stringFirst, jsval *rval)
+{
+    jsval values[3] = {OBJECT_TO_JSVAL(obj), JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSAtom *atom;
+    JSBool ok = JS_FALSE;
+    uintN i;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    for (i = 0; i < 2; ++i) {
+        atom = (stringFirst != (i != 0)) ? cx->runtime->atomState.toStringAtom
+                                       : cx->runtime->atomState.valueOfAtom;
+        if (!OBJ_GET_PROPERTY(cx, obj, ATOM_TO_JSID(atom), &values[1])) goto out;
+        if (js_IsCallable(cx, values[1])) {
+            if (!js_InternalCall(cx, obj, values[1], 0, NULL, &values[2])) goto out;
+            if (JSVAL_IS_PRIMITIVE(values[2])) { *rval = values[2]; ok = JS_TRUE; goto out; }
+        }
+    }
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO,
+                         "object", "primitive type");
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSBool
 js_DefaultValue(JSContext *cx, JSObject *obj, JSType hint, jsval *vp)
 {
@@ -4650,6 +4679,10 @@ js_DefaultValue(JSContext *cx, JSObject *obj, JSType hint, jsval *vp)
         return JS_FALSE;
     if (handled)
         return JS_TRUE;
+    if ((hint == JSTYPE_VOID || hint == JSTYPE_STRING || hint == JSTYPE_NUMBER) &&
+        OBJ_GET_CLASS(cx, obj) == &js_DateClass &&
+        js_IsModernGlobal(cx, JS_GetGlobalForObject(cx, obj)))
+        return js_OrdinaryToPrimitive(cx, obj, hint == JSTYPE_STRING, vp);
     v = save = OBJECT_TO_JSVAL(obj);
     switch (hint) {
       case JSTYPE_STRING:

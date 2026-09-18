@@ -1500,3 +1500,42 @@ standalone packaged XULRunner passes ChatZilla initialization and input. Desktop
 reports: `artifacts/es6/regexp-replace-runtime`. Other operating systems and
 architectures have not been revalidated. Unicode RegExp matching and the other
 remaining ES6 features are still incomplete.
+
+### Date conversion and prototype
+
+Modern Date globals provide the configurable, non-writable Symbol.toPrimitive
+method. Its generic ordinary conversion preserves getter exceptions, calls
+methods with zero arguments, accepts primitive results including Symbols, and
+rejects invalid hints without coercing them. Removing the hook from a modern
+Date selects ordinary conversion rather than the historical hint-argument path.
+Modern valueOf ignores extra arguments. Existing legacy globals retain their
+hint-sensitive valueOf and NaN-valued Date prototype, even when Date is first
+resolved by a modern caller.
+
+Modern Date.prototype retains the private native class layout but has no date
+value; instance methods reject it, and its default ES2015 Object tag is Object.
+The Date constructor copies real instances' stored values without observable
+conversion, and uses the default primitive hint for other objects before
+parsing strings or converting numbers. Classic native Date creation/getter APIs
+and foreign-context lifetimes are covered.
+
+The complete Date diagnostic subset passes 898/898 cases. There are 29 focused
+script and 32 native embedding checks under MallocScribble; C89 checks pass.
+The complete pinned ES2015 run passes **26,281 cases**, with **2,285 failures**,
+14 unsupported module cases and two harness errors: **32 gained, zero lost**
+relative to replacement. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/date-primitive-full.json` and
+`date-primitive-es5.json`; runtime: `/tmp/zr-date-primitive-conformance-20260918`.
+Its library hash matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass. Calendar passes eight unit suites and four views; Browser passes 169
+navigation/layout assertions; Suite passes 24 lifecycle assertions and ChatZilla;
+standalone XULRunner passes packaged ChatZilla initialization/input. Reports:
+`artifacts/es6/date-primitive-runtime`. The first Date
+subset was stopped because it started before compilation completed; only the
+completed third subset is the final diagnostic result. A native fixture used
+`undefined` before initializing that global; replacing it with `void 0` preserves
+the assertion without requiring extra global bootstrap. Upstream tests are
+unchanged. Other operating systems and architectures have not been revalidated.

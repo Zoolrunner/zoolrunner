@@ -598,6 +598,9 @@ extern JSObject *
 js_ValueToNonNullObject(JSContext *cx, jsval v);
 
 extern JSBool
+js_OrdinaryToPrimitive(JSContext *cx, JSObject *obj, JSBool stringFirst, jsval *rval);
+
+extern JSBool
 js_TryValueOf(JSContext *cx, JSObject *obj, JSType type, jsval *rval);
 
 extern JSBool

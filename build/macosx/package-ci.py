@@ -362,7 +362,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("regexp-protocols.js", "ES6-REGEXP-PROTOCOLS checks=56 failures=0"),
                 ("regexp-constructor.js", "ES6-REGEXP-CONSTRUCTOR checks=35 failures=0"),
                 ("regexp-split.js", "ES6-REGEXP-SPLIT checks=33 failures=0"),
-                ("regexp-replace.js", "ES6-REGEXP-REPLACE checks=34 failures=0")):
+                ("regexp-replace.js", "ES6-REGEXP-REPLACE checks=34 failures=0"),
+                ("date-primitive.js", "ES6-DATE-PRIMITIVE checks=29 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -401,6 +402,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestRegExpConstructor.c", "ES6-REGEXP-CONSTRUCTOR-EMBEDDING checks=36 failures=0"),
                 ("es6/TestRegExpSplit.c", "ES6-REGEXP-SPLIT-EMBEDDING checks=27 failures=0"),
                 ("es6/TestRegExpReplace.c", "ES6-REGEXP-REPLACE-EMBEDDING checks=27 failures=0"),
+                ("es6/TestDatePrimitive.c", "ES6-DATE-PRIMITIVE-EMBEDDING checks=32 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),

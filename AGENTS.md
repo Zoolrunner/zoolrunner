@@ -1232,3 +1232,11 @@ observable result/capture conversion order, raw callback receivers, overlap
 side effects and checked UTF-16 buffer growth. Keep native capture loops
 interruptible and exercise foreign contexts, cloned methods and GC callbacks.
 Legacy globals retain the original replace method and its historical `$+` token.
+
+For Date conversion changes, run `date-primitive.js` and `TestDatePrimitive.c`.
+Preserve the initialized global's policy across lazy Date resolution and foreign
+callers. Modern Date methods reject prototypes without a date value, while
+legacy globals retain their historical NaN-valued prototype and hint-sensitive
+valueOf. Exercise native Date creation, cloned conversion methods, foreign
+contexts, getter exceptions, removal of Symbol.toPrimitive and GC callbacks.
+Do not route ordinary primitive conversion back through its symbol hook.

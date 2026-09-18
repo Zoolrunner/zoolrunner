@@ -61,6 +61,7 @@
 #include "prmjtime.h"
 #include "jsutil.h" /* Added by JSIFY */
 #include "jsapi.h"
+#include "jsiteres6.h"
 #include "jsconfig.h"
 #include "jscntxt.h"
 #include "jsdate.h"
@@ -69,6 +70,8 @@
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsstr.h"
+#include "jsrealm.h"
+#include "jssymbol.h"
 
 /*
  * The JS 'Date' object is patterned after the Java 'Date' object.
@@ -1001,9 +1004,15 @@ date_now(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static jsdouble *
 date_getProlog(JSContext *cx, JSObject *obj, jsval *argv)
 {
-    if (!JS_InstanceOf(cx, obj, &js_DateClass, argv))
+    jsval value;
+    if (!JS_InstanceOf(cx, obj, &js_DateClass, argv)) return NULL;
+    value = OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE);
+    if (!JSVAL_IS_DOUBLE(value)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO,
+                             "Date without a date value", "Date value");
         return NULL;
-    return JSVAL_TO_DOUBLE(OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE));
+    }
+    return JSVAL_TO_DOUBLE(value);
 }
 
 /*
@@ -2072,7 +2081,7 @@ date_valueOf(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
      */
 
     /* If called directly with no arguments, convert to a time number. */
-    if (argc == 0)
+    if (argc == 0 || js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
         return date_getTime(cx, obj, argc, argv, rval);
 
     /* Convert to number only if the hint was given, otherwise favor string. */
@@ -2203,6 +2212,20 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
         *date = msec_time;
     } else if (argc == 1) {
+        if (js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)) &&
+            !JSVAL_IS_PRIMITIVE(argv[0])) {
+            JSObject *input = JSVAL_TO_OBJECT(argv[0]);
+            jsval value;
+            if (OBJ_GET_CLASS(cx, input) == &js_DateClass &&
+                JSVAL_IS_DOUBLE(value = OBJ_GET_SLOT(cx, input, JSSLOT_PRIVATE))) {
+                d = *JSVAL_TO_DOUBLE(value);
+                date = date_constructor(cx, obj);
+                if (!date) return JS_FALSE;
+                *date = d;
+                return JS_TRUE;
+            }
+            if (!OBJ_DEFAULT_VALUE(cx, input, JSTYPE_VOID, &argv[0])) return JS_FALSE;
+        }
         if (!JSVAL_IS_STRING(argv[0])) {
             /* the argument is a millisecond number */
             if (!js_ValueToNumber(cx, argv[0], &d))
@@ -2272,11 +2295,57 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+static JSBool
+date_toPrimitive(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *hint;
+    JSBool stringFirst;
+    if (JSVAL_IS_PRIMITIVE(argv[-1]) || !JSVAL_IS_STRING(argv[0])) goto bad;
+    hint = JSVAL_TO_STRING(argv[0]);
+    if (JSSTRING_LENGTH(hint) == 6 &&
+        js_EqualStrings(hint, ATOM_TO_STRING(cx->runtime->atomState.typeAtoms[JSTYPE_STRING]))) {
+        stringFirst = JS_TRUE;
+    } else {
+        static const jschar defaultHint[] = {'d','e','f','a','u','l','t'};
+        static const jschar numberHint[] = {'n','u','m','b','e','r'};
+        if (JSSTRING_LENGTH(hint) == 7 && !memcmp(JSSTRING_CHARS(hint), defaultHint, sizeof(defaultHint)))
+            stringFirst = JS_TRUE;
+        else if (JSSTRING_LENGTH(hint) == 6 && !memcmp(JSSTRING_CHARS(hint), numberHint, sizeof(numberHint)))
+            stringFirst = JS_FALSE;
+        else goto bad;
+    }
+    return js_OrdinaryToPrimitive(cx, JSVAL_TO_OBJECT(argv[-1]), stringFirst, rval);
+  bad:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO,
+                         "Date @@toPrimitive receiver or hint", "primitive type");
+    return JS_FALSE;
+}
+
+static JSBool
+InitDatePrimitive(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    JSFunction *fun;
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!js_WellKnownSymbolId(cx, JS_WKS_TO_PRIMITIVE, &id)) return JS_FALSE;
+    fun = JS_NewFunction(cx, date_toPrimitive, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                         global, "[Symbol.toPrimitive]");
+    if (!fun) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(fun->object),
+                             JS_PropertyStub, JS_PropertyStub, JSPROP_READONLY, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSObject *
 js_InitDateClass(JSContext *cx, JSObject *obj)
 {
     JSObject *proto, *ctor;
     jsdouble *proto_date;
+    JSBool modern = js_GetCachedClassObject(cx, obj, JSProto_Object)
+                    ? js_IsModernGlobal(cx, obj) : JS_VERSION_IS_ES2015(cx);
 
     /* set static LocalTZA */
     LocalTZA = -(PRMJ_LocalGMTDifference() * msPerSecond);
@@ -2302,11 +2371,16 @@ js_InitDateClass(JSContext *cx, JSObject *obj)
     if (!JS_AliasProperty(cx, proto, "toUTCString", "toGMTString"))
         return NULL;
 
-    /* Set the value of the Date.prototype date to NaN */
-    proto_date = date_constructor(cx, proto);
-    if (!proto_date)
-        return NULL;
-    *proto_date = *cx->runtime->jsNaN;
+    if (modern) {
+        /* Preserve the native class layout without giving the ordinary
+         * ES2015 prototype a date value. Instance methods validate the slot. */
+        OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_VOID);
+        if (!InitDatePrimitive(cx, obj, proto)) return NULL;
+    } else {
+        proto_date = date_constructor(cx, proto);
+        if (!proto_date) return NULL;
+        *proto_date = *cx->runtime->jsNaN;
+    }
 
     return proto;
 }
