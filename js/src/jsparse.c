@@ -248,6 +248,7 @@ NewParseNode(JSContext *cx, JSTokenStream *ts, JSParseNodeArity arity,
     pn->pn_pos = tp->pos;
     pn->pn_op = JSOP_NOP;
     pn->pn_arity = arity;
+    if (arity == PN_FUNC) pn->pn_restSlot = -1;
     pn->pn_next = NULL;
     pn->pn_ts = ts;
     pn->pn_source = NULL;
@@ -897,7 +898,9 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
         /* A body's directive applies to the parameters parsed before it. */
         for (sprop = SCOPE_LAST_PROP(OBJ_SCOPE(funobj)); pn && sprop;
              sprop = sprop->parent) {
-            if (sprop->getter == js_GetArgument) {
+            if (sprop->getter == js_GetArgument ||
+                (sprop->getter == js_GetLocalVariable &&
+                 tc->restSlot == (intN)(uint16)sprop->shortid)) {
                 JSAtom *name = JSID_TO_ATOM(sprop->id);
 
                 /* SPROP_IS_DUPLICATE is mutable on shared property-tree
@@ -966,6 +969,10 @@ js_CompileFunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun)
                               ts->principals)) {
         return JS_FALSE;
     }
+
+    /* Dynamic Function parses rest separately; it has no earlier local
+     * bindings, so that formal occupies local slot zero. */
+    if (FUN_HAS_REST(fun)) funcg.treeContext.restSlot = 0;
 
     /* Prevent GC activation while compiling. */
     JS_KEEP_ATOMS(cx->runtime);
@@ -1211,6 +1218,105 @@ BindDestructuringArg(JSContext *cx, BindData *data, JSAtom *atom,
     return JS_TRUE;
 }
 #endif /* JS_HAS_DESTRUCTURING */
+
+/* Rest formals occupy local slots, leaving nargs equal to Function.length.
+ * Their initialization precedes body declarations in the function prolog. */
+JSBool
+js_BindRestParameter(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
+                  JSAtom *name, JSTreeContext *tc)
+{
+    JSAtomList seen;
+    JSAtomListElement *entry;
+    JSScopeProperty *sprop;
+    JSAtom *atom;
+    uintN slot = fun->u.i.nvars;
+
+    ATOM_LIST_INIT(&seen);
+    for (sprop = SCOPE_LAST_PROP(OBJ_SCOPE(fun->object)); sprop;
+         sprop = sprop->parent) {
+        if (sprop->getter != js_GetArgument &&
+            sprop->getter != js_GetLocalVariable)
+            continue;
+        atom = js_AtomizeString(cx, ATOM_TO_STRING(JSID_TO_ATOM(sprop->id)), 0);
+        if (!atom) return JS_FALSE;
+        ATOM_LIST_SEARCH(entry, &seen, atom);
+        if (entry || atom == name) {
+            LexicalSyntaxError(cx, ts);
+            return JS_FALSE;
+        }
+        if (!js_IndexAtom(cx, atom, &seen)) return JS_FALSE;
+    }
+    if (slot == JS_BITMASK(16)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_VARS);
+        return JS_FALSE;
+    }
+    if (!js_AddHiddenProperty(cx, fun->object, ATOM_TO_JSID(name),
+                              js_GetLocalVariable, js_SetLocalVariable,
+                              SPROP_INVALID_SLOT, JSPROP_PERMANENT | JSPROP_SHARED,
+                              SPROP_HAS_SHORTID, slot))
+        return JS_FALSE;
+    fun->u.i.nvars++;
+    fun->kind |= JSFUN_KIND_REST;
+    tc->restSlot = (intN)slot;
+    return JS_TRUE;
+}
+
+/* Parse only the parenthesized cover grammar. A rest placeholder must be
+ * followed by ')' and '=>' before the caller can accept it as an expression. */
+static JSParseNode *
+ModernParenthesizedExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+                        JSBool *hasRest)
+{
+    JSParseNode *pn = NULL, *item, *list;
+    uintN oldflags = tc->flags;
+    JSTokenType tt;
+
+    *hasRest = JS_FALSE;
+    tc->flags &= ~TCF_IN_FOR_INIT;
+    for (;;) {
+        ts->flags |= TSF_OPERAND;
+        tt = js_PeekToken(cx, ts);
+        ts->flags &= ~TSF_OPERAND;
+        if (tt == TOK_ELLIPSIS) {
+            js_GetToken(cx, ts);
+            if (js_GetToken(cx, ts) != TOK_NAME) {
+                LexicalSyntaxError(cx, ts);
+                pn = NULL;
+                break;
+            }
+            item = NewParseNode(cx, ts, PN_NAME, tc);
+            if (!item) { pn = NULL; break; }
+            item->pn_type = TOK_ELLIPSIS;
+            item->pn_op = JSOP_NAME;
+            item->pn_atom = CURRENT_TOKEN(ts).t_atom;
+            item->pn_expr = NULL;
+            item->pn_slot = -1;
+            item->pn_attrs = 0;
+            *hasRest = JS_TRUE;
+        } else {
+            item = AssignExpr(cx, ts, tc);
+            if (!item) { pn = NULL; break; }
+        }
+        if (!pn) {
+            pn = item;
+        } else {
+            if (pn->pn_type != TOK_COMMA || pn->pn_parens) {
+                list = NewParseNode(cx, ts, PN_LIST, tc);
+                if (!list) { pn = NULL; break; }
+                list->pn_type = TOK_COMMA;
+                list->pn_pos.begin = pn->pn_pos.begin;
+                PN_INIT_LIST_1(list, pn);
+                pn = list;
+            }
+            PN_APPEND(pn, item);
+            pn->pn_pos.end = item->pn_pos.end;
+        }
+        if (*hasRest || !js_MatchToken(cx, ts, TOK_COMMA))
+            break;
+    }
+    tc->flags = oldflags | (tc->flags & TCF_FUN_FLAGS);
+    return pn;
+}
 
 static JSParseNode *
 FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
@@ -1466,6 +1572,19 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
               }
 #endif /* JS_HAS_DESTRUCTURING */
 
+              case TOK_ELLIPSIS:
+                if (fun->flags & (JSPROP_GETTER | JSPROP_SETTER)) {
+                    LexicalSyntaxError(cx, ts);
+                    return NULL;
+                }
+                if (js_GetToken(cx, ts) != TOK_NAME) {
+                    LexicalSyntaxError(cx, ts);
+                    return NULL;
+                }
+                if (!js_BindRestParameter(cx, ts, fun, CURRENT_TOKEN(ts).t_atom, &funtc))
+                    return NULL;
+                break;
+
               case TOK_NAME:
                 if (!data.binder(cx, &data, CURRENT_TOKEN(ts).t_atom, tc))
                     return NULL;
@@ -1477,6 +1596,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                                             JSMSG_MISSING_FORMAL);
                 return NULL;
             }
+            if (FUN_HAS_REST(fun)) break;
         } while (js_MatchToken(cx, ts, TOK_COMMA));
 
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_AFTER_FORMAL);
@@ -1605,6 +1725,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_flags = (funtc.flags & (TCF_FUN_FLAGS | TCF_HAS_DEFXMLNS)) |
                    ((fun->flags & JSFUN_STRICT) ? TCF_STRICT_MODE : 0);
     pn->pn_tryCount = funtc.tryCount;
+    pn->pn_restSlot = funtc.restSlot;
     TREE_CONTEXT_FINISH(&funtc);
     return result;
 }
@@ -1637,6 +1758,7 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     if (parameters->pn_type == TOK_RP && parameters->pn_parens == 1)
         names = parameters->pn_kid;
     if (names->pn_type != TOK_NAME &&
+        !(names->pn_type == TOK_ELLIPSIS && parameters->pn_parens == 1) &&
         !(parameters->pn_parens == 1 &&
           (names->pn_type == TOK_COMMA ||
            (names->pn_type == TOK_ARROW && names->pn_count == 0)))) {
@@ -1665,9 +1787,10 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     data.binder = BindArg;
     data.u.arg.fun = fun;
     ATOM_LIST_INIT(&seen);
-    name = names->pn_type == TOK_NAME ? names : names->pn_head;
-    for (; name; name = names->pn_type == TOK_NAME ? NULL : name->pn_next) {
-        if (name->pn_type != TOK_NAME ||
+    name = names->pn_arity == PN_NAME ? names : names->pn_head;
+    for (; name; name = names->pn_arity == PN_NAME ? NULL : name->pn_next) {
+        if ((name->pn_type != TOK_NAME && name->pn_type != TOK_ELLIPSIS) ||
+            (name->pn_type == TOK_ELLIPSIS && name->pn_next) ||
             (name != parameters && name->pn_parens) ||
             ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, name->pn_atom))) {
             LexicalSyntaxError(cx, ts);
@@ -1678,9 +1801,12 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             LexicalSyntaxError(cx, ts);
             goto bad;
         }
-        if (!js_IndexAtom(cx, name->pn_atom, &seen) ||
-            !BindArg(cx, &data, name->pn_atom, &funtc))
+        if (!js_IndexAtom(cx, name->pn_atom, &seen)) goto bad;
+        if (name->pn_type == TOK_ELLIPSIS) {
+            if (!js_BindRestParameter(cx, ts, fun, name->pn_atom, &funtc)) goto bad;
+        } else if (!BindArg(cx, &data, name->pn_atom, &funtc)) {
             goto bad;
+        }
     }
     ts->flags |= TSF_OPERAND;
     expressionBody = !js_MatchToken(cx, ts, TOK_LC);
@@ -1708,6 +1834,7 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_flags = (funtc.flags & (TCF_FUN_FLAGS | TCF_HAS_DEFXMLNS)) |
                    ((fun->flags & JSFUN_STRICT) ? TCF_STRICT_MODE : 0);
     pn->pn_tryCount = funtc.tryCount;
+    pn->pn_restSlot = funtc.restSlot;
     TREE_CONTEXT_FINISH(&funtc);
     return pn;
 bad:
@@ -1816,6 +1943,11 @@ Statements(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                        JSSTRING_LENGTH(ATOM_TO_STRING(literal->pn_atom)) == 10 &&
                        !memcmp(JSSTRING_CHARS(ATOM_TO_STRING(literal->pn_atom)),
                                strictDirective, sizeof(strictDirective))) {
+                    if (cx->fp->fun && FUN_HAS_REST(cx->fp->fun) &&
+                        !(cx->fp->flags & JSFRAME_EVAL_COMPILER)) {
+                        StrictSyntaxError(cx, ts);
+                        return NULL;
+                    }
                     /* Escaped spellings are not strict-mode directives. */
                     tc->flags |= TCF_STRICT_MODE;
                     ts->flags |= TSF_STRICT_MODE;
@@ -6198,7 +6330,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                                 if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
                                      JS_VERSION_IS_ES2015(cx) ||
                                      (accessor->flags & JSFUN_STRICT)) &&
-                                    accessor->nargs != (op == JSOP_GETTER ? 0 : 1)) {
+                                    (FUN_HAS_REST(accessor) ||
+                                     accessor->nargs != (op == JSOP_GETTER ? 0 : 1))) {
                                     StrictSyntaxError(cx, ts);
                                     return NULL;
                                 }
@@ -6417,6 +6550,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif /* JS_HAS_SHARP_VARS */
 
       case TOK_LP:
+      {
+        JSBool hasRest = JS_FALSE;
         pn = NewParseNode(cx, ts, PN_UNARY, tc);
         if (!pn)
             return NULL;
@@ -6438,11 +6573,17 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 break;
             }
         }
-        pn2 = BracketedExpr(cx, ts, tc);
+        pn2 = JS_VERSION_IS_ES2015(cx)
+              ? ModernParenthesizedExpr(cx, ts, tc, &hasRest)
+              : BracketedExpr(cx, ts, tc);
         if (!pn2)
             return NULL;
 
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_IN_PAREN);
+        if (hasRest && js_PeekTokenSameLine(cx, ts) != TOK_ARROW) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
         if (pn2->pn_type == TOK_STRING)
             pn2->pn_attrs |= TOKF_PAREN;
         if ((pn2->pn_type == TOK_RP ||
@@ -6476,6 +6617,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         }
 
         break;
+      }
 
 #if JS_HAS_XML_SUPPORT
       case TOK_STAR:

@@ -518,3 +518,6 @@ OPDEF(JSOP_TOSTRING,     236,"tostring",     NULL,   1, 1, 1,19, JOF_BYTE)
 
 OPDEF(JSOP_TEMPLATEOBJECT,237,"templateobject",NULL,3,0,1,19,JOF_CONST)
 OPDEF(JSOP_TAGCALL,238,"tagcall",NULL,3,-1,1,18,JOF_UINT16)
+
+/* Initialize a rest formal before body declarations. */
+OPDEF(JSOP_RESTARG,239,"restarg",NULL,3,0,0,0,JOF_UINT16)

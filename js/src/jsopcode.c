@@ -1944,6 +1944,9 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
 #define END_LITOPX_CASE                                                       \
                 break;
 
+              case JSOP_RESTARG:
+                break;
+
               case JSOP_NOP:
                 /*
                  * Check for a do-while loop, a for-loop with an empty
@@ -4720,6 +4723,31 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
             }
         }
 
+        if (ok && FUN_HAS_REST(fun)) {
+            jsbytecode *restpc = fun->u.i.script->code;
+            uintN restslot;
+            if (*restpc == JSOP_GENERATOR) restpc += JSOP_GENERATOR_LENGTH;
+            if (*restpc != JSOP_RESTARG) {
+                JS_ReportError(cx, "missing rest parameter initializer");
+                ok = JS_FALSE;
+            } else {
+                restslot = GET_UINT16(restpc);
+                for (sprop = SCOPE_LAST_PROP(scope); sprop; sprop = sprop->parent) {
+                    if (sprop->getter == js_GetLocalVariable &&
+                        (uint16)sprop->shortid == restslot)
+                        break;
+                }
+                if (!sprop) {
+                    JS_ReportError(cx, "missing rest parameter binding");
+                    ok = JS_FALSE;
+                } else {
+                    if (nargs) js_puts(jp, ", ");
+                    js_puts(jp, "...");
+                    ok = QuoteString(&jp->sprinter,
+                                     ATOM_TO_STRING(JSID_TO_ATOM(sprop->id)), 0) != NULL;
+                }
+            }
+        }
 #ifdef JS_HAS_DESTRUCTURING
         jp->script = oldscript;
         jp->scope = oldscope;
@@ -4738,7 +4766,9 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     indent = jp->indent;
     jp->indent += 4;
     if (FUN_INTERPRETED(fun) && fun->object) {
-        if ((fun->flags & JSFUN_STRICT) &&
+        /* A non-simple formal list cannot contain an explicit strict
+         * directive. Its strictness comes from the enclosing source. */
+        if ((fun->flags & JSFUN_STRICT) && !FUN_HAS_REST(fun) &&
             js_printf(jp, "\t\"use strict\";\n") < 0) {
             jp->indent = indent;
             return JS_FALSE;

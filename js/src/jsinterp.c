@@ -1476,7 +1476,7 @@ have_fun:
                 goto out;
             }
         }
-        if (script->strictMode && script->needsArguments &&
+        if (((script->strictMode && script->needsArguments) || FUN_HAS_REST(fun)) &&
                     !FUN_IS_ARROW(fun) &&
             !js_GetArgsObject(cx, &frame)) {
             ok = JS_FALSE;
@@ -4440,7 +4440,7 @@ interrupt:
                 obj = NULL;
                 inlineCallCount++;
                 JS_RUNTIME_METER(rt, inlineCalls);
-                if (script->strictMode && script->needsArguments &&
+                if (((script->strictMode && script->needsArguments) || FUN_HAS_REST(fun)) &&
                     !FUN_IS_ARROW(fun) &&
                     !js_GetArgsObject(cx, fp)) {
                     ok = JS_FALSE;
@@ -4859,6 +4859,30 @@ interrupt:
             PUSH_OPND(JSVAL_NULL);
             obj = NULL;
           END_CASE(JSOP_NULL)
+
+          BEGIN_CASE(JSOP_RESTARG)
+          {
+            uintN restIndex, restSlot = GET_UINT16(pc);
+            JSTempValueRooter restRoot;
+            SAVE_SP_AND_PC(fp);
+            argc = fp->argc > fp->fun->nargs ? fp->argc - fp->fun->nargs : 0;
+            obj = js_NewArrayObject(cx, argc, NULL);
+            if (!obj) { ok = JS_FALSE; goto out; }
+            JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &restRoot);
+            ok = JS_TRUE;
+            for (restIndex = 0; restIndex < argc; ++restIndex) {
+                if (!js_CreateDataPropertyOrThrow(cx, obj, INT_TO_JSID(restIndex),
+                        fp->argv[fp->fun->nargs + restIndex])) {
+                    ok = JS_FALSE;
+                    break;
+                }
+            }
+            JS_POP_TEMP_ROOT(cx, &restRoot);
+            if (!ok) goto out;
+            fp->vars[restSlot] = OBJECT_TO_JSVAL(obj);
+            obj = NULL;
+          }
+          END_CASE(JSOP_RESTARG)
 
           BEGIN_CASE(JSOP_NEWTARGET)
             PUSH_OPND((fp->flags & JSFRAME_NEW_TARGET)

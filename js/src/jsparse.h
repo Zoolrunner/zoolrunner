@@ -282,6 +282,7 @@ struct JSParseNode {
             JSParseNode *body;          /* TOK_LC list of statements */
             uint32      flags;          /* accumulated tree context flags */
             uint32      tryCount;       /* count of try statements in body */
+            intN        restSlot;       /* local slot for rest formal, or -1 */
         } func;
         struct {                        /* list of next-linked nodes */
             JSParseNode *head;          /* first node in list */
@@ -324,6 +325,7 @@ struct JSParseNode {
 #define pn_body         pn_u.func.body
 #define pn_flags        pn_u.func.flags
 #define pn_tryCount     pn_u.func.tryCount
+#define pn_restSlot     pn_u.func.restSlot
 #define pn_head         pn_u.list.head
 #define pn_tail         pn_u.list.tail
 #define pn_count        pn_u.list.count
@@ -421,6 +423,10 @@ js_ParseTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts);
 extern JS_FRIEND_API(JSBool)
 js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
                       JSCodeGenerator *cg);
+
+extern JSBool
+js_BindRestParameter(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
+                      JSAtom *name, JSTreeContext *tc);
 
 extern JSBool
 js_CompileFunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun);

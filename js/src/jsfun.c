@@ -63,6 +63,7 @@
 #include "jsobj.h"
 #include "jsopcode.h"
 #include "jsparse.h"
+#include "jsemit.h"
 #include "jsscan.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -210,7 +211,7 @@ js_GetArgsProperty(JSContext *cx, JSStackFrame *fp, jsid id,
         return OBJ_GET_PROPERTY(cx, obj, id, vp);
     }
 
-    if (fp->fun->flags & JSFUN_STRICT) {
+    if ((fp->fun->flags & JSFUN_STRICT) || FUN_HAS_REST(fp->fun)) {
         obj = js_GetArgsObject(cx, fp);
         if (!obj) return JS_FALSE;
         *objp = obj;
@@ -267,7 +268,7 @@ js_GetArgsObject(JSContext *cx, JSStackFrame *fp)
     while (fp->flags & JSFRAME_SPECIAL)
         fp = fp->down;
 
-    strict = (fp->fun->flags & JSFUN_STRICT) != 0;
+    strict = (fp->fun->flags & JSFUN_STRICT) != 0 || FUN_HAS_REST(fp->fun);
 
     /* Create an arguments object for fp only if it lacks one. */
     argsobj = fp->argsobj;
@@ -300,7 +301,9 @@ js_GetArgsObject(JSContext *cx, JSStackFrame *fp)
     if (strict) {
         if (!JS_DefineProperty(cx, argsobj, "length", INT_TO_JSVAL(fp->argc),
                                NULL, NULL, 0) ||
-            !DefinePoisonProperties(cx, argsobj, "callee", "caller"))
+            !DefinePoisonProperties(cx, argsobj,
+                fp->fun->edition >= JSVERSION_ECMA_2015 ? "caller" : "callee",
+                fp->fun->edition >= JSVERSION_ECMA_2015 ? "callee" : "caller"))
             return NULL;
         for (i = 0; i < fp->argc; i++) {
             if (!JS_DefineElement(cx, argsobj, i, fp->argv[i], NULL, NULL,
@@ -330,7 +333,7 @@ js_PutArgsObject(JSContext *cx, JSStackFrame *fp)
      * deleted argument slot bitmap, because args_enumerate depends on that.
      */
     argsobj = fp->argsobj;
-    if (fp->fun->flags & JSFUN_STRICT)
+    if ((fp->fun->flags & JSFUN_STRICT) || FUN_HAS_REST(fp->fun))
         return JS_TRUE; /* Already an independent, fully materialized object. */
     ok = args_enumerate(cx, argsobj);
 
@@ -1482,7 +1485,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         goto bad;
     }
 
-    if (fun->kind > JSFUN_KIND_ARROW) {
+    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST)) {
         JS_ReportError(cx, "invalid serialized function kind");
         goto bad;
     }
@@ -2571,6 +2574,21 @@ Function(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         tt = js_GetToken(cx, ts);
         if (tt != TOK_EOF) {
             for (;;) {
+                if (tt == TOK_ELLIPSIS) {
+                    JSTreeContext resttc;
+                    tt = js_GetToken(cx, ts);
+                    if (tt != TOK_NAME) goto bad_formal;
+                    TREE_CONTEXT_INIT(&resttc);
+                    JS_KEEP_ATOMS(cx->runtime);
+                    ok = js_BindRestParameter(cx, ts, fun,
+                                              CURRENT_TOKEN(ts).t_atom, &resttc);
+                    JS_UNKEEP_ATOMS(cx->runtime);
+                    TREE_CONTEXT_FINISH(&resttc);
+                    if (!ok) goto bad_formal;
+                    tt = js_GetToken(cx, ts);
+                    if (tt != TOK_EOF) goto bad_formal;
+                    break;
+                }
                 /*
                  * Check that it's a name.  This also implicitly guards against
                  * TOK_ERROR, which was already reported.

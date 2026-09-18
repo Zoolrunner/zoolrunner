@@ -158,6 +158,7 @@ struct JSStmtInfo {
 struct JSTreeContext {              /* tree context for semantic checks */
     uint16          flags;          /* statement state flags, see below */
     uint16          numGlobalVars;  /* max. no. of global variables/regexps */
+    intN            restSlot;       /* rest formal local, or -1 */
     uint32          tryCount;       /* total count of try statements parsed */
     uint32          globalUses;     /* optimizable global var uses in total */
     uint32          loopyGlobalUses;/* optimizable global var uses in loops */
@@ -192,6 +193,7 @@ struct JSTreeContext {              /* tree context for semantic checks */
 
 #define TREE_CONTEXT_INIT(tc)                                                 \
     ((tc)->flags = (tc)->numGlobalVars = 0,                                   \
+     (tc)->restSlot = -1,                                                  \
      (tc)->tryCount = (tc)->globalUses = (tc)->loopyGlobalUses = 0,           \
      (tc)->topStmt = (tc)->topScopeStmt = NULL,                               \
      (tc)->blockChain = NULL,                                                 \

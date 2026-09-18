@@ -126,6 +126,8 @@ function modernWindowEdition() {
                          return (() => this).call({}) === owner && read() === 17 &&
                                 !read.hasOwnProperty("prototype"); }).call(symbolTarget, 17) &&
            (function() { "use strict"; return (() => this)() === 23; }).call(23) &&
+           ((first,...rest) => first === 7 && rest[0] === 8)(7,8) &&
+           Function("a", "...rest", "a=9;return arguments[0]===7&&rest[0]===8")(7,8) &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

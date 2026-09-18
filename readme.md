@@ -623,5 +623,15 @@ The callback tests also exposed and fixed argument lifetime and debugger/eval
 receiver defects. All four applications pass build, package and relocated
 desktop checks, including Calendar views, browser navigation/layout and ChatZilla;
 their engine binaries match the frozen conformance runtime.
-Default/rest/destructured parameters and class/super behavior remain incomplete. See the
+Default/destructured parameters and class/super behavior remain incomplete. See the
 [arrow notes](js/tests/es6/README.md#arrow-functions).
+
+Named rest parameters are implemented for ordinary/arrow functions, methods and
+`Function`, with independent arguments snapshots, intrinsic array creation and
+source/XDR reconstruction. The final macOS arm64 suite passes **27,316 ES6
+cases**, with **1,250 failures**, 14 unsupported modules and two harness errors:
+20 gained, zero lost, no crashes/timeouts. All 11,540 ES5 cases and the 56 focused
+and 24 native checks pass. All four applications pass build, package and relocated
+desktop checks, including Calendar views, browser navigation/layout and ChatZilla;
+their engine binaries match the frozen conformance runtime. Default parameters
+and rest patterns remain unfinished. See the [rest notes](js/tests/es6/README.md#rest-parameters).

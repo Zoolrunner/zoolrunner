@@ -1755,6 +1755,15 @@ retry:
       case '?':  tt = TOK_HOOK; break;
 
       case '.':
+        if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, '.')) {
+            if (!MatchChar(ts, '.')) {
+                js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                            JSMSG_SYNTAX_ERROR);
+                return TOK_ERROR;
+            }
+            tt = TOK_ELLIPSIS;
+            break;
+        }
 #if JS_HAS_XML_SUPPORT
         if (!JS_VERSION_IS_ES2015(cx) && MatchChar(ts, c))
             tt = TOK_DBLDOT;

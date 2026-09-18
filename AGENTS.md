@@ -1380,6 +1380,16 @@ and invalidate old serialized code (cache version 44 adds function kind).
 Snapshot live mapped argument values before detaching a returning frame without
 reviving deleted mappings or invoking replacement accessors. Eval/debugger
 receiver conversion follows the enclosing function's binding, not the eval
-script's directive. Simple arrow parameters are implemented; default/rest/
-destructured parameters and class/super behavior still require implementation
+script's directive. Simple and named-rest arrow parameters are implemented; default/destructured
+parameters and class/super behavior still require implementation
 and complete conformance/application validation.
+
+For rest-parameter changes, run `js/tests/es6/rest-parameters.js`,
+`TestRestEmbedding.c` and modern chrome/content checks. Keep ordinary non-simple
+arguments unmapped, arrow arguments lexical, and rest initialization before body
+function declarations. Create own rest-array elements without inherited setters
+and keep partial arrays rooted across native callbacks. Exercise dynamic
+Function, strict inheritance, forbidden explicit strict directives, decompilation,
+XDR and native cloning. Cache version 45 adds rest initialization. Named rest
+bindings are implemented; defaults and rest patterns remain unfinished, and
+focused checks do not replace complete conformance/application runs.

@@ -2177,8 +2177,9 @@ ES2015 arrows with simple named parameters now parse and execute in the existing
 engine. Expression/block bodies, duplicate-parameter rejection, lexical `this`,
 lexical `arguments`, lexical `new.target`, metadata and constructor rejection are
 implemented. Parenthesis provenance prevents arbitrary expressions or nested
-parameter parentheses from being accepted as arrow formals. Default, rest and
-destructured arrow parameters, and class/super integration remain unfinished.
+parameter parentheses from being accepted as arrow formals. Default and
+destructured arrow parameters, and class/super integration remain unfinished;
+named rest parameters are covered in the subsequent section.
 
 A private function-kind field occupies existing structure padding; public
 function flags and the native frame ABI remain intact. Traced per-activation
@@ -2226,3 +2227,50 @@ The earlier `arrow-basic-full-*` diagnostic precedes the two callback-discovered
 corrections. Four argument/eval regressions fail on the committed template
 runtime and pass with these corrections. Full ES2015 compliance and current
 other-platform validation remain unfinished.
+
+### Rest parameters
+
+Named rest formals are implemented for ordinary functions, arrow functions,
+object methods and the dynamic `Function` constructor. A hidden local holds the
+rest array; `nargs` continues to represent the fixed parameter count and hence
+`Function.length`. Cache version 45 adds a rest-initialization opcode and extends
+private function-kind flags. The initializer runs in the prolog before body
+function declarations, creates own array elements without invoking inherited
+setters, and roots the incomplete array independently of debugger-visible
+bindings. It does not read mutable global Array helpers.
+
+Ordinary rest functions use an unmapped arguments snapshot even when non-strict;
+arrow rest functions still resolve outer arguments. Fast indexed argument reads
+also honor the snapshot. Parsing rejects duplicate bindings, invalid rest
+placement, getter/setter rest lists and explicit strict directives with
+non-simple formals. Legacy edition grammar remains separate. Rest source
+reconstruction retains its parameter name; inherited strictness remains in the
+enclosing source rather than introducing an illegal directive inside the rest
+function. Default parameters and rest destructuring patterns remain unfinished.
+
+Focused `rest-parameters.js` passes 56 cases; `TestRestEmbedding.c` passes
+24 checks, including XDR, decompilation, cross-realm calls, native cloning, GC
+and debugger reentry while rest arrays are allocated. Modern chrome/content
+fixtures exercise rest arrows and dynamic Function. ES2015 unmapped arguments
+create the caller/callee poison properties in the specified order, while older
+editions retain their historical ordering. The
+final frozen macOS arm64 runtime passes **27,316 ES2015 cases**, with
+**1,250 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **20 gained, zero lost** against the arrow baseline. All
+**11,540 ES5.1 cases** pass, and runtime hashes remain unchanged through both
+complete suites. All four macOS arm64 applications pass root build, package and
+relocated desktop checks, including modern chrome/content globals, Calendar's
+four views, browser navigation/layout (169 checks) and Suite/XULRunner ChatZilla.
+Their engine binaries match the frozen conformance runtime (SHA-256
+`bdb8da644b063b05604a47007995cecc9bcc1e83680f9341c8ba4aaa7c163a0c`).
+Reports use `rest-corrected-*`; the frozen runtime is
+`/tmp/zr-rest-corrected-conformance-20260918`. The upstream rest-parameter folder
+passes 16/22 cases; the remaining six modes require patterns or class/new-target
+integration. Runner integration passes all 23 checks on an unchanged retry; its
+first launch exceeded the two-second per-case limit, and both logs are retained.
+C89 checks pass. Other platforms have not been revalidated for these changes.
+
+`rest-final-*` precedes the metadata correction and was superseded after its
+active build/runtime children completed.
+Earlier `rest-basic-full-*` reports precede inherited-setter and dynamic-Function
+corrections and are intermediate diagnostics only.

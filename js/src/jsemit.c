@@ -3149,6 +3149,13 @@ js_EmitFunctionBytecode(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body)
         CG_SWITCH_TO_MAIN(cg);
     }
 
+    if (cg->treeContext.restSlot >= 0) {
+        uintN slot = (uintN)cg->treeContext.restSlot;
+        CG_SWITCH_TO_PROLOG(cg);
+        if (js_Emit3(cx, cg, JSOP_RESTARG, UINT16_HI(slot), UINT16_LO(slot)) < 0)
+            return JS_FALSE;
+        CG_SWITCH_TO_MAIN(cg);
+    }
     return js_EmitTree(cx, cg, body) &&
            js_Emit1(cx, cg, JSOP_STOP) >= 0;
 }
@@ -3996,6 +4003,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         }
         cg2->treeContext.flags = (uint16) (pn->pn_flags | TCF_IN_FUNCTION);
         cg2->treeContext.tryCount = pn->pn_tryCount;
+        cg2->treeContext.restSlot = pn->pn_restSlot;
         cg2->parent = cg;
         fun = (JSFunction *) JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
         if (!js_EmitFunctionBody(cx, cg2, pn->pn_body, fun))
