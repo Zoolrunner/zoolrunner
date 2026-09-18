@@ -549,7 +549,7 @@ remain incomplete. See [invocation validation notes](js/tests/es6/README.md#mode
 
 The reflection follow-up fixes modern key ordering and foreign result-array
 realms while preserving legacy script behavior and proxy order. All 5,984 Object
-and 208 JSON cases pass. The latest full macOS arm64 ES2015 run passes **26,654
+and 208 JSON cases pass. The reflection macOS arm64 ES2015 run passes **26,654
 cases**, with **1,912 failures**, 14 unsupported module cases and two harness
 errors: six gained, zero lost. All 11,540 ES5.1 cases and all four build, package
 and desktop checks pass. Full ES6 and other-platform validation remain incomplete.
@@ -563,10 +563,20 @@ All 11,540 ES5 cases and all four packaged application checks pass. Other
 platforms have not been revalidated for this batch.
 
 The ES6 job queue foundation adds explicit embedding checkpoints and shell
-execution tests. Promise construction and DOM checkpoints remain unfinished;
-queue support alone is not Promise conformance. The corrected macOS arm64 run
-preserves 26,654 ES6 passes and all 11,540 ES5 passes; all four application checks
+execution tests. Queue support alone is not Promise conformance. The corrected
+macOS arm64 queue-foundation run preserves 26,654 ES6 passes and all 11,540 ES5 passes; all four application checks
 pass. Application testing found and fixed a context-migration teardown crash;
 an isolated lifecycle timeout remains recorded in the validation notes. See the
 [job queue notes](js/tests/es6/README.md#ecmascript-job-queue-foundation) for
 ownership, teardown and validation limits.
+
+
+Promise construction, reactions, then/catch, resolve/reject, all/race and
+application job checkpoints are implemented. The latest full macOS arm64 run
+passes **27,036 ES2015 cases**, with **1,530 failures**, 14 unsupported module
+cases and two harness errors: 382 gained, zero lost, no crashes/timeouts.
+All **11,540 ES5.1 cases** and all four application build, package and desktop
+checks pass. Application testing also fixed job principal lookup for sandbox
+callbacks while preserving content security restrictions. Full ES6 and
+other-platform validation remain incomplete. See the
+[Promise validation notes](js/tests/es6/README.md#promise-and-application-checkpoints).

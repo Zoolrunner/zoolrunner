@@ -59,8 +59,8 @@ do not compare a legacy run with an ES2015 run as if the semantics were equal.
 Modules are currently reported as **unsupported**, not passed or skipped.
 The runner drains the engine's pending jobs after test evaluation, before
 checking `$DONE`. A job exception cannot satisfy a synchronous negative test.
-Async tests that still do not complete are reported as unsupported. The Promise
-constructor and DOM host checkpoints remain to be implemented. These
+Async tests that still do not complete are reported as unsupported. Promise and
+application checkpoints are covered in the implementation notes below. These
 statuses count against completion and give the runner a failing exit status.
 Every result is recorded. `--filter` is only a diagnostic subset and cannot
 establish a full-suite pass. Engine and host support must eventually execute
@@ -119,10 +119,11 @@ Calendar passes the 156 Number assertions, eight unchanged compatibility test
 files, startup and all four views. These application checks do not establish
 compatibility with every historical application.
 
-Major remaining work includes remaining well-known Symbol protocols; lexical scopes
+At that initial baseline, remaining work included well-known Symbol protocols; lexical scopes
 and TDZ; ES2015 functions, destructuring, classes and `super`; iteration consumers, syntax and
 generators; collections and typed arrays; standard-library and regexp changes;
-Promise jobs; and module compilation, linking and evaluation. Preserve XDR and
+Promise jobs; and module compilation, linking and evaluation. Later sections
+record subsequent implementations and remaining failures. Preserve XDR and
 decompilation when bytecode changes. Review compatibility at the script-loading
 boundary instead of changing old applications to accommodate engine regressions.
 
@@ -1884,8 +1885,8 @@ exception patterns. These hooks are not exposed as web globals.
 
 Focused validation uses `TestJobQueue.c` (51 checks), `test-job-shell.py` (ten
 xpcshell checks and nine standalone-shell checks), and the 23-check runner
-integration fixture. This foundation does **not** implement Promise or DOM
-checkpoints.
+integration fixture. This foundation did not itself implement Promise or DOM
+checkpoints; the following batch adds those features.
 
 The final macOS arm64/SDK 11.3 queue run preserves all **26,654 ES2015 passes**,
 with 1,912 failures, 14 unsupported module cases, two harness errors and no
@@ -1908,3 +1909,72 @@ also timed out without a crash report; the unchanged package subsequently passed
 That isolated timeout is not claimed fixed. The lifecycle runner now preserves
 partial timeout output, and the desktop runner reports nonzero GUI exits early.
 Final runtime reports are under `artifacts/es6/promise-jobs-fixed-runtime`.
+
+
+## Promise and application checkpoints
+
+The engine implements Promise construction, then/catch, resolve/reject, all/race,
+thenable assimilation, reaction jobs and species constructors. Resolving functions
+share an already-resolved record, and queued work retains traced records rather
+than pointers into C stack storage. The implementation preserves custom constructor
+callbacks, raw handler receivers, callback exceptions and foreign intrinsic realms.
+The pinned corpus incorporates the correction removing static all/race species
+lookup; instance then still uses species. Promise.all limits its result array to
+2^32−1 elements and rejects larger input, subject to allocation limits.
+
+Promise metadata uses ES2015 attributes even in legacy globals. Existing legacy
+built-ins and syntax remain version-selected. The added JSProto entry changes
+internal runtime layout, requiring complete application/embedding rebuilds;
+bytecode is unchanged. Embedders outside ZoolRunner must arrange their own
+JS_RunJobs checkpoints.
+
+DOM script completion drains jobs only after the outer script returns. The full
+context stack is inspected, including frames below null barriers; nested event
+loops cannot drain a suspended outer script's queue. Context ownership survives
+jobs that close their window. XPConnect also provides an outer event-boundary
+checkpoint, plus a checkpoint after each completed wrapped-JS component callback
+so batched native events preserve job ordering. It reports abrupt job errors
+and prevents safe-context replacement during a checkpoint. A marked native job entry frame supplies
+the callback realm for security principal lookup before a handler enters its
+script; the generic XULRunner safe context must neither block legitimate
+sandbox handlers nor supply chrome privileges to content handlers. Native and
+window fixtures cover job scopes, unprivileged component-access denial and
+existing cross-principal constructor access restrictions. Bound/proxy callbacks
+use their target realm; revoked callbacks still reject asynchronously.
+Promise rejection is represented as Promise state; this batch does not add an unhandled-rejection notification API.
+
+Focused fixtures cover 40 shell assertions and 55 native assertions, including
+GC, interruptions, foreign contexts, legacy globals and cloned resolver captures.
+The chrome/content fixture covers 16 checks including component timers, nested
+event processing, result realms and queued work after closing a child window. The initial synthetic
+command event did not execute its listener; the corrected fixture uses a custom
+synthetic event, explicitly accepts untrusted events and verifies listener entry.
+
+The final macOS arm64/SDK 11.3 full pinned run passes **27,036 ES2015 cases**,
+with **1,530 failures**, 14 unsupported module cases, two harness errors and
+zero crashes/timeouts. Compared with the queue baseline, 382 cases gained and
+zero previously passing cases were lost. The Promise group passes 380/396;
+all 16 remaining failures require unsupported class syntax, with no exclusions.
+All **11,540 ES5.1 cases** pass in America/Los_Angeles. Reports are
+`artifacts/es6/promise-realm-full.json`, `promise-realm-es5.json` and
+`promise-realm-pass-comparison.json`. The frozen XULRunner runtime at
+`/tmp/zr-promise-realm-conformance-20260918` remained unchanged during both runs;
+its engine hash matches all four completed applications.
+
+All four root builds, packages and relocated GUI checks pass, including the
+16-check Promise fixture. Calendar passes eight unit suites and all four views;
+Browser passes 169 navigation/layout checks; Suite passes 24 lifecycle checks
+and ChatZilla; standalone XULRunner ChatZilla initializes with its input widget.
+The native fixture passes under MallocScribble; C89 checks and all 23 runner
+integration checks pass. Final desktop reports are under
+`artifacts/es6/promise-realm-runtime`. These results cover macOS arm64 only;
+other platforms and complete ES6 remain unvalidated/incomplete.
+
+Application validation exposed a security-bootstrap defect absent from shell
+results: XULRunner's generic safe context could drain a job yet reject a sloppy
+sandbox handler's implicit parent lookup before entering its script. Suite's
+hidden-window context masked this. Explicit job scopes and callback-realm
+selection fix that path while preserving content/component and cross-principal
+access restrictions. Foreign-window result arrays and both privilege levels are
+covered by the final fixture. Earlier failures and diagnostic runs are retained
+in `artifacts/es6/promise-*`; focused diagnostics are not full application passes.

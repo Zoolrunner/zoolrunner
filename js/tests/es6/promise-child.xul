@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="Promise close lifecycle" onload="runChild()">
+<script><![CDATA[
+function runChild() {
+    var owner = window.arguments[0];
+    Promise.resolve().then(function () { owner.childFirst++; window.close(); });
+    Promise.resolve().then(function () { owner.childAfterClose++; });
+}
+]]></script></window>

@@ -2155,6 +2155,16 @@ nsScriptSecurityManager::GetFramePrincipal(JSContext *cx,
                                            nsresult *rv)
 {
     NS_PRECONDITION(rv, "Null out param");
+    if (JS_IsJobFrame(cx, fp))
+    {
+        // Native Promise jobs need an owning principal before entering a
+        // scripted handler (including its implicit global receiver lookup).
+        // Do not borrow privileges from whichever context hosts the queue.
+        JSObject *scope = JS_GetFrameScopeChain(cx, fp);
+        nsIPrincipal *principal = scope ? doGetObjectPrincipal(cx, scope) : nsnull;
+        *rv = principal ? NS_OK : NS_ERROR_FAILURE;
+        return principal;
+    }
     JSObject *obj = JS_GetFrameFunctionObject(cx, fp);
     if (!obj)
     {

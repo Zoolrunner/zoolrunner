@@ -62,6 +62,7 @@
 #include "jsiteres6.h"
 #include "jsproxy.h"
 #include "jsbinarydata.h"
+#include "jspromise.h"
 #include "jsexn.h"
 #include "jsiter.h"
 #include "jslock.h"
@@ -2090,8 +2091,9 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
         return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
     }
     if (fun && (FUN_NATIVE(fun) == js_ArrayBufferConstructor ||
-                FUN_NATIVE(fun) == js_DataViewConstructor)) {
-        /* Binary constructors perform argument conversion before observing
+                FUN_NATIVE(fun) == js_DataViewConstructor ||
+                FUN_NATIVE(fun) == js_PromiseConstructor)) {
+        /* These constructors validate or convert arguments before observing
          * newTarget.prototype, and allocate their own internal slots. */
         vp[1] = JSVAL_NULL;
         return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);

@@ -75,6 +75,7 @@
 #include "jsreflect.h"
 #include "jsproxy.h"
 #include "jsbinarydata.h"
+#include "jspromise.h"
 #include "jsrealm.h"
 #include "jsopcode.h"
 #include "jsparse.h"
@@ -1300,6 +1301,7 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitProxyClass(cx, obj) &&
            js_InitArrayBufferClass(cx, obj) &&
            js_InitDataViewClass(cx, obj) &&
+           js_InitPromiseClass(cx, obj) &&
 #if JS_HAS_SCRIPT_OBJECT
            js_InitScriptClass(cx, obj) &&
 #endif
@@ -1379,6 +1381,7 @@ static JSStdName standard_class_atoms[] = {
     {js_InitProxyClass,                 EAGER_ATOM_AND_CLASP(Proxy)},
     {js_InitArrayBufferClass,           EAGER_ATOM_AND_CLASP(ArrayBuffer)},
     {js_InitDataViewClass,              EAGER_ATOM_AND_CLASP(DataView)},
+    {js_InitPromiseClass,               EAGER_ATOM_AND_CLASP(Promise)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
     {js_InitExceptionClasses,           EAGER_ATOM_AND_CLASP(Error)},
     {js_InitRegExpClass,                EAGER_ATOM_AND_CLASP(RegExp)},
@@ -1569,7 +1572,8 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
         if ((stdnm->clasp == &js_MapClass || stdnm->clasp == &js_SetClass ||
              stdnm->clasp == &js_WeakMapClass || stdnm->clasp == &js_WeakSetClass ||
              stdnm->clasp == &js_ReflectClass || stdnm->clasp == &js_ProxyClass ||
-             stdnm->clasp == &js_ArrayBufferClass || stdnm->clasp == &js_DataViewClass) &&
+             stdnm->clasp == &js_ArrayBufferClass || stdnm->clasp == &js_DataViewClass ||
+             stdnm->clasp == &js_PromiseClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(stdnm->clasp))) {
             return JS_TRUE;
@@ -1630,7 +1634,8 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
              standard_class_atoms[i].clasp == &js_ReflectClass ||
              standard_class_atoms[i].clasp == &js_ProxyClass ||
              standard_class_atoms[i].clasp == &js_ArrayBufferClass ||
-             standard_class_atoms[i].clasp == &js_DataViewClass) &&
+             standard_class_atoms[i].clasp == &js_DataViewClass ||
+             standard_class_atoms[i].clasp == &js_PromiseClass) &&
             js_GetCachedClassObject(cx, obj,
                 (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(standard_class_atoms[i].clasp)))
             continue;

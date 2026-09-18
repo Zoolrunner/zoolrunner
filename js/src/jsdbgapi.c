@@ -878,6 +878,12 @@ JS_IsNativeFrame(JSContext *cx, JSStackFrame *fp)
     return !fp->script;
 }
 
+JS_PUBLIC_API(JSBool)
+JS_IsJobFrame(JSContext *cx, JSStackFrame *fp)
+{
+    return (fp->flags & JSFRAME_JOB) != 0;
+}
+
 /* this is deprecated, use JS_GetFrameScopeChain instead */
 JS_PUBLIC_API(JSObject *)
 JS_GetFrameObject(JSContext *cx, JSStackFrame *fp)

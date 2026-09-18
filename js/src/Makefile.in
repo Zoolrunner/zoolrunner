@@ -92,6 +92,7 @@ CSRCS		= \
 		jsbinarydata.c \
 		jscasing.c \
 		jsjobs.c \
+		jspromise.c \
 		jsjson.c \
 		jslock.c \
 		jslog2.c \

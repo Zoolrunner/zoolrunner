@@ -58,12 +58,17 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
     (fixture / 'early-application.xul').write_text(code)
     for name in ['window-bootstrap.xul', 'legacy-window-syntax.js']:
         shutil.copy2(root / 'js/tests/es5' / name, fixture / name)
-    for name in ['window-editions.xul', 'window-editions.html', 'edition-modern.js']:
+    for name in ['window-editions.xul', 'window-editions.html', 'edition-modern.js',
+                 'window-promise.xul', 'window-promise.html', 'promise-child.xul']:
         shutil.copy2(root / 'js/tests/es6' / name, fixture / name)
     edition_fixture = fixture / 'window-editions.xul'
     edition_fixture.write_text(edition_fixture.read_text().replace(
         'chrome://es6window/content/window-editions.html',
         (fixture / 'window-editions.html').as_uri()))
+    promise_fixture = fixture / 'window-promise.xul'
+    promise_fixture.write_text(promise_fixture.read_text().replace(
+        'chrome://zooltest/content/window-promise.html',
+        (fixture / 'window-promise.html').as_uri()))
     # Calendar intentionally omits data:; use an ordinary file content global.
     (fixture / 'window-content.html').write_text('<html><head><title>Content global</title></head><body>Content global</body></html>')
     window_fixture = fixture / 'window-bootstrap.xul'
@@ -105,7 +110,8 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
     try:
         cases = [('application', 'early-application.xul', 'APPLICATION PASS:'),
                  ('window', 'window-bootstrap.xul', 'WINDOW-BOOTSTRAP checks=17 failures=0'),
-                 ('editions', 'window-editions.xul', 'ES6-WINDOW-EDITIONS checks=5 failures=0')]
+                 ('editions', 'window-editions.xul', 'ES6-WINDOW-EDITIONS checks=5 failures=0'),
+                 ('promises', 'window-promise.xul', 'ES6-PROMISE-WINDOW checks=16 failures=0')]
         if args.app == 'suite':
             cases.append(('chatzilla', 'chatzilla.xul', 'SUITE-CHATZILLA initialized=true'))
         original = code
@@ -128,6 +134,8 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
                     text = path.read_text(errors='replace')
                     if marker in text:
                         break
+                    if 'checks=' in marker and marker.partition('checks=')[0] + 'checks=' in text:
+                        raise RuntimeError(name + ' GUI reported failure: ' + text[-2000:])
                     if 'APPLICATION FAIL:' in text:
                         raise RuntimeError(text[-2000:])
                     status = proc.poll()

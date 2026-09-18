@@ -1468,6 +1468,7 @@ nsresult
 nsJSContext::CallEventHandler(JSObject *aTarget, JSObject *aHandler,
                               uintN argc, jsval *argv, jsval *rval)
 {
+  nsCOMPtr<nsIScriptContext> keepAlive(this);
   NS_ENSURE_TRUE(mIsInitialized, NS_ERROR_NOT_INITIALIZED);
 
   *rval = JSVAL_VOID;
@@ -2157,6 +2158,7 @@ nsJSContext::GC()
 void
 nsJSContext::ScriptEvaluated(PRBool aTerminated)
 {
+  nsCOMPtr<nsIScriptContext> keepAlive(this);
   if (aTerminated && mTerminations) {
     // Make sure to null out mTerminations before doing anything that
     // might cause new termination funcs to be added!
@@ -2170,6 +2172,43 @@ nsJSContext::ScriptEvaluated(PRBool aTerminated)
     }
     delete start;
   }
+
+  // A completed outer script is a job checkpoint. A null context-stack entry
+  // can hide a suspended outer frame (modal/nested event processing), so scan
+  // the entire stack rather than trusting Peek or this context's frame alone.
+  JS_BeginRequest(mContext);
+  if (JS_HasPendingJobs(mContext) && !JS_IsRunning(mContext) &&
+      !JS_IsExceptionPending(mContext)) {
+    nsCOMPtr<nsIJSContextStack> stack =
+      do_GetService("@mozilla.org/js/xpc/ContextStack;1");
+    nsCOMPtr<nsIJSContextStackIterator> iterator =
+      do_CreateInstance("@mozilla.org/js/xpc/ContextStackIterator;1");
+    PRBool canRun = stack && iterator && NS_SUCCEEDED(iterator->Reset(stack));
+    PRBool done = PR_FALSE;
+    while (canRun && NS_SUCCEEDED(iterator->Done(&done)) && !done) {
+      JSContext *outer = nsnull;
+      if (NS_FAILED(iterator->Prev(&outer)) || outer)
+        canRun = PR_FALSE;
+    }
+#ifdef JS_THREADSAFE
+    for (JSCList *link = mContext->thread->contextList.next;
+         canRun && link != &mContext->thread->contextList; link = link->next) {
+      if (JS_IsRunning(CX_FROM_THREAD_LINKS(link)))
+        canRun = PR_FALSE;
+    }
+#endif
+    if (canRun && NS_SUCCEEDED(stack->Push(mContext))) {
+      // Keep our context on the stack while reporting errors too: reentrant
+      // notifications must not start another checkpoint halfway through one.
+      while (JS_HasPendingJobs(mContext) && !JS_RunJobs(mContext)) {
+        if (!JS_IsExceptionPending(mContext) ||
+            !JS_ReportPendingException(mContext))
+          break;
+      }
+      stack->Pop(nsnull);
+    }
+  }
+  JS_EndRequest(mContext);
 
   mNumEvaluations++;
 

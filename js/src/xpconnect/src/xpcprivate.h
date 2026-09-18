@@ -2749,6 +2749,8 @@ public:
     const nsTArray<JSContextAndFrame>* GetStack()
     { return &mStack; }
 
+    void RunJobs(JSRuntime* runtime);
+
 private:
     void SyncJSContexts();
 
@@ -2759,6 +2761,7 @@ private:
     // If non-null, we own it; same as mSafeJSContext if SetSafeJSContext
     // not called.
     JSContext*  mOwnSafeJSContext;
+    PRBool      mRunningJobs;
 };
 
 /***************************************************************************/

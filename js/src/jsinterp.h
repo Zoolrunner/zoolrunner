@@ -117,6 +117,7 @@ typedef struct JSInlineFrame {
 #define JSFRAME_STRICT_EVAL   0x8000 /* inherit strictness for direct eval */
 
 #define JSFRAME_NEW_TARGET    0x10000 /* constructor frame has newTarget */
+#define JSFRAME_JOB           0x20000 /* host job entry with an owning scope */
 
 #define JSFRAME_OVERRIDE_SHIFT 24   /* override bit-set params; see jsfun.c */
 #define JSFRAME_OVERRIDE_BITS  8

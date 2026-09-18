@@ -9,6 +9,7 @@
 #include "jsiteres6.h"
 #include "jsobj.h"
 #include "jsrealm.h"
+#include <string.h>
 
 static JSClass jobClass = {
     "Job", JSCLASS_HAS_RESERVED_SLOTS(2),
@@ -91,6 +92,7 @@ JS_RunJobs(JSContext *cx)
     jsval values[2] = {JSVAL_VOID, JSVAL_VOID};
     JSTempValueRooter root;
     JSObject *job;
+    JSStackFrame frame;
     JSBool ok = JS_TRUE;
     JOB_CHECK_REQUEST(cx);
     /* A callback requesting another checkpoint cannot run later jobs ahead
@@ -105,7 +107,14 @@ JS_RunJobs(JSContext *cx)
         queue->head = JSVAL_TO_OBJECT(JOB_SLOT(job, 1));
         if (!queue->head) queue->tail = NULL;
         /* Callback remains rooted by job through the entire invocation. */
+        memset(&frame, 0, sizeof frame);
+        frame.flags = JSFRAME_JOB | JSFRAME_INTERNAL;
+        frame.scopeChain = OBJ_GET_PARENT(cx, job);
+        frame.varobj = frame.scopeChain;
+        frame.down = cx->fp;
+        cx->fp = &frame;
         ok = js_InternalInvokeValue(cx, JSVAL_VOID, JOB_SLOT(job, 0), 0, 0, NULL, &values[1]);
+        cx->fp = frame.down;
         if (!ok) break;
         values[0] = values[1] = JSVAL_VOID;
     }

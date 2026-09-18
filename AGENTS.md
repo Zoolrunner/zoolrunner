@@ -1303,3 +1303,19 @@ exception/interruption recovery. Hosts choose checkpoints; nested load/evaluate
 calls must not drain the outer script's jobs. Last-context thread detach cancels
 pending jobs, so embeddings that need completion must drain before teardown.
 Shell queue support alone does not establish Promise or DOM event-loop support.
+
+For Promise changes, run `promise.js`, `TestPromise.c` and the packaged
+`window-promise.xul` chrome/content fixture. Keep resolving functions and reaction
+records traced across GC, context destruction and cross-global callbacks. Preserve
+once-only resolution, iterator closing, intrinsic realms and interruption without
+turning fatal engine failures into successful rejections. DOM checkpoints must
+inspect the entire context stack, including contexts below null barriers, and
+must not drain jobs during a suspended outer script. Keep contexts alive through
+callbacks that close windows; test queued work after window closure. Component
+event checkpoints must preserve their safe context and report abrupt job errors.
+Native job entry frames carry their owning global for principal lookup before a
+sloppy handler enters its script. Preserve access checks; test both system and
+unprivileged sandbox callbacks so safe-context differences cannot grant chrome
+privileges or prevent legitimate handlers from running.
+Promise metadata follows ES2015 even in legacy globals; other legacy built-ins
+and application syntax must retain their selected-version behavior.

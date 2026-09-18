@@ -1,0 +1,129 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="Promise window checkpoint test" onload="setTimeout(runPromiseWindow, 1000)">
+<browser id="content" type="content" src="chrome://zooltest/content/window-promise.html"/>
+<button id="nested" label="Nested event"/>
+<script><![CDATA[
+var checks = 0, failures = 0, startup = ['script'];
+var childFirst = 0, childAfterClose = 0, childWindow;
+var componentSandbox, contentSandbox, contentTimer;
+function check(value, label) {
+    checks++; if (!value) failures++;
+    dump((value ? 'PASS ' : 'FAIL ') + label + '\n');
+}
+Promise.resolve().then(function () { startup.push('job'); });
+check(startup.join(',') === 'script', 'initial job deferred');
+startup.push('script-end');
+function finish() {
+    if (failures) {
+        var console = Components.classes['@mozilla.org/consoleservice;1']
+            .getService(Components.interfaces.nsIConsoleService), messages = {}, count = {};
+        console.getMessageArray(messages, count);
+        for (var i = 0; i < count.value; i++) dump('PROMISE-CONSOLE ' + messages.value[i].message + '\n');
+    }
+    dump('ES6-PROMISE-WINDOW checks=' + checks + ' failures=' + failures + '\n');
+    Components.classes['@mozilla.org/toolkit/app-startup;1']
+        .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+function runComponentCheckpoint() {
+    try {
+        componentSandbox = new Components.utils.Sandbox(window);
+        // Both timer callbacks belong to a non-window global. The second
+        // observes completion before any DOM timer can provide a checkpoint.
+        Components.utils.evalInSandbox(
+            "var jobRan = false, componentDone = false, componentPassed = false, jobError = '';" +
+            "var first = Components.classes['@mozilla.org/timer;1'].createInstance(Components.interfaces.nsITimer);" +
+            "var second = Components.classes['@mozilla.org/timer;1'].createInstance(Components.interfaces.nsITimer);" +
+            "first.initWithCallback({notify:function () {" +
+            "Promise.resolve().then(function () { jobRan = true; }).catch(function(e) { jobError = String(e); });" +
+            "}},0,0);" +
+            "second.initWithCallback({notify:function () { componentPassed = jobRan; componentDone = true; }},1,0);" +
+            // Let both native timer events queue before returning to dispatch.
+            // Neither timer runs JS during this bounded wait in the outer script.
+            "var deadline = Date.now() + 50; while (Date.now() < deadline) {}", componentSandbox);
+        contentSandbox = new Components.utils.Sandbox('http://example.invalid');
+        contentSandbox.foreignPromise = Promise;
+        Components.utils.evalInSandbox(
+            "var contentDone = false, denied = false, foreignDenied = false;" +
+            "var callback = {notify:function () {" +
+            "try { foreignPromise.resolve().then(function () {}); }" +
+            "catch (e) { foreignDenied = String(e).indexOf('Permission denied') >= 0; }" +
+            "Promise.resolve().then(function () {" +
+            "try { Components.classes['@mozilla.org/file/local;1'].createInstance(Components.interfaces.nsILocalFile); }" +
+            "catch (e) { denied = true; } contentDone = true; }); }};", contentSandbox);
+        contentTimer = Components.classes['@mozilla.org/timer;1']
+            .createInstance(Components.interfaces.nsITimer);
+        contentTimer.initWithCallback(contentSandbox.callback, 0, 0);
+        var attempts = 0;
+        setTimeout(function waitForComponent() {
+            if ((componentSandbox.componentDone && contentSandbox.contentDone) || ++attempts >= 50) {
+                check(componentSandbox.componentDone && componentSandbox.componentPassed,
+                      'component callback job before next component timer: done=' +
+                      componentSandbox.componentDone + ' job=' + componentSandbox.jobRan +
+                      ' observed=' + componentSandbox.componentPassed + ' error=' + componentSandbox.jobError);
+                check(contentSandbox.contentDone && contentSandbox.denied,
+                      'content job runs without chrome component privileges');
+                check(contentSandbox.foreignDenied,
+                      'content cannot inspect a chrome Promise constructor');
+                finish();
+            } else setTimeout(waitForComponent, 100);
+        }, 100);
+    } catch (error) { check(false, String(error)); finish(); }
+}
+function runPromiseWindow() {
+    try {
+        check(startup.join(',') === 'script,script-end,job', 'script checkpoint');
+        var content = document.getElementById('content').contentWindow;
+        content = content.wrappedJSObject || content;
+        check(content.contentPromiseDone, 'content Promise completion');
+        check(content.contentRawReceiver, 'content strict handler receiver');
+        var order = [], realm = false, rejected = false, nestedCalled = 0;
+        Promise.resolve().then(function () {
+            order.push('handler');
+            Promise.resolve().then(function () { order.push('nested'); });
+            order.push('handler-end');
+        });
+        var button = document.getElementById('nested');
+        button.addEventListener('promiseprobe', function () {
+            nestedCalled++;
+            Promise.resolve().then(function () { order.push('event'); });
+        }, false, true);
+        var event = document.createEvent('Events');
+        event.initEvent('promiseprobe', true, true); button.dispatchEvent(event);
+        check(nestedCalled === 1 && order.length === 0,
+              'nested event ran without draining outer script');
+        Components.classes['@mozilla.org/event-queue-service;1']
+            .getService(Components.interfaces.nsIEventQueueService)
+            .getSpecialEventQueue(0).processPendingEvents();
+        check(order.length === 0, 'nested event loop does not drain suspended script');
+        content.Promise.all([1,2]).then(function (values) {
+            realm = Object.getPrototypeOf(values) === content.Array.prototype;
+        });
+        Promise.resolve().then(function () { throw 'expected rejection'; })
+            .catch(function (reason) { rejected = reason === 'expected rejection'; });
+        setTimeout(function () {
+            try {
+                check(order.join(',') === 'handler,handler-end,event,nested',
+                      'jobs before next timer: ' + order.join(','));
+                check(realm, 'foreign content result array realm');
+                check(rejected, 'window rejection propagation');
+                childWindow = window.openDialog('chrome://zooltest/content/promise-child.xul',
+                                                'promise-child', 'chrome,dialog=no', window);
+                var attempts = 0;
+                setTimeout(function waitForChild() {
+                    if (childAfterClose || ++attempts >= 50) {
+                        check(childFirst === 1, 'child close job ran');
+                        check(childAfterClose === 1, 'queued job survives child close');
+                        check(childWindow.closed, 'child window closed');
+                        var legacy = {};
+                        legacy.value setter = function (value) { this.saved = value; };
+                        legacy.value = 7;
+                        check(legacy.saved === 7, 'legacy XUL setter still works');
+                        runComponentCheckpoint();
+                    } else setTimeout(waitForChild, 100);
+                }, 100);
+            } catch (error) { check(false, String(error)); finish(); }
+        }, 0);
+    } catch (error) { check(false, String(error)); finish(); }
+}
+]]></script></window>
