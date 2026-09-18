@@ -862,3 +862,29 @@ embedding and desktop checks. Calendar passes its eight unit suites and four
 views; Browser passes 169 navigation/layout assertions. Suite Composer and
 ChatZilla, and standalone XULRunner ChatZilla pass. Windows, Linux and other
 architectures have not been revalidated for this batch.
+
+
+### Symbol.match classification
+
+String `includes`, `startsWith` and `endsWith` now use ES2015 IsRegExp: an
+object's observable `Symbol.match` value controls classification unless it is
+undefined, when the native RegExp type supplies the result. Truth testing does
+not invoke user conversion. Receiver conversion precedes classification, and
+classification precedes search-string and position conversion. This does not
+implement RegExp's matching, replacement, searching or splitting protocols.
+
+The focused fixture `string-match-classification.js` passes 39 checks on macOS
+arm64, including getter exceptions, inherited classification, opt-out, callback
+ordering and GC. The pinned String prototype subset passes 1,524/1,572 cases;
+all cases for these three methods pass. The full pinned ES2015 run passes
+**23,787 cases**, with **4,779 failures**, 14 unsupported module cases and two
+harness errors. This gains six passes without losing any; there are no crashes
+or timeouts and runtime hashes remain unchanged. All **11,540 required ES5
+cases** pass. Reports are `artifacts/es6/match-classification-full.json` and
+`match-classification-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, embedding and
+desktop checks. Calendar's eight unit suites and four views, Browser's 169
+navigation/layout assertions, Suite Composer/ChatZilla and standalone XULRunner
+ChatZilla pass. Other architectures and operating systems have not been
+revalidated for this batch.

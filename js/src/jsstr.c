@@ -2359,13 +2359,15 @@ str_literalSearch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     size_t length, searchLength, position, last;
     jsdouble number;
     const jschar *chars, *needle;
+    JSBool isRegExp;
 
     str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
     if (!str)
         return JS_FALSE;
     argv[-1] = STRING_TO_JSVAL(str);
-    /* Symbol.match customization is added with the Symbol property protocol. */
-    if (JSVAL_IS_REGEXP(cx, argv[0])) {
+    if (!js_IsRegExp(cx, argv[0], &isRegExp))
+        return JS_FALSE;
+    if (isRegExp) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_REGEXP_SEARCH);
         return JS_FALSE;
     }

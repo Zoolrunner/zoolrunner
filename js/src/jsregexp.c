@@ -50,6 +50,7 @@
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
+#include "jsbool.h"
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsfun.h"
@@ -62,6 +63,33 @@
 #include "jsregexp.h"
 #include "jsscan.h"
 #include "jsstr.h"
+#include "jssymbol.h"
+
+JSBool
+js_IsRegExp(JSContext *cx, jsval value, JSBool *result)
+{
+    jsval roots[2];
+    JSTempValueRooter root;
+    jsid id;
+    JSBool ok;
+
+    *result = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(value))
+        return JS_TRUE;
+    roots[0] = value;
+    roots[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    ok = js_WellKnownSymbolId(cx, JS_WKS_MATCH, &id) &&
+         OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(value), id, &roots[1]);
+    if (ok) {
+        if (JSVAL_IS_VOID(roots[1]))
+            *result = JSVAL_IS_REGEXP(cx, value);
+        else
+            ok = js_ValueToBoolean(cx, roots[1], result);
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
 
 /* Note : contiguity of 'simple opcodes' is important for SimpleMatch() */
 typedef enum REOp {

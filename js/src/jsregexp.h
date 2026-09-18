@@ -152,6 +152,10 @@ js_FreeRegExpStatics(JSContext *cx, JSRegExpStatics *res);
 
 extern JSClass js_RegExpClass;
 
+/* ES2015 IsRegExp, including the observable @@match lookup. */
+extern JSBool
+js_IsRegExp(JSContext *cx, jsval value, JSBool *result);
+
 extern JSObject *
 js_InitRegExpClass(JSContext *cx, JSObject *obj);
 

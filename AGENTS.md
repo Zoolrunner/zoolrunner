@@ -437,8 +437,9 @@ and the optional host `test-math-kernels.py` diagnostic for numerical changes;
 a host libm comparison is not target-OS runtime validation.
 Run `string-additions.js` for the new String methods. Preserve UTF-16 code units,
 observable conversion order, rooting across callbacks/GC, reentrant raw assembly
-and checked allocation lengths. Do not equate literal RegExp rejection with the
-complete Symbol.match protocol.
+and checked allocation lengths. Run `string-match-classification.js` for
+String search IsRegExp changes, including observable Symbol.match getters.
+Classification alone does not implement the RegExp matching protocols.
 Keep the private Unicode normalization data checksum-pinned and reproducible;
 preserve Unicode licensing in source and packaged license pages. Run
 `normalization.js` and the full pinned `test-normalization.py` check when changing

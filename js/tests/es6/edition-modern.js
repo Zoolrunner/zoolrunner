@@ -38,6 +38,8 @@ function modernWindowEdition() {
            String.fromCodePoint(0x1f600).codePointAt(0) === 0x1f600 &&
            "ab".repeat(2) === "abab" && "abc".startsWith("b", 1) &&
            "abc".endsWith("b", 2) && "abc".includes("bc") &&
+           (function() { var rx = /x/; rx[Symbol.match] = false;
+                         return "/x/".includes(rx); })() &&
            String.raw({raw:["a", "b"]}, "!") === "a!b" &&
            Array.of(1, 2).join() === "1,2" &&
            [1, 2].find(function(v) { return v > 1; }) === 2 &&

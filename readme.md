@@ -324,3 +324,9 @@ cases pass. All four macOS arm64 applications pass build, package and runtime
 checks; other platforms have not been revalidated for this batch. Several
 well-known-symbol protocols remain unimplemented; this is not full ES2015
 compliance. See `js/tests/es6/README.md`.
+
+String `includes`, `startsWith` and `endsWith` now respect Symbol.match-based
+RegExp classification. The full macOS arm64 ES2015 run passes 23,787 cases,
+with 4,779 failures, 14 unsupported cases and two harness errors; all 11,540
+ES5 cases pass. All four applications pass packaged compatibility checks.
+Other platforms have not been revalidated for this batch.
