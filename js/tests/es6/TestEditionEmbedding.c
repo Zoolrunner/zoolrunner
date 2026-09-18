@@ -70,6 +70,7 @@ int main(void)
         "try{constantValue+=1;immutable=false;}catch(error){immutable=immutable && error instanceof TypeError;}"
         "return radixValue===20 && Number('0b101')===5 && caught && "
         "immutable && "
+        "(function(Array,Object){return [].length===0 && ({answer:42}).answer===42;})(null,null) && "
         "edition()===2015 && ({x:1,x:2}).x===2"
         " && legacyEdition() && nativeNested() && edition()===2015;}"
         "modernEdition() && eval('modernEdition()') && "

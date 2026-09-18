@@ -95,6 +95,7 @@ CSRCS		= \
 		jsopcode.c \
 		jsparse.c \
 		jsprf.c \
+		jsrealm.c \
 		jsregexp.c \
 		jsscan.c \
 		jsscope.c \

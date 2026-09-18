@@ -1067,3 +1067,11 @@ providers of that API/ABI.
 For environments where GTK2 is unavailable or inappropriate, prefer restoring
 or maintaining historical alternatives such as Xlib and Qt 3 rather than
 porting ZoolRunner to GTK3 or GTK4.
+
+
+For intrinsic changes, preserve classic globals without reserved JSProto slots.
+Run `js/tests/es6/realm-intrinsics.js` and `TestRealmIntrinsics.c`; verify live
+intrinsics survive GC, dead globals are collected, and JS_ClearScope resets the
+cache. Modern literal construction bypasses mutable Array/Object bindings;
+legacy scripts retain their historical lookup. Keep bytecode versioning,
+decompilation, cross-edition XDR and real XUL/content globals covered.

@@ -301,3 +301,12 @@ ZoolRunner continues that work with the application runtime as its central focus
 Mozilla and RetroZilla authorship, copyright, and attribution remain part of the
 project. See [LICENSE](LICENSE), [LEGAL](LEGAL), and individual source and
 third-party license files for applicable terms and credits.
+
+
+On the ES6 development branch, modern array/object literal construction now
+uses private per-global intrinsic constructors, including classic embedding
+globals without reserved slots. Legacy scripts retain their historical binding
+lookup. Bytecode cache version 36 invalidates earlier caches. All four macOS arm64 applications pass the packaged compatibility checks;
+the full ES5 run passes 11,540 cases, and ES2015 remains at 23,528 passes with
+5,038 failures, 14 unsupported cases and two harness errors. Other platforms
+have not been revalidated for this change. See `js/tests/es6/README.md`.

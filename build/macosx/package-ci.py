@@ -234,6 +234,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         print(result.stdout)
         if result.returncode or "ES6-PROTOTYPE-MUTATION checks=100 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed prototype mutation")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/realm-intrinsics.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-REALM-INTRINSICS checks=35 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed realm intrinsics")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -249,7 +257,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestFunctionMetadata.c",
                  "ES6-FUNCTION-METADATA-EMBEDDING checks=20 failures=0"),
                 ("es6/TestPrototypeMutation.c",
-                 "ES6-PROTOTYPE-EMBEDDING checks=15 failures=0")):
+                 "ES6-PROTOTYPE-EMBEDDING checks=15 failures=0"),
+                ("es6/TestRealmIntrinsics.c",
+                 "ES6-REALM-EMBEDDING checks=19 failures=0")):
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",

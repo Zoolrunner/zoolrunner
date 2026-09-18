@@ -6073,10 +6073,14 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * but use a stack slot for t and avoid dup'ing and popping it via
          * the JSOP_NEWINIT and JSOP_INITELEM bytecodes.
          */
-        ale = js_IndexAtom(cx, CLASS_ATOM(cx, Array), &cg->atomList);
-        if (!ale)
-            return JS_FALSE;
-        EMIT_ATOM_INDEX_OP(JSOP_NAME, ALE_INDEX(ale));
+        if (JS_VERSION_IS_ES2015(cx)) {
+            EMIT_UINT16_IMM_OP(JSOP_INTRINSIC, JSProto_Array);
+        } else {
+            ale = js_IndexAtom(cx, CLASS_ATOM(cx, Array), &cg->atomList);
+            if (!ale)
+                return JS_FALSE;
+            EMIT_ATOM_INDEX_OP(JSOP_NAME, ALE_INDEX(ale));
+        }
         if (js_Emit1(cx, cg, JSOP_PUSHOBJ) < 0)
             return JS_FALSE;
         if (js_Emit1(cx, cg, JSOP_NEWINIT) < 0)
@@ -6148,10 +6152,14 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * but use a stack slot for t and avoid dup'ing and popping it via
          * the JSOP_NEWINIT and JSOP_INITELEM bytecodes.
          */
-        ale = js_IndexAtom(cx, CLASS_ATOM(cx, Object), &cg->atomList);
-        if (!ale)
-            return JS_FALSE;
-        EMIT_ATOM_INDEX_OP(JSOP_NAME, ALE_INDEX(ale));
+        if (JS_VERSION_IS_ES2015(cx)) {
+            EMIT_UINT16_IMM_OP(JSOP_INTRINSIC, JSProto_Object);
+        } else {
+            ale = js_IndexAtom(cx, CLASS_ATOM(cx, Object), &cg->atomList);
+            if (!ale)
+                return JS_FALSE;
+            EMIT_ATOM_INDEX_OP(JSOP_NAME, ALE_INDEX(ale));
+        }
 
         if (js_Emit1(cx, cg, JSOP_PUSHOBJ) < 0)
             return JS_FALSE;

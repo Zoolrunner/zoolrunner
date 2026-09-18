@@ -755,3 +755,40 @@ embedding and desktop checks. Additional checks pass for Calendar's eight unit
 suites and all four views, Browser's 169 navigation/layout assertions, Suite
 Composer/ChatZilla and standalone XULRunner ChatZilla. These results do not
 establish validation on other operating systems or architectures.
+
+
+### Realm intrinsics and literal construction
+
+Modern array/object literals use an intrinsic-constructor bytecode instead of
+looking up mutable `Array`/`Object` bindings. Explicit constructor calls still
+use the application's binding. Default and explicitly selected legacy scripts
+retain their historical literal lookup. Bytecode cache version **36** invalidates
+older cached scripts; decompilation and cross-edition XDR tests cover literals.
+
+A private runtime table retains the first built-in constructors for each global,
+including classic embedding globals with no reserved JSProto slots. Its global
+keys are weak: constructors are traced only through a reachable global, and
+entries disappear before dead globals are finalized. `JS_ClearScope` resets the
+cache. Reinitializing a deleted global property does not replace a modern realm's
+original intrinsic. Public JSClass layouts and existing reserved slots are
+unchanged. This is groundwork for ES2015 intrinsic handling, not complete realm
+or ES2015 conformance.
+
+Focused shell checks cover shadowed/deleted globals, hostile global getters,
+boxing, collection, decompilation and legacy-to-modern calls. Native checks
+cover separate globals, rooted and unreachable realm lifetimes and scope reset.
+The packaged checks include both probes and mixed-edition XUL/content windows.
+All 35 shell and 19 native embedding checks pass; the cross-edition XDR probe
+passes its 13 checks with bytecode version 36.
+
+The complete pinned ES2015 run remains **23,528 passes, 5,038 failures, 14
+unsupported module cases and two harness errors**, with zero timeouts/crashes.
+No previously passing cases regress, and runtime hashes remain unchanged.
+All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/realm-intrinsics-full.json` and `realm-intrinsics-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, embedding and
+desktop checks. Additional checks pass for Calendar's eight unit suites and four
+views, Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla. Other platforms have not been revalidated for
+this batch.

@@ -63,6 +63,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsrealm.h"
 #include "jsscan.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -2683,7 +2684,7 @@ JSBool
 js_GetClassObject(JSContext *cx, JSObject *obj, JSProtoKey key,
                   JSObject **objp)
 {
-    JSBool ok;
+    JSBool ok = JS_TRUE, reserved;
     JSObject *tmp, *cobj;
     JSResolvingKey rkey;
     JSResolvingEntry *rentry;
@@ -2693,17 +2694,27 @@ js_GetClassObject(JSContext *cx, JSObject *obj, JSProtoKey key,
 
     while ((tmp = OBJ_GET_PARENT(cx, obj)) != NULL)
         obj = tmp;
-    if (!(OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL)) {
+    if (JS_VERSION_IS_ES2015(cx)) {
+        cobj = js_GetCachedClassObject(cx, obj, key);
+        if (cobj) {
+            *objp = cobj;
+            return JS_TRUE;
+        }
+    }
+    reserved = (OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) != 0;
+    if (!reserved && !JS_VERSION_IS_ES2015(cx)) {
         *objp = NULL;
         return JS_TRUE;
     }
 
-    ok = JS_GetReservedSlot(cx, obj, key, &v);
-    if (!ok)
-        return JS_FALSE;
-    if (!JSVAL_IS_PRIMITIVE(v)) {
-        *objp = JSVAL_TO_OBJECT(v);
-        return JS_TRUE;
+    if (reserved) {
+        ok = JS_GetReservedSlot(cx, obj, key, &v);
+        if (!ok)
+            return JS_FALSE;
+        if (!JSVAL_IS_PRIMITIVE(v)) {
+            *objp = JSVAL_TO_OBJECT(v);
+            return JS_TRUE;
+        }
     }
 
     rkey.obj = obj;
@@ -2722,6 +2733,8 @@ js_GetClassObject(JSContext *cx, JSObject *obj, JSProtoKey key,
     if (init) {
         if (!init(cx, obj)) {
             ok = JS_FALSE;
+        } else if (!reserved) {
+            cobj = js_GetCachedClassObject(cx, obj, key);
         } else {
             ok = JS_GetReservedSlot(cx, obj, key, &v);
             if (ok && !JSVAL_IS_PRIMITIVE(v))
@@ -2738,6 +2751,8 @@ JSBool
 js_SetClassObject(JSContext *cx, JSObject *obj, JSProtoKey key, JSObject *cobj)
 {
     JS_ASSERT(!OBJ_GET_PARENT(cx, obj));
+    if (!js_CacheClassObject(cx, obj, key, cobj))
+        return JS_FALSE;
     if (!(OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL))
         return JS_TRUE;
 

@@ -4240,6 +4240,15 @@ interrupt:
           END_CASE(JSOP_SETCALL)
 #endif
 
+          BEGIN_CASE(JSOP_INTRINSIC)
+            SAVE_SP_AND_PC(fp);
+            ok = js_FindClassObject(cx, NULL, INT_TO_JSID(GET_UINT16(pc)), &rval);
+            if (!ok)
+                goto out;
+            PUSH_OPND(rval);
+            obj = NULL;
+          END_CASE(JSOP_INTRINSIC)
+
           BEGIN_CASE(JSOP_NAME)
             atom = GET_ATOM(cx, script, pc);
             id   = ATOM_TO_JSID(atom);

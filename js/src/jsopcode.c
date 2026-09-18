@@ -3402,6 +3402,10 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 LOCAL_ASSERT(atom);
                 goto do_name;
 
+              case JSOP_INTRINSIC:
+                atom = cx->runtime->atomState.classAtoms[GET_UINT16(pc)];
+                goto do_name;
+
               case JSOP_NAME:
               case JSOP_GETGVAR:
                 atom = GET_ATOM(cx, jp->script, pc);

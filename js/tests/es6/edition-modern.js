@@ -21,6 +21,7 @@ function modernWindowEdition() {
     try { fixed++; } catch (error) { immutable = error instanceof TypeError; }
     return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
            metadata && inferredMetadata && immutable &&
+           (function(Array, Object) { return [].length === 0 && ({answer:42}).answer === 42; })(null, null) &&
            Math.imul(4294967295, 5) === -5 && Math.clz32(1) === 31 &&
            1 / Math.trunc(-0.25) === -Infinity && Math.sign(-7) === -1 &&
            Math.round(0.49999999999999994) === 0 && Math.hypot(3, 4) === 5 &&

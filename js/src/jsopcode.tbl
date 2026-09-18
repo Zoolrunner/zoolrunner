@@ -486,3 +486,6 @@ OPDEF(JSOP_CONSTINC,     218,"constinc",    NULL,    1,  1,  1, 15,  JOF_BYTE|JO
 OPDEF(JSOP_CONSTDEC,     219,"constdec",    NULL,    1,  1,  1, 15,  JOF_BYTE|JOF_DEC)
 OPDEF(JSOP_CONSTPOSTINC, 220,"constpostinc",NULL,    1,  1,  1, 15,  JOF_BYTE|JOF_INC|JOF_POST)
 OPDEF(JSOP_CONSTPOSTDEC, 221,"constpostdec",NULL,    1,  1,  1, 15,  JOF_BYTE|JOF_DEC|JOF_POST)
+
+/* Modern literal constructors bypass mutable lexical/global bindings. */
+OPDEF(JSOP_INTRINSIC,    222,"intrinsic",   NULL,    3,  0,  1, 19,  JOF_UINT16)

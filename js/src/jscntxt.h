@@ -449,6 +449,8 @@ struct JSRuntime {
     double              strdepLengthSum;
     double              strdepLengthSquaredSum;
 #endif
+    /* Weak global keys; constructors are traced from each live global. */
+    JSDHashTable        *classObjectCache;
 };
 
 #ifdef DEBUG

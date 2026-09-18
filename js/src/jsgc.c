@@ -69,6 +69,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsrealm.h"
 #include "jsscope.h"
 #include "jsscript.h"
 #include "jsstr.h"
@@ -726,6 +727,7 @@ js_FinishGC(JSRuntime *rt)
     js_DumpGCStats(rt, stdout);
 #endif
 
+    js_FinishCachedClassObjects(rt);
     FreePtrTable(&rt->gcIteratorTable, &iteratorTableInfo);
 #if JS_HAS_GENERATORS
     rt->gcCloseState.reachableList = NULL;
@@ -2061,6 +2063,8 @@ MarkGCThingChildren(JSContext *cx, void *thing, uint8 *flagp,
         if (!vp)
             break;
 
+        js_MarkCachedClassObjects(cx, obj);
+
         /* Mark slots if they are small enough to be GC-allocated. */
         if ((vp[-1] + 1) * sizeof(jsval) <= GC_NBYTES_MAX)
             GC_MARK(cx, vp - 1, "slots");
@@ -2987,6 +2991,9 @@ restart:
         cx->insideGCMarkCallback = JS_FALSE;
     }
     JS_ASSERT(rt->gcUnscannedBagSize == 0);
+
+    /* Inspect weak global keys before sweep clears mark bits/finalizes them. */
+    js_SweepCachedClassObjects(rt);
 
     /* Finalize iterator states before the objects they iterate over. */
     CloseIteratorStates(cx);

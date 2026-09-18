@@ -69,6 +69,7 @@
 #include "jsmath.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsrealm.h"
 #include "jsopcode.h"
 #include "jsparse.h"
 #include "jsregexp.h"
@@ -3262,6 +3263,8 @@ JS_ClearScope(JSContext *cx, JSObject *obj)
 
     if (obj->map->ops->clear)
         obj->map->ops->clear(cx, obj);
+
+    js_ClearCachedClassObjects(cx, obj);
 
     /* Clear cached class objects on the global object. */
     if (JS_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) {
