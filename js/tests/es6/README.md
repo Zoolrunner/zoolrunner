@@ -2170,3 +2170,59 @@ errors, conditional-callee decompilation and intrinsic eval tagging.
 Full ES2015 compliance and other-platform validation remain unfinished.
 Earlier `template-untagged-full-*` reports are intermediate diagnostics and
 precede tagged-template implementation.
+
+### Arrow functions
+
+ES2015 arrows with simple named parameters now parse and execute in the existing
+engine. Expression/block bodies, duplicate-parameter rejection, lexical `this`,
+lexical `arguments`, lexical `new.target`, metadata and constructor rejection are
+implemented. Parenthesis provenance prevents arbitrary expressions or nested
+parameter parentheses from being accepted as arrow formals. Default, rest and
+destructured arrow parameters, and class/super integration remain unfinished.
+
+A private function-kind field occupies existing structure padding; public
+function flags and the native frame ABI remain intact. Traced per-activation
+cells retain the raw receiver and new target, including strict primitives and
+undefined. Arrows retain outer argument environments without introducing an
+implicit arguments binding of their own. Native cloning retains the original
+lexical cell, and interpreted closure creation allocates independent instances.
+Cache version 44 serializes function kind. Function/script decompilation retains
+arrow syntax and invocation precedence.
+
+Native allocation hooks exercise GC and debugger evaluation that recursively
+creates arrows during lexical-cell allocation. This exposed two additional
+lifetime defects: already materialized mapped argument indices needed their
+last live parameter values saved before frame destruction, and debugger/eval
+`this` conversion must follow the enclosing function rather than the evaluated
+script's directive prologue. The fixes preserve deleted/detached argument
+indices and do not invoke user index accessors during frame cleanup.
+
+Focused checks pass: `arrow.js` (37), `TestArrowEmbedding.c` (20), and
+`../es5/arguments-lifetime.js` (12). The native checks also cover cross-realm
+calls/cloning, XDR, source reconstruction, legacy rejection and explicit GC.
+Package validation registers these checks; the modern chrome/content fixture
+checks arrows with object and strict primitive receivers. All changed C files
+pass C89 declaration and implicit-function checks.
+
+The final frozen macOS arm64 runtime passes **27,296 ES2015 cases**, with
+**1,270 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **79 gained, zero lost** against the template baseline. All
+**11,540 ES5.1 cases** pass; runtime hashes remain unchanged through both full
+suites. The arrow diagnostic passes 120/146 cases; remaining cases need parameter,
+destructuring or class/super support. Runner integration passes all 23 checks.
+Reports use `arrow-final-*` under `artifacts/es6`; the frozen runtime is
+`/tmp/zr-arrow-final-conformance-20260918`.
+
+All four macOS arm64 applications pass root build and package checks. Their
+engine binaries match the frozen conformance runtime (SHA-256
+`c5910c8616ee44c6ed0c0c9b8043a828c8a6eaec27ea8c47311598694bcb91d7`).
+All four relocated desktop checks pass, including real chrome/content globals,
+Calendar's four views, browser navigation/layout (169 checks), and unchanged
+Suite/XULRunner ChatZilla. The first desktop run caught an incorrect expectation
+in the new strict-mode fixture (arguments must retain the original value);
+the corrected fixture passes in all four applications. Failed-run diagnostics
+remain in `arrow-final-*-strict-fixture-error*` artifacts.
+The earlier `arrow-basic-full-*` diagnostic precedes the two callback-discovered
+corrections. Four argument/eval regressions fail on the committed template
+runtime and pass with these corrections. Full ES2015 compliance and current
+other-platform validation remain unfinished.

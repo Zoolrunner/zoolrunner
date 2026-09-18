@@ -1233,6 +1233,15 @@ have_fun:
             nslots += fun->u.n.extra;
         }
 
+        if (FUN_IS_ARROW(fun)) {
+            if (!js_GetArrowBindings(cx, funobj, &vp[1], &newTarget)) {
+                ok = JS_FALSE;
+                goto out2;
+            }
+            thisv = vp[1];
+            thisp = JSVAL_IS_OBJECT(thisv) ? JSVAL_TO_OBJECT(thisv) : NULL;
+            goto init_frame;
+        }
         if ((fun->flags & JSFUN_STRICT) && !(flags & JSINVOKE_CONSTRUCT)) {
             /* The raw receiver remains in argv[-1]. Keep thisp an object
              * pointer for debuggers and legacy embedding frame consumers. */
@@ -1336,6 +1345,9 @@ have_fun:
     frame.flags = flags;
     if (flags & JSINVOKE_CONSTRUCT) {
         frame.newTarget = newTarget ? newTarget : frame.callee;
+        frame.flags |= JSFRAME_NEW_TARGET;
+    } else if (fun && FUN_IS_ARROW(fun) && newTarget) {
+        frame.newTarget = newTarget;
         frame.flags |= JSFRAME_NEW_TARGET;
     }
     frame.dormantNext = NULL;
@@ -1465,6 +1477,7 @@ have_fun:
             }
         }
         if (script->strictMode && script->needsArguments &&
+                    !FUN_IS_ARROW(fun) &&
             !js_GetArgsObject(cx, &frame)) {
             ok = JS_FALSE;
             goto out;
@@ -4350,8 +4363,15 @@ interrupt:
                 newifp->rvp = rvp;
                 newifp->mark = newmark;
 
-                /* Strict functions retain their receiver without coercion. */
-                if (fun->flags & JSFUN_STRICT) {
+                if (FUN_IS_ARROW(fun)) {
+                    if (!js_GetArrowBindings(cx, obj, &vp[1],
+                                              &newifp->frame.newTarget))
+                        goto bad_inline_call;
+                    if (newifp->frame.newTarget)
+                        newifp->frame.flags |= JSFRAME_NEW_TARGET;
+                }
+                /* Strict functions and arrows retain raw receivers. */
+                if ((fun->flags & JSFUN_STRICT) || FUN_IS_ARROW(fun)) {
                     newifp->frame.thisp = JSVAL_IS_OBJECT(vp[1])
                                          ? JSVAL_TO_OBJECT(vp[1]) : NULL;
                 } else {
@@ -4421,6 +4441,7 @@ interrupt:
                 inlineCallCount++;
                 JS_RUNTIME_METER(rt, inlineCalls);
                 if (script->strictMode && script->needsArguments &&
+                    !FUN_IS_ARROW(fun) &&
                     !js_GetArgsObject(cx, fp)) {
                     ok = JS_FALSE;
                     goto out;
@@ -4846,7 +4867,19 @@ interrupt:
           END_CASE(JSOP_NEWTARGET)
 
           BEGIN_CASE(JSOP_THIS)
-            if (script->strictMode && fp->fun && fp->argv &&
+            if (fp->fun && FUN_IS_ARROW(fp->fun)) {
+                SAVE_SP_AND_PC(fp);
+                if (!js_GetArrowBindings(cx, fp->callee, &rval, &obj2)) {
+                    ok = JS_FALSE;
+                    goto out;
+                }
+                PUSH_OPND(rval);
+                obj = NULL;
+                DO_NEXT_OP(JSOP_THIS_LENGTH);
+            }
+            /* Eval/debugger scripts inherit the function's this binding.
+             * Their own directive prologue must not change its conversion. */
+            if (fp->fun && (fp->fun->flags & JSFUN_STRICT) && fp->argv &&
                 !(fp->flags & JSFRAME_CONSTRUCTING)) {
                 PUSH_OPND(fp->argv[-1]);
                 obj = NULL;
@@ -5496,12 +5529,18 @@ interrupt:
                 ok = JS_FALSE;
                 goto out;
             }
-            if (OBJ_GET_PARENT(cx, obj) != parent) {
+            if (OBJ_GET_PARENT(cx, obj) != parent ||
+                FUN_IS_ARROW((JSFunction *)JS_GetPrivate(cx, obj))) {
                 obj = js_CloneFunctionObject(cx, obj, parent);
                 if (!obj) {
                     ok = JS_FALSE;
                     goto out;
                 }
+            }
+            if (FUN_IS_ARROW((JSFunction *)JS_GetPrivate(cx, obj)) &&
+                !js_CaptureArrowBindings(cx, obj, fp)) {
+                ok = JS_FALSE;
+                goto out;
             }
             PUSH_OPND(OBJECT_TO_JSVAL(obj));
             obj = NULL;

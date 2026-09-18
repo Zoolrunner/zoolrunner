@@ -52,6 +52,7 @@ struct JSFunction {
     uint16       nargs;         /* minimum number of actual arguments */
     uint16       flags;         /* bound method and other flags, see jsapi.h */
     uint16       edition;       /* creation edition, including native functions */
+    uint16       kind;          /* private interpreted function kind */
     union {
         struct {
             uint16   extra;     /* number of arg slots for local GC roots */
@@ -68,6 +69,14 @@ struct JSFunction {
     JSClass      *clasp;        /* if non-null, constructor for this class */
     JSAtom       *inferredName; /* modern metadata, never a lexical binding */
 };
+
+#define JSFUN_KIND_ORDINARY 0
+#define JSFUN_KIND_ARROW    1
+#define FUN_IS_ARROW(fun) ((fun)->kind == JSFUN_KIND_ARROW)
+#define JSFUN_ARROW_SLOT(fun) (3 + (fun)->u.i.nregexps)
+
+extern JSBool js_CaptureArrowBindings(JSContext *, JSObject *, JSStackFrame *);
+extern JSBool js_GetArrowBindings(JSContext *, JSObject *, jsval *, JSObject **);
 
 /* Internal function flag; it is not a property attribute or a public API flag. */
 #define JSFUN_NO_CONSTRUCT   0x4000 /* no [[Construct]] or implicit prototype */

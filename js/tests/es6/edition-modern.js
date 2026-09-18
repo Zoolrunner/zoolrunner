@@ -121,6 +121,11 @@ function modernWindowEdition() {
                          {toString:function(){order.push("receiver");return "x";}},
                          {toString:function(){order.push("attribute");return "y";}});
                          return order.join() === "receiver,attribute"; })() &&
+           (function(value) { var owner = this, read = () => arguments[0];
+                         read(); value = 29;
+                         return (() => this).call({}) === owner && read() === 17 &&
+                                !read.hasOwnProperty("prototype"); }).call(symbolTarget, 17) &&
+           (function() { "use strict"; return (() => this)() === 23; }).call(23) &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

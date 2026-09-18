@@ -95,6 +95,9 @@ enum {
 #define SET_OVERRIDE_BIT(fp, tinyid) \
     ((fp)->flags |= JS_BIT(JSFRAME_OVERRIDE_SHIFT - ((tinyid) + 1)))
 
+/* The kind occupies existing alignment padding on supported 32/64-bit ABIs. */
+JS_STATIC_ASSERT(sizeof(JSFunction) == 6 * sizeof(void *) + 8);
+
 static JSBool
 DefinePoisonProperties(JSContext *cx, JSObject *obj, const char *first,
                         const char *second);
@@ -557,6 +560,7 @@ args_enumerate(JSContext *cx, JSObject *obj)
     JSStackFrame *fp;
     JSObject *pobj;
     JSProperty *prop;
+    JSScopeProperty *sprop;
     uintN slot, argc;
 
     fp = (JSStackFrame *)
@@ -592,8 +596,19 @@ args_enumerate(JSContext *cx, JSObject *obj)
     for (slot = 0; slot < argc; slot++) {
         if (!js_LookupProperty(cx, obj, INT_TO_JSID((jsint)slot), &pobj, &prop))
             return JS_FALSE;
-        if (prop)
+        if (prop) {
+            /* An earlier read can already have materialized this index.
+             * Refresh its stored value before the owning frame disappears;
+             * merely looking it up leaves the old value behind. Do not call
+             * user accessors or revive deleted/detached parameter mappings. */
+            if (pobj == obj && !ArgWasDeleted(cx, fp, slot)) {
+                sprop = (JSScopeProperty *)prop;
+                if (sprop->getter == args_getProperty &&
+                    SPROP_HAS_VALID_SLOT(sprop, OBJ_SCOPE(obj)))
+                    LOCKED_OBJ_SET_SLOT(obj, sprop->slot, fp->argv[slot]);
+            }
             OBJ_DROP_PROPERTY(cx, pobj, prop);
+        }
     }
     return JS_TRUE;
 }
@@ -668,6 +683,8 @@ js_GetCallObject(JSContext *cx, JSStackFrame *fp, JSObject *parent)
         return NULL;
     }
     fp->callobj = callobj;
+    if (FUN_IS_ARROW(fp->fun))
+        OBJ_SET_PROTO(cx, callobj, NULL);
 
     /* Make callobj be the scope chain and the variables object. */
     JS_ASSERT(fp->scopeChain == parent);
@@ -699,10 +716,12 @@ js_PutCallObject(JSContext *cx, JSStackFrame *fp)
     /*
      * Get the arguments object to snapshot fp's actual argument values.
      */
-    if (fp->argsobj) {
+    if (fp->argsobj && !FUN_IS_ARROW(fp->fun)) {
         argsid = ATOM_TO_JSID(cx->runtime->atomState.argumentsAtom);
         ok &= js_GetProperty(cx, callobj, argsid, &aval);
         ok &= js_SetProperty(cx, callobj, argsid, &aval);
+        ok &= js_PutArgsObject(cx, fp);
+    } else if (fp->argsobj) {
         ok &= js_PutArgsObject(cx, fp);
     }
 
@@ -1001,7 +1020,7 @@ call_convert(JSContext *cx, JSObject *obj, JSType type, jsval *vp)
 JSClass js_CallClass = {
     js_Call_str,
     JSCLASS_HAS_PRIVATE | JSCLASS_NEW_RESOLVE | JSCLASS_IS_ANONYMOUS |
-    JSCLASS_HAS_CACHED_PROTO(JSProto_Call),
+    JSCLASS_HAS_RESERVED_SLOTS(1) | JSCLASS_HAS_CACHED_PROTO(JSProto_Call),
     JS_PropertyStub,    JS_PropertyStub,
     call_getProperty,   call_setProperty,
     call_enumerate,     (JSResolveOp)call_resolve,
@@ -1247,7 +1266,8 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
             *objp = obj;
             return JS_TRUE;
         }
-        if (fun && (fun->edition < JSVERSION_ECMA_2015 || FUN_INTERPRETED(fun)) &&
+        if (fun && !FUN_IS_ARROW(fun) &&
+            (fun->edition < JSVERSION_ECMA_2015 || FUN_INTERPRETED(fun)) &&
             !(fun->flags & (JSFUN_STRICT | JSFUN_BOUND_FUNCTION)) &&
             OBJ_GET_PROTO(cx, obj) &&
             js_IsModernFunction(cx, OBJ_GET_PROTO(cx, obj))) {
@@ -1456,8 +1476,14 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
 
     if (!JS_XDRUint16(xdr, &fun->nargs) ||
         !JS_XDRUint16(xdr, &fun->edition) ||
+        !JS_XDRUint16(xdr, &fun->kind) ||
         !JS_XDRUint16(xdr, &fun->u.i.nvars) ||
         !JS_XDRUint32(xdr, &flagsword)) {
+        goto bad;
+    }
+
+    if (fun->kind > JSFUN_KIND_ARROW) {
+        JS_ReportError(cx, "invalid serialized function kind");
         goto bad;
     }
 
@@ -1789,7 +1815,8 @@ fun_reserveSlots(JSContext *cx, JSObject *obj)
         return 4;
     if (fun && FUN_INTERPRETED(fun)) {
         /* Function.prototype owns the realm's shared ThrowTypeError. */
-        return fun->u.i.nregexps + ((fun->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0);
+        return fun->u.i.nregexps + ((fun->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0) +
+               (FUN_IS_ARROW(fun) ? 1 : 0);
     }
     return fun->u.n.spare;
 }
@@ -2724,6 +2751,118 @@ bad:
     return NULL;
 }
 
+/* A traced lexical binding shared by arrows from the same activation. Keeping
+ * the cell in the CallObject avoids changing the classic native frame ABI and
+ * permits derived-constructor initialization to update a shared this binding. */
+static JSClass arrowBindingClass = {
+    "ArrowBinding", JSCLASS_HAS_RESERVED_SLOTS(2),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+JSBool
+js_GetArrowBindings(JSContext *cx, JSObject *function, jsval *thisValue,
+                    JSObject **newTarget)
+{
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, function);
+    jsval cell, target;
+    JS_ASSERT(fun && FUN_IS_ARROW(fun));
+    if (!JS_GetReservedSlot(cx, function, JSFUN_ARROW_SLOT(fun), &cell))
+        return JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(cell) ||
+        OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(cell)) != &arrowBindingClass) {
+        JS_ReportError(cx, "missing arrow lexical binding");
+        return JS_FALSE;
+    }
+    if (!JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(cell), 0, thisValue) ||
+        !JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(cell), 1, &target))
+        return JS_FALSE;
+    *newTarget = JSVAL_IS_OBJECT(target) ? JSVAL_TO_OBJECT(target) : NULL;
+    return JS_TRUE;
+}
+
+JSBool
+js_CaptureArrowBindings(JSContext *cx, JSObject *function, JSStackFrame *fp)
+{
+    jsval roots[4], existing;
+    JSTempValueRooter root;
+    JSObject *call, *cell, *global, *parent, *receiver;
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, function);
+    JSClass *clasp;
+    JSBool ok = JS_FALSE;
+    uintN i;
+
+    for (i = 0; i < 4; ++i) roots[i] = JSVAL_VOID;
+    roots[0] = OBJECT_TO_JSVAL(function);
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    if (fp->fun && FUN_IS_ARROW(fp->fun)) {
+        if (!JS_GetReservedSlot(cx, fp->callee, JSFUN_ARROW_SLOT(fp->fun),
+                                 &roots[2]))
+            goto out;
+    } else {
+        call = fp->fun ? fp->callobj : NULL;
+        if (fp->fun && !call) {
+            if (!js_GetScopeChain(cx, fp)) goto out;
+            call = fp->callobj;
+            if (!call) {
+                JS_ReportError(cx, "missing arrow activation");
+                goto out;
+            }
+        }
+        roots[1] = OBJECT_TO_JSVAL(call);
+        if (call && !JS_GetReservedSlot(cx, call, 0, &roots[2]))
+            goto out;
+        if (JSVAL_IS_VOID(roots[2])) {
+            /* A non-strict arguments object must stay mapped to this frame
+             * until it returns, then survive through the captured CallObject.
+             * Strict functions already snapshot arguments at invocation. */
+            if (call && !js_GetArgsObject(cx, fp))
+                goto out;
+            if (fp->fun && (fp->fun->flags & JSFUN_STRICT) && fp->argv &&
+                !(fp->flags & JSFRAME_CONSTRUCTING)) {
+                roots[3] = fp->argv[-1];
+            } else {
+                receiver = fp->thisp;
+                clasp = OBJ_GET_CLASS(cx, receiver);
+                if (clasp->flags & JSCLASS_IS_EXTENDED) {
+                    JSExtendedClass *extended = (JSExtendedClass *)clasp;
+                    if (extended->outerObject) {
+                        receiver = extended->outerObject(cx, receiver);
+                        if (!receiver) goto out;
+                    }
+                }
+                roots[3] = OBJECT_TO_JSVAL(receiver);
+            }
+            global = fp->scopeChain;
+            while ((parent = OBJ_GET_PARENT(cx, global)) != NULL)
+                global = parent;
+            cell = js_NewObject(cx, &arrowBindingClass, NULL, global);
+            if (!cell) goto out;
+            roots[2] = OBJECT_TO_JSVAL(cell);
+            OBJ_SET_PROTO(cx, cell, NULL);
+            if (!JS_SetReservedSlot(cx, cell, 0, roots[3]) ||
+                !JS_SetReservedSlot(cx, cell, 1,
+                    (fp->flags & JSFRAME_NEW_TARGET)
+                    ? OBJECT_TO_JSVAL(fp->newTarget) : JSVAL_VOID))
+                goto out;
+            if (call) {
+                /* Allocation hooks can create another arrow from this frame. */
+                if (!JS_GetReservedSlot(cx, call, 0, &existing)) goto out;
+                if (JSVAL_IS_VOID(existing)) {
+                    if (!JS_SetReservedSlot(cx, call, 0, roots[2])) goto out;
+                } else {
+                    roots[2] = existing;
+                }
+            }
+        }
+    }
+    ok = JS_SetReservedSlot(cx, function, JSFUN_ARROW_SLOT(fun), roots[2]);
+out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSObject *
 js_InitCallClass(JSContext *cx, JSObject *obj)
 {
@@ -2774,6 +2913,7 @@ js_NewFunction(JSContext *cx, JSObject *funobj, JSNative native, uintN nargs,
     fun->nargs = nargs;
     fun->flags = flags & JSFUN_INTERNAL_FLAGS_MASK;
     fun->edition = (uint16) JSVERSION_NUMBER(cx);
+    fun->kind = JSFUN_KIND_ORDINARY;
     fun->u.n.native = native;
     fun->u.n.extra = 0;
     fun->u.n.spare = 0;
@@ -2833,6 +2973,11 @@ js_CloneFunctionObject(JSContext *cx, JSObject *funobj, JSObject *parent)
             metadataOK = JS_GetReservedSlot(cx, funobj, i + 2, &value) &&
                          JS_SetReservedSlot(cx, newfunobj, i + 2, value);
         }
+    }
+    if (metadataOK && FUN_IS_ARROW(fun)) {
+        jsval cell;
+        metadataOK = JS_GetReservedSlot(cx, funobj, JSFUN_ARROW_SLOT(fun), &cell) &&
+                     JS_SetReservedSlot(cx, newfunobj, JSFUN_ARROW_SLOT(fun), cell);
     }
     if (metadataOK) metadataOK = js_InitFunctionProperties(cx, newfunobj);
     JS_POP_TEMP_ROOT(cx, &metadataRoot);

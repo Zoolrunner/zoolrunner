@@ -4607,7 +4607,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     if (jp->pretty) {
         js_printf(jp, "\t");
     } else {
-        if (!jp->grouped && (fun->flags & JSFUN_LAMBDA))
+        if ((!jp->grouped || FUN_IS_ARROW(fun)) && (fun->flags & JSFUN_LAMBDA))
             js_puts(jp, "(");
     }
     if (JSFUN_GETTER_TEST(fun->flags))
@@ -4615,9 +4615,11 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     else if (JSFUN_SETTER_TEST(fun->flags))
         js_printf(jp, "%s ", js_setter_str);
 
-    js_printf(jp, "%s ", js_function_str);
-    if (fun->atom && !QuoteString(&jp->sprinter, ATOM_TO_STRING(fun->atom), 0))
-        return JS_FALSE;
+    if (!FUN_IS_ARROW(fun)) {
+        js_printf(jp, "%s ", js_function_str);
+        if (fun->atom && !QuoteString(&jp->sprinter, ATOM_TO_STRING(fun->atom), 0))
+            return JS_FALSE;
+    }
     js_puts(jp, "(");
 
     if (FUN_INTERPRETED(fun) && fun->object) {
@@ -4732,7 +4734,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
 #endif
     }
 
-    js_printf(jp, ") {\n");
+    js_printf(jp, FUN_IS_ARROW(fun) ? ") => {\n" : ") {\n");
     indent = jp->indent;
     jp->indent += 4;
     if (FUN_INTERPRETED(fun) && fun->object) {
@@ -4757,7 +4759,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     js_printf(jp, "\t}");
 
     if (!jp->pretty) {
-        if (!jp->grouped && (fun->flags & JSFUN_LAMBDA))
+        if ((!jp->grouped || FUN_IS_ARROW(fun)) && (fun->flags & JSFUN_LAMBDA))
             js_puts(jp, ")");
     }
     return JS_TRUE;

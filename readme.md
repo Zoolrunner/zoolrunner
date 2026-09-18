@@ -613,3 +613,15 @@ binaries match the frozen conformance runtime. Focused checks cover raw Unicode,
 decompilation/XDR, realm identity, reentrant native allocation/GC and long lines.
 See the [template notes](js/tests/es6/README.md#template-literals) for the
 ES2015-specific cache rules and remaining validation limits.
+
+ES2015 arrows with simple parameters raise the full macOS arm64 result to
+**27,296 ES6 passes**, with **1,270 failures**, 14 unsupported module cases and
+two harness errors: 79 gained, zero lost, no crashes/timeouts. All 11,540 ES5
+cases pass. Lexical `this`, `arguments` and `new.target`, constructor rejection,
+metadata and XDR/decompilation are covered, including native callback/GC reentry.
+The callback tests also exposed and fixed argument lifetime and debugger/eval
+receiver defects. All four applications pass build, package and relocated
+desktop checks, including Calendar views, browser navigation/layout and ChatZilla;
+their engine binaries match the frozen conformance runtime.
+Default/rest/destructured parameters and class/super behavior remain incomplete. See the
+[arrow notes](js/tests/es6/README.md#arrow-functions).

@@ -2104,7 +2104,8 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
          * object.
          */
         if ((pn->pn_op == JSOP_NAME || pn->pn_op == JSOP_DELNAME) &&
-            atom == cx->runtime->atomState.argumentsAtom) {
+            atom == cx->runtime->atomState.argumentsAtom &&
+            (!fp->fun || !FUN_IS_ARROW(fp->fun))) {
             pn->pn_op = pn->pn_op == JSOP_DELNAME ? JSOP_FALSE : JSOP_ARGUMENTS;
             return JS_TRUE;
         }

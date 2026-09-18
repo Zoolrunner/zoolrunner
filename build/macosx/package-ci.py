@@ -175,6 +175,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         subprocess.run([str(blocking)], env=environment, check=True, timeout=60)
         for test, marker in (
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
+                ("arguments-lifetime.js", "ARGUMENTS-LIFETIME checks=12 failures=0"),
                 ("legacy-application.js", "LEGACY-APPLICATION checks=58 failures=0"),
                 ("debugger-lifecycle.js", "DEBUGGER-LIFECYCLE checks=5 failures=0"),
                 ("destructuring-errors.js", "DESTRUCTURING-ERRORS checks=54 failures=0"),
@@ -379,6 +380,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("assignment-reference-wide.js", "ES6-ASSIGNMENT-REFERENCE-WIDE checks=12 failures=0"),
                 ("identifier-reference.js", "ES6-IDENTIFIER-REFERENCE checks=33 failures=0"),
                 ("identifier-reference-wide.js", "ES6-IDENTIFIER-REFERENCE-WIDE checks=14 failures=0"),
+                ("arrow.js", "ES6-ARROW checks=37 failures=0"),
                 ("template-literals.js", "ES6-TEMPLATE-LITERALS checks=45 failures=0"),
                 ("template-boundaries.js", "ES6-TEMPLATE-BOUNDARIES checks=5416 failures=0")):
             result = subprocess.run(
@@ -401,6 +403,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
                 ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=14 failures=0"),
                 ("es6/TestReferenceEmbedding.c", "ES6-REFERENCE-EMBEDDING checks=38 failures=0"),
+                ("es6/TestArrowEmbedding.c", "ES6-ARROW-EMBEDDING PASS checks=20"),
                 ("es6/TestTemplateEmbedding.c", "ES6-TEMPLATE-EMBEDDING PASS checks=33"),
                 ("es6/TestFunctionMetadata.c",
                  "ES6-FUNCTION-METADATA-EMBEDDING checks=20 failures=0"),

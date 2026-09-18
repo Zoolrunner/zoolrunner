@@ -1368,3 +1368,18 @@ as source escape sequences changes observable tagged-template values. Exercise
 nested functions, wide atoms, XDR and scanner line-buffer boundaries. Cache
 version 43 adds template evaluation opcodes. Arrow-dependent upstream template
 cases remain part of the complete suite even before arrow support is finished.
+
+For arrow/captured-environment changes, run `js/tests/es6/arrow.js`,
+`TestArrowEmbedding.c`, `js/tests/es5/arguments-lifetime.js`, the debugger
+lifecycle regression and modern chrome/content checks. Preserve raw strict
+receivers, lexical arguments/new.target and independent closure instances.
+Native allocation callbacks may collect and evaluate in the allocating frame;
+recheck shared-cell publication after reentry. Keep the native frame ABI and
+public function flags intact, preserve arrow syntax through XDR/decompilation,
+and invalidate old serialized code (cache version 44 adds function kind).
+Snapshot live mapped argument values before detaching a returning frame without
+reviving deleted mappings or invoking replacement accessors. Eval/debugger
+receiver conversion follows the enclosing function's binding, not the eval
+script's directive. Simple arrow parameters are implemented; default/rest/
+destructured parameters and class/super behavior still require implementation
+and complete conformance/application validation.
