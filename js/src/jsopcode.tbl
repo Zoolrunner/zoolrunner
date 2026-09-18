@@ -512,3 +512,9 @@ OPDEF(JSOP_CHECKELEMENT, 232,"checkelement", NULL,   1, 2, 2, 0, JOF_BYTE)
 OPDEF(JSOP_BINDREF,      233,"bindref",      NULL,   3, 0, 2, 0, JOF_CONST|JOF_NAME|JOF_SET|JOF_ASSIGNING)
 OPDEF(JSOP_GETREF,       234,"getref",       NULL,   3, 2, 3,19, JOF_CONST|JOF_NAME)
 OPDEF(JSOP_SETREF,       235,"setref",       NULL,   3, 3, 1, 3, JOF_CONST|JOF_NAME|JOF_SET|JOF_ASSIGNING)
+
+/* Template substitution performs ToString with a string primitive hint. */
+OPDEF(JSOP_TOSTRING,     236,"tostring",     NULL,   1, 1, 1,19, JOF_BYTE)
+
+OPDEF(JSOP_TEMPLATEOBJECT,237,"templateobject",NULL,3,0,1,19,JOF_CONST)
+OPDEF(JSOP_TAGCALL,238,"tagcall",NULL,3,-1,1,18,JOF_UINT16)

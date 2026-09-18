@@ -32,7 +32,15 @@ function modernWindowEdition() {
         return {target:new.target, evaluated:eval('new.target')};
     }
     var constructed = new WindowConstructor();
-    return radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
+    function windowTemplateTag(t, v) { return {template:t, value:v}; }
+    var templateValue = {}, tagged = windowTemplateTag`a\n${templateValue}b`;
+    var templateChecks = tagged.value === templateValue &&
+        tagged.template[0] === "a\n" && tagged.template.raw[0] === "a\\n" &&
+        tagged.template === windowTemplateTag`a\n${3}b`.template &&
+        Object.isFrozen(tagged.template) && Object.isFrozen(tagged.template.raw) &&
+        `${radixValue}` === "20" && String.raw`a\n${3}b` === "a\\n3b";
+
+    return templateChecks && radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
            constructed.target === WindowConstructor && constructed.evaluated === WindowConstructor &&
            WindowConstructor().target === undefined &&
            (function() { var order = [], object = {}, key = {

@@ -2115,3 +2115,58 @@ remain unchanged through both suites and match all four application engines
 Earlier `identifier-reference-*` reports precede the native prefix correction.
 Destructuring, lexical TDZ, arrow/class semantics, other platforms and full
 ES2015 compliance remain unfinished.
+
+### Template literals
+
+ES2015 ordinary and tagged template parsing/evaluation are implemented in the
+existing engine. Ordinary substitutions perform ToString with the string hint
+before the next expression. Tags receive unconverted values, preserve their
+reference receiver, and treat tagged `eval` as an indirect call. Selected legacy
+language versions continue rejecting template syntax.
+
+The registry follows [ES2015 GetTemplateObject](https://262.ecma-international.org/6.0/#sec-gettemplateobject):
+equal ordered raw strings share an immutable template array within one realm,
+including different source sites and substitution expressions. This intentionally
+differs from later editions' site identity rule. ES2015 also rejects malformed
+escapes in tagged templates. The private registry uses the existing weak-global
+intrinsic cache, immutable raw/cooked arrays, traced operands and native roots;
+it does not call mutable global Array/Object helpers.
+
+Cache version 43 adds ToString, template-object and tag-call bytecodes. Encoded
+UTF-16 raw/cooked atoms survive XDR. The decompiler preserves raw Unicode,
+including lone surrogates, NUL and line separators, through its byte-oriented
+internal buffers without changing the public byte-string JSAPI. Long scanner
+lines preserve CRLF pairs across buffer boundaries and only normalize a line
+terminator once it actually belongs to the copied segment.
+
+`template-literals.js` passes 45 focused checks; `template-boundaries.js` passes
+5,416 checks covering long lines, raw strings, nested decompilation and wide atom
+indices. `TestTemplateEmbedding.c` passes 33 checks for native Unicode compilation,
+XDR, GC, distinct realms, cross-realm calls, selected legacy editions and native
+allocation hooks that reenter while the registry or an entry is being created.
+The modern chrome/content fixture also exercises templates. C89 syntax checks
+pass. The upstream template diagnostic passes 132/134 cases; the two remaining
+cases additionally require arrow functions. These are retained as failures.
+
+The final frozen macOS arm64 runtime passes **27,217 ES2015 cases**, with
+**1,349 failures**, 14 unsupported module cases, two harness errors and no
+crashes/timeouts: **117 gained, zero lost** against the identifier-reference
+baseline. All **11,540 ES5.1 cases** pass on the same frozen runtime, whose hashes
+remain unchanged through both complete suites. String.raw passes all 58 upstream
+cases and runner integration passes all 23 checks. Reports use `template-final-*`
+under `artifacts/es6`; the frozen runtime is
+`/tmp/zr-template-final-conformance-20260918`.
+
+All four macOS arm64 applications pass root build, package and relocated
+desktop checks, including real chrome/content globals, Calendar's four views,
+browser navigation/layout (169 checks) and Suite/XULRunner ChatZilla. Their
+engine binaries match the frozen conformance runtime (SHA-256
+`43b65c08df3e0f981329df11a0dc0a733cf79c367f6fc659f1ba45d58683e5f2`).
+The 33 native checks also cover 540 file-input CRLF boundaries; the engine opens
+its own file stream to preserve Windows static-CRT ownership. Six supplemental
+checks cover primitive/getter tag receivers, evaluation order, non-callable
+errors, conditional-callee decompilation and intrinsic eval tagging.
+
+Full ES2015 compliance and other-platform validation remain unfinished.
+Earlier `template-untagged-full-*` reports are intermediate diagnostics and
+precede tagged-template implementation.

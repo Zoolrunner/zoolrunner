@@ -1282,6 +1282,13 @@ out:
     return ok;
 }
 
+JSBool
+js_FreezeObject(JSContext *cx, JSObject *obj)
+{
+    jsval value = OBJECT_TO_JSVAL(obj), result;
+    return ObjectIntegrity(cx, 1, &value, &result, JS_TRUE, JS_FALSE);
+}
+
 #define INTEGRITY_METHOD(name, freeze, query) \
 static JSBool name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) \
 { return ObjectIntegrity(cx, argc, argv, rval, freeze, query); }

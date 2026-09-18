@@ -141,6 +141,11 @@ typedef enum JSTokenType {
     TOK_RESERVED,                       /* reserved keywords */
     TOK_ARROW,                          /* ES2015 => punctuator */
     TOK_COMPUTED_NAME,                  /* computed object property parse node */
+    TOK_TEMPLATE_HEAD,                  /* template segment ending in ${ */
+    TOK_TEMPLATE_TAIL,                  /* template segment ending in ` */
+    TOK_TEMPLATE,                       /* template expression AST list */
+    TOK_TEMPLATE_OBJECT,                /* tagged-template record */
+    TOK_TEMPLATE_SEGMENT,               /* cooked/raw AST atom pair */
     TOK_LIMIT                           /* domain size */
 } JSTokenType;
 
@@ -239,6 +244,7 @@ struct JSTokenStream {
     uintN               ungetpos;       /* next free char slot in ungetbuf */
     jschar              ungetbuf[6];    /* at most 6, for \uXXXX lookahead */
     uintN               flags;          /* flags -- see below */
+    jschar              lineTerminator; /* original linebuf terminator */
     ptrdiff_t           linelen;        /* physical linebuf segment length */
     ptrdiff_t           linepos;        /* linebuf offset in physical line */
     JSTokenBuf          linebuf;        /* line buffer for diagnostics */
@@ -377,6 +383,9 @@ js_PeekTokenSameLine(JSContext *cx, JSTokenStream *ts);
 /*
  * Get the next token from ts.
  */
+extern JSTokenType
+js_GetTemplateContinuation(JSContext *cx, JSTokenStream *ts);
+
 extern JSTokenType
 js_GetToken(JSContext *cx, JSTokenStream *ts);
 

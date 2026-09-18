@@ -384,6 +384,12 @@ GetChar(JSTokenStream *ts)
                 len = PTRDIFF(nl, ts->userbuf.ptr, jschar) + 1;
             if (len >= JS_LINE_LIMIT) {
                 len = JS_LINE_LIMIT - 1;
+                /* Keep a CRLF pair together when splitting a long line. */
+                if (ts->userbuf.ptr[len - 1] == '\r' &&
+                    ts->userbuf.ptr + len < ts->userbuf.limit &&
+                    ts->userbuf.ptr[len] == '\n') {
+                    --len;
+                }
                 ts->saveEOL = nl;
             } else {
                 ts->saveEOL = NULL;
@@ -391,12 +397,13 @@ GetChar(JSTokenStream *ts)
             js_strncpy(ts->linebuf.base, ts->userbuf.ptr, len);
             ts->userbuf.ptr += len;
             olen = len;
+            ts->lineTerminator = len ? ts->linebuf.base[len - 1] : 0;
 
             /*
              * Make sure linebuf contains \n for EOL (don't do this in
              * userbuf because the user's string might be readonly).
              */
-            if (nl < ts->userbuf.limit) {
+            if (nl < ts->userbuf.ptr) {
                 if (*nl == '\r') {
                     if (ts->linebuf.base[len-1] == '\r') {
                         /*
@@ -1077,6 +1084,151 @@ ScanAsSpace(jschar c)
     return JS_FALSE;
 }
 
+/* GetChar preserves historical scanner normalization. Templates additionally
+ * need the original Unicode line/paragraph separator, even when the current
+ * line buffer was filled before the opening backtick was encountered. */
+static int32
+GetTemplateChar(JSTokenStream *ts)
+{
+    int32 c = GetChar(ts);
+    if (c == '\n' && (ts->lineTerminator == LINE_SEPARATOR ||
+                      ts->lineTerminator == PARA_SEPARATOR))
+        return ts->lineTerminator;
+    return c;
+}
+
+static JSTokenType
+ScanTemplateSegment(JSContext *cx, JSTokenStream *ts, JSToken *tp)
+{
+    JSStringBuffer cooked, raw;
+    JSTokenType tt = TOK_ERROR;
+    int32 c, digit;
+    uint32 value;
+    uintN count, limit;
+    JSBool braced;
+
+    js_InitStringBuffer(&cooked);
+    js_InitStringBuffer(&raw);
+    for (;;) {
+        c = GetTemplateChar(ts);
+        if (c == EOF)
+            goto syntax;
+        if (c == '`') {
+            tt = TOK_TEMPLATE_TAIL;
+            break;
+        }
+        if (c == '$' && PeekChar(ts) == '{') {
+            GetChar(ts);
+            tt = TOK_TEMPLATE_HEAD;
+            break;
+        }
+        js_AppendChar(&raw, (jschar)c);
+        if (c == '\\') {
+            c = GetTemplateChar(ts);
+            if (c == EOF)
+                goto syntax;
+            js_AppendChar(&raw, (jschar)c);
+            switch (c) {
+              case '\n': case LINE_SEPARATOR: case PARA_SEPARATOR:
+                continue;
+              case 'b': c = '\b'; break;
+              case 'f': c = '\f'; break;
+              case 'n': c = '\n'; break;
+              case 'r': c = '\r'; break;
+              case 't': c = '\t'; break;
+              case 'v': c = '\v'; break;
+              case '0':
+                if (JS7_ISDEC(PeekChar(ts)))
+                    goto syntax;
+                c = 0;
+                break;
+              case 'x': case 'u':
+                limit = c == 'x' ? 2 : 4;
+                braced = c == 'u' && PeekChar(ts) == '{';
+                if (braced) {
+                    GetChar(ts);
+                    js_AppendChar(&raw, '{');
+                }
+                value = count = 0;
+                for (;;) {
+                    digit = GetTemplateChar(ts);
+                    if (digit == EOF)
+                        goto syntax;
+                    js_AppendChar(&raw, (jschar)digit);
+                    if (braced && digit == '}') {
+                        if (!count)
+                            goto syntax;
+                        break;
+                    }
+                    if (!JS7_ISHEX(digit))
+                        goto syntax;
+                    if (value > 0x10ffffU / 16)
+                        goto syntax;
+                    value = value * 16 + JS7_UNHEX(digit);
+                    if (value > 0x10ffffU)
+                        goto syntax;
+                    ++count;
+                    if (!braced && count == limit)
+                        break;
+                }
+                if (value > 0xffffU) {
+                    value -= 0x10000U;
+                    js_AppendChar(&cooked, (jschar)(0xd800U + (value >> 10)));
+                    value = 0xdc00U + (value & 0x3ffU);
+                }
+                c = (int32)value;
+                break;
+              default:
+                if (c >= '1' && c <= '9')
+                    goto syntax;
+                break;
+            }
+        }
+        js_AppendChar(&cooked, (jschar)c);
+        if (!STRING_BUFFER_OK(&cooked) || !STRING_BUFFER_OK(&raw))
+            goto oom;
+    }
+    if (!STRING_BUFFER_OK(&cooked) || !STRING_BUFFER_OK(&raw))
+        goto oom;
+    tp->t_atom = js_AtomizeChars(cx, cooked.base,
+                                 cooked.base ? STRING_BUFFER_OFFSET(&cooked) : 0, 0);
+    if (!tp->t_atom) {
+        tt = TOK_ERROR;
+        goto done;
+    }
+    tp->t_atom2 = js_AtomizeChars(cx, raw.base,
+                                  raw.base ? STRING_BUFFER_OFFSET(&raw) : 0, 0);
+    if (!tp->t_atom2)
+        tt = TOK_ERROR;
+    goto done;
+
+syntax:
+    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                JSMSG_SYNTAX_ERROR);
+    tt = TOK_ERROR;
+    goto done;
+oom:
+    JS_ReportOutOfMemory(cx);
+    tt = TOK_ERROR;
+done:
+    js_FinishStringBuffer(&cooked);
+    js_FinishStringBuffer(&raw);
+    tp->type = tt;
+    tp->pos.end.lineno = (uint16)ts->lineno;
+    tp->pos.end.index = ts->linepos +
+                        PTRDIFF(ts->linebuf.ptr, ts->linebuf.base, jschar) -
+                        ts->ungetpos;
+    ts->flags |= tt == TOK_ERROR ? TSF_ERROR : TSF_DIRTYLINE;
+    return tt;
+}
+
+JSTokenType
+js_GetTemplateContinuation(JSContext *cx, JSTokenStream *ts)
+{
+    JS_ASSERT(ts->lookahead == 0);
+    return ScanTemplateSegment(cx, ts, NewToken(ts, 0));
+}
+
 JSTokenType
 js_GetToken(JSContext *cx, JSTokenStream *ts)
 {
@@ -1493,6 +1645,11 @@ retry:
         }
         tp->t_dval = dval;
         tt = TOK_NUMBER;
+        goto out;
+    }
+
+    if (c == '`' && JS_VERSION_IS_ES2015(cx)) {
+        tt = ScanTemplateSegment(cx, ts, tp);
         goto out;
     }
 

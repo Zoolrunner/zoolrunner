@@ -108,6 +108,7 @@ static JSParser Statements;
 static JSParseNode *Statement(JSContext *cx, JSTokenStream *ts,
                               JSTreeContext *tc, JSBool allowLexical);
 static JSParser Variables;
+static JSParser TemplateLiteral;
 static JSParser Expr;
 static JSParser AssignExpr;
 static JSParser CondExpr;
@@ -4624,6 +4625,75 @@ ArgumentList(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     return JS_TRUE;
 }
 
+static void
+TemplateWord(JSStringBuffer *buffer, uint32 value)
+{
+    js_AppendChar(buffer, (jschar)(value >> 16));
+    js_AppendChar(buffer, (jschar)value);
+}
+
+static JSParseNode *
+TaggedTemplate(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+               JSParseNode *callee)
+{
+    JSParseNode *literal, *call, *object, *part, *expression, *next;
+    JSStringBuffer record;
+    JSString *str;
+    JSAtom *atom;
+    size_t i, length;
+    uintN which;
+
+    literal = TemplateLiteral(cx, ts, tc);
+    if (!literal)
+        return NULL;
+    if ((literal->pn_count + 1) / 2 >= ARGC_LIMIT) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_TOO_MANY_FUN_ARGS);
+        return NULL;
+    }
+    js_InitStringBuffer(&record);
+    TemplateWord(&record, (literal->pn_count + 1) / 2);
+    for (part = literal->pn_head; part;
+         part = part->pn_next ? part->pn_next->pn_next : NULL) {
+        for (which = 0; which < 2; ++which) {
+            str = ATOM_TO_STRING(which ? part->pn_atom : part->pn_atom2);
+            length = JSSTRING_LENGTH(str);
+            TemplateWord(&record, (uint32)length);
+            for (i = 0; i < length; ++i)
+                js_AppendChar(&record, JSSTRING_CHARS(str)[i]);
+        }
+    }
+    if (!STRING_BUFFER_OK(&record)) {
+        js_FinishStringBuffer(&record);
+        JS_ReportOutOfMemory(cx);
+        return NULL;
+    }
+    atom = js_AtomizeChars(cx, record.base, STRING_BUFFER_OFFSET(&record), 0);
+    js_FinishStringBuffer(&record);
+    if (!atom)
+        return NULL;
+    call = NewParseNode(cx, ts, PN_LIST, tc);
+    object = NewParseNode(cx, ts, PN_NULLARY, tc);
+    if (!call || !object)
+        return NULL;
+    call->pn_type = TOK_LP;
+    call->pn_op = JSOP_TAGCALL;
+    call->pn_pos.begin = callee->pn_pos.begin;
+    call->pn_pos.end = literal->pn_pos.end;
+    object->pn_type = TOK_TEMPLATE_OBJECT;
+    object->pn_op = JSOP_TEMPLATEOBJECT;
+    object->pn_atom = atom;
+    PN_INIT_LIST_1(call, callee);
+    PN_APPEND(call, object);
+    for (part = literal->pn_head; part && part->pn_next; part = next) {
+        expression = part->pn_next;
+        next = expression->pn_next;
+        expression->pn_next = NULL;
+        PN_APPEND(call, expression);
+    }
+    return call;
+}
+
 static JSParseNode *
 MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
            JSBool allowCallSyntax)
@@ -4822,6 +4892,10 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 pn2->pn_left = pn;
                 pn2->pn_right = pn3;
             }
+        } else if (tt == TOK_TEMPLATE_HEAD || tt == TOK_TEMPLATE_TAIL) {
+            pn2 = TaggedTemplate(cx, ts, tc, pn);
+            if (!pn2)
+                return NULL;
         } else if (allowCallSyntax && tt == TOK_LP) {
             pn2 = NewParseNode(cx, ts, PN_LIST, tc);
             if (!pn2)
@@ -5542,6 +5616,42 @@ js_ParseXMLTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
 
 #endif /* JS_HAS_XMLSUPPORT */
 
+/* Parse alternating literal segments and substitution expressions. Retain raw
+ * segments as well as cooked values for tagged-template evaluation. */
+static JSParseNode *
+TemplateLiteral(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
+{
+    JSParseNode *pn, *part, *expression;
+    JSTokenType tt;
+
+    pn = NewParseNode(cx, ts, PN_LIST, tc);
+    if (!pn)
+        return NULL;
+    pn->pn_type = TOK_TEMPLATE;
+    PN_INIT_LIST(pn);
+    for (;;) {
+        tt = CURRENT_TOKEN(ts).type;
+        part = NewParseNode(cx, ts, PN_NULLARY, tc);
+        if (!part)
+            return NULL;
+        part->pn_type = TOK_TEMPLATE_SEGMENT;
+        part->pn_atom = CURRENT_TOKEN(ts).t_atom;
+        part->pn_atom2 = CURRENT_TOKEN(ts).t_atom2;
+        PN_APPEND(pn, part);
+        if (tt == TOK_TEMPLATE_TAIL)
+            break;
+        expression = BracketedExpr(cx, ts, tc);
+        if (!expression)
+            return NULL;
+        PN_APPEND(pn, expression);
+        MUST_MATCH_TOKEN(TOK_RC, JSMSG_CURLY_AFTER_LIST);
+        if (js_GetTemplateContinuation(cx, ts) == TOK_ERROR)
+            return NULL;
+    }
+    pn->pn_pos.end = CURRENT_TOKEN(ts).pos.end;
+    return pn;
+}
+
 static JSParseNode *
 PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             JSTokenType tt, JSBool afterDot)
@@ -6233,6 +6343,16 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         notsharp = JS_TRUE;     /* XXXbe could be sharp? */
         break;
 #endif /* JS_HAS_XML_SUPPORT */
+
+      case TOK_TEMPLATE_HEAD:
+      case TOK_TEMPLATE_TAIL:
+        pn = TemplateLiteral(cx, ts, tc);
+        if (!pn)
+            return NULL;
+#if JS_HAS_SHARP_VARS
+        notsharp = JS_TRUE;
+#endif
+        break;
 
       case TOK_STRING:
 #if JS_HAS_SHARP_VARS

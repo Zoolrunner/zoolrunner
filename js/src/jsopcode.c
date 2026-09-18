@@ -458,6 +458,174 @@ Sprint(Sprinter *sp, const char *format, ...)
     return offset;
 }
 
+/* Preserve template raw UTF-16 through the historical byte-oriented printer.
+ * Quoted ordinary strings escape control characters, so this private marker
+ * cannot be confused with user string contents. Raw template text and nested
+ * Unicode printer results always encode the marker itself. */
+static ptrdiff_t
+SprintSourceChar(Sprinter *sp, jschar c)
+{
+    char bytes[7];
+    static const char hex[] = "0123456789abcdef";
+    if (c >= 32 && c < 127) {
+        bytes[0] = (char)c;
+        return SprintPut(sp, bytes, 1);
+    }
+    bytes[0] = 1;
+    bytes[1] = hex[c >> 12];
+    bytes[2] = hex[(c >> 8) & 15];
+    bytes[3] = hex[(c >> 4) & 15];
+    bytes[4] = hex[c & 15];
+    bytes[5] = 2;
+    return SprintPut(sp, bytes, 6);
+}
+
+static ptrdiff_t
+SprintSourceString(Sprinter *sp, JSString *str)
+{
+    size_t i, length = JSSTRING_LENGTH(str);
+    const jschar *chars = JSSTRING_CHARS(str);
+    ptrdiff_t start = sp->offset;
+    for (i = 0; i < length; ++i) {
+        if (SprintSourceChar(sp, chars[i]) < 0)
+            return -1;
+    }
+    if (!length && SprintPut(sp, "", 0) < 0)
+        return -1;
+    return start;
+}
+
+static int
+SourceHex(char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    return -1;
+}
+
+static JSString *
+DecodePrinterSource(JSContext *cx, const char *bytes)
+{
+    const char *p, *end, *next;
+    jschar *chars;
+    size_t length, count = 0, chunk;
+    uintN i, value;
+    int digit;
+    JSString *str;
+
+    if (!strchr(bytes, 1))
+        return JS_NewStringCopyZ(cx, bytes);
+    length = strlen(bytes);
+    if (length > ((size_t)-1 / sizeof(jschar)) - 1) {
+        JS_ReportOutOfMemory(cx);
+        return NULL;
+    }
+    chars = (jschar *)JS_malloc(cx, (length + 1) * sizeof(jschar));
+    if (!chars)
+        return NULL;
+    end = bytes + length;
+    for (p = bytes; p < end;) {
+        if (*p == 1) {
+            if (end - p < 6 || p[5] != 2)
+                goto malformed;
+            value = 0;
+            for (i = 1; i < 5; ++i) {
+                digit = SourceHex(p[i]);
+                if (digit < 0)
+                    goto malformed;
+                value = (value << 4) | digit;
+            }
+            chars[count++] = (jschar)value;
+            p += 6;
+        } else {
+            next = (const char *)memchr(p, 1, end - p);
+            if (!next) next = end;
+            chunk = length - count;
+            if (!js_InflateStringToBuffer(cx, p, next - p, chars + count, &chunk)) {
+                JS_free(cx, chars);
+                return NULL;
+            }
+            count += chunk;
+            p = next;
+        }
+    }
+    chars[count] = 0;
+    str = JS_NewUCString(cx, chars, count);
+    if (!str) JS_free(cx, chars);
+    return str;
+malformed:
+    JS_free(cx, chars);
+    JS_ReportError(cx, "invalid template printer encoding");
+    return NULL;
+}
+
+/* Template-object stack entries hold hex, never executable source. The tag
+ * opcode consumes the entry and emits the original raw segments. */
+static ptrdiff_t
+SprintTemplateRecord(Sprinter *sp, JSString *record)
+{
+    size_t i;
+    ptrdiff_t start = sp->offset;
+    const jschar *chars = JSSTRING_CHARS(record);
+    if (SprintPut(sp, ":", 1) < 0)
+        return -1;
+    for (i = 0; i < JSSTRING_LENGTH(record); ++i) {
+        if (Sprint(sp, "%04x", (unsigned)chars[i]) < 0)
+            return -1;
+    }
+    return start;
+}
+
+static JSBool
+TemplateHexWord(const char **cursor, const char *end, uintN digits,
+                uint32 *value)
+{
+    uintN i;
+    int digit;
+    if ((size_t)(end - *cursor) < digits)
+        return JS_FALSE;
+    *value = 0;
+    for (i = 0; i < digits; ++i) {
+        digit = SourceHex((*cursor)[i]);
+        if (digit < 0) return JS_FALSE;
+        *value = (*value << 4) | digit;
+    }
+    *cursor += digits;
+    return JS_TRUE;
+}
+
+static ptrdiff_t
+SprintTaggedCall(Sprinter *sp, uintN argc, char **argv)
+{
+    const char *p, *end;
+    uint32 count, length, c, i, j;
+    ptrdiff_t start = sp->offset;
+    if (!argc || !argv[1] || argv[1][0] != ':')
+        return -1;
+    p = argv[1] + 1;
+    end = p + strlen(p);
+    if (!TemplateHexWord(&p, end, 8, &count) || count != argc ||
+        Sprint(sp, "%s`", argv[0]) < 0)
+        return -1;
+    for (i = 0; i < count; ++i) {
+        if (!TemplateHexWord(&p, end, 8, &length)) return -1;
+        for (j = 0; j < length; ++j) {
+            if (!TemplateHexWord(&p, end, 4, &c) ||
+                SprintSourceChar(sp, (jschar)c) < 0)
+                return -1;
+        }
+        if (!TemplateHexWord(&p, end, 8, &length) ||
+            length > (size_t)(end - p) / 4)
+            return -1;
+        p += (size_t)length * 4;
+        if (i + 1 < count && Sprint(sp, "${%s}", argv[i + 2]) < 0)
+            return -1;
+    }
+    if (p != end || SprintPut(sp, "`", 1) < 0)
+        return -1;
+    return start;
+}
+
 const jschar js_EscapeMap[] = {
     '\b', 'b',
     '\f', 'f',
@@ -630,7 +798,7 @@ js_GetPrinterOutput(JSPrinter *jp)
     cx = jp->sprinter.context;
     if (!jp->sprinter.base)
         return cx->runtime->emptyString;
-    str = JS_NewStringCopyZ(cx, jp->sprinter.base);
+    str = DecodePrinterSource(cx, jp->sprinter.base);
     if (!str)
         return NULL;
     JS_FreeArenaPool(&jp->pool);
@@ -804,7 +972,7 @@ GetOff(SprintStack *ss, uintN i)
                                          JSVAL_NULL, NULL);
         if (!str)
             return 0;
-        off = SprintCString(&ss->sprinter, JS_GetStringBytes(str));
+        off = SprintSourceString(&ss->sprinter, str);
         if (off < 0)
             off = 0;
         ss->offsets[i] = off;
@@ -1878,9 +2046,10 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     if (ok) {
                         js_puts(jp2, "\n");
                         str = js_GetPrinterOutput(jp2);
-                        if (str)
-                            js_printf(jp, "%s\n", JS_GetStringBytes(str));
-                        else
+                        if (str) {
+                            ok = SprintSourceString(&jp->sprinter, str) >= 0 &&
+                                 js_puts(jp, "\n");
+                        } else
                             ok = JS_FALSE;
                     }
                     js_DestroyPrinter(jp2);
@@ -3045,6 +3214,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 break;
 
               case JSOP_NEW:
+              case JSOP_TAGCALL:
               case JSOP_CALL:
               case JSOP_EVAL:
 #if JS_HAS_LVALUE_RETURN
@@ -3057,6 +3227,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 if (!argv)
                     return NULL;
 
+                memset(argv, 0, (size_t)(argc + 1) * sizeof *argv);
                 ok = JS_TRUE;
                 for (i = argc; i > 0; i--) {
                     argv[i] = JS_strdup(cx, POP_STR());
@@ -3066,14 +3237,24 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     }
                 }
 
+                if (!ok)
+                    goto free_call_args;
+
                 /* Skip the JSOP_PUSHOBJ-created empty string. */
                 LOCAL_ASSERT(ss->top >= 2);
                 (void) PopOff(ss, op);
 
                 op = saveop;
                 argv[0] = JS_strdup(cx, POP_STR());
-                if (!argv[i])
+                if (!argv[0])
                     ok = JS_FALSE;
+                if (!ok)
+                    goto free_call_args;
+                if (op == JSOP_TAGCALL) {
+                    todo = SprintTaggedCall(&ss->sprinter, argc, argv);
+                    ok = todo >= 0;
+                    goto free_call_args;
+                }
 
                 lval = "(", rval = ")";
                 if (op == JSOP_NEW) {
@@ -3099,6 +3280,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 if (Sprint(&ss->sprinter, rval) < 0)
                     ok = JS_FALSE;
 
+              free_call_args:
                 for (i = 0; i <= argc; i++) {
                     if (argv[i])
                         JS_free(cx, argv[i]);
@@ -3153,6 +3335,12 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                               js_delete_str, lval, xval);
                 break;
 #endif
+
+              case JSOP_TOSTRING:
+                op = JSOP_NOP;
+                rval = POP_STR();
+                todo = Sprint(&ss->sprinter, "`${%s}`", rval);
+                break;
 
               case JSOP_TYPEOFEXPR:
               case JSOP_TYPEOF:
@@ -3553,6 +3741,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                   case JSOP_NEWREGEXP:    goto do_JSOP_NEWREGEXP;
                   case JSOP_SETCONST:     goto do_JSOP_SETCONST;
                   case JSOP_STRING:       goto do_JSOP_STRING;
+                  case JSOP_TEMPLATEOBJECT: goto do_JSOP_TEMPLATEOBJECT;
 #if JS_HAS_XML_SUPPORT
                   case JSOP_XMLCDATA:     goto do_JSOP_XMLCDATA;
                   case JSOP_XMLCOMMENT:   goto do_JSOP_XMLCOMMENT;
@@ -3580,6 +3769,10 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     }
                     todo = Sprint(&ss->sprinter, numStr);
                 }
+              END_LITOPX_CASE
+
+              BEGIN_LITOPX_CASE(JSOP_TEMPLATEOBJECT)
+                todo = SprintTemplateRecord(&ss->sprinter, ATOM_TO_STRING(atom));
               END_LITOPX_CASE
 
               BEGIN_LITOPX_CASE(JSOP_STRING)
@@ -3618,8 +3811,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     }
                 }
                 str = JSVAL_TO_STRING(val);
-                todo = SprintPut(&ss->sprinter, JS_GetStringBytes(str),
-                                 JSSTRING_LENGTH(str));
+                todo = SprintSourceString(&ss->sprinter, str);
                 break;
 
               case JSOP_TABLESWITCH:

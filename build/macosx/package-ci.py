@@ -378,7 +378,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("assignment-reference.js", "ES6-ASSIGNMENT-REFERENCE checks=44 failures=0"),
                 ("assignment-reference-wide.js", "ES6-ASSIGNMENT-REFERENCE-WIDE checks=12 failures=0"),
                 ("identifier-reference.js", "ES6-IDENTIFIER-REFERENCE checks=33 failures=0"),
-                ("identifier-reference-wide.js", "ES6-IDENTIFIER-REFERENCE-WIDE checks=14 failures=0")):
+                ("identifier-reference-wide.js", "ES6-IDENTIFIER-REFERENCE-WIDE checks=14 failures=0"),
+                ("template-literals.js", "ES6-TEMPLATE-LITERALS checks=45 failures=0"),
+                ("template-boundaries.js", "ES6-TEMPLATE-BOUNDARIES checks=5416 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -399,6 +401,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
                 ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=14 failures=0"),
                 ("es6/TestReferenceEmbedding.c", "ES6-REFERENCE-EMBEDDING checks=38 failures=0"),
+                ("es6/TestTemplateEmbedding.c", "ES6-TEMPLATE-EMBEDDING PASS checks=33"),
                 ("es6/TestFunctionMetadata.c",
                  "ES6-FUNCTION-METADATA-EMBEDDING checks=20 failures=0"),
                 ("es6/TestPrototypeMutation.c",

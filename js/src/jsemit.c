@@ -2157,7 +2157,8 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
             pn->pn_type == TOK_LP ||
             pn->pn_type == TOK_LB ||
             pn->pn_type == TOK_RB ||
-            pn->pn_type == TOK_RC) {
+            pn->pn_type == TOK_RC ||
+            pn->pn_type == TOK_TEMPLATE) {
             /*
              * All invocation operations (construct: TOK_NEW, call: TOK_LP)
              * are presumed to be useful, because they may have side effects
@@ -6324,6 +6325,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
       case TOK_XMLCDATA:
       case TOK_XMLCOMMENT:
 #endif
+      case TOK_TEMPLATE_OBJECT:
       case TOK_STRING:
       case TOK_OBJECT:
         /*
@@ -6338,6 +6340,23 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * in pn_op and emit the same format as NAME, so they share this code.
          */
         ok = EmitAtomOp(cx, pn, pn->pn_op, cg);
+        break;
+
+      case TOK_TEMPLATE:
+        pn2 = pn->pn_head;
+        if (!EmitAtomOp(cx, pn2, JSOP_STRING, cg) ||
+            js_Emit1(cx, cg, JSOP_TOSTRING) < 0)
+            return JS_FALSE;
+        for (pn2 = pn2->pn_next; pn2; pn2 = pn3->pn_next) {
+            pn3 = pn2->pn_next;
+            JS_ASSERT(pn3 && pn3->pn_type == TOK_TEMPLATE_SEGMENT);
+            if (!js_EmitTree(cx, cg, pn2) ||
+                js_Emit1(cx, cg, JSOP_TOSTRING) < 0 ||
+                js_Emit1(cx, cg, JSOP_ADD) < 0 ||
+                !EmitAtomOp(cx, pn3, JSOP_STRING, cg) ||
+                js_Emit1(cx, cg, JSOP_ADD) < 0)
+                return JS_FALSE;
+        }
         break;
 
       case TOK_NUMBER:

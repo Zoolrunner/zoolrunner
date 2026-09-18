@@ -1356,3 +1356,15 @@ executing extended atom opcodes. Native assignment/resolve hints must decode
 both extended operands and debugger traps. Run `TestReferenceEmbedding.c` with
 small and large atom tables, callback GC and nested evaluation, plus debugger
 lifecycle checks when changing this path.
+
+For template changes, run `template-literals.js`, `template-boundaries.js`,
+`TestTemplateEmbedding.c` and the modern chrome/content checks. Follow the
+requested ES2015 edition: equal raw segment lists share one template object per
+realm, and malformed escapes remain syntax errors even in tagged templates.
+Keep registry state private, preserve reentrant native allocation/GC behavior,
+and avoid mutable global constructors. Decompilation must preserve exact raw
+UTF-16, including lone surrogates, NUL and line separators; escaping raw Unicode
+as source escape sequences changes observable tagged-template values. Exercise
+nested functions, wide atoms, XDR and scanner line-buffer boundaries. Cache
+version 43 adds template evaluation opcodes. Arrow-dependent upstream template
+cases remain part of the complete suite even before arrow support is finished.

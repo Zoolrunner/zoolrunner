@@ -106,6 +106,7 @@ CSRCS		= \
 		jsparse.c \
 		jsprf.c \
 		jsrealm.c \
+	jstemplate.c \
 	jssymbol.c \
 		jsregexp.c \
 		jsscan.c \

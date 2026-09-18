@@ -74,6 +74,7 @@
 #include "jsscope.h"
 #include "jsscript.h"
 #include "jsstr.h"
+#include "jstemplate.h"
 
 #if JS_HAS_XML_SUPPORT
 #include "jsxml.h"
@@ -4235,6 +4236,7 @@ interrupt:
             PUSH_OPND(obj ? OBJECT_TO_JSVAL(obj) : JSVAL_VOID);
           END_CASE(JSOP_PUSHOBJ)
 
+          BEGIN_CASE(JSOP_TAGCALL)
           BEGIN_CASE(JSOP_CALL)
           BEGIN_CASE(JSOP_EVAL)
             argc = GET_ARGC(pc);
@@ -4647,6 +4649,7 @@ interrupt:
               case JSOP_SETPROP:      goto do_JSOP_SETPROP;
               case JSOP_INITPROP:     goto do_JSOP_INITPROP;
               case JSOP_STRING:       goto do_JSOP_STRING;
+              case JSOP_TEMPLATEOBJECT: goto do_JSOP_TEMPLATEOBJECT;
 #if JS_HAS_XML_SUPPORT
               case JSOP_XMLCDATA:     goto do_JSOP_XMLCDATA;
               case JSOP_XMLCOMMENT:   goto do_JSOP_XMLCOMMENT;
@@ -4670,6 +4673,16 @@ interrupt:
             PUSH_OPND(ATOM_KEY(atom));
             obj = NULL;
           END_CASE(JSOP_NUMBER)
+
+          BEGIN_LITOPX_CASE(JSOP_TEMPLATEOBJECT, 0)
+            SAVE_SP_AND_PC(fp);
+            if (!js_GetTemplateObject(cx, ATOM_TO_STRING(atom), &rval)) {
+                ok = JS_FALSE;
+                goto out;
+            }
+            PUSH_OPND(rval);
+            obj = NULL;
+          END_LITOPX_CASE(JSOP_TEMPLATEOBJECT)
 
           BEGIN_LITOPX_CASE(JSOP_NEWREGEXP, 0)
             /* The atom retains only an immutable compiled pattern template.
@@ -5801,6 +5814,17 @@ interrupt:
             }
             obj = NULL;
           END_CASE(JSOP_CHECKPROP)
+
+          BEGIN_CASE(JSOP_TOSTRING)
+            SAVE_SP_AND_PC(fp);
+            str = js_ValueToString(cx, FETCH_OPND(-1));
+            if (!str) {
+                ok = JS_FALSE;
+                goto out;
+            }
+            STORE_OPND(-1, STRING_TO_JSVAL(str));
+            obj = NULL;
+          END_CASE(JSOP_TOSTRING)
 
           BEGIN_CASE(JSOP_PROPERTYKEY)
             SAVE_SP_AND_PC(fp);

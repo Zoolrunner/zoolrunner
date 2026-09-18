@@ -603,3 +603,13 @@ pass, and the compound-assignment group passes all 703 cases. All four
 applications pass build, package and desktop checks with the additional
 large-script native assignment/debugger correction. Its 38 native checks and
 existing debugger lifecycle checks pass. See the [identifier reference notes](js/tests/es6/README.md#identifier-assignment-references).
+
+ES2015 ordinary and tagged templates raise the full macOS arm64 result to
+**27,217 ES6 passes**, with **1,349 failures**, 14 unsupported module cases and
+two harness errors: 117 gained, zero lost, no crashes/timeouts. All 11,540 ES5
+cases pass. All four applications pass build, package and desktop checks,
+including Calendar views, browser navigation/layout and ChatZilla. Their engine
+binaries match the frozen conformance runtime. Focused checks cover raw Unicode,
+decompilation/XDR, realm identity, reentrant native allocation/GC and long lines.
+See the [template notes](js/tests/es6/README.md#template-literals) for the
+ES2015-specific cache rules and remaining validation limits.

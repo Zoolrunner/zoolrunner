@@ -54,6 +54,8 @@
 
 JS_BEGIN_EXTERN_C
 
+extern JSBool js_FreezeObject(JSContext *cx, JSObject *obj);
+
 struct JSObjectMap {
     jsrefcount  nrefs;          /* count of all referencing objects */
     JSObjectOps *ops;           /* high level object operation vtable */
