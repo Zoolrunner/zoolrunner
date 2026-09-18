@@ -1564,7 +1564,7 @@ retry:
             } else if (kw->version <= JSVERSION_NUMBER(cx) &&
                        !(JS_VERSION_IS_ES2015(cx) &&
                          (kw->tokentype == TOK_LET ||
-                          kw->tokentype == TOK_YIELD))) {
+                          (kw->tokentype == TOK_YIELD && !(ts->flags & TSF_GENERATOR))))) {
                 if (hadUnicodeEscape) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                  JSMSG_RESERVED_ID, kw->chars);

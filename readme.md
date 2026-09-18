@@ -694,3 +694,12 @@ failures**, 14 unsupported modules and two harness errors (**14 gained, zero
 lost**). All 11,540 ES5 cases and all four application build/package/runtime
 checks pass. Other platforms have not been revalidated for this batch. See
 [the validation record](js/tests/es6/README.md#unicode-identifier-code-points).
+
+
+Modern generators now implement function-star and generator methods, delegated
+yield, return/throw completion and a separate modern iterator protocol while
+preserving classic generator APIs. The complete macOS arm64 run passes
+**27,878 ES2015 modes**, with **688 failures**, 14 unsupported modules and two
+harness errors (**379 gained, zero lost**). All **11,540 ES5 cases** and all
+four application build/package/runtime checks pass. Full ES2015 compliance
+remains unfinished. See [the generator validation record](js/tests/es6/README.md#modern-generators).

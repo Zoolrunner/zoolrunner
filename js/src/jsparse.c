@@ -804,7 +804,7 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     JSStackFrame *fp, frame;
     JSObject *funobj;
     JSStmtInfo stmtInfo;
-    uintN oldflags, firstLine, oldStrict;
+    uintN oldflags, firstLine, oldStrict, oldGenerator;
     JSParseNode *pn;
     JSScopeProperty *sprop;
     JSBool parametersOK;
@@ -832,6 +832,12 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     stmtInfo.flags = SIF_BODY_BLOCK;
 
     oldflags = tc->flags;
+    oldGenerator = ts->flags & TSF_GENERATOR;
+    ts->flags &= ~TSF_GENERATOR;
+    if (FUN_IS_GENERATOR(fun)) {
+        ts->flags |= TSF_GENERATOR;
+        tc->flags |= TCF_FUN_IS_GENERATOR;
+    }
     oldStrict = ts->flags & TSF_STRICT_MODE;
     if (tc->flags & TCF_STRICT_MODE)
         ts->flags |= TSF_STRICT_MODE;
@@ -886,13 +892,13 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     } else if (parametersOK) {
         pn = Statements(cx, ts, tc);
     }
-    if (tc->flags & TCF_STRICT_MODE) {
+    if ((tc->flags & TCF_STRICT_MODE) || FUN_IS_GENERATOR(fun)) {
         JSAtomList formals;
         JSAtomListElement *formal;
 
         ATOM_LIST_INIT(&formals);
-        fun->flags |= JSFUN_STRICT;
-        if (pn && fun->atom && RestrictedBinding(cx, fun->atom)) {
+        if (tc->flags & TCF_STRICT_MODE) fun->flags |= JSFUN_STRICT;
+        if (pn && fun->atom && (tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, fun->atom)) {
             StrictSyntaxError(cx, ts);
             pn = NULL;
         }
@@ -909,7 +915,7 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
                  * establish duplicate formals, not another function's use
                  * of the same shared node. */
                 ATOM_LIST_SEARCH(formal, &formals, name);
-                if (formal || RestrictedBinding(cx, name)) {
+                if (formal || ((tc->flags & TCF_STRICT_MODE) && RestrictedBinding(cx, name))) {
                     StrictSyntaxError(cx, ts);
                     pn = NULL;
                 } else if (!js_IndexAtom(cx, name, &formals)) {
@@ -918,7 +924,7 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
             }
         }
     }
-    ts->flags = (ts->flags & ~TSF_STRICT_MODE) | oldStrict;
+    ts->flags = (ts->flags & ~(TSF_STRICT_MODE | TSF_GENERATOR)) | oldStrict | oldGenerator;
 
     js_PopStatement(tc);
 
@@ -1337,6 +1343,10 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     JSParseNode *item, *list = NULL;
 #endif
 
+    JSBool generator;
+    uintN outerGenerator = ts->flags & TSF_GENERATOR;
+    generator = JS_VERSION_IS_ES2015(cx) &&
+                (CURRENT_TOKEN(ts).flags & TOKF_GENERATOR_METHOD);
     /* Make a TOK_FUNCTION node. */
 #if JS_HAS_GETTER_SETTER
     op = CURRENT_TOKEN(ts).t_op;
@@ -1345,8 +1355,10 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     if (!pn)
         return NULL;
 
-    /* Scan the optional function name into funAtom. */
     ts->flags |= TSF_KEYWORD_IS_NAME;
+    if (JS_VERSION_IS_ES2015(cx) && !generator)
+        generator = js_MatchToken(cx, ts, TOK_STAR);
+    /* Scan the optional function name into funAtom. */
     tt = js_GetToken(cx, ts);
     ts->flags &= ~TSF_KEYWORD_IS_NAME;
     if (tt == TOK_NAME) {
@@ -1356,6 +1368,17 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         js_UngetToken(ts);
     }
 
+    if (JS_VERSION_IS_ES2015(cx) && funAtom && ((generator && lambda) || (!lambda && outerGenerator)) &&
+        js_CheckKeyword(JSSTRING_CHARS(ATOM_TO_STRING(funAtom)),
+                        JSSTRING_LENGTH(ATOM_TO_STRING(funAtom))) == TOK_YIELD) {
+        LexicalSyntaxError(cx, ts);
+        return NULL;
+    }
+    if (generator && !lambda && !funAtom) {
+        LexicalSyntaxError(cx, ts);
+        return NULL;
+    }
+    ts->flags = (ts->flags & ~TSF_GENERATOR) | (generator ? TSF_GENERATOR : 0);
     /* Find the nearest variable-declaring scope and use it as our parent. */
     fp = cx->fp;
     varobj = fp->varobj;
@@ -1458,6 +1481,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                          funAtom);
     if (!fun)
         return NULL;
+    if (generator) fun->kind |= JSFUN_KIND_GENERATOR;
 #if JS_HAS_GETTER_SETTER
     if (op != JSOP_NOP)
         fun->flags |= (op == JSOP_GETTER) ? JSPROP_GETTER : JSPROP_SETTER;
@@ -1728,6 +1752,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_tryCount = funtc.tryCount;
     pn->pn_restSlot = funtc.restSlot;
     TREE_CONTEXT_FINISH(&funtc);
+    ts->flags = (ts->flags & ~TSF_GENERATOR) | outerGenerator;
     return result;
 }
 
@@ -2877,9 +2902,16 @@ ReturnOrYield(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
     if (tt2 != TOK_EOF && tt2 != TOK_EOL && tt2 != TOK_SEMI && tt2 != TOK_RC
 #if JS_HAS_GENERATORS
-        && (tt != TOK_YIELD || (tt2 != tt && tt2 != TOK_RB && tt2 != TOK_RP))
+        && (tt != TOK_YIELD ||
+            ((JS_VERSION_IS_ES2015(cx) || tt2 != tt) &&
+             tt2 != TOK_RB && tt2 != TOK_RP &&
+             (!JS_VERSION_IS_ES2015(cx) || (tt2 != TOK_COMMA && tt2 != TOK_COLON))))
 #endif
         ) {
+        if (tt == TOK_YIELD && JS_VERSION_IS_ES2015(cx) && tt2 == TOK_STAR) {
+            js_GetToken(cx, ts);
+            pn->pn_op = JSOP_YIELDSTAR;
+        }
         pn2 = operandParser(cx, ts, tc);
         if (!pn2)
             return NULL;
@@ -2897,7 +2929,8 @@ ReturnOrYield(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         pn->pn_kid = NULL;
     }
 
-    if ((~tc->flags & (TCF_RETURN_EXPR | TCF_FUN_IS_GENERATOR)) == 0) {
+    if (!JS_VERSION_IS_ES2015(cx) &&
+        (~tc->flags & (TCF_RETURN_EXPR | TCF_FUN_IS_GENERATOR)) == 0) {
         /* As in Python (see PEP-255), disallow return v; in generators. */
         ReportBadReturn(cx, ts, JSREPORT_ERROR,
                         JSMSG_BAD_GENERATOR_RETURN,
@@ -3146,8 +3179,8 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif
         /* Declarations are StatementListItems, not strict Statement bodies.
          * Keep the selected historical grammar and sloppy extensions intact. */
-        if (JS_VERSION_IS_ES2015(cx) && (tc->flags & TCF_STRICT_MODE) &&
-            !allowLexical) {
+        if (JS_VERSION_IS_ES2015(cx) && !allowLexical &&
+            ((tc->flags & TCF_STRICT_MODE) || js_PeekToken(cx, ts) == TOK_STAR)) {
             LexicalSyntaxError(cx, ts);
             return NULL;
         }
@@ -4460,7 +4493,7 @@ Expr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         do {
 #if JS_HAS_GENERATORS
             pn2 = PN_LAST(pn);
-            if (pn2->pn_type == TOK_YIELD) {
+            if (!JS_VERSION_IS_ES2015(cx) && pn2->pn_type == TOK_YIELD) {
                 js_ReportCompileErrorNumber(cx, pn2,
                                             JSREPORT_PN | JSREPORT_ERROR,
                                             JSMSG_BAD_YIELD_SYNTAX);
@@ -4967,7 +5000,7 @@ ArgumentList(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             if (!argNode)
                 return JS_FALSE;
 #if JS_HAS_GENERATORS
-            if (argNode->pn_type == TOK_YIELD) {
+            if (!JS_VERSION_IS_ES2015(cx) && argNode->pn_type == TOK_YIELD) {
                 js_ReportCompileErrorNumber(cx, argNode,
                                             JSREPORT_PN | JSREPORT_ERROR,
                                             JSMSG_BAD_YIELD_SYNTAX);
@@ -6334,7 +6367,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
       case TOK_LC:
       {
-        JSBool afterComma;
+        JSBool afterComma, generatorMethod;
         JSAtomList properties;
         JSAtomListElement *entry;
         JSAtom *propertyAtom;
@@ -6357,8 +6390,13 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
         afterComma = JS_FALSE;
         for (;;) {
+            generatorMethod = JS_FALSE;
             ts->flags |= TSF_KEYWORD_IS_NAME;
             tt = js_GetToken(cx, ts);
+            if (JS_VERSION_IS_ES2015(cx) && tt == TOK_STAR) {
+                generatorMethod = JS_TRUE;
+                tt = js_GetToken(cx, ts);
+            }
             ts->flags &= ~TSF_KEYWORD_IS_NAME;
             switch (tt) {
               case TOK_LB:
@@ -6473,7 +6511,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     return NULL;
             }
 #endif
-            if ((tt == TOK_COMMA || tt == TOK_RC) &&
+            if (!generatorMethod && (tt == TOK_COMMA || tt == TOK_RC) &&
                 pn3->pn_type == TOK_NAME && JS_VERSION_IS_ES2015(cx)) {
                 JSString *name = ATOM_TO_STRING(pn3->pn_atom);
                 JSTokenType keyword = js_CheckKeyword(JSSTRING_CHARS(name), JSSTRING_LENGTH(name));
@@ -6509,10 +6547,11 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 js_UngetToken(ts);
                 CURRENT_TOKEN(ts).t_op = JSOP_NOP;
                 CURRENT_TOKEN(ts).type = TOK_FUNCTION;
+                if (generatorMethod) CURRENT_TOKEN(ts).flags |= TOKF_GENERATOR_METHOD;
                 pn2 = FunctionExpr(cx, ts, tc);
                 if (!pn2) return NULL;
                 method = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
-                method->flags |= JSFUN_NO_CONSTRUCT;
+                if (!generatorMethod) method->flags |= JSFUN_NO_CONSTRUCT;
                 ATOM_LIST_INIT(&formals);
                 for (parameter = SCOPE_LAST_PROP(OBJ_SCOPE(method->object)); parameter;
                      parameter = parameter->parent) {
@@ -6538,7 +6577,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 pn2 = NewBinary(cx, TOK_COLON, JSOP_INITMETHODCOMPUTED, pn3, pn2, tc);
                 goto skip;
             }
-            if (tt != TOK_COLON) {
+            if (generatorMethod || tt != TOK_COLON) {
                 js_ReportCompileErrorNumber(cx, ts,
                                             JSREPORT_TS | JSREPORT_ERROR,
                                             JSMSG_COLON_AFTER_ID);

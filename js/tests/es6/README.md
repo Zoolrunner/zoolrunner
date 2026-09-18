@@ -2481,3 +2481,39 @@ remained unchanged through both suites; its engine SHA-256 is
 `47078f7aa13cdd3a766fc22299c27464c7eb0fbf1df87104ea92eb8a764171c4`,
 matching all four application engines. C89 syntax checks pass. No bytecode-format
 change is needed. Other platforms remain unvalidated for this batch.
+
+
+### Modern generators
+
+Modern function-star declarations/expressions and generator methods use a
+separate intrinsic prototype graph and resume protocol. Classic generators
+retain next/send/throw/close and StopIteration. Modern next/throw/return handle
+newborn, suspended, running and closed states; return values survive yielding
+finally blocks. Strict/rest arguments stay unmapped when frames are moved.
+Abandoned modern generators do not run legacy GC close hooks; escaped block,
+call and mapped-argument environments retain their suspended generator.
+
+Yield-star delegates next/throw/return, preserves done-false result identity,
+and closes on a missing throw method. Abrupt cleanup interoperates with for-of.
+Function kind survives cloning/XDR, generator functions reject construction,
+and the decompiler retains function-star and yield-star syntax. Cache version
+49 records the new function kind and delegated-yield opcode.
+
+Focused validation passes 78 checks and a 14-check native embedding probe with
+GC on allocation, debugger reentry, suspended return values, XDR and source
+round-trips. Targeted upstream groups pass 114/114 Generator built-in cases,
+122/122 generator syntax cases and 29/29 yield cases. The for-of group now
+passes 170/206; the remaining 36 depend on typed arrays. The first diagnostic
+full run (`generators-first-*`) predates completion-value, contextual-yield and
+strict-argument corrections. The final full run passes **27,878 modes**, with
+**688 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **379 gained, zero lost** against the identifier baseline. All
+**11,540 ES5.1 cases** pass. All four macOS arm64 applications pass root builds,
+packaging and desktop checks, including Calendar's four views, 169 Browser
+navigation/layout checks and Suite/XULRunner ChatZilla. C89 checks pass.
+Reports use `generators-validated-final-*`; the frozen runtime remained
+unchanged through both complete suites. Its engine SHA-256 is
+`07ea6ede90438b0282945f319ccd9c25fa35479e5c5c4d442178a5d756b61b9d`,
+matching all four application engines. Other platforms remain unvalidated for
+this batch. Typed arrays, classes, modules, Unicode regular expressions and
+broader parameter/destructuring/global lexical semantics still require work.

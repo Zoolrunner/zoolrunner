@@ -1243,7 +1243,7 @@ have_fun:
         /* Get private data and set derived locals from it. */
         fun = (JSFunction *) JS_GetPrivate(cx, funobj);
         if ((flags & JSINVOKE_CONSTRUCT) &&
-            (fun->flags & JSFUN_NO_CONSTRUCT)) {
+            ((fun->flags & JSFUN_NO_CONSTRUCT) || FUN_IS_GENERATOR(fun))) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                                  JSMSG_NOT_CONSTRUCTOR, "function");
             ok = JS_FALSE;
@@ -6836,6 +6836,37 @@ interrupt:
             }
             goto out;
 
+          BEGIN_CASE(JSOP_YIELDSTAR)
+          {
+            JSGenerator *gen = FRAME_TO_GENERATOR(fp);
+            JSBool done = JS_FALSE, returning = JS_FALSE;
+            SAVE_SP_AND_PC(fp);
+            if (!gen->delegate) {
+                gen->delegate = js_ForOfStart(cx, FETCH_OPND(-1));
+                if (!gen->delegate) { ok = JS_FALSE; goto out; }
+                gen->sentValue = JSVAL_VOID;
+                gen->resumeKind = 0; /* JSGENOP_NEXT */
+            }
+            ok = js_DelegateGenerator(cx, gen, &done, &returning, &rval);
+            if (!ok) goto out;
+            if (done) {
+                STORE_OPND(-1, rval);
+                if (returning) {
+                    gen->returnValue = rval;
+                    JS_SetPendingException(cx, JSVAL_ARETURN);
+                    ok = JS_FALSE;
+                    goto out;
+                }
+            } else {
+                fp->rval = rval;
+                gen->yieldResult = JS_TRUE;
+                fp->flags |= JSFRAME_YIELDING;
+                SAVE_SP_AND_PC(fp);
+                goto out;
+            }
+          }
+          END_CASE(JSOP_YIELDSTAR)
+
           BEGIN_CASE(JSOP_YIELD)
             ASSERT_NOT_THROWING(cx);
             if (fp->flags & JSFRAME_FILTERING) {
@@ -7016,7 +7047,9 @@ out:
                 if (!pc) {
                     cx->throwing = JS_FALSE;
                     ok = JS_TRUE;
-                    fp->rval = JSVAL_VOID;
+                    fp->rval = (fp->flags & JSFRAME_GENERATOR) &&
+                               FUN_IS_GENERATOR(fp->fun)
+                               ? FRAME_TO_GENERATOR(fp)->returnValue : JSVAL_VOID;
                     goto no_catch;
                 }
             }

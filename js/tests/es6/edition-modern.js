@@ -147,6 +147,11 @@ function modernWindowEdition() {
                              return:function(){closed++;return {}}};};
                          for(var value of source) break;
                          return value===7 && closed===1; })() &&
+           (function() { var i=(function*(){yield* [3,4];return 5})();
+                         return i.next().value===3 && i.next().value===4 &&
+                                i.next().value===5 && i.next().done; })() &&
+           (function() { var i=(function*(){try{yield 1}finally{yield 2}})();
+                         i.next();return i.return(9).value===2 && i.next().value===9; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

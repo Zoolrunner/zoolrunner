@@ -1452,3 +1452,18 @@ malformed escapes, token-buffer boundaries and decompiled source. Identifier
 escaping must remain distinct from string/XML text escaping. Run
 `js/tests/es6/identifier-codepoints.js` and `test-identifiers.py` against the
 checksum-pinned UCD inputs; generation is maintenance work, not a build dependency.
+
+
+For modern generator changes, run `js/tests/es6/generators.js` and
+`TestGeneratorEmbedding.c` alongside complete pinned conformance and application
+checks. Preserve classic next/send/throw/close/StopIteration semantics. Keep
+modern return completion separately rooted across yielding finally blocks, trace
+delegated iterator state, and retain suspended generators through escaped lexical
+objects. Moving a frame must not remap strict/rest arguments. Preserve original
+ES2015 delegated-yield result identity and missing-throw cleanup precedence.
+Check generator intrinsic descriptors, non-constructibility, contextual yield,
+source reconstruction and XDR. Cache version 49 records the generator function
+kind and delegated-yield instruction. The validated macOS arm64 baseline passes
+27,878 ES2015 modes and all 11,540 ES5 modes; 688 failures, 14 unsupported modules
+and two harness errors remain. All four macOS arm64 applications pass packaged
+runtime checks; other platforms remain unvalidated for this batch.

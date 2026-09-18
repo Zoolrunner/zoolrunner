@@ -2663,13 +2663,24 @@ block_xdrObject(JSXDRState *xdr, JSObject **objp)
 # define block_xdrObject NULL
 #endif
 
+static uint32
+block_mark(JSContext *cx, JSObject *obj, void *arg)
+{
+#if JS_HAS_GENERATORS
+    JSStackFrame *fp = (JSStackFrame *)JS_GetPrivate(cx, obj);
+    if (fp && (fp->flags & JSFRAME_GENERATOR))
+        GC_MARK(cx, FRAME_TO_GENERATOR(fp)->obj, "block generator");
+#endif
+    return 0;
+}
+
 JSClass js_BlockClass = {
     "Block",
     JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(1) |
     JSCLASS_IS_ANONYMOUS | JSCLASS_HAS_CACHED_PROTO(JSProto_Block),
     JS_PropertyStub,  JS_PropertyStub,  block_getProperty, block_setProperty,
     JS_EnumerateStub, JS_ResolveStub,   JS_ConvertStub,    JS_FinalizeStub,
-    NULL, NULL, NULL, NULL, block_xdrObject, NULL, NULL, NULL
+    NULL, NULL, NULL, NULL, block_xdrObject, NULL, block_mark, NULL
 };
 
 JSObject*

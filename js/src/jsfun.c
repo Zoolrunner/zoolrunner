@@ -1099,6 +1099,8 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
     }
     if (fun->flags & JSFUN_BOUND_FUNCTION)
         return JS_TRUE;
+    if (FUN_IS_GENERATOR(fun) && !js_InitGeneratorFunction(cx, obj))
+        return JS_FALSE;
     if (!js_DefineNativeProperty(cx, obj,
                                 ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
                                 INT_TO_JSVAL(fun->nargs), NULL, NULL,
@@ -1269,7 +1271,7 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
             *objp = obj;
             return JS_TRUE;
         }
-        if (fun && !FUN_IS_ARROW(fun) &&
+        if (fun && !FUN_IS_ARROW(fun) && !FUN_IS_GENERATOR(fun) &&
             (fun->edition < JSVERSION_ECMA_2015 || FUN_INTERPRETED(fun)) &&
             !(fun->flags & (JSFUN_STRICT | JSFUN_BOUND_FUNCTION)) &&
             OBJ_GET_PROTO(cx, obj) &&
@@ -1321,6 +1323,16 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
             FUN_NATIVE(fun) == js_ProxyConstructor)
             return JS_TRUE;
 
+        if (FUN_IS_GENERATOR(fun)) {
+            parentProto = js_ModernGeneratorPrototype(cx, JS_GetGlobalForObject(cx, obj));
+            proto = parentProto ? js_NewObject(cx, &js_ObjectClass, parentProto,
+                                                OBJ_GET_PARENT(cx, obj)) : NULL;
+            if (!proto || !JS_DefineProperty(cx, obj, "prototype", OBJECT_TO_JSVAL(proto),
+                                              NULL, NULL, JSPROP_PERMANENT))
+                return JS_FALSE;
+            *objp = obj;
+            return JS_TRUE;
+        }
         proto = parentProto = NULL;
         if (fun->object != obj && fun->object &&
             fun->edition < JSVERSION_ECMA_2015) {
@@ -1485,7 +1497,8 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         goto bad;
     }
 
-    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST)) {
+    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR) ||
+        (FUN_IS_ARROW(fun) && FUN_IS_GENERATOR(fun))) {
         JS_ReportError(cx, "invalid serialized function kind");
         goto bad;
     }
@@ -1938,7 +1951,7 @@ js_IsConstructor(JSContext *cx, jsval v)
                    ? clasp->construct != NULL
                    : obj->map->ops->construct != NULL;
         fun = (JSFunction *)JS_GetPrivate(cx, obj);
-        if (!fun || (fun->flags & JSFUN_NO_CONSTRUCT))
+        if (!fun || (fun->flags & JSFUN_NO_CONSTRUCT) || FUN_IS_GENERATOR(fun))
             return JS_FALSE;
         if (!(fun->flags & JSFUN_BOUND_FUNCTION))
             return JS_TRUE;
@@ -2418,7 +2431,8 @@ js_IsIdentifier(JSString *str)
 }
 
 static JSBool
-Function(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+DynamicFunction(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
+                JSBool generator)
 {
     JSStackFrame *fp, *caller;
     JSFunction *fun;
@@ -2474,7 +2488,8 @@ Function(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
      * are built for Function.prototype.call or .apply activations that invoke
      * Function indirectly from a script.
      */
-    JS_ASSERT(!fp->script && fp->fun && fp->fun->u.n.native == Function);
+    JS_ASSERT(!fp->script && fp->fun);
+    if (generator) fun->kind |= JSFUN_KIND_GENERATOR;
     caller = JS_GetScriptedCaller(cx, fp);
     if (caller) {
         principals = JS_EvalFramePrincipals(cx, fp, caller);
@@ -2570,6 +2585,7 @@ Function(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             return JS_FALSE;
         }
 
+        if (generator) ts->flags |= TSF_GENERATOR;
         /* The argument string may be empty or contain no tokens. */
         tt = js_GetToken(cx, ts);
         if (tt != TOK_EOF) {
@@ -2710,6 +2726,21 @@ bad:
     (void)js_CloseTokenStream(cx, ts);
     JS_ARENA_RELEASE(&cx->tempPool, mark);
     return JS_FALSE;
+}
+
+static JSBool
+Function(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return DynamicFunction(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+JSBool
+js_GeneratorFunction(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSVersion version = JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    JSBool ok = DynamicFunction(cx, obj, argc, argv, rval, JS_TRUE);
+    JS_SetVersion(cx, version);
+    return ok;
 }
 
 JSBool
@@ -3076,7 +3107,7 @@ js_ValueToFunction(JSContext *cx, jsval *vp, uintN flags)
     {
         JSFunction *fun = (JSFunction *) JS_GetPrivate(cx, obj);
         if ((flags & JSV2F_CONSTRUCT) && fun &&
-            (fun->flags & JSFUN_NO_CONSTRUCT)) {
+            ((fun->flags & JSFUN_NO_CONSTRUCT) || FUN_IS_GENERATOR(fun))) {
             /* Reject before the constructor path reads .prototype or
              * allocates a receiver. That property may have a user getter. */
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,

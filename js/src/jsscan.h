@@ -269,6 +269,8 @@ struct JSTokenStream {
 #define TOKF_OCTAL      0x01            /* legacy numeric literal or escape */
 #define TOKF_PAREN  0x04 /* parenthesized literal is not a directive */
 #define TOKF_ESCAPE 0x02 /* raw string contains an escape or continuation */
+#define TOKF_GENERATOR_METHOD 0x08
+#define TSF_GENERATOR 0x10000
 #define TSF_STRICT_MODE 0x8000          /* ES5 strict lexical grammar */
 
 #define TSF_ERROR       0x01            /* fatal error while compiling */

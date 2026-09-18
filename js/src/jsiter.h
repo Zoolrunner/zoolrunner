@@ -88,6 +88,11 @@ struct JSGenerator {
     JSGenerator         *next;
     JSObject            *obj;
     JSGeneratorState    state;
+    jsval               returnValue; /* modern return across yielding finally */
+    jsval               sentValue;
+    JSObject            *delegate;
+    uintN               resumeKind;
+    JSBool              yieldResult;
     JSStackFrame        frame;
     JSArena             arena;
     jsval               stack[1];
@@ -95,6 +100,10 @@ struct JSGenerator {
 
 #define FRAME_TO_GENERATOR(fp) \
     ((JSGenerator *) ((uint8 *)(fp) - offsetof(JSGenerator, frame)))
+
+extern JSBool js_InitGeneratorFunction(JSContext *, JSObject *);
+extern JSObject *js_ModernGeneratorPrototype(JSContext *, JSObject *);
+extern JSBool js_DelegateGenerator(JSContext *, JSGenerator *, JSBool *, JSBool *, jsval *);
 
 extern JSObject *
 js_NewGenerator(JSContext *cx, JSStackFrame *fp);

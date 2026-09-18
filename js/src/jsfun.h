@@ -73,9 +73,13 @@ struct JSFunction {
 #define JSFUN_KIND_ORDINARY 0
 #define JSFUN_KIND_ARROW    1
 #define JSFUN_KIND_REST     2
+#define JSFUN_KIND_GENERATOR 4
+#define FUN_IS_GENERATOR(fun) (((fun)->kind & JSFUN_KIND_GENERATOR) != 0)
 #define FUN_IS_ARROW(fun) (((fun)->kind & JSFUN_KIND_ARROW) != 0)
 #define FUN_HAS_REST(fun) (((fun)->kind & JSFUN_KIND_REST) != 0)
 #define JSFUN_ARROW_SLOT(fun) (3 + (fun)->u.i.nregexps)
+
+extern JSBool js_GeneratorFunction(JSContext *, JSObject *, uintN, jsval *, jsval *);
 
 extern JSBool js_CaptureArrowBindings(JSContext *, JSObject *, JSStackFrame *);
 extern JSBool js_GetArrowBindings(JSContext *, JSObject *, jsval *, JSObject **);

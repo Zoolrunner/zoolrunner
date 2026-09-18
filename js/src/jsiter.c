@@ -57,6 +57,9 @@
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jsiter.h"
+#include "jsiteres6.h"
+#include "jsrealm.h"
+#include "jssymbol.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
@@ -714,6 +717,11 @@ generator_mark(JSContext *cx, JSObject *obj, void *arg)
         JS_ASSERT(!JSVAL_IS_PRIMITIVE(gen->frame.argv[-2]));
         GC_MARK(cx, JSVAL_TO_GCTHING(gen->frame.argv[-2]), "generator");
         js_MarkStackFrame(cx, &gen->frame);
+        if (JSVAL_IS_GCTHING(gen->returnValue))
+            GC_MARK(cx, JSVAL_TO_GCTHING(gen->returnValue), "generator return");
+        if (JSVAL_IS_GCTHING(gen->sentValue))
+            GC_MARK(cx, JSVAL_TO_GCTHING(gen->sentValue), "generator sent");
+        if (gen->delegate) GC_MARK(cx, gen->delegate, "generator delegate");
     }
     return 0;
 }
@@ -745,7 +753,18 @@ js_NewGenerator(JSContext *cx, JSStackFrame *fp)
     jsval *newsp;
 
     /* After the following return, failing control flow must goto bad. */
-    obj = js_NewObject(cx, &js_GeneratorClass, NULL, NULL);
+    if (FUN_IS_GENERATOR(fp->fun)) {
+        jsval prototype;
+        JSObject *global = JS_GetGlobalForObject(cx, fp->callee);
+        if (!JS_GetProperty(cx, fp->callee, "prototype", &prototype))
+            return NULL;
+        obj = JSVAL_IS_PRIMITIVE(prototype)
+              ? js_ModernGeneratorPrototype(cx, global) : JSVAL_TO_OBJECT(prototype);
+        if (!obj) return NULL;
+        obj = js_NewObject(cx, &js_GeneratorClass, obj, global);
+    } else {
+        obj = js_NewObject(cx, &js_GeneratorClass, NULL, NULL);
+    }
     if (!obj)
         return NULL;
 
@@ -763,6 +782,10 @@ js_NewGenerator(JSContext *cx, JSStackFrame *fp)
         goto bad;
 
     gen->obj = obj;
+    gen->returnValue = gen->sentValue = JSVAL_VOID;
+    gen->delegate = NULL;
+    gen->resumeKind = 0;
+    gen->yieldResult = JS_FALSE;
 
     /* Steal away objects reflecting fp and point them at gen->frame. */
     gen->frame.callobj = fp->callobj;
@@ -772,7 +795,10 @@ js_NewGenerator(JSContext *cx, JSStackFrame *fp)
     }
     gen->frame.argsobj = fp->argsobj;
     if (fp->argsobj) {
-        JS_SetPrivate(cx, fp->argsobj, &gen->frame);
+        /* Strict/non-simple arguments have no frame mapping. Do not attach
+         * them when moving a generator activation to its suspended frame. */
+        if (JS_GetPrivate(cx, fp->argsobj))
+            JS_SetPrivate(cx, fp->argsobj, &gen->frame);
         fp->argsobj = NULL;
     }
 
@@ -824,6 +850,7 @@ js_NewGenerator(JSContext *cx, JSStackFrame *fp)
     gen->frame.dormantNext = NULL;
     gen->frame.xmlNamespace = NULL;
     gen->frame.blockChain = NULL;
+    gen->frame.newTarget = (fp->flags & JSFRAME_NEW_TARGET) ? fp->newTarget : NULL;
 
     /* Note that gen is newborn. */
     gen->state = JSGEN_NEWBORN;
@@ -837,7 +864,7 @@ js_NewGenerator(JSContext *cx, JSStackFrame *fp)
      * Register with GC to ensure that suspended finally blocks will be
      * executed.
      */
-    js_RegisterGenerator(cx, gen);
+    if (!FUN_IS_GENERATOR(fp->fun)) js_RegisterGenerator(cx, gen);
     return obj;
 
   bad:
@@ -849,7 +876,8 @@ typedef enum JSGeneratorOp {
     JSGENOP_NEXT,
     JSGENOP_SEND,
     JSGENOP_THROW,
-    JSGENOP_CLOSE
+    JSGENOP_CLOSE,
+    JSGENOP_RETURN
 } JSGeneratorOp;
 
 /*
@@ -866,7 +894,13 @@ SendToGenerator(JSContext *cx, JSGeneratorOp op, JSObject *obj,
     JSBool ok;
 
     JS_ASSERT(gen->state ==  JSGEN_NEWBORN || gen->state == JSGEN_OPEN);
-    switch (op) {
+    gen->sentValue = arg;
+    gen->resumeKind = op;
+    gen->yieldResult = JS_FALSE;
+    if (FUN_IS_GENERATOR(gen->frame.fun)) gen->frame.rval = JSVAL_VOID;
+    if (gen->delegate) {
+        gen->state = JSGEN_RUNNING;
+    } else switch (op) {
       case JSGENOP_NEXT:
       case JSGENOP_SEND:
         if (gen->state == JSGEN_OPEN) {
@@ -881,6 +915,12 @@ SendToGenerator(JSContext *cx, JSGeneratorOp op, JSObject *obj,
 
       case JSGENOP_THROW:
         JS_SetPendingException(cx, arg);
+        gen->state = JSGEN_RUNNING;
+        break;
+
+      case JSGENOP_RETURN:
+        gen->returnValue = arg;
+        JS_SetPendingException(cx, JSVAL_ARETURN);
         gen->state = JSGEN_RUNNING;
         break;
 
@@ -931,6 +971,10 @@ SendToGenerator(JSContext *cx, JSGeneratorOp op, JSObject *obj,
         /* Returned, explicitly or by falling off the end. */
         if (op == JSGENOP_CLOSE)
             return JS_TRUE;
+        if (FUN_IS_GENERATOR(gen->frame.fun)) {
+            *rval = gen->frame.rval;
+            return JS_TRUE;
+        }
         return js_ThrowStopIteration(cx, obj);
     }
 
@@ -967,6 +1011,11 @@ generator_op(JSContext *cx, JSGeneratorOp op,
         return JS_FALSE;
 
     gen = (JSGenerator *) JS_GetPrivate(cx, obj);
+    if (gen && FUN_IS_GENERATOR(gen->frame.fun)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_INCOMPATIBLE_PROTO, "Generator", "legacy method", "modern generator");
+        return JS_FALSE;
+    }
     if (gen == NULL) {
         /* This happens when obj is the generator prototype. See bug 352885. */
         goto closed_generator;
@@ -1036,6 +1085,188 @@ generator_op(JSContext *cx, JSGeneratorOp op,
     if (!SendToGenerator(cx, op, obj, gen, arg, rval))
         return JS_FALSE;
     return JS_TRUE;
+}
+
+
+static JSBool
+ModernGeneratorOp(JSContext *cx, uintN op, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *obj, *global;
+    JSGenerator *gen;
+    jsval arg = argc ? argv[0] : JSVAL_VOID;
+    JSBool ok;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) goto incompatible;
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    if (OBJ_GET_CLASS(cx, obj) != &js_GeneratorClass) goto incompatible;
+    gen = (JSGenerator *)JS_GetPrivate(cx, obj);
+    if (!gen || !FUN_IS_GENERATOR(gen->frame.fun)) goto incompatible;
+    global = js_BuiltinGlobal(cx, argv);
+    if (gen->state == JSGEN_RUNNING || gen->state == JSGEN_CLOSING) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NESTING_GENERATOR, "generator");
+        return JS_FALSE;
+    }
+    if (gen->state == JSGEN_NEWBORN && op != JSGENOP_NEXT)
+        gen->state = JSGEN_CLOSED;
+    if (gen->state == JSGEN_CLOSED) {
+        if (op == JSGENOP_THROW) {
+            JS_SetPendingException(cx, arg);
+            return JS_FALSE;
+        }
+        return js_IteratorResult(cx, global, op == JSGENOP_RETURN ? arg : JSVAL_VOID,
+                                  JS_TRUE, rval);
+    }
+    ok = SendToGenerator(cx, (JSGeneratorOp)op, obj, gen, arg, rval);
+    if (!ok) return JS_FALSE;
+    if (gen->yieldResult) return JS_TRUE;
+    return js_IteratorResult(cx, global, *rval, gen->state == JSGEN_CLOSED, rval);
+  incompatible:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INCOMPATIBLE_PROTO,
+                         "Generator", "resume", "receiver");
+    return JS_FALSE;
+}
+
+static JSBool
+ModernNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{ return ModernGeneratorOp(cx, JSGENOP_NEXT, argc, argv, rval); }
+static JSBool
+ModernThrow(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{ return ModernGeneratorOp(cx, JSGENOP_THROW, argc, argv, rval); }
+static JSBool
+ModernReturn(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{ return ModernGeneratorOp(cx, JSGENOP_RETURN, argc, argv, rval); }
+
+static JSBool
+InitModernGenerators(JSContext *cx, JSObject *global)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    JSObject *iterator, *functionProto, *genProto, *genFunctionProto;
+    JSFunction *constructor;
+    JSBool ok = JS_FALSE;
+    JSAtom *name;
+    JSVersion version;
+    if (js_GetCachedIntrinsic(cx, global, JS_INTRINSIC_GENERATOR_FUNCTION_PROTO))
+        return JS_TRUE;
+    version = JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    roots[0] = roots[1] = roots[2] = roots[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    iterator = js_GetIteratorPrototype(cx, global);
+    functionProto = js_BuiltinPrototype(cx, global, JSProto_Function);
+    if (!iterator || !functionProto) goto out;
+    genProto = js_NewObject(cx, &js_ObjectClass, iterator, global);
+    if (!genProto) goto out;
+    roots[0] = OBJECT_TO_JSVAL(genProto);
+    genFunctionProto = js_NewObject(cx, &js_ObjectClass, functionProto, global);
+    if (!genFunctionProto) goto out;
+    roots[1] = OBJECT_TO_JSVAL(genFunctionProto);
+    name = js_Atomize(cx, "GeneratorFunction", 17, 0);
+    if (!name) goto out;
+    roots[3] = ATOM_KEY(name);
+    constructor = js_NewFunction(cx, NULL, js_GeneratorFunction, 1, JSFUN_STRICT,
+                                 global, name);
+    if (!constructor) goto out;
+    roots[2] = OBJECT_TO_JSVAL(constructor->object);
+    constructor->clasp = &js_FunctionClass;
+    ok = JS_DefineProperty(cx, constructor->object, "prototype", roots[1], NULL, NULL,
+                            JSPROP_PERMANENT | JSPROP_READONLY) &&
+         JS_DefineProperty(cx, genFunctionProto, "constructor", roots[2], NULL, NULL, JSPROP_READONLY) &&
+         JS_DefineProperty(cx, genFunctionProto, "prototype", roots[0], NULL, NULL, JSPROP_READONLY) &&
+         JS_DefineProperty(cx, genProto, "constructor", roots[1], NULL, NULL, JSPROP_READONLY) &&
+         JS_DefineFunction(cx, genProto, "next", ModernNext, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
+         JS_DefineFunction(cx, genProto, "throw", ModernThrow, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
+         JS_DefineFunction(cx, genProto, "return", ModernReturn, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
+         js_DefineBuiltinTag(cx, genProto, "Generator") &&
+         js_DefineBuiltinTag(cx, genFunctionProto, "GeneratorFunction") &&
+         js_CacheIntrinsic(cx, global, JS_INTRINSIC_GENERATOR_PROTO, genProto) &&
+         js_CacheIntrinsic(cx, global, JS_INTRINSIC_GENERATOR_CONSTRUCTOR, constructor->object) &&
+         js_CacheIntrinsic(cx, global, JS_INTRINSIC_GENERATOR_FUNCTION_PROTO, genFunctionProto);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    JS_SetVersion(cx, version);
+    return ok;
+}
+
+JSObject *
+js_ModernGeneratorPrototype(JSContext *cx, JSObject *global)
+{
+    return InitModernGenerators(cx, global)
+           ? js_GetCachedIntrinsic(cx, global, JS_INTRINSIC_GENERATOR_PROTO) : NULL;
+}
+
+JSBool
+js_InitGeneratorFunction(JSContext *cx, JSObject *obj)
+{
+    JSObject *global = JS_GetGlobalForObject(cx, obj);
+    jsval prototype;
+    if (!InitModernGenerators(cx, global)) return JS_FALSE;
+    /* Materialize the function's own writable prototype before an assignment
+     * can encounter GeneratorFunction.prototype's inherited readonly one. */
+    return JS_SetPrototype(cx, obj,
+        js_GetCachedIntrinsic(cx, global, JS_INTRINSIC_GENERATOR_FUNCTION_PROTO)) &&
+        JS_GetProperty(cx, obj, "prototype", &prototype);
+}
+
+/* yield* returns the delegate's result object unchanged for done=false. */
+JSBool
+js_DelegateGenerator(JSContext *cx, JSGenerator *gen, JSBool *done,
+                     JSBool *returning, jsval *result)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    JSObject *iterator;
+    uintN argc = 1;
+    const char *method;
+    JSBool ok = JS_FALSE;
+    roots[0] = roots[1] = roots[2] = roots[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    JS_GetReservedSlot(cx, gen->delegate, 0, &roots[0]);
+    iterator = JSVAL_TO_OBJECT(roots[0]);
+    method = gen->resumeKind == JSGENOP_THROW ? "throw" :
+             gen->resumeKind == JSGENOP_RETURN ? "return" : "next";
+    *returning = gen->resumeKind == JSGENOP_RETURN;
+    if (!JS_GetProperty(cx, iterator, method, &roots[1])) goto out;
+    if ((JSVAL_IS_VOID(roots[1]) || JSVAL_IS_NULL(roots[1])) &&
+        gen->resumeKind == JSGENOP_RETURN) {
+        *done = JS_TRUE;
+        *result = gen->sentValue;
+        ok = JS_TRUE;
+        goto out;
+    }
+    if ((JSVAL_IS_VOID(roots[1]) || JSVAL_IS_NULL(roots[1])) &&
+        gen->resumeKind == JSGENOP_THROW) {
+        if (!JS_GetProperty(cx, iterator, "return", &roots[1])) goto out;
+        if (!JSVAL_IS_VOID(roots[1]) && !JSVAL_IS_NULL(roots[1])) {
+            if (!js_IsCallable(cx, roots[1])) goto not_callable;
+            if (!js_InternalCall(cx, iterator, roots[1], 0, NULL, &roots[2])) goto out;
+            if (JSVAL_IS_PRIMITIVE(roots[2])) goto bad_result;
+        }
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+        goto out;
+    }
+    if (!js_IsCallable(cx, roots[1])) goto not_callable;
+    if (!js_InternalCall(cx, iterator, roots[1], argc, &gen->sentValue, &roots[2])) goto out;
+    if (JSVAL_IS_PRIMITIVE(roots[2])) goto bad_result;
+    if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(roots[2]), "done", &roots[3]) ||
+        !JS_ValueToBoolean(cx, roots[3], done)) goto out;
+    if (*done) {
+        if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(roots[2]), "value", &roots[3])) goto out;
+        *result = roots[3];
+    } else {
+        *result = roots[2];
+    }
+    ok = JS_TRUE;
+    goto out;
+  not_callable:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, method);
+    goto out;
+  bad_result:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                         JSMSG_BAD_ITERATOR_RETURN, "iterator", method);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    if (!ok || *done) gen->delegate = NULL;
+    return ok;
 }
 
 static JSBool

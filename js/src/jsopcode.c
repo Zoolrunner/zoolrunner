@@ -2759,6 +2759,10 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 break;
 
 #if JS_HAS_GENERATORS
+              case JSOP_YIELDSTAR:
+                rval = POP_STR();
+                todo = Sprint(&ss->sprinter, "yield* (%s)", rval);
+                break;
               case JSOP_YIELD:
                 op = JSOP_SETNAME;      /* turn off most parens */
                 rval = POP_STR();
@@ -4698,7 +4702,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
         js_printf(jp, "%s ", js_setter_str);
 
     if (!FUN_IS_ARROW(fun)) {
-        js_printf(jp, "%s ", js_function_str);
+        js_printf(jp, "%s%s ", js_function_str, FUN_IS_GENERATOR(fun) ? "*" : "");
         if (fun->atom && !QuoteString(&jp->sprinter, ATOM_TO_STRING(fun->atom), IDENTIFIER_ESCAPE))
             return JS_FALSE;
     }
