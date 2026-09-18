@@ -30,6 +30,7 @@ extern JSObject *js_InitSymbolClass(JSContext *cx, JSObject *global);
 extern JSSymbol *js_NewSymbol(JSContext *cx, JSString *description);
 extern JSSymbol *js_GetWellKnownSymbol(JSContext *cx, JSWellKnownSymbol key);
 extern JSBool js_WellKnownSymbolId(JSContext *cx, JSWellKnownSymbol key, jsid *idp);
+extern JSBool js_DefineBuiltinTag(JSContext *cx, JSObject *obj, const char *name);
 extern JSString *js_SymbolToString(JSContext *cx, JSSymbol *symbol);
 extern JSObject *js_SymbolToObject(JSContext *cx, JSSymbol *symbol);
 extern void js_MarkSymbolState(JSContext *cx);

@@ -145,6 +145,28 @@ js_WellKnownSymbolId(JSContext *cx, JSWellKnownSymbol key, jsid *idp)
     return JS_TRUE;
 }
 
+JSBool
+js_DefineBuiltinTag(JSContext *cx, JSObject *obj, const char *name)
+{
+    jsval roots[2];
+    JSTempValueRooter root;
+    JSString *tag;
+    jsid id;
+    JSBool ok = JS_FALSE;
+    roots[0] = OBJECT_TO_JSVAL(obj);
+    roots[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    tag = JS_NewStringCopyZ(cx, name);
+    if (tag) {
+        roots[1] = STRING_TO_JSVAL(tag);
+        ok = js_WellKnownSymbolId(cx, JS_WKS_TO_STRING_TAG, &id) &&
+             OBJ_DEFINE_PROPERTY(cx, obj, id, roots[1], NULL, NULL,
+                                 JSPROP_READONLY, NULL);
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSString *
 js_SymbolToString(JSContext *cx, JSSymbol *symbol)
 {

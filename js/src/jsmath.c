@@ -56,6 +56,7 @@
 #include "jsmathfd.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 
 #ifndef M_E
 #define M_E             2.7182818284590452354
@@ -717,7 +718,8 @@ js_InitMathClass(JSContext *cx, JSObject *obj)
     if (!JS_DefineFunctions(cx, Math, math_static_methods) ||
         !js_SetBuiltinMethodFlags(cx, Math, math_static_methods, JSFUN_NO_CONSTRUCT))
         return NULL;
-    if (!JS_DefineConstDoubles(cx, Math, math_constants))
+    if (!JS_DefineConstDoubles(cx, Math, math_constants) ||
+        !js_DefineBuiltinTag(cx, Math, "Math"))
         return NULL;
     return Math;
 }

@@ -946,3 +946,32 @@ embedding and desktop checks. Calendar's eight unit suites and four views,
 Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
 standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
 for this batch.
+
+
+### Built-in Symbol.toStringTag properties
+
+Math and JSON now define their standard non-writable, non-enumerable,
+configurable Symbol.toStringTag properties. Explicit ES2015 Object.prototype
+toString uses the specification's default tags when a custom tag is absent or
+non-string, including Object for Math, JSON and Symbol wrappers whose tags were
+removed. Legacy script modes retain historical native JSClass names. Native
+callability is inspected without invoking the object.
+
+`builtin-tags.js` passes 27 focused checks on macOS arm64, including tag
+deletion, replacement, Unicode getters and collection. TestBuiltinTags passes
+13 native checks, including ordinary/callable native objects and legacy edition
+transitions. All 40 pinned Object.prototype.toString cases pass; the separate
+Symbol.toStringTag filename subset passes 8/40, with the remaining cases
+requiring other unimplemented built-ins.
+
+The full pinned ES2015 run passes **23,815 cases**, with **4,751 failures**,
+14 unsupported module cases and two harness errors. This gains four passes
+without losing any; there are no crashes or timeouts and runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/builtin-tags-full.json` and `builtin-tags-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.

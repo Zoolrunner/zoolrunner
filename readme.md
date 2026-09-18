@@ -174,7 +174,7 @@ Modern function metadata and restricted accessors have native, shell and
 window regressions. Portable `Math.sign`, `trunc`, `clz32` and `imul` additions
 and corrected `Math.round` boundaries have focused regression coverage. The
 remaining ES2015 numeric Math methods use selected bundled fdlibm kernels and
-portable rounding/summation code; Math's Symbol-based tag remains unfinished.
+portable rounding/summation code; Math's Symbol-based tag is also implemented.
 New String code-point, repetition, literal-search and raw-assembly methods have
 UTF-16 and callback/GC checks. `String.prototype.normalize` uses pinned Unicode
 18.0.0 data and passes the upstream normalization checks; this does not change
@@ -345,3 +345,9 @@ with 4,755 failures, 14 unsupported cases and two harness errors. All 11,540
 ES5 cases and all four applications' packaged compatibility checks pass.
 Legacy script modes and the public JS_HasInstance API preserve their native
 dispatch. Other platforms have not been revalidated for this batch.
+
+Math/JSON Symbol.toStringTag properties and modern default-tag corrections are
+implemented, preserving legacy native class names. The full macOS arm64 ES2015
+run passes 23,815 cases, with 4,751 failures, 14 unsupported cases and two harness
+errors. All 11,540 ES5 cases and all four applications' packaged compatibility
+checks pass. Other platforms have not been revalidated for this batch.

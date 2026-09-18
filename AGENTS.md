@@ -1096,3 +1096,8 @@ For Symbol.hasInstance changes, run `js/tests/es6/has-instance.js` and
 `TestHasInstanceEmbedding.c`. Preserve native JSClass instance hooks for legacy
 scripts and the public JS_HasInstance API while validating modern custom hooks,
 bound targets, raw builtin receivers and collection during callbacks.
+
+For Object.prototype.toString and built-in tag changes, run
+`js/tests/es6/builtin-tags.js` and `TestBuiltinTags.c`. Preserve historical
+JSClass names in legacy modes; modern fallback tags must follow the specified
+internal types and must not invoke native callable objects to classify them.

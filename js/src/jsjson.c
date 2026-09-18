@@ -12,6 +12,7 @@
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsstr.h"
+#include "jssymbol.h"
 
 /* Grow UTF-16 output with checked arithmetic on both 32- and 64-bit hosts. */
 typedef struct JSONBuffer {
@@ -677,6 +678,7 @@ js_InitJSONClass(JSContext *cx, JSObject *global)
     JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &root);
     ok = JS_DefineFunction(cx, obj, "parse", json_parse, 2, JSFUN_NO_CONSTRUCT) &&
          JS_DefineFunction(cx, obj, "stringify", json_stringify, 3, JSFUN_NO_CONSTRUCT) &&
+         js_DefineBuiltinTag(cx, obj, "JSON") &&
          JS_DefineProperty(cx, global, "JSON", OBJECT_TO_JSVAL(obj), NULL, NULL, 0);
     JS_POP_TEMP_ROOT(cx, &root);
     return ok ? obj : NULL;

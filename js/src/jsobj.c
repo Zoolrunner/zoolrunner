@@ -57,6 +57,8 @@
 #include "jsbool.h"
 #include "jscntxt.h"
 #include "jsconfig.h"
+#include "jsdate.h"
+#include "jsexn.h"
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
@@ -65,6 +67,7 @@
 #include "jsobj.h"
 #include "jssymbol.h"
 #include "jsrealm.h"
+#include "jsregexp.h"
 #include "jsscan.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -1163,12 +1166,29 @@ js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     jsid id;
     JSTempValueRooter root;
     JSBool ok = JS_FALSE;
+    JSClass *clasp;
 
     if (JSVAL_IS_VOID(argv[-1]))
         clazz = "Undefined";
     else if (JSVAL_IS_NULL(argv[-1]))
         clazz = "Null";
-    else
+    else if (JS_VERSION_IS_ES2015(cx)) {
+        clasp = OBJ_GET_CLASS(cx, obj);
+        if (clasp == &js_ArrayClass)
+            clazz = "Array";
+        else if (clasp == &js_StringClass)
+            clazz = "String";
+        else if (clasp == &js_ArgumentsClass)
+            clazz = "Arguments";
+        else if (js_IsCallable(cx, OBJECT_TO_JSVAL(obj)))
+            clazz = "Function";
+        else if (clasp == &js_ErrorClass || clasp == &js_BooleanClass ||
+                 clasp == &js_NumberClass ||
+                 clasp == &js_DateClass || clasp == &js_RegExpClass)
+            clazz = clasp->name;
+        else
+            clazz = "Object";
+    } else
         clazz = OBJ_GET_CLASS(cx, obj) == &js_ArgumentsClass
                 ? "Arguments" : OBJ_GET_CLASS(cx, obj)->name;
     JS_PUSH_SINGLE_TEMP_ROOT(cx, tagValue, &root);

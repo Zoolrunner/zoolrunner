@@ -61,6 +61,7 @@ function modernWindowEdition() {
                          return values[0] !== values[1] && values[1].lastIndex === 0; })() &&
            (function() { var target = {}; target[Symbol.hasInstance] = function(v) { return v === 7; };
                          return 7 instanceof target && !(8 instanceof target); })() &&
+           Math[Symbol.toStringTag] === "Math" && JSON[Symbol.toStringTag] === "JSON" &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();
