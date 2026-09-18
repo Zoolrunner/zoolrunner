@@ -2277,10 +2277,11 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
         if (pn->pn_type == TOK_NAME && pn->pn_op != JSOP_NOP) {
             if (!BindNameToSlot(cx, tc, pn, JS_FALSE))
                 return JS_FALSE;
-            if (pn->pn_slot < 0 && pn->pn_op != JSOP_ARGUMENTS) {
+            if ((pn->pn_slot < 0 && pn->pn_op != JSOP_ARGUMENTS) ||
+                (JS_VERSION_IS_ES2015(cx) && pn->pn_op == JSOP_GETLOCAL)) {
                 /*
-                 * Not an argument or local variable use, so this expression
-                 * could invoke a getter that has side effects.
+                 * Dynamic names may invoke getters.  Modern lexical reads
+                 * may throw even when their result is discarded.
                  */
                 *answer = JS_TRUE;
             }
@@ -3370,6 +3371,13 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             break;
 
           case JSOP_SETLOCAL:
+            if (declOp == JSOP_NOP && JS_VERSION_IS_ES2015(cx)) {
+                slot = (jsuint) pn->pn_slot;
+                EMIT_UINT16_IMM_OP(JSOP_INITLOCAL, slot);
+                if (wantpop && js_Emit1(cx, cg, JSOP_POP) < 0)
+                    return JS_FALSE;
+                break;
+            }
             if (wantpop) {
                 slot = (jsuint) pn->pn_slot;
                 EMIT_UINT16_IMM_OP(JSOP_SETLOCALPOP, slot);
@@ -3887,6 +3895,12 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                            ? SRC_DECL_VAR
                            : SRC_DECL_LET) < 0) {
             return JS_FALSE;
+        }
+        if (let && JS_VERSION_IS_ES2015(cx)) {
+            if (op == JSOP_SETLOCAL)
+                op = JSOP_INITLOCAL;
+            else if (op == JSOP_GETLOCAL)
+                op = JSOP_INITLOCALVOID;
         }
         if (op == JSOP_ARGUMENTS) {
             if (js_Emit1(cx, cg, op) < 0)
@@ -4428,6 +4442,14 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                     if (!BindNameToSlot(cx, &cg->treeContext, pn3, JS_FALSE))
                         return JS_FALSE;
                     op = pn3->pn_op;
+                }
+                /* FORLOCAL initializes a loop declaration.  A bare lexical
+                 * assignment must use the environment setter, which checks
+                 * whether the binding has been initialized. */
+                if (JS_VERSION_IS_ES2015(cx) && type == TOK_NAME &&
+                    op == JSOP_FORLOCAL) {
+                    op = JSOP_FORNAME;
+                    pn3->pn_slot = -1;
                 }
                 if (pn3->pn_slot >= 0) {
                     if (pn3->pn_attrs & JSPROP_READONLY) {

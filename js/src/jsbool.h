@@ -57,6 +57,9 @@ JS_BEGIN_EXTERN_C
 #define JSVAL_HOLE      BOOLEAN_TO_JSVAL(2)
 #define JSVAL_ARETURN   BOOLEAN_TO_JSVAL(3)
 
+/* An uninitialized lexical binding: non-GC and never exposed to script. */
+#define JSVAL_UNINITIALIZED BOOLEAN_TO_JSVAL(4)
+
 extern JSClass js_BooleanClass;
 
 extern JSObject *

@@ -2383,6 +2383,24 @@ js_NewBlockObject(JSContext *cx)
     return obj;
 }
 
+/* The template may have been decoded in reverse property-slot order.  Use
+ * shortids, not physical property slots, to initialize frame locals. */
+void
+js_InitBlockSlots(JSContext *cx, JSObject *obj, JSStackFrame *fp)
+{
+    JSScopeProperty *sprop;
+    uintN depth;
+
+    depth = OBJ_BLOCK_DEPTH(cx, obj);
+    for (sprop = OBJ_SCOPE(obj)->lastProp; sprop; sprop = sprop->parent) {
+        if (sprop->flags & SPROP_HAS_SHORTID) {
+            JS_ASSERT(depth + (uint16)sprop->shortid < fp->script->depth);
+            fp->spbase[depth + (uint16)sprop->shortid] =
+                OBJ_GET_SLOT(cx, obj, sprop->slot);
+        }
+    }
+}
+
 JSObject *
 js_CloneBlockObject(JSContext *cx, JSObject *proto, JSObject *parent,
                     JSStackFrame *fp)
@@ -2443,12 +2461,16 @@ block_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
         return JS_TRUE;
 
     fp = (JSStackFrame *) JS_GetPrivate(cx, obj);
-    if (!fp)
-        return JS_TRUE;
-
-    slot = OBJ_BLOCK_DEPTH(cx, obj) + (uint16) JSVAL_TO_INT(id);
-    JS_ASSERT((uintN)slot < fp->script->depth);
-    *vp = fp->spbase[slot];
+    if (fp) {
+        slot = OBJ_BLOCK_DEPTH(cx, obj) + (uint16) JSVAL_TO_INT(id);
+        JS_ASSERT((uintN)slot < fp->script->depth);
+        *vp = fp->spbase[slot];
+    }
+    if (*vp == JSVAL_UNINITIALIZED) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_UNINITIALIZED_LEXICAL);
+        return JS_FALSE;
+    }
     return JS_TRUE;
 }
 
@@ -2457,18 +2479,35 @@ block_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
     JSStackFrame *fp;
     jsint slot;
+    jsval old;
+    JSScopeProperty *sprop;
 
     JS_ASSERT(JS_InstanceOf(cx, obj, &js_BlockClass, NULL));
     if (!JSVAL_IS_INT(id))
         return JS_TRUE;
 
     fp = (JSStackFrame *) JS_GetPrivate(cx, obj);
-    if (!fp)
-        return JS_TRUE;
-
     slot = OBJ_BLOCK_DEPTH(cx, obj) + (uint16) JSVAL_TO_INT(id);
-    JS_ASSERT((uintN)slot < fp->script->depth);
-    fp->spbase[slot] = *vp;
+    old = JSVAL_VOID;
+    if (fp) {
+        JS_ASSERT((uintN)slot < fp->script->depth);
+        old = fp->spbase[slot];
+    } else {
+        for (sprop = OBJ_SCOPE(obj)->lastProp; sprop; sprop = sprop->parent) {
+            if ((sprop->flags & SPROP_HAS_SHORTID) &&
+                (uint16)sprop->shortid == (uint16)JSVAL_TO_INT(id)) {
+                old = OBJ_GET_SLOT(cx, obj, sprop->slot);
+                break;
+            }
+        }
+    }
+    if (old == JSVAL_UNINITIALIZED) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_UNINITIALIZED_LEXICAL);
+        return JS_FALSE;
+    }
+    if (fp)
+        fp->spbase[slot] = *vp;
     return JS_TRUE;
 }
 
@@ -2505,6 +2544,7 @@ block_xdrObject(JSXDRState *xdr, JSObject **objp)
     jsid propid;
     JSAtom *atom;
     int16 shortid;
+    uint32 uninitialized;
     JSBool ok;
 
     cx = xdr->cx;
@@ -2583,19 +2623,24 @@ block_xdrObject(JSXDRState *xdr, JSObject **objp)
             JS_ASSERT(JSID_IS_ATOM(propid));
             atom = JSID_TO_ATOM(propid);
             shortid = sprop->shortid;
+            uninitialized = OBJ_GET_SLOT(cx, obj, sprop->slot) ==
+                            JSVAL_UNINITIALIZED;
             JS_ASSERT(shortid >= 0);
         }
 
         /* XDR the real id, then the shortid. */
         if (!js_XDRStringAtom(xdr, &atom) ||
-            !JS_XDRUint16(xdr, (uint16 *)&shortid)) {
+            !JS_XDRUint16(xdr, (uint16 *)&shortid) ||
+            !JS_XDRUint32(xdr, &uninitialized) || uninitialized > 1) {
             ok = JS_FALSE;
             break;
         }
 
         if (xdr->mode == JSXDR_DECODE) {
             if (!js_DefineNativeProperty(cx, obj, ATOM_TO_JSID(atom),
-                                         JSVAL_VOID, NULL, NULL,
+                                         uninitialized ? JSVAL_UNINITIALIZED
+                                                       : JSVAL_VOID,
+                                         NULL, NULL,
                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
                                          SPROP_HAS_SHORTID, shortid, NULL)) {
                 ok = JS_FALSE;

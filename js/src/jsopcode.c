@@ -1371,6 +1371,7 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
       case JSOP_CONSTASSIGN:
       case JSOP_SETVAR:
       case JSOP_SETGVAR:
+      case JSOP_INITLOCAL:
       case JSOP_SETLOCAL:
         LOCAL_ASSERT(pc[oplen] == JSOP_POP || pc[oplen] == JSOP_SETSP);
         /* FALL THROUGH */
@@ -2619,6 +2620,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 break;
               }
 
+              case JSOP_INITLOCALVOID:
               case JSOP_GETLOCAL:
                 i = GET_UINT16(pc);
                 sn = js_GetSrcNote(jp->script, pc);
@@ -2639,6 +2641,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 todo = Sprint(&ss->sprinter, ss_format, VarPrefix(sn), rval);
                 break;
 
+              case JSOP_INITLOCAL:
               case JSOP_SETLOCAL:
               case JSOP_SETLOCALPOP:
                 i = GET_UINT16(pc);

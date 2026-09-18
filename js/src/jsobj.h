@@ -290,6 +290,9 @@ extern JSObject *
 js_CloneBlockObject(JSContext *cx, JSObject *proto, JSObject *parent,
                     JSStackFrame *fp);
 
+extern void
+js_InitBlockSlots(JSContext *cx, JSObject *obj, JSStackFrame *fp);
+
 extern JSBool
 js_PutBlockObject(JSContext *cx, JSObject *obj);
 

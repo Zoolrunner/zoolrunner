@@ -1393,3 +1393,15 @@ Function, strict inheritance, forbidden explicit strict directives, decompilatio
 XDR and native cloning. Cache version 45 adds rest initialization. Named rest
 bindings are implemented; defaults and rest patterns remain unfinished, and
 focused checks do not replace complete conformance/application runs.
+
+
+For block lexical initialization changes, run
+`js/tests/es6/lexical-initialization.js`, `TestLexicalEmbedding.c` and modern
+chrome/content checks. Keep initialization distinct from assignment, preserve
+uninitialized state in detached closures and XDR, and retain producer PCs used
+by value decompilation. Discarded lexical reads can throw and must not be
+optimized away. Exercise direct eval, native GC/debugger reentry and selected
+legacy let semantics. Cache version 46 adds lexical initialization metadata and
+instructions. Global lexical environments, block const scoping and fresh
+per-iteration bindings remain unfinished; focused checks do not replace full
+conformance and application validation.

@@ -61,6 +61,7 @@
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
+#include "jsbool.h"
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsemit.h"
@@ -2238,7 +2239,9 @@ BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
 
     /* Use JSPROP_ENUMERATE to aid the disassembler. */
     return js_DefineNativeProperty(cx, blockObj, ATOM_TO_JSID(atom),
-                                   JSVAL_VOID, NULL, NULL,
+                                   data->lexicalDeclaration
+                                   ? JSVAL_UNINITIALIZED : JSVAL_VOID,
+                                   NULL, NULL,
                                    JSPROP_ENUMERATE | JSPROP_PERMANENT,
                                    SPROP_HAS_SHORTID,
                                    (intN)data->u.let.index++,

@@ -3004,6 +3004,10 @@ interrupt:
              * it on op == JSOP_FORNAME.
              */
             SAVE_SP_AND_PC(fp);
+            if (JS_VERSION_IS_ES2015(cx) && !js_GetScopeChain(cx, fp)) {
+                ok = JS_FALSE;
+                goto out;
+            }
             ok = js_FindProperty(cx, id, &obj, &obj2, &prop);
             if (!ok)
                 goto out;
@@ -5502,8 +5506,10 @@ interrupt:
                  * scope needed to parent the function object's clone.
                  */
                 parent = OBJ_GET_PARENT(cx, obj);
-                if (OBJ_GET_CLASS(cx, parent) == &js_BlockClass)
+                if (OBJ_GET_CLASS(cx, parent) == &js_BlockClass) {
+                    js_InitBlockSlots(cx, parent, fp);
                     fp->blockChain = parent;
+                }
                 parent = js_GetScopeChain(cx, fp);
             } else {
                 /*
@@ -6147,6 +6153,8 @@ interrupt:
             JS_ASSERT(sp - fp->spbase >= 2);
             slot = GET_UINT16(pc);
             JS_ASSERT(slot + 1 < (uintN)depth);
+            if (fp->spbase[slot] == JSVAL_UNINITIALIZED)
+                goto uninitialized_lexical;
             fp->spbase[slot] = POP_OPND();
           END_CASE(JSOP_SETLOCALPOP)
 
@@ -6557,8 +6565,10 @@ interrupt:
             JS_ASSERT(fp->spbase + OBJ_BLOCK_DEPTH(cx, obj) == sp);
             vp = sp + OBJ_BLOCK_COUNT(cx, obj);
             JS_ASSERT(vp <= fp->spbase + depth);
+            js_InitBlockSlots(cx, obj, fp);
             while (sp < vp) {
-                STORE_OPND(0, JSVAL_VOID);
+                /* Preserve producer PCs for value decompilation. */
+                sp[-depth] = (jsval)CURRENT_PC;
                 sp++;
             }
 
@@ -6641,17 +6651,36 @@ interrupt:
           }
           END_CASE(JSOP_LEAVEBLOCK)
 
+          BEGIN_CASE(JSOP_INITLOCALVOID)
+            slot = GET_UINT16(pc);
+            JS_ASSERT(slot < (uintN)depth);
+            fp->spbase[slot] = JSVAL_VOID;
+            PUSH_OPND(JSVAL_VOID);
+            obj = NULL;
+          END_CASE(JSOP_INITLOCALVOID)
+
           BEGIN_CASE(JSOP_GETLOCAL)
             slot = GET_UINT16(pc);
             JS_ASSERT(slot < (uintN)depth);
+            if (fp->spbase[slot] == JSVAL_UNINITIALIZED) {
+              uninitialized_lexical:
+                SAVE_SP_AND_PC(fp);
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_UNINITIALIZED_LEXICAL);
+                ok = JS_FALSE;
+                goto out;
+            }
             PUSH_OPND(fp->spbase[slot]);
             obj = NULL;
           END_CASE(JSOP_GETLOCAL)
 
+          BEGIN_CASE(JSOP_INITLOCAL)
           BEGIN_CASE(JSOP_SETLOCAL)
             slot = GET_UINT16(pc);
             JS_ASSERT(slot < (uintN)depth);
             vp = &fp->spbase[slot];
+            if (op != JSOP_INITLOCAL && *vp == JSVAL_UNINITIALIZED)
+                goto uninitialized_lexical;
             GC_POKE(cx, *vp);
             *vp = FETCH_OPND(-1);
             obj = NULL;
@@ -6662,6 +6691,8 @@ interrupt:
     slot = GET_UINT16(pc);                                                    \
     JS_ASSERT(slot < (uintN)depth);                                           \
     vp = fp->spbase + slot;                                                   \
+    if (*vp == JSVAL_UNINITIALIZED)                                           \
+        goto uninitialized_lexical;                                          \
     rval = *vp;                                                               \
     if (!JSVAL_IS_INT(rval) || rval == INT_TO_JSVAL(JSVAL_INT_##MINMAX))      \
         goto do_nonint_fast_incop;                                            \

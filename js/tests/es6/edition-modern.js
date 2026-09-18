@@ -128,6 +128,12 @@ function modernWindowEdition() {
            (function() { "use strict"; return (() => this)() === 23; }).call(23) &&
            ((first,...rest) => first === 7 && rest[0] === 8)(7,8) &&
            Function("a", "...rest", "a=9;return arguments[0]===7&&rest[0]===8")(7,8) &&
+           (function() { try { let pending = pending; return false; }
+                         catch (e) { return e instanceof ReferenceError; } })() &&
+           (function() { var read = (function() { return () => pending; let pending; })();
+                         try { read(); return false; }
+                         catch (e) { return e instanceof ReferenceError; } })() &&
+           (function() { let first = 7, second = first + 1; return second === 8; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

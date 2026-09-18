@@ -317,3 +317,4 @@ MSG_DEF(JSMSG_SYMBOL_CONVERSION,    234, 1, JSEXN_TYPEERR, "cannot convert a Sym
 MSG_DEF(JSMSG_SYMBOL_XDR,           235, 0, JSEXN_TYPEERR, "cannot serialize a Symbol value")
 MSG_DEF(JSMSG_ARGUMENT_LIST_LIMIT,  236, 0, JSEXN_RANGEERR, "argument list exceeds the implementation limit")
 MSG_DEF(JSMSG_PROMISE_OPERATION,    237, 0, JSEXN_TYPEERR, "incompatible Promise receiver or callback")
+MSG_DEF(JSMSG_UNINITIALIZED_LEXICAL, 238, 0, JSEXN_REFERENCEERR, "cannot access an uninitialized lexical binding")

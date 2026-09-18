@@ -2274,3 +2274,38 @@ C89 checks pass. Other platforms have not been revalidated for these changes.
 active build/runtime children completed.
 Earlier `rest-basic-full-*` reports precede inherited-setter and dynamic-Function
 corrections and are intermediate diagnostics only.
+
+
+### Block lexical initialization
+
+Modern block and function-body `let` bindings now retain an uninitialized state
+until their declaration executes. Reads, writes, `typeof`, increments, direct
+eval and captured closures check that state, including after the frame exits.
+Discarded lexical reads still execute because they can throw. Initialization
+uses separate bytecodes from assignment; cache version 46 also records template
+initialization metadata in XDR. Block entry preserves producer PCs used by value
+decompilation. Selected legacy-version let semantics remain unchanged.
+
+`lexical-initialization.js` passes 44 focused checks; `TestLexicalEmbedding.c`
+passes 14 checks, including GC, debugger reentry during function cloning, XDR
+and decompilation. Modern chrome/content fixtures exercise initialized and
+uninitialized bindings. Runner integration passes 23 checks and C89 checks pass.
+
+The final frozen macOS arm64 runtime passes **27,338 ES2015 cases**, with
+**1,228 failures**, 14 unsupported modules, two harness errors, and no crashes or
+timeouts: **22 gained, zero lost** against the rest-parameter baseline. All
+**11,540 ES5.1 cases** pass. Reports use `block-tdz-final-*`; the frozen runtime is
+`/tmp/zr-block-tdz-final-conformance-20260918`, with engine SHA-256
+`068b6779b57b2dbbec84a7e1791e60e703679c3dc988c8d646891bef8ecb558f`.
+All four macOS arm64 applications pass root build, package and relocated desktop
+checks, including modern chrome/content globals, Calendar's four views, browser
+navigation/layout (169 checks), and Suite/XULRunner ChatZilla. All four engine
+binaries match the frozen runtime; hashes remain unchanged through both complete
+conformance runs.
+
+This does not complete lexical environments: persistent global declarative
+bindings, block const scoping and fresh per-iteration environments still require
+work. The earlier `block-tdz-diagnostic-*` run precedes the bare for-in assignment
+and producer-PC follow-ups; it has the same totals but is not the final runtime.
+Other operating systems and architectures have not been revalidated for these
+changes.

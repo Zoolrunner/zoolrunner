@@ -635,3 +635,15 @@ and 24 native checks pass. All four applications pass build, package and relocat
 desktop checks, including Calendar views, browser navigation/layout and ChatZilla;
 their engine binaries match the frozen conformance runtime. Default parameters
 and rest patterns remain unfinished. See the [rest notes](js/tests/es6/README.md#rest-parameters).
+
+
+The latest block-lexical initialization batch passes **27,338 ES2015 cases** on
+macOS arm64, with **1,228 failures**, 14 unsupported modules and two harness
+errors (**22 gained, zero lost**). All **11,540 ES5.1 cases** pass. Modern block
+and function-body `let` accesses now reject uninitialized bindings, including
+captured closures after frame exit, while selected legacy let semantics are
+preserved. Global lexical storage, block const scoping and per-iteration loop
+bindings remain unfinished. All four macOS arm64 applications pass build,
+package and desktop checks, including Calendar views, browser navigation and
+ChatZilla. Other platforms have not been revalidated for these changes; see
+[the ES6 validation record](js/tests/es6/README.md#block-lexical-initialization).

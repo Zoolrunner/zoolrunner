@@ -521,3 +521,7 @@ OPDEF(JSOP_TAGCALL,238,"tagcall",NULL,3,-1,1,18,JOF_UINT16)
 
 /* Initialize a rest formal before body declarations. */
 OPDEF(JSOP_RESTARG,239,"restarg",NULL,3,0,0,0,JOF_UINT16)
+
+/* Lexical initialization is distinct from assignment into an existing binding. */
+OPDEF(JSOP_INITLOCAL,240,"initlocal",NULL,3,1,1,3,JOF_LOCAL|JOF_NAME|JOF_SET)
+OPDEF(JSOP_INITLOCALVOID,241,"initlocalvoid",NULL,3,0,1,19,JOF_LOCAL|JOF_NAME)
