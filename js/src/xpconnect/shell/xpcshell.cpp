@@ -439,7 +439,12 @@ Clear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+static JSBool EnqueueJob(JSContext *, JSObject *, uintN, jsval *, jsval *);
+static JSBool DrainJobQueue(JSContext *, JSObject *, uintN, jsval *, jsval *);
+
 static JSFunctionSpec glob_functions[] = {
+    {"enqueueJob",      EnqueueJob,     1},
+    {"drainJobQueue",   DrainJobQueue,  0},
     {"print",           Print,          0},
     {"load",            Load,           1},
     {"evaluate",        Evaluate,       1},
@@ -643,6 +648,41 @@ GetLine(JSContext *cx, char *bufp, FILE *file, const char *prompt) {
     return JS_TRUE;
 }
 
+/* Shell hooks expose the engine queue without making them web globals. */
+static JSBool
+EnqueueJob(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) {
+        JS_ReportError(cx, "enqueueJob requires a callable object");
+        return JS_FALSE;
+    }
+    return JS_EnqueueJob(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+static JSBool
+DrainJobQueue(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return JS_RunJobs(cx);
+}
+
+/* Only command-line turns checkpoint automatically. Nested load/evaluate calls
+ * must finish the surrounding script before its pending jobs can execute. */
+static JSBool
+RunShellJobs(JSContext *cx)
+{
+    if (gQuitting || !JS_HasPendingJobs(cx))
+        return JS_TRUE;
+    if (JS_RunJobs(cx))
+        return JS_TRUE;
+    if (JS_IsExceptionPending(cx))
+        JS_ReportPendingException(cx);
+    if (!gQuitting && !gExitCode)
+        gExitCode = EXITCODE_RUNTIME_ERROR;
+    return JS_FALSE;
+}
+
 static void
 ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
 {
@@ -680,8 +720,10 @@ ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
 #endif
 
         if (script) {
-            if (!compileOnly)
+            if (!compileOnly) {
                 (void)JS_ExecuteScript(cx, obj, script, &result);
+                (void)RunShellJobs(cx);
+            }
             JS_DestroyScript(cx, script);
         }
         DoEndRequest(cx);
@@ -732,6 +774,8 @@ ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
                     else
                         ok = JS_FALSE;
                 }
+                if (!RunShellJobs(cx))
+                    ok = JS_FALSE;
 #if 0
 #if JS_HAS_ERROR_EXCEPTIONS
                 /*
@@ -915,6 +959,8 @@ ProcessArgs(JSContext *cx, JSObject *obj, char **argv, int argc)
             DoBeginRequest(cx);
             JSBool evaluated = JS_EvaluateScriptForPrincipals(
                 cx, obj, gJSPrincipals, argv[i], strlen(argv[i]), "-e", 1, &rval);
+            if (!RunShellJobs(cx))
+                evaluated = JS_FALSE;
             DoEndRequest(cx);
             if (!evaluated && !gQuitting && !gExitCode)
                 gExitCode = EXITCODE_RUNTIME_ERROR;

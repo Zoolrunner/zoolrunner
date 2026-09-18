@@ -421,6 +421,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestCasing.c", "ES6-CASING-EMBEDDING checks=26 failures=0"),
                 ("es6/TestFunctionInvoke.c", "ES6-FUNCTION-INVOKE-EMBEDDING checks=29 failures=0"),
                 ("es6/TestReflectionKeys.c", "ES6-REFLECTION-KEYS-EMBEDDING checks=28 failures=0"),
+                ("es6/TestJobQueue.c", "ES6-JOB-QUEUE-EMBEDDING checks=51 failures=0"),
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),
@@ -430,13 +431,18 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
                 "-I" + str(dist / "include/js"), "-I" + str(dist / "include/nspr"),
                 str(root / "js/tests" / source),
-                "-L" + str(runtime), "-lmozjs", "-o", str(embedding)], check=True)
+                "-L" + str(runtime), "-lmozjs",
+                *(["-lnspr4"] if source == "es6/TestJobQueue.c" else []),
+                "-o", str(embedding)], check=True)
             result = subprocess.run([str(embedding)], env=embedding_env,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     text=True, timeout=60)
             print(result.stdout)
             if result.returncode or marker not in result.stdout:
                 raise RuntimeError("Packaged runtime failed embedding compatibility: " + source)
+        subprocess.run([
+            "python3", str(root / "js/tests/es6/test-job-shell.py"),
+            "--shell", str(runtime / "xpcshell")], check=True)
         if args.app == "calendar":
             subprocess.run([
                 "python3", str(root / "calendar/test/run-compatibility.py"),

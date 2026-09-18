@@ -1295,3 +1295,11 @@ For reflection key ordering/array changes, run `reflection-keys.js` and
 TypeErrors, proxy-supplied key order, and JSON's internal key-enumeration callers.
 Those callers do not supply argv[-2]; obtain result-array realms from the active
 operation frame. Keep copied identifiers rooted across GC/interrupt callbacks.
+
+For ECMAScript job queue changes, run `TestJobQueue.c`, `test-job-shell.py` and
+`test-runner-integration.py`. Preserve FIFO order, roots across GC and context
+destruction, per-runtime/thread ownership, nested checkpoint suppression and
+exception/interruption recovery. Hosts choose checkpoints; nested load/evaluate
+calls must not drain the outer script's jobs. Last-context thread detach cancels
+pending jobs, so embeddings that need completion must drain before teardown.
+Shell queue support alone does not establish Promise or DOM event-loop support.

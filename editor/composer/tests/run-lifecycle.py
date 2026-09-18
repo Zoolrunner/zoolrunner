@@ -45,11 +45,19 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
 <RDF:Description RDF:about="urn:mozilla:package:lifecycle" c:name="lifecycle" c:locType="profile" c:baseURL=BASE/>
 </RDF:RDF>
 '''.replace('BASE', quoteattr(fixture.as_uri() + '/')))
-        result = subprocess.run([str(runtime / 'zoolrunner-bin'), '-P', name,
-                                 '-chrome', 'chrome://lifecycle/content/platform-lifecycle.xul'],
-                                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, timeout=90)
         args.report.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            result = subprocess.run([str(runtime / 'zoolrunner-bin'), '-P', name,
+                                     '-chrome', 'chrome://lifecycle/content/platform-lifecycle.xul'],
+                                    env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    text=True, timeout=90)
+        except subprocess.TimeoutExpired as error:
+            output = error.stdout or ''
+            if isinstance(output, bytes):
+                output = output.decode('utf-8', errors='replace')
+            args.report.write_text(output)
+            print(output)
+            raise
         args.report.write_text(result.stdout)
         print(result.stdout)
         if result.returncode or 'PLATFORM-LIFECYCLE checks=24 failures=0' not in result.stdout:

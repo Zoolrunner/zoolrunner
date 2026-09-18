@@ -56,6 +56,7 @@
 #include "jspubtd.h"
 #include "jsregexp.h"
 #include "jsutil.h"
+#include "jsjobs.h"
 
 JS_BEGIN_EXTERN_C
 
@@ -126,6 +127,7 @@ struct JSThread {
      * among two or more contexts running script in one thread.
      */
     JSGSNCache          gsnCache;
+    JSJobQueue          jobs;
 };
 
 #define JS_GSN_CACHE(cx) ((cx)->thread->gsnCache)
@@ -453,6 +455,9 @@ struct JSRuntime {
     JSDHashTable        *classObjectCache;
     struct JSSymbolState *symbolState;
     struct JSWeakCollection *weakCollections;
+#ifndef JS_THREADSAFE
+    JSJobQueue          jobs;
+#endif
 };
 
 #ifdef DEBUG

@@ -60,6 +60,7 @@ def driver_source(case, harness, marker):
     # evaluate compiles Unicode source as a separate *global* script, not eval.
     return '''(function (global) {
 var emit = print, compile = evaluate, stringify = String, done = 0, doneError;
+var drain = typeof drainJobQueue === "function" ? drainJobQueue : null;
 function describe(error) {
   try { return stringify(error); } catch (_) { return "unprintable exception"; }
 }
@@ -69,10 +70,13 @@ catch (error) { finish("HARNESS", describe(error)); return; }
 if (%s) global.$DONE = function (error) { done++; if (error !== undefined) doneError = error; };
 try { compile(%s, %s); }
 catch (error) { finish("THROW", describe(error)); return; }
+// A queued exception cannot satisfy a synchronous negative-test pattern.
+try { if (drain) drain(); }
+catch (error) { finish("FAIL", "job checkpoint: " + describe(error)); return; }
 if (%s) {
   if (done > 1) { finish("FAIL", "$DONE called more than once"); return; }
   if (doneError !== undefined) { finish("FAIL", describe(doneError)); return; }
-  if (!done) { finish("UNSUPPORTED", "async job/event-loop completion is not implemented"); return; }
+  if (!done) { finish("UNSUPPORTED", "async test did not complete at the host job checkpoint"); return; }
 }
 finish("PASS", "");
 })(this);

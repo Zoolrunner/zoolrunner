@@ -561,3 +561,12 @@ arm64, all 322 pinned built-in cases pass; the full ES2015 run passes 25,064
 cases, with 3,502 failures, 14 unsupported module cases and two harness errors.
 All 11,540 ES5 cases and all four packaged application checks pass. Other
 platforms have not been revalidated for this batch.
+
+The ES6 job queue foundation adds explicit embedding checkpoints and shell
+execution tests. Promise construction and DOM checkpoints remain unfinished;
+queue support alone is not Promise conformance. The corrected macOS arm64 run
+preserves 26,654 ES6 passes and all 11,540 ES5 passes; all four application checks
+pass. Application testing found and fixed a context-migration teardown crash;
+an isolated lifecycle timeout remains recorded in the validation notes. See the
+[job queue notes](js/tests/es6/README.md#ecmascript-job-queue-foundation) for
+ownership, teardown and validation limits.

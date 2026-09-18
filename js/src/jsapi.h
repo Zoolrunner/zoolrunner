@@ -1813,6 +1813,22 @@ extern JS_PUBLIC_API(JSBool)
 JS_CallFunctionValue(JSContext *cx, JSObject *obj, jsval fval, uintN argc,
                      jsval *argv, jsval *rval);
 
+/* Job queues are FIFO per runtime/thread, shared by its active contexts.
+ * The embedding chooses checkpoints after a complete script/event turn.
+ * A nested drain is a no-op. An abrupt job stops a drain and leaves later jobs
+ * queued; an already pending exception prevents draining. Enqueue/Run require
+ * a request in thread-safe builds. Drain before detaching/destroying the last
+ * context on a thread: that lifecycle boundary cancels its remaining jobs.
+ */
+extern JS_PUBLIC_API(JSBool)
+JS_EnqueueJob(JSContext *cx, JSObject *callback);
+
+extern JS_PUBLIC_API(JSBool)
+JS_HasPendingJobs(JSContext *cx);
+
+extern JS_PUBLIC_API(JSBool)
+JS_RunJobs(JSContext *cx);
+
 extern JS_PUBLIC_API(JSBranchCallback)
 JS_SetBranchCallback(JSContext *cx, JSBranchCallback cb);
 

@@ -169,6 +169,41 @@ GetLine(JSContext *cx, char *bufp, FILE *file, const char *prompt) {
     return JS_TRUE;
 }
 
+/* Shell hooks expose the engine queue without making them web globals. */
+static JSBool
+EnqueueJob(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) {
+        JS_ReportError(cx, "enqueueJob requires a callable object");
+        return JS_FALSE;
+    }
+    return JS_EnqueueJob(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+static JSBool
+DrainJobQueue(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return JS_RunJobs(cx);
+}
+
+/* Only command-line turns checkpoint automatically. Nested load/evaluate calls
+ * must finish the surrounding script before its pending jobs can execute. */
+static JSBool
+RunShellJobs(JSContext *cx)
+{
+    if (gQuitting || !JS_HasPendingJobs(cx))
+        return JS_TRUE;
+    if (JS_RunJobs(cx))
+        return JS_TRUE;
+    if (JS_IsExceptionPending(cx))
+        JS_ReportPendingException(cx);
+    if (!gQuitting && !gExitCode)
+        gExitCode = EXITCODE_RUNTIME_ERROR;
+    return JS_FALSE;
+}
+
 static void
 Process(JSContext *cx, JSObject *obj, char *filename, JSBool forceTTY)
 {
@@ -228,8 +263,10 @@ Process(JSContext *cx, JSObject *obj, char *filename, JSBool forceTTY)
         ungetc(ch, file);
         script = JS_CompileFileHandle(cx, obj, filename, file);
         if (script) {
-            if (!compileOnly)
+            if (!compileOnly) {
                 (void)JS_ExecuteScript(cx, obj, script, &result);
+                (void)RunShellJobs(cx);
+            }
             JS_DestroyScript(cx, script);
         }
 
@@ -273,6 +310,8 @@ Process(JSContext *cx, JSObject *obj, char *filename, JSBool forceTTY)
                     else
                         ok = JS_FALSE;
                 }
+                if (!RunShellJobs(cx))
+                    ok = JS_FALSE;
             }
             JS_DestroyScript(cx, script);
         }
@@ -454,6 +493,7 @@ ProcessArgs(JSContext *cx, JSObject *obj, char **argv, int argc)
             /* Pass a filename of -e to imitate PERL */
             JS_EvaluateScript(cx, obj, argv[i], strlen(argv[i]),
                               "-e", 1, &rval);
+            (void)RunShellJobs(cx);
 
             isInteractive = JS_FALSE;
             break;
@@ -2140,6 +2180,8 @@ out:
 }
 
 static JSFunctionSpec shell_functions[] = {
+    {"enqueueJob",      EnqueueJob,     1,0,0},
+    {"drainJobQueue",   DrainJobQueue,  0,0,0},
     {"version",         Version,        0,0,0},
     {"options",         Options,        0,0,0},
     {"load",            Load,           1,0,0},
@@ -2186,6 +2228,8 @@ static JSFunctionSpec shell_functions[] = {
 /* NOTE: These must be kept in sync with the above. */
 
 static char *shell_help_messages[] = {
+    "enqueueJob(callback)   Queue a callback for the next job checkpoint",
+    "drainJobQueue()        Run pending jobs in FIFO order",
     "version([number])      Get or set JavaScript version number",
     "options([option ...])  Get or toggle JavaScript options",
     "load(['foo.js' ...])   Load files named by string arguments",

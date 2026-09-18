@@ -57,8 +57,10 @@ original default-language baseline. Reports identify the selected edition;
 do not compare a legacy run with an ES2015 run as if the semantics were equal.
 
 Modules are currently reported as **unsupported**, not passed or skipped.
-Async tests without synchronous `$DONE` completion are also unsupported: a
-Promise job queue and host completion pump remain to be implemented. These
+The runner drains the engine's pending jobs after test evaluation, before
+checking `$DONE`. A job exception cannot satisfy a synchronous negative test.
+Async tests that still do not complete are reported as unsupported. The Promise
+constructor and DOM host checkpoints remain to be implemented. These
 statuses count against completion and give the runner a failing exit status.
 Every result is recorded. `--filter` is only a diagnostic subset and cannot
 establish a full-suite pass. Engine and host support must eventually execute
@@ -1863,3 +1865,46 @@ Calendar passes eight unit suites and four views; Browser passes 169 navigation/
 layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
 XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
 `artifacts/es6/reflection-keys-runtime`. Other platforms and full ES6 remain incomplete.
+
+## ECMAScript job queue foundation
+
+`JS_EnqueueJob`, `JS_HasPendingJobs` and `JS_RunJobs` provide explicit embedding
+checkpoints. Contexts on the same runtime/thread share a FIFO queue; separate
+threads never execute one another's jobs. Queued callbacks remain rooted across
+GC and temporary-context destruction. Removing the last context from a thread
+cancels its remaining jobs. A nested drain is a no-op. A pending exception blocks
+a drain, and an abrupt callback stops it with later jobs still queued.
+
+Both shells provide `enqueueJob` and `drainJobQueue` testing hooks and drain after
+a command-line script turn. Nested `load` and `evaluate` calls do not themselves
+checkpoint. Uncaught job failures give the shell a failing exit status. Test262
+captures the drain hook before running test code, then checks async completion
+only after the queue drains; queued failures cannot satisfy synchronous negative
+exception patterns. These hooks are not exposed as web globals.
+
+Focused validation uses `TestJobQueue.c` (51 checks), `test-job-shell.py` (ten
+xpcshell checks and nine standalone-shell checks), and the 23-check runner
+integration fixture. This foundation does **not** implement Promise or DOM
+checkpoints.
+
+The final macOS arm64/SDK 11.3 queue run preserves all **26,654 ES2015 passes**,
+with 1,912 failures, 14 unsupported module cases, two harness errors and no
+crashes/timeouts. Zero cases gained or lost against reflection. All **11,540
+ES5.1 cases** pass in America/Los_Angeles. Reports are
+`artifacts/es6/promise-jobs-fixed-full.json` and `promise-jobs-fixed-es5.json`;
+the frozen runtime `/tmp/zr-job-queue-fixed-conformance-20260918` remained unchanged.
+All four root builds, packages and relocated application checks passed, along
+with Calendar's eight unit suites/four views, Browser's 169 navigation/layout
+checks, Suite's 24 lifecycle checks/ChatZilla, and standalone XULRunner ChatZilla.
+Other platforms and full ES6 remain unvalidated/incomplete.
+
+Application testing caught a thread-teardown crash that shell conformance did
+not: direct context migration could leave the old thread's queue root registered
+with an empty context list. Migration now detaches the previous owner normally;
+thread teardown clears surviving contexts' owner pointers for later TLS cleanup.
+The native migration fixture crashes on the pre-fix build and passes on the fix.
+Pre-fix crash reports and logs are retained. One fixed-package lifecycle attempt
+also timed out without a crash report; the unchanged package subsequently passed.
+That isolated timeout is not claimed fixed. The lifecycle runner now preserves
+partial timeout output, and the desktop runner reports nonzero GUI exits early.
+Final runtime reports are under `artifacts/es6/promise-jobs-fixed-runtime`.

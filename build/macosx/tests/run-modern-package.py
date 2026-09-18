@@ -130,6 +130,9 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
                         break
                     if 'APPLICATION FAIL:' in text:
                         raise RuntimeError(text[-2000:])
+                    status = proc.poll()
+                    if status is not None and status != 0:
+                        raise RuntimeError(name + ' GUI exited with ' + str(status) + ': ' + text[-2000:])
                     time.sleep(1)
                 else:
                     raise RuntimeError(name + ' GUI timed out: ' + path.read_text(errors='replace')[-2000:])

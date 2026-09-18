@@ -91,6 +91,7 @@ CSRCS		= \
 		jsproxy.c \
 		jsbinarydata.c \
 		jscasing.c \
+		jsjobs.c \
 		jsjson.c \
 		jslock.c \
 		jslog2.c \
@@ -131,6 +132,7 @@ EXPORTS		= \
 		jsbool.h \
 		jsclist.h \
 		jscntxt.h \
+		jsjobs.h \
 		jscompat.h \
 		jsconfig.h \
 		jsdate.h \

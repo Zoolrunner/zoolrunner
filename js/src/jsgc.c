@@ -2887,6 +2887,7 @@ restart:
         JS_DHashTableEnumerate(rt->gcLocksHash, gc_lock_marker, cx);
     js_MarkAtomState(&rt->atomState, keepAtoms, gc_mark_atom_key_thing, cx);
     js_MarkSymbolState(cx);
+    js_MarkJobs(cx);
     js_MarkWatchPoints(cx);
     js_MarkScriptFilenames(rt, keepAtoms);
     js_MarkNativeIteratorStates(cx);
