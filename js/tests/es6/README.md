@@ -3005,3 +3005,71 @@ C89 checks pass. Other platforms are not revalidated for this batch.
 The pinned corpus also includes later rest binding-pattern cases. Those formals
 are accepted without widening ordinary variable-declaration rest grammar; the
 unchanged `array-rest.js` negative cases and all 56 rest-parameter checks pass.
+
+
+### Modules (integrated macOS arm64 validation)
+
+The native engine now compiles Unicode module source, records imports/exports,
+instantiates private bindings, resolves live imports and re-exports through
+cycles, and evaluates each dependency graph once. Missing or ambiguous named
+exports fail linking. Star ambiguities are omitted from namespaces. Namespace
+objects expose sorted live bindings and preserve the original ES2015 edition's
+key iterator and definition restrictions (9.4.6 and 26.3); these differ from
+later editions. Module `this` is undefined, including arrows/direct eval, and
+module declarations never become properties of the application global.
+
+Embedding APIs are additive: `JS_CompileUCModule`, `JS_GetModuleRequests`,
+`JS_SetModuleDependency`, `JS_InstantiateModule`, `JS_EvaluateModule` and
+`JS_GetModuleNamespace`. Root returned record/namespace objects through the
+normal JSAPI. Compilation temporarily selects ES2015 and restores the caller's
+edition; existing XUL/component loaders retain their classic script behavior.
+The host supplies dependency records for each requested specifier before linking.
+No filesystem/network resolver or HTML module-script loader is implied. Records
+own their compiled scripts and are not ordinary XDR script-cache objects.
+
+The shell exposes `compileModule(source, filename)`, `moduleRequests(record)`,
+`linkModule(record, specifier, dependency)`, `instantiateModule(record)`,
+`evaluateModule(record)` and `namespaceModule(record)`. Test262 harness setup
+remains a separately compiled global script; module tests then use the actual
+module compiler/evaluator. All 14 pinned module cases are negative cases, so
+positive coverage is supplied separately by grammar, linking, namespace, lifetime
+and embedding regressions. Do not equate 14 negative-test passes with a complete
+module implementation. The full integrated results are recorded below.
+
+A separate wide-declaration probe also covers more than 65,535 atoms before
+exported var/function declarations. The native host probe checks dependency
+request deduplication, live values, repeat evaluation, global isolation, context
+edition restoration, namespace-only reachability and balanced script hooks
+with collection during compilation. C89 declaration/implicit-function checks
+pass. These checks do not replace the full conformance and application runs.
+
+The later-coverage inventory is reproducible with `inventory-test262.py`, using
+the original baseline and the clean later checkout at
+`35d566604512cba908054eec49f85e64a59f3091`. It inventories all 48,912 files in
+the same three ECMA-262 roots: 36,100 added paths, 10,684 changed bodies, and
+2,128 identical bodies at retained paths. These are file comparisons, not test
+passes or edition decisions. Every entry remains in the review queue. An
+`es6id` is insufficient to determine the expected edition: for example, later
+module namespace tests retain ES6 references while asserting changed namespace
+symbol descriptors. The pinned historical run alone does not complete this
+later-coverage review.
+
+The frozen integrated run passes **28,582/28,582 pinned ES6 modes**, with **zero
+failures, unsupported cases, harness errors, crashes or timeouts**: 14 gained
+and zero lost. All **11,540 ES5 modes** pass. All four applications pass root
+builds, packaging and relocated desktop checks, including Calendar's four
+views, Browser navigation/layout (169 checks), and Suite/XULRunner ChatZilla.
+All four libraries and the frozen runtime share SHA-256
+`acc1c5edf759d2803a256403802a83902edffe433776c067a70d7f3c68815cfe`.
+Reports use `artifacts/es6/modules-validated-*`. C89 checks and 27 runner
+integration checks pass. Cache version remains 62. Other operating systems and
+architectures were not revalidated for this batch.
+
+This is the first complete pinned-corpus pass, not completion of the user's
+full ES2015 coverage objective. The later `es6id` diagnostic ran 5,852 modes:
+5,734 diagnostic passes, 109 failures and nine harness errors. Its edition
+review and modern host support are incomplete, so these are not conformance
+counts. Follow-up probes also found escaped module-contextual keywords,
+export-list semicolon insertion, and top-level-arrow `new.target` gaps; fixes
+are being validated separately. No upstream assertions or failing cases were
+removed to obtain the complete historical pass.

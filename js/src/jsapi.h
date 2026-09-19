@@ -1644,6 +1644,27 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
                                 const jschar *chars, size_t length,
                                 const char *filename, uintN lineno);
 
+/* Modules are opt-in Unicode compilation units. The returned record is a
+ * GC object: root it while the host resolves its requested dependencies.
+ * Compilation preserves the context's selected classic-script edition.
+ * The host supplies resolution explicitly; no file/network loader is implied.
+ * Records own their scripts and are not ordinary script/XDR cache objects. */
+extern JS_PUBLIC_API(JSObject *)
+JS_CompileUCModule(JSContext *cx, JSObject *global, JSPrincipals *principals,
+                   const jschar *source, size_t length,
+                   const char *filename, uintN lineno);
+extern JS_PUBLIC_API(JSObject *)
+JS_GetModuleRequests(JSContext *cx, JSObject *module);
+extern JS_PUBLIC_API(JSBool)
+JS_SetModuleDependency(JSContext *cx, JSObject *module, JSString *specifier,
+                        JSObject *dependency);
+extern JS_PUBLIC_API(JSBool)
+JS_InstantiateModule(JSContext *cx, JSObject *module);
+extern JS_PUBLIC_API(JSBool)
+JS_EvaluateModule(JSContext *cx, JSObject *module);
+extern JS_PUBLIC_API(JSObject *)
+JS_GetModuleNamespace(JSContext *cx, JSObject *module);
+
 extern JS_PUBLIC_API(JSScript *)
 JS_CompileFile(JSContext *cx, JSObject *obj, const char *filename);
 

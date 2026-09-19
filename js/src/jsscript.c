@@ -498,6 +498,10 @@ XDRScriptBody(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
     if (hasMagic)
         *hasMagic = JS_TRUE;
 
+    if (xdr->mode == JSXDR_ENCODE && script->isModule) {
+        JS_ReportError(cx, "module records require host linking and cannot use the script cache");
+        return JS_FALSE;
+    }
     if (xdr->mode == JSXDR_ENCODE) {
         length = script->length;
         prologLength = PTRDIFF(script->main, script->code, jsbytecode);
@@ -1439,6 +1443,7 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
     memcpy(script->code, CG_PROLOG_BASE(cg), prologLength * sizeof(jsbytecode));
     memcpy(script->main, CG_BASE(cg), mainLength * sizeof(jsbytecode));
     script->numGlobalVars = cg->treeContext.numGlobalVars;
+    script->isModule = cg->treeContext.module != NULL;
     script->strictMode = (cg->treeContext.flags & TCF_STRICT_MODE) != 0 ||
                          (fun && (fun->flags & JSFUN_STRICT));
     script->needsArguments =

@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 spec = importlib.util.spec_from_file_location('runner', Path(__file__).with_name('run-test262.py'))
 runner = importlib.util.module_from_spec(spec)
@@ -34,9 +35,27 @@ class RunnerTests(unittest.TestCase):
 
     def test_unsupported_is_never_pass(self):
         self.assertEqual(self.result('RESULT UNSUPPORTED async', '.*'), 'unsupported')
-        case = self.case('.*')
+        self.assertEqual(self.result('RESULT UNSUPPORTED module host APIs are unavailable', '.*'), 'unsupported')
+
+    def test_modules_reach_the_engine(self):
+        case = self.case('SyntaxError')
         case['mode'] = 'module'
-        self.assertEqual(runner.run_case(case, None, None, {}, 1)['status'], 'unsupported')
+        with tempfile.TemporaryDirectory() as temporary:
+            suite = Path(temporary)
+            harness = suite / 'harness'
+            harness.mkdir()
+            for name in ('sta.js', 'cth.js', 'assert.js'):
+                (harness / name).write_text('// harness\n')
+            def run(command, **kwargs):
+                driver = Path(command[-1]).read_text()
+                self.assertIn('evaluateModuleUnit(compileModuleUnit(', driver)
+                self.assertIn('if (true)', driver)
+                marker = 'ZOOL262-' + Path(command[-1]).parent.name + ' '
+                return mock.Mock(returncode=0, stdout=(marker+'THROW SyntaxError: expected\n').encode())
+            with mock.patch.object(runner.subprocess, 'run', side_effect=run) as process:
+                result = runner.run_case(case, suite, Path('/test/xpcshell'), {}, 1)
+            process.assert_called_once()
+            self.assertEqual(result['status'], 'pass')
 
     def test_mode_policy(self):
         with tempfile.TemporaryDirectory() as temporary:

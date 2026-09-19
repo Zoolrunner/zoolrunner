@@ -244,6 +244,93 @@ Evaluate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return ok;
 }
 
+/* Module records are explicit host objects; ordinary load/evaluate keep
+ * their historical script behavior. The caller supplies dependency records. */
+static JSBool
+ModuleArgument(JSContext *cx, uintN argc, jsval *argv, uintN index)
+{
+    if (argc <= index || JSVAL_IS_PRIMITIVE(argv[index])) {
+        JS_ReportError(cx, "expected a module record");
+        return JS_FALSE;
+    }
+    return JS_TRUE;
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+CompileModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *source, *name;
+    JSObject *module;
+    const char *filename = "module";
+    source = JS_ValueToString(cx, argc ? argv[0] : JSVAL_VOID);
+    if (!source) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(source);
+    if (argc > 1) {
+        name = JS_ValueToString(cx, argv[1]);
+        if (!name) return JS_FALSE;
+        argv[1] = STRING_TO_JSVAL(name);
+        filename = JS_GetStringBytes(name);
+        if (!filename) return JS_FALSE;
+    }
+    module = JS_CompileUCModule(cx, obj, gJSPrincipals,
+               JS_GetStringChars(source), JS_GetStringLength(source), filename, 1);
+    if (!module) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(module);
+    return JS_TRUE;
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+ModuleRequests(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *array;
+    if (!ModuleArgument(cx, argc, argv, 0)) return JS_FALSE;
+    array = JS_GetModuleRequests(cx, JSVAL_TO_OBJECT(argv[0]));
+    if (!array) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(array);
+    return JS_TRUE;
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+LinkModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *name;
+    if (!ModuleArgument(cx, argc, argv, 0) || !ModuleArgument(cx, argc, argv, 2))
+        return JS_FALSE;
+    name = JS_ValueToString(cx, argv[1]);
+    if (!name) return JS_FALSE;
+    argv[1] = STRING_TO_JSVAL(name);
+    *rval = JSVAL_VOID;
+    return JS_SetModuleDependency(cx, JSVAL_TO_OBJECT(argv[0]), name,
+                                   JSVAL_TO_OBJECT(argv[2]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+InstantiateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return ModuleArgument(cx, argc, argv, 0) &&
+           JS_InstantiateModule(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+EvaluateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return ModuleArgument(cx, argc, argv, 0) &&
+           JS_EvaluateModule(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+ModuleNamespace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *ns;
+    if (!ModuleArgument(cx, argc, argv, 0)) return JS_FALSE;
+    ns = JS_GetModuleNamespace(cx, JSVAL_TO_OBJECT(argv[0]));
+    if (!ns) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(ns);
+    return JS_TRUE;
+}
+
 #if defined(_MSC_VER) && !defined(_DLL)
 static JSScript*
 CompileLocalFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
@@ -448,6 +535,12 @@ static JSFunctionSpec glob_functions[] = {
     {"print",           Print,          0},
     {"load",            Load,           1},
     {"evaluate",        Evaluate,       1},
+    {"compileModule",   CompileModule,  1},
+    {"moduleRequests",  ModuleRequests, 1},
+    {"linkModule",      LinkModule,     3},
+    {"instantiateModule", InstantiateModule, 1},
+    {"evaluateModule",  EvaluateModule, 1},
+    {"namespaceModule", ModuleNamespace, 1},
     {"quit",            Quit,           0},
     {"version",         Version,        1},
     {"build",           BuildDate,      0},

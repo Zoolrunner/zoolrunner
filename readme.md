@@ -837,3 +837,13 @@ pass build/package/desktop checks, including Calendar views, Browser
 navigation/layout, and Suite/XULRunner ChatZilla. Module support is still required
 for completion. Other platforms were not revalidated for this batch; see
 `js/tests/es6/README.md`.
+
+
+The native module implementation reaches **28,582/28,582 pinned ES6 modes**,
+with zero failures or unsupported cases, and preserves **11,540/11,540 ES5**.
+All four macOS arm64 applications pass build/package/desktop checks, including
+Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla. This
+is the complete historical corpus, not the completion of the broader ES2015
+coverage review: later tests and newly found edge cases remain under review
+and implementation. Other platforms were not revalidated for this batch. See
+`js/tests/es6/README.md` for APIs, reports and remaining work.

@@ -118,6 +118,8 @@ typedef struct JSInlineFrame {
 
 #define JSFRAME_NEW_TARGET    0x10000 /* constructor frame has newTarget */
 #define JSFRAME_PARAMETER_INIT 0x80000 /* evaluating parameter initializers */
+#define JSFRAME_MODULE 0x100000 /* compiling or evaluating a module body */
+#define JSFRAME_MODULE_THIS 0x200000 /* module lexical this, including eval */
 #define JSFRAME_JOB           0x20000 /* host job entry with an owning scope */
 #define JSFRAME_EVAL_FUNCTION 0x40000 /* eval compiler has a function environment */
 

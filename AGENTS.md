@@ -1588,3 +1588,17 @@ initializer scripts are owned by their body scripts: trace, serialize, destroy
 and notify debugger hooks consistently. Run `default-parameters.js` and
 `TestParameterWide.c`, including wide operands, callback-triggered GC and
 cache/source round trips. Preserve legacy formal parsing and embedding APIs.
+
+
+Module compilation is an explicit Unicode host API, separate from classic
+load/evaluate. Preserve private module environments, immutable live imports,
+cycle-aware instantiation/evaluation, and per-module exception retention. Hosts
+resolve requested specifiers explicitly; do not add an implicit loader to old
+XUL scripts. Run `modules-grammar.js`, `modules-link.js`, `modules-namespace.js`,
+`modules-extra.js`, `modules-edges.js` and `TestModules.c`, including GC during
+script hooks, namespace-only lifetime, Unicode sources and legacy context
+version restoration. Keep module grammar separate from direct eval and classic
+script grammar. Module records own their scripts and cannot use ordinary script
+XDR caches. Namespace behavior follows the original ES2015 edition, including
+its key iterator and rejection of even no-op property/prototype definitions.
+The complete pinned corpus and all four application gates remain required.

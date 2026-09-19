@@ -1,0 +1,12 @@
+/* ES2015 module host regression. MPL 1.1/GPL 2.0/LGPL 2.1. */
+function readModule(module,name){return namespaceModule(module)[name]}
+var checks=0,failures=0;
+function valid(source){checks++;try{compileModule(source)}catch(e){failures++;print('FAIL valid '+source+' '+e)}}
+function invalid(source){checks++;try{compileModule(source);failures++;print('FAIL accepted '+source)}catch(e){if(!(e instanceof SyntaxError)){failures++;print('FAIL type '+source+' '+e)}}}
+function value(source,name,wanted){checks++;try{var m=compileModule(source);gc();evaluateModule(m);if(readModule(m,name)!==wanted){failures++;print('FAIL value '+source+' '+readModule(m,name))}}catch(e){failures++;print('FAIL execution '+source+' '+e)}}
+valid('import "dep";');valid('import x from "dep";');valid('import * as ns from "dep";');valid('import {a,b as c,default as d} from "dep";');valid('import x, * as ns from "dep";');valid('import x,{a, b as c,} from "dep";');valid('export {a as b}; let a=3;');valid('export {a as b,default} from "dep";');valid('export * from "dep";');
+value('export var n=3','n',3);value('export let n=4','n',4);value('export const n=5','n',5);value('export var [n]=[6]','n',6);value('export let {x:n}={x:7}','n',7);value('export default 8','default',8);
+value('export default function(){return 9};export var n=9','n',9);value('export default class {}; export var n=10','n',10);valid('export default function named(){};export {named};');valid('export default class Named{};export {Named};');
+invalid('export {missing}');invalid('export let n;export {n}');invalid('export default 1;export default 2');invalid('import x,{a as x} from "dep"');invalid('if(true)import "dep"');invalid('{export var a=1}');invalid('function f(){import "dep"}');invalid('import {default} from "dep"');invalid('export {default}');invalid('var x;export {x as y,x as y}');invalid('import x from "dep";let x');invalid('import x from "dep";var x');invalid('let x;var x');invalid('new.target');invalid('super.x');invalid('label:label:;');invalid('break missing;');invalid('continue missing;');
+invalid('var await');invalid('function f(await){}');invalid('function f(){return await}');invalid('var aw\\u0061it');invalid('<!-- comment\nexport var x');invalid('--> comment\nexport var x');valid('export let x={await:1};x.await');valid('export {await as x} from "dep"');
+print('MODULE-GRAMMAR checks='+checks+' failures='+failures);if(failures)throw Error('module grammar failures');

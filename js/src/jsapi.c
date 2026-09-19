@@ -74,6 +74,7 @@
 #include "jsweakcollection.h"
 #include "jsreflect.h"
 #include "jsproxy.h"
+#include "jsmodule.h"
 #include "jsbinarydata.h"
 #include "jspromise.h"
 #include "jsrealm.h"
@@ -4043,6 +4044,50 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
     script = CompileTokenStream(cx, obj, ts, mark, NULL);
     LAST_FRAME_CHECKS(cx, script);
     return script;
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_CompileUCModule(JSContext *cx, JSObject *global, JSPrincipals *principals,
+                   const jschar *source, size_t length,
+                   const char *filename, uintN lineno)
+{
+    CHECK_REQUEST(cx);
+    return js_CompileModule(cx, global, principals, source, length, filename, lineno);
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_GetModuleRequests(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_GetModuleRequests(cx, module);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_SetModuleDependency(JSContext *cx, JSObject *module, JSString *specifier, JSObject *dependency)
+{
+    CHECK_REQUEST(cx);
+    return js_SetModuleDependency(cx, module, specifier, dependency);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_InstantiateModule(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_InstantiateModule(cx, module);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_EvaluateModule(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_EvaluateModule(cx, module);
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_GetModuleNamespace(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_GetModuleNamespace(cx, module);
 }
 
 JS_PUBLIC_API(JSBool)

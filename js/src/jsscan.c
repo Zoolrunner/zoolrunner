@@ -1582,6 +1582,15 @@ retry:
         }
         UngetChar(ts, c);
 
+        if ((ts->flags & TSF_MODULE) && !(ts->flags & TSF_KEYWORD_IS_NAME) &&
+            TOKENBUF_OK() && TOKENBUF_LENGTH() == 5 &&
+            TOKENBUF_BASE()[0] == 'a' && TOKENBUF_BASE()[1] == 'w' &&
+            TOKENBUF_BASE()[2] == 'a' && TOKENBUF_BASE()[3] == 'i' &&
+            TOKENBUF_BASE()[4] == 't') {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                         JSMSG_RESERVED_ID, "await");
+            goto error;
+        }
         /*
          * Check for keywords unless we saw Unicode escape or parser asks
          * to ignore keywords.
@@ -2109,6 +2118,11 @@ retry:
         if (MatchChar(ts, '!')) {
             if (MatchChar(ts, '-')) {
                 if (MatchChar(ts, '-')) {
+                    if (ts->flags & TSF_MODULE) {
+                        js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                     JSMSG_STRICT_SYNTAX);
+                        goto error;
+                    }
                     ts->flags |= TSF_IN_HTML_COMMENT;
                     goto skipline;
                 }
@@ -2374,7 +2388,7 @@ skipline:
             tp->t_op = JSOP_SUB;
             tt = TOK_ASSIGN;
         } else if (MatchChar(ts, c)) {
-            if (PeekChar(ts) == '>' && !(ts->flags & TSF_DIRTYLINE)) {
+            if (PeekChar(ts) == '>' && !(ts->flags & (TSF_DIRTYLINE | TSF_MODULE))) {
                 ts->flags &= ~TSF_IN_HTML_COMMENT;
                 goto skipline;
             }

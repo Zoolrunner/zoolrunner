@@ -72,6 +72,7 @@
 #include "jsobj.h"
 #include "jsopcode.h"
 #include "jsparse.h"
+#include "jsmodule.h"
 #include "jsscan.h"
 #include "jsscope.h"
 #include "jsscript.h"
@@ -516,7 +517,11 @@ js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
     /* Prevent GC activation while compiling. */
     JS_KEEP_ATOMS(cx->runtime);
 
-    if (cx->fp->flags & JSFRAME_STRICT_EVAL) {
+    if (cx->fp->flags & JSFRAME_MODULE) {
+        cg->treeContext.module = cx->fp->thisp;
+        ts->flags |= TSF_MODULE;
+    }
+    if (cx->fp->flags & (JSFRAME_STRICT_EVAL | JSFRAME_MODULE)) {
         cg->treeContext.flags |= TCF_STRICT_MODE;
         ts->flags |= TSF_STRICT_MODE;
     }
@@ -548,7 +553,9 @@ js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
          * do have to emit that here.
          */
         JS_ASSERT(cg->treeContext.flags & TCF_COMPILING);
-        ok = js_Emit1(cx, cg, JSOP_STOP) >= 0;
+        ok = (!cg->treeContext.module ||
+              js_ValidateModuleExports(cx, cg->treeContext.module, &cg->treeContext)) &&
+             js_Emit1(cx, cg, JSOP_STOP) >= 0;
     }
 
 #ifdef METER_PARSENODES
@@ -767,8 +774,8 @@ RecordDeclaration(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     while (stmt && !STMT_MAYBE_SCOPE(stmt))
         stmt = stmt->down;
     lexical = kind == JSOP_NOP ||
-              (kind == JSOP_CLOSURE && stmt &&
-               !(stmt->flags & SIF_BODY_BLOCK));
+              (kind == JSOP_CLOSURE &&
+               ((stmt && !(stmt->flags & SIF_BODY_BLOCK)) || (!stmt && tc->module)));
     for (;;) {
         lexicals = stmt ? &stmt->lexicalDecls : &tc->lexicalDecls;
         vars = stmt ? &stmt->varDecls : &tc->varDecls;
@@ -3366,6 +3373,297 @@ IsLexicalLet(JSContext *cx, JSTokenStream *ts)
 static JSParseNode *
 ClassDefinition(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSAtom *declName, size_t sourceBegin);
 
+static JSBool
+ModuleWord(JSAtom *atom, const char *word)
+{
+    JSString *str = ATOM_TO_STRING(atom);
+    size_t i, length = strlen(word);
+    if (JSSTRING_LENGTH(str) != length) return JS_FALSE;
+    for (i = 0; i < length; ++i)
+        if (JSSTRING_CHARS(str)[i] != (jschar)word[i]) return JS_FALSE;
+    return JS_TRUE;
+}
+
+static JSBool
+ModuleNameAllowed(JSAtom *atom, JSBool binding)
+{
+    JSString *str = ATOM_TO_STRING(atom);
+    return !js_IsKeyword(JSSTRING_CHARS(str), JSSTRING_LENGTH(str)) &&
+           !StrictReserved(atom) && !ModuleWord(atom, "await") && (!binding ||
+           (!ModuleWord(atom, "eval") && !ModuleWord(atom, "arguments")));
+}
+
+static JSAtom *
+ModuleName(JSContext *cx, JSTokenStream *ts, JSBool identifierName)
+{
+    JSTokenType tt;
+    if (identifierName) ts->flags |= TSF_KEYWORD_IS_NAME;
+    tt = js_GetToken(cx, ts);
+    ts->flags &= ~TSF_KEYWORD_IS_NAME;
+    if (tt != TOK_NAME) { LexicalSyntaxError(cx, ts); return NULL; }
+    return CURRENT_TOKEN(ts).t_atom;
+}
+
+static JSBool
+ModuleCloseClause(JSContext *cx, JSTokenStream *ts)
+{
+    JSBool closed;
+    ts->flags |= TSF_KEYWORD_IS_NAME;
+    closed = js_MatchToken(cx, ts, TOK_RC);
+    ts->flags &= ~TSF_KEYWORD_IS_NAME;
+    return closed;
+}
+
+static JSBool
+ModuleFrom(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, uint32 *request)
+{
+    JSAtom *word = ModuleName(cx, ts, JS_FALSE);
+    if (!word || !ModuleWord(word, "from") || js_GetToken(cx, ts) != TOK_STRING)
+        return LexicalSyntaxError(cx, ts);
+    return js_AddModuleRequest(cx, tc->module, CURRENT_TOKEN(ts).t_atom, request);
+}
+
+static JSParseNode *
+ModuleEnd(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSParseNode *pn)
+{
+    JSTokenType tt;
+    if (!pn) {
+        pn = NewParseNode(cx, ts, PN_UNARY, tc);
+        if (!pn) return NULL;
+        pn->pn_type = TOK_SEMI;
+        pn->pn_kid = NULL;
+    }
+    if (ON_CURRENT_LINE(ts, pn->pn_pos)) {
+        ts->flags |= TSF_OPERAND;
+        tt = js_PeekTokenSameLine(cx, ts);
+        ts->flags &= ~TSF_OPERAND;
+        if (tt != TOK_EOF && tt != TOK_EOL && tt != TOK_SEMI && tt != TOK_RC) {
+            LexicalSyntaxError(cx, ts); return NULL;
+        }
+    }
+    (void)js_MatchToken(cx, ts, TOK_SEMI);
+    return pn;
+}
+
+static JSBool
+ModuleBindingExports(JSContext *cx, JSTreeContext *tc, JSParseNode *pn)
+{
+    JSParseNode *item;
+    JSAtom *name;
+    if (pn->pn_type == TOK_NAME) {
+        name = pn->pn_atom;
+        return js_AddModuleExport(cx, tc->module, name, name, JS_MODULE_LOCAL, NULL);
+    }
+    if (pn->pn_type == TOK_ASSIGN) return ModuleBindingExports(cx, tc, pn->pn_left);
+    if (pn->pn_type == TOK_ELLIPSIS) return ModuleBindingExports(cx, tc, pn->pn_kid);
+    if (pn->pn_type == TOK_FUNCTION) {
+        name = ((JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom)))->atom;
+        return js_AddModuleExport(cx, tc->module, name, name, JS_MODULE_LOCAL, NULL);
+    }
+    if (pn->pn_type == TOK_COMMA && pn->pn_arity == PN_NULLARY) return JS_TRUE;
+    if (pn->pn_arity != PN_LIST) return JS_FALSE;
+    for (item = pn->pn_head; item; item = item->pn_next) {
+        if (!ModuleBindingExports(cx, tc, pn->pn_type == TOK_RC ? item->pn_right : item))
+            return JS_FALSE;
+    }
+    return JS_TRUE;
+}
+
+static JSParseNode *
+ModuleDefaultBinding(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+                       JSAtom *name, JSParseNode *value)
+{
+    JSParseNode *pn, *binding;
+    BindData data;
+    JSObject *block;
+    if (!tc->globalLexicalAtom) {
+        block = js_NewBlockObject(cx);
+        if (!block) return NULL;
+        tc->globalLexicalAtom = js_AtomizeObject(cx, block, 0);
+        if (!tc->globalLexicalAtom) return NULL;
+    }
+    memset(&data, 0, sizeof data);
+    data.ts = ts;
+    data.obj = ATOM_TO_OBJECT(tc->globalLexicalAtom);
+    data.op = JSOP_NOP;
+    data.lexicalDeclaration = JS_TRUE;
+    data.u.let.index = OBJ_BLOCK_COUNT(cx, data.obj);
+    data.u.let.overflow = JSMSG_TOO_MANY_FUN_VARS;
+    if (!BindLet(cx, &data, name, tc)) return NULL;
+    binding = FormalNameNode(cx, ts, tc, name, JSOP_SETNAME, -1);
+    pn = NewParseNode(cx, ts, PN_LIST, tc);
+    if (!binding || !pn) return NULL;
+    binding->pn_attrs = PN_GLOBAL_LEXICAL;
+    binding->pn_expr = value;
+    pn->pn_type = TOK_LET;
+    pn->pn_op = JSOP_NOP;
+    pn->pn_extra = PNX_POPVAR;
+    PN_INIT_LIST_1(pn, binding);
+    return pn;
+}
+
+static JSParseNode *
+ModuleStatement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+                 JSTokenType kind, JSBool allowLexical)
+{
+    JSParseNode *list, *item, *pn, *classNode;
+    JSAtom *first, *second, *defaultName;
+    JSFunction *fun;
+    JSTokenType tt;
+    uint32 request = JS_MODULE_LOCAL;
+    JSBool from = JS_FALSE;
+    if (!tc->module || tc->topStmt || !allowLexical) goto syntax;
+    list = NewParseNode(cx, ts, PN_LIST, tc);
+    if (!list) return NULL;
+    list->pn_type = TOK_COMMA;
+    PN_INIT_LIST(list);
+    defaultName = js_Atomize(cx, "default", 7, 0);
+    if (!defaultName) return NULL;
+    ts->flags |= TSF_OPERAND;
+    tt = js_GetToken(cx, ts);
+    ts->flags &= ~TSF_OPERAND;
+    if (kind == TOK_IMPORT) {
+        if (tt == TOK_STRING) {
+            if (!js_AddModuleRequest(cx, tc->module, CURRENT_TOKEN(ts).t_atom, &request))
+                return NULL;
+            return ModuleEnd(cx, ts, tc, NULL);
+        }
+        if (tt == TOK_NAME) {
+            first = CURRENT_TOKEN(ts).t_atom;
+            if (!ModuleNameAllowed(first, JS_TRUE) ||
+                !RecordDeclaration(cx, ts, tc, first, JSOP_NOP)) goto syntax;
+            item = FormalNameNode(cx, ts, tc, first, JSOP_NOP, -1);
+            if (!item) return NULL;
+            item->pn_source = defaultName;
+            PN_APPEND(list, item);
+            if (!js_MatchToken(cx, ts, TOK_COMMA)) goto import_from;
+            tt = js_GetToken(cx, ts);
+        }
+        if (tt == TOK_STAR) {
+            first = ModuleName(cx, ts, JS_FALSE);
+            if (!first || !ModuleWord(first, "as")) goto syntax;
+            first = ModuleName(cx, ts, JS_FALSE);
+            if (!first || !ModuleNameAllowed(first, JS_TRUE) ||
+                !RecordDeclaration(cx, ts, tc, first, JSOP_NOP)) goto syntax;
+            item = FormalNameNode(cx, ts, tc, first, JSOP_NOP, -1);
+            if (!item) return NULL;
+            item->pn_source = NULL; /* namespace import */
+            PN_APPEND(list, item);
+        } else if (tt == TOK_LC) {
+            while (!ModuleCloseClause(cx, ts)) {
+                first = ModuleName(cx, ts, JS_TRUE);
+                if (!first) return NULL;
+                second = first;
+                if (js_PeekToken(cx, ts) == TOK_NAME) {
+                    js_GetToken(cx, ts);
+                    if (!ModuleWord(CURRENT_TOKEN(ts).t_atom, "as")) goto syntax;
+                    second = ModuleName(cx, ts, JS_FALSE);
+                }
+                if (!second || !ModuleNameAllowed(second, JS_TRUE) ||
+                    !RecordDeclaration(cx, ts, tc, second, JSOP_NOP)) goto syntax;
+                item = FormalNameNode(cx, ts, tc, second, JSOP_NOP, -1);
+                if (!item) return NULL;
+                item->pn_source = first;
+                PN_APPEND(list, item);
+                if (!js_MatchToken(cx, ts, TOK_COMMA)) {
+                    if (js_GetToken(cx, ts) != TOK_RC) goto syntax;
+                    break;
+                }
+            }
+        } else goto syntax;
+ import_from:
+        if (!ModuleFrom(cx, ts, tc, &request)) return NULL;
+        for (item = list->pn_head; item; item = item->pn_next) {
+            if (!js_AddModuleImport(cx, tc->module, request, item->pn_source, item->pn_atom))
+                return NULL;
+        }
+        return ModuleEnd(cx, ts, tc, NULL);
+    }
+    if (tt == TOK_STAR) {
+        if (!ModuleFrom(cx, ts, tc, &request) ||
+            !js_AddModuleExport(cx, tc->module, NULL, NULL, request, NULL)) return NULL;
+        return ModuleEnd(cx, ts, tc, NULL);
+    }
+    if (tt == TOK_LC) {
+        while (!ModuleCloseClause(cx, ts)) {
+            first = ModuleName(cx, ts, JS_TRUE);
+            if (!first) return NULL;
+            second = first;
+            if (js_PeekToken(cx, ts) == TOK_NAME) {
+                js_GetToken(cx, ts);
+                if (!ModuleWord(CURRENT_TOKEN(ts).t_atom, "as")) goto syntax;
+                second = ModuleName(cx, ts, JS_TRUE);
+            }
+            if (!second) return NULL;
+            item = FormalNameNode(cx, ts, tc, second, JSOP_NOP, -1);
+            if (!item) return NULL;
+            item->pn_source = first;
+            PN_APPEND(list, item);
+            if (!js_MatchToken(cx, ts, TOK_COMMA)) {
+                if (js_GetToken(cx, ts) != TOK_RC) goto syntax;
+                break;
+            }
+        }
+        if (js_PeekToken(cx, ts) == TOK_NAME) {
+            if (!ModuleFrom(cx, ts, tc, &request)) return NULL;
+            from = JS_TRUE;
+        }
+        for (item = list->pn_head; item; item = item->pn_next) {
+            if (!from && !ModuleNameAllowed(item->pn_source, JS_FALSE)) goto syntax;
+            if (!js_AddModuleExport(cx, tc->module, item->pn_atom,
+                    from ? NULL : item->pn_source, request,
+                    from ? item->pn_source : NULL)) return NULL;
+        }
+        return ModuleEnd(cx, ts, tc, NULL);
+    }
+    if (tt == TOK_DEFAULT) {
+        ts->flags |= TSF_OPERAND;
+        tt = js_GetToken(cx, ts);
+        ts->flags &= ~TSF_OPERAND;
+        if (tt == TOK_FUNCTION) {
+            pn = FunctionDef(cx, ts, tc, JS_TRUE);
+            if (!pn) return NULL;
+            fun = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
+            first = fun->atom ? fun->atom : defaultName;
+            fun->atom = first;
+            fun->flags &= ~JSFUN_LAMBDA;
+            pn->pn_op = JSOP_NOP;
+            if (!RecordDeclaration(cx, ts, tc, first, JSOP_CLOSURE) ||
+                !js_AddModuleExport(cx, tc->module, defaultName, first, JS_MODULE_LOCAL, NULL))
+                return NULL;
+            return pn;
+        }
+        if (tt == TOK_CLASS) {
+            pn = ClassDefinition(cx, ts, tc, NULL, CURRENT_TOKEN(ts).sourceBegin);
+            if (!pn) return NULL;
+            classNode = pn;
+            while (classNode->pn_type == TOK_LEXICALSCOPE) classNode = classNode->pn_expr;
+            first = classNode->pn_kid1->pn_atom;
+            if (!JSSTRING_LENGTH(ATOM_TO_STRING(first))) first = defaultName;
+            if (!InferFunctionName(cx, pn, defaultName, JSOP_NOP)) return NULL;
+            pn = ModuleDefaultBinding(cx, ts, tc, first, pn);
+            if (!pn || !js_AddModuleExport(cx, tc->module, defaultName, first, JS_MODULE_LOCAL, NULL))
+                return NULL;
+            return pn;
+        }
+        js_UngetToken(ts);
+        pn = AssignExpr(cx, ts, tc);
+        if (!pn || !InferFunctionName(cx, pn, defaultName, JSOP_NOP)) return NULL;
+        pn = ModuleDefaultBinding(cx, ts, tc, defaultName, pn);
+        if (!pn || !js_AddModuleExport(cx, tc->module, defaultName, defaultName, JS_MODULE_LOCAL, NULL))
+            return NULL;
+        return ModuleEnd(cx, ts, tc, pn);
+    }
+    if (tt != TOK_VAR && tt != TOK_LET && tt != TOK_FUNCTION && tt != TOK_CLASS &&
+        !IsLexicalLet(cx, ts)) goto syntax;
+    js_UngetToken(ts);
+    pn = Statement(cx, ts, tc, JS_TRUE);
+    return pn && ModuleBindingExports(cx, tc, pn) ? pn : NULL;
+ syntax:
+    LexicalSyntaxError(cx, ts);
+    return NULL;
+}
+
 static JSParseNode *
 Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
           JSBool allowLexical)
@@ -3381,6 +3679,9 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     ts->flags |= TSF_OPERAND;
     tt = js_GetToken(cx, ts);
     ts->flags &= ~TSF_OPERAND;
+
+    if (JS_VERSION_IS_ES2015(cx) && (tt == TOK_IMPORT || tt == TOK_EXPORT))
+        return ModuleStatement(cx, ts, tc, tt, allowLexical);
 
     if (IsLexicalLet(cx, ts)) {
         if (!allowLexical) {
@@ -7406,7 +7707,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             pn->pn_atom == cx->runtime->atomState.argumentsAtom)
             tc->flags |= TCF_FUN_USES_ARGUMENTS;
         if (tt == TOK_NAME && !afterDot && (tc->flags & TCF_STRICT_MODE) &&
-            StrictReserved(pn->pn_atom)) {
+            (StrictReserved(pn->pn_atom) ||
+             ((ts->flags & TSF_MODULE) && ModuleWord(pn->pn_atom, "await")))) {
             StrictSyntaxError(cx, ts);
             return NULL;
         }

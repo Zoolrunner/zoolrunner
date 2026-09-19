@@ -3344,7 +3344,9 @@ js_CaptureArrowBindings(JSContext *cx, JSObject *function, JSStackFrame *fp)
              * Strict functions already snapshot arguments at invocation. */
             if (call && !js_GetArgsObject(cx, fp))
                 goto out;
-            if (fp->fun && (fp->fun->flags & JSFUN_STRICT) && fp->argv &&
+            if (fp->flags & JSFRAME_MODULE_THIS) {
+                roots[3] = JSVAL_VOID;
+            } else if (fp->fun && (fp->fun->flags & JSFUN_STRICT) && fp->argv &&
                 !(fp->flags & JSFRAME_CONSTRUCTING)) {
                 roots[3] = fp->argv[-1];
             } else {

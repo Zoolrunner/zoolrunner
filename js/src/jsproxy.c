@@ -1115,8 +1115,8 @@ JSClass js_ProxyClass = {
     ProxyObjectOps, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
 
-static JSObject *
-NewProxy(JSContext *cx, jsval target, jsval handler, JSObject *global)
+JSObject *
+js_NewProxyObject(JSContext *cx, jsval target, jsval handler, JSObject *global)
 {
     JSObject *obj, *proto, *checked;
     JSTempValueRooter root;
@@ -1149,7 +1149,7 @@ js_ProxyConstructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
 {
     JSObject *proxy;
     if (!(cx->fp->flags & JSFRAME_CONSTRUCTING)) return ProxyError(cx, "requires new");
-    proxy = NewProxy(cx, argv[0], argv[1], js_BuiltinGlobal(cx, argv));
+    proxy = js_NewProxyObject(cx, argv[0], argv[1], js_BuiltinGlobal(cx, argv));
     if (!proxy) return JS_FALSE;
     *rval = OBJECT_TO_JSVAL(proxy);
     return JS_TRUE;
@@ -1192,7 +1192,7 @@ Revocable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSTempValueRooter root;
     JSBool ok = JS_FALSE;
     JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
-    proxy = NewProxy(cx, argv[0], argv[1], global);
+    proxy = js_NewProxyObject(cx, argv[0], argv[1], global);
     if (!proxy) goto out;
     values[0] = OBJECT_TO_JSVAL(proxy);
     /* Reserve the captured proxy before allocating own metadata properties:

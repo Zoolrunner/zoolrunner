@@ -34,7 +34,11 @@ fixtures = [
     ('queued-negative', 'strict', {'negative': 'SyntaxError'}, 'enqueueJob(function() { throw new SyntaxError("job"); });', 'fail'),
     ('queued-after-done', 'strict', {'flags': ['async']}, '$DONE(); enqueueJob(function() { throw new Error("late failure"); });', 'fail'),
     ('queued-captured-hook', 'strict', {'flags': ['async']}, 'enqueueJob(function() { $DONE(); }); drainJobQueue = null;', 'pass'),
-    ('module', 'module', {}, 'export default 1;', 'unsupported'),
+    ('module', 'module', {}, 'export default 1;', 'pass'),
+    ('module-unicode', 'module', {}, 'export let \u03b1=7;if(\u03b1!==7||this!==undefined)throw Error("module");', 'pass'),
+    ('module-negative', 'module', {'negative':'SyntaxError'}, 'export {missing};', 'pass'),
+    ('module-wrong-negative', 'module', {'negative':'SyntaxError'}, 'throw new TypeError("wrong");', 'fail'),
+    ('module-harness-negative', 'module', {'negative':'.*','includes':['missing.js']}, '', 'harness-error'),
     ('early-exit', 'raw', {}, 'quit(0);', 'harness-error'),
     ('timeout', 'raw', {}, 'while (true) {}', 'timeout'),
 ]

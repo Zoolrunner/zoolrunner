@@ -1944,6 +1944,7 @@ CheckScriptDeclarations(JSContext *cx, JSStackFrame *fp)
     JSAtom *atom;
     jsid id;
     JSBool conflict;
+    if (fp->flags & JSFRAME_MODULE) return JS_TRUE;
     if ((script->version & JSVERSION_MASK) < JSVERSION_ECMA_2015)
         return CheckGlobalDeclarations(cx, fp);
     if (script->globalLexicalIndex != (uint32)-1) {
@@ -2026,6 +2027,10 @@ js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
     hookData = mark = NULL;
     oldfp = cx->fp;
     frame.script = script;
+    if (script->isModule && !(flags & JSFRAME_MODULE)) {
+        JS_ReportError(cx, "module scripts must be evaluated as module records");
+        return JS_FALSE;
+    }
     if (down) {
         /* Propagate arg/var state for eval and the debugger API. */
         frame.callobj = down->callobj;
@@ -2045,7 +2050,7 @@ js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
         frame.callobj = frame.argsobj = NULL;
         obj = chain;
         if (((flags & JSFRAME_EVAL) && !script->strictMode) ||
-            (!(flags & JSFRAME_EVAL) && (cx->options & JSOPTION_VAROBJFIX))) {
+            (!(flags & (JSFRAME_EVAL | JSFRAME_MODULE)) && (cx->options & JSOPTION_VAROBJFIX))) {
             while ((tmp = OBJ_GET_PARENT(cx, obj)) != NULL)
                 obj = tmp;
         }
@@ -2079,6 +2084,7 @@ js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
     frame.spbase = NULL;
     frame.sharpDepth = 0;
     frame.flags = flags;
+    if (down && (down->flags & JSFRAME_MODULE_THIS)) frame.flags |= JSFRAME_MODULE_THIS;
     if (down && (down->flags & JSFRAME_NEW_TARGET)) {
         frame.newTarget = down->newTarget;
         frame.flags |= JSFRAME_NEW_TARGET;
@@ -2115,7 +2121,7 @@ js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
      * Use frame.rval, not result, so the last result stays rooted across any
      * GC activations nested within this js_Interpret.
      */
-    if (ok) ok = js_Interpret(cx, script->code, &frame.rval);
+    if (ok) ok = js_Interpret(cx, (flags & JSFRAME_MODULE) ? script->main : script->code, &frame.rval);
     *result = frame.rval;
 
     if (hookData) {
@@ -5584,6 +5590,11 @@ interrupt:
           END_CASE(JSOP_NEWTARGET)
 
           BEGIN_CASE(JSOP_THIS)
+            if (fp->flags & JSFRAME_MODULE_THIS) {
+                PUSH_OPND(JSVAL_VOID);
+                obj = NULL;
+                DO_NEXT_OP(JSOP_THIS_LENGTH);
+            }
             if (fp->fun && FUN_IS_ARROW(fp->fun)) {
                 SAVE_SP_AND_PC(fp);
                 if (!js_GetArrowBindings(cx, fp->callee, &rval, &obj2)) {

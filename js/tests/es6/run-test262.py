@@ -60,6 +60,8 @@ def driver_source(case, harness, marker):
     # evaluate compiles Unicode source as a separate *global* script, not eval.
     return '''(function (global) {
 var emit = print, compile = evaluate, stringify = String, done = 0, doneError;
+var compileModuleUnit = typeof compileModule === "function" ? compileModule : null;
+var evaluateModuleUnit = typeof evaluateModule === "function" ? evaluateModule : null;
 var drain = typeof drainJobQueue === "function" ? drainJobQueue : null;
 function describe(error) {
   try { return stringify(error); } catch (_) { return "unprintable exception"; }
@@ -68,7 +70,14 @@ function finish(kind, detail) { emit(%s + kind + " " + (detail || "")); }
 try { compile(%s, "test262-harness.js"); }
 catch (error) { finish("HARNESS", describe(error)); return; }
 if (%s) global.$DONE = function (error) { done++; if (error !== undefined) doneError = error; };
-try { compile(%s, %s); }
+try {
+  if (%s) {
+    if (!compileModuleUnit || !evaluateModuleUnit) {
+      finish("UNSUPPORTED", "module host APIs are unavailable"); return;
+    }
+    evaluateModuleUnit(compileModuleUnit(%s, %s));
+  } else { compile(%s, %s); }
+}
 catch (error) { finish("THROW", describe(error)); return; }
 // A queued exception cannot satisfy a synchronous negative-test pattern.
 try { if (drain) drain(); }
@@ -81,8 +90,10 @@ if (%s) {
 finish("PASS", "");
 })(this);
 ''' % (json.dumps(marker), json.dumps(harness, ensure_ascii=True),
-       'true' if asynchronous else 'false', json.dumps(source, ensure_ascii=True),
-       json.dumps(case['test']), 'true' if asynchronous else 'false')
+       'true' if asynchronous else 'false', 'true' if case['mode'] == 'module' else 'false',
+       json.dumps(source, ensure_ascii=True), json.dumps(case['test']),
+       json.dumps(source, ensure_ascii=True), json.dumps(case['test']),
+       'true' if asynchronous else 'false')
 
 
 def classify(case, output, code, marker):
@@ -112,8 +123,6 @@ def run_case(case, suite, shell, env, timeout, edition='es2015'):
     result['specification'] = {key: case['record'][key]
                                for key in ('es5id', 'es6id', 'es7id', 'esid')
                                if key in case['record']}
-    if case['mode'] == 'module':
-        return dict(result, status='unsupported', detail='ES module compilation/linking is not implemented')
     try:
         includes = [] if case['mode'] == 'raw' else ['sta.js', 'cth.js', 'assert.js']
         if case['mode'] != 'raw':

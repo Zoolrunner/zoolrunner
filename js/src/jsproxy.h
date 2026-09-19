@@ -4,6 +4,7 @@
 #include "jspubtd.h"
 JS_BEGIN_EXTERN_C
 extern JSClass js_ProxyClass;
+extern JSObject *js_NewProxyObject(JSContext *, jsval, jsval, JSObject *);
 extern JSObject *js_ProxyOperationGlobal(JSContext *cx);
 extern JSObject *js_InitProxyClass(JSContext *cx, JSObject *global);
 extern JSBool js_IsProxy(JSContext *cx, JSObject *obj);
