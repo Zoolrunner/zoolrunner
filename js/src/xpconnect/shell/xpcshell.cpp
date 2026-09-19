@@ -529,7 +529,183 @@ Clear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static JSBool EnqueueJob(JSContext *, JSObject *, uintN, jsval *, jsval *);
 static JSBool DrainJobQueue(JSContext *, JSObject *, uintN, jsval *, jsval *);
 
+/* Test262 host realms keep tested globals separate from shell bookkeeping. */
+static JSClass test262GlobalClass = {
+    "Test262 global", JSCLASS_GLOBAL_FLAGS,
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+RealmCall(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSNative native)
+{
+    JSFunction *fun = JS_ValueToFunction(cx, argv[-2]);
+    JSObject *global, *previous = JS_GetGlobalObject(cx);
+    JSVersion version;
+    JSBool ok;
+    if (!fun) return JS_FALSE;
+    global = JS_GetParent(cx, JS_GetFunctionObject(fun));
+    if (!global || !JS_AddNamedRoot(cx, &previous, "previous host realm"))
+        return JS_FALSE;
+    version = JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    JS_SetGlobalObject(cx, global);
+    ok = native(cx, global, argc, argv, rval);
+    JS_SetGlobalObject(cx, previous);
+    JS_SetVersion(cx, version);
+    JS_RemoveRoot(cx, &previous);
+    return ok;
+}
+
+/* Keep compiled scripts opaque and tied to their compilation realm. */
+static JSClass test262ScriptClass = {
+    "Test262 script", JSCLASS_HAS_RESERVED_SLOTS(1),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+CompileRealmScript(JSContext *cx, JSObject *global, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *source;
+    JSScript *script;
+    JSObject *record, *owner;
+    source = JS_ValueToString(cx, argc ? argv[0] : JSVAL_VOID);
+    if (!source) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(source);
+    record = JS_NewObject(cx, &test262ScriptClass, NULL, global);
+    if (!record) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(record);
+    if (!JS_SetPrototype(cx, record, NULL)) return JS_FALSE;
+    script = JS_CompileUCScriptForPrincipals(cx, global, gJSPrincipals,
+        JS_GetStringChars(source), JS_GetStringLength(source), "test262-script", 1);
+    if (!script) return JS_FALSE;
+    owner = JS_NewScriptObject(cx, script);
+    if (!owner) {
+        JS_DestroyScript(cx, script);
+        return JS_FALSE;
+    }
+    return JS_SetReservedSlot(cx, record, 0, OBJECT_TO_JSVAL(owner));
+}
+
+static JSBool
+ExecuteRealmScript(JSContext *cx, JSObject *global, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *record;
+    jsval owner;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0]) ||
+        JS_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) != &test262ScriptClass) {
+        JS_ReportError(cx, "expected a Test262 compiled script");
+        return JS_FALSE;
+    }
+    record = JSVAL_TO_OBJECT(argv[0]);
+    if (JS_GetParent(cx, record) != global) {
+        JS_ReportError(cx, "compiled script belongs to another realm");
+        return JS_FALSE;
+    }
+    if (!JS_GetReservedSlot(cx, record, 0, &owner)) return JS_FALSE;
+    return JS_ExecuteScript(cx, global,
+        (JSScript *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(owner)), rval);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmCompileScript(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, CompileRealmScript);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmExecuteScript(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, ExecuteRealmScript);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmEvaluate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, Evaluate);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmCompileModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, CompileModule);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmEvaluateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, EvaluateModule);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmInstantiateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, InstantiateModule);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmLinkModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, LinkModule);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+CreateTest262Realm(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *global = NULL, *host = NULL, *previous = JS_GetGlobalObject(cx);
+    jsval value = JSVAL_VOID;
+    JSVersion version = JS_GetVersion(cx);
+    JSFunction *fun;
+    JSBool ok = JS_FALSE;
+    unsigned rooted = 0, i;
+    void *addresses[] = { &global, &host, &previous, &value };
+    const char *names[] = { "test realm global", "test realm host", "prior realm", "host method" };
+    static const struct {
+        const char *name;
+        JSNative native;
+        uintN nargs;
+    } methods[] = {
+        { "evalScript", RealmEvaluate, 1 },
+        { "compileScript", RealmCompileScript, 1 },
+        { "executeScript", RealmExecuteScript, 1 },
+        { "createRealm", CreateTest262Realm, 0 },
+        { "gc", GC, 0 },
+        { "compileModule", RealmCompileModule, 1 },
+        { "instantiateModule", RealmInstantiateModule, 1 },
+        { "evaluateModule", RealmEvaluateModule, 1 },
+        { "linkModule", RealmLinkModule, 3 }
+    };
+    for (i = 0; i < 4; ++i) {
+        if (!JS_AddNamedRoot(cx, addresses[i], names[i])) goto out;
+        ++rooted;
+    }
+    JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    global = JS_NewObject(cx, &test262GlobalClass, NULL, NULL);
+    if (!global || !JS_SetParent(cx, global, NULL) || !JS_SetPrototype(cx, global, NULL))
+        goto out;
+    JS_SetGlobalObject(cx, global);
+    if (!JS_InitStandardClasses(cx, global)) goto out;
+    host = JS_NewObject(cx, NULL, NULL, global);
+    if (!host ||
+        !JS_DefineProperty(cx, host, "global", OBJECT_TO_JSVAL(global), NULL, NULL, JSPROP_ENUMERATE) ||
+        !JS_DefineProperty(cx, global, "$262", OBJECT_TO_JSVAL(host), NULL, NULL, 0) ||
+        !JS_DefineFunction(cx, global, "print", Print, 0, 0)) goto out;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        fun = JS_NewFunction(cx, methods[i].native, methods[i].nargs, 0, global, methods[i].name);
+        if (!fun) goto out;
+        value = OBJECT_TO_JSVAL(JS_GetFunctionObject(fun));
+        if (!JS_DefineProperty(cx, host, methods[i].name, value, NULL, NULL, JSPROP_ENUMERATE))
+            goto out;
+    }
+    *rval = OBJECT_TO_JSVAL(host);
+    ok = JS_TRUE;
+ out:
+    JS_SetGlobalObject(cx, previous);
+    JS_SetVersion(cx, version);
+    while (rooted) JS_RemoveRoot(cx, addresses[--rooted]);
+    return ok;
+}
+
+
 static JSFunctionSpec glob_functions[] = {
+    {"createTest262Realm", CreateTest262Realm, 0, 0, 0},
     {"enqueueJob",      EnqueueJob,     1},
     {"drainJobQueue",   DrainJobQueue,  0},
     {"print",           Print,          0},

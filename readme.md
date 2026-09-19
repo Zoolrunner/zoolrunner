@@ -143,8 +143,10 @@ direction.
 
 SpiderMonkey is being modernized within the existing engine and embedding APIs.
 Full ECMAScript 5.1 correctness is a required target. The pinned historical
-Test262 suite passes **11,540 / 11,540 cases in each of the eight modern macOS
-application packages**, with zero failures, crashes, timeouts, or harness errors.
+Test262 suite passes **11,540 / 11,540 required-mode cases** in the latest
+macOS arm64 engine validation, with zero failures, crashes, timeouts, or harness
+errors. All four macOS arm64 application packages pass their compatibility
+checks; earlier platform results do not revalidate the current ES6 changes.
 This includes inherited earlier-edition coverage and annotated strict-mode
 cases. Unmarked cases use the upstream non-strict default; Unicode source,
 directive prologues, expected exceptions, and the required
@@ -160,42 +162,31 @@ is the next required target, with historical XUL applications and legacy
 JavaScript compatibility preserved. This work is in progress; the engine is
 not yet ES6 compliant. The [ES6 testing guide](js/tests/es6/README.md) records
 the baseline corpus, runner limitations and remaining implementation work.
-An explicit ES2015 mode now separates initial modern parser behavior from
-historical script modes; it remains incomplete. Existing application scripts
-keep their current defaults, with mixed-edition and embedding regressions
-covering the new boundary. Modern contextual `let`/`yield` parsing and
-scope-local declaration conflict checks have focused regressions; full lexical
-environments and temporal dead zones remain unfinished. Explicit ES2015 mode
-also accepts binary/octal literals and numeric strings, with separate legacy
-grammar and conversion regressions. Modern global initialization is opt-in
-through `xpcshell -E` or selection of ES2015 before native standard-class
-initialization; script edition changes alone do not replace existing built-ins.
-Modern function metadata and restricted accessors have native, shell and
-window regressions. Portable `Math.sign`, `trunc`, `clz32` and `imul` additions
-and corrected `Math.round` boundaries have focused regression coverage. The
-remaining ES2015 numeric Math methods use selected bundled fdlibm kernels and
-portable rounding/summation code; Math's Symbol-based tag is also implemented.
-New String code-point, repetition, literal-search and raw-assembly methods have
-UTF-16 and callback/GC checks. `String.prototype.normalize` uses pinned Unicode
-18.0.0 data and passes the upstream normalization checks; this does not change
-the platform's historical Unicode tables. Array `find`, `findIndex`, `fill`
-and `copyWithin` use full ToLength indices and preserve callback/GC behavior;
-Symbol protocols, including Array unscopables, remain unfinished. `Object.is`
-and string-key `Object.assign` have focused identity, property-order and callback
-checks; Symbol copying is included in the Symbol implementation. Reflection and integrity methods
-accept primitive arguments in explicitly selected ES2015 scripts while retaining
-the ES5/legacy argument policy. `Object.setPrototypeOf` preserves
-embedding access checks and built-in instance fields across prototype changes;
-Proxy behavior remains unfinished.
-Anonymous ordinary functions infer names from variable
-initializers, identifier assignments and static object properties; modern
-accessors have prefixed names and cannot be constructed. Inferred names remain
-separate from lexical self-bindings. Computed property names, concise methods,
-arrows, classes and other ES2015 behavior remain incomplete. Modern `const` declarations require initializers, and writes to
-initialized constant bindings throw after evaluating their operands. Legacy
-script modes retain their historical behavior. Focused checks cover closures,
-eval, destructuring, decompilation and extended atom operands; lexical scoping,
-temporal dead zones and per-iteration bindings still require implementation.
+The complete pinned historical ES6 corpus now passes **28,582 / 28,582 modes**,
+with zero failures or unsupported cases. Later coverage is still under review,
+and proper tail calls remain unfinished. This historical pass does not complete
+the full ES2015 target.
+
+Implemented areas include lexical bindings and temporal dead zones, per-iteration
+environments, destructuring, arrows, default/rest parameters, spread, classes,
+inheritance, `super`, `new.target`, generators, iteration, templates, Symbols,
+collections, Promises, Proxy/Reflect, binary data, typed arrays, Unicode regular
+expressions, standard-library additions and native modules. Focused regressions
+cover callbacks, garbage collection, Unicode source, decompilation and wide
+operands. Later tests continue to identify edge cases in these implementations.
+
+Modern global initialization is opt-in through `xpcshell -E` or selection of
+ES2015 before native standard-class initialization. Script edition changes alone
+do not replace a global's built-ins. Existing application scripts retain their
+historical defaults and embedding APIs; explicit legacy versions preserve their
+grammar and compatibility behavior. The module JSAPI adds explicit compilation,
+dependency linking and evaluation without changing classic XUL/component loaders.
+It does not imply an HTML module-script loader or ordinary module XDR caching.
+
+The detailed entries below record implementation milestones chronologically.
+Use the latest integrated result in the ES6 testing guide for current validation
+scope; historical failure counts and feature gaps in older entries describe
+those earlier milestones.
 
 Application compatibility is tested separately from language conformance:
 
@@ -884,3 +875,15 @@ and 32 failures, without harness errors. That diagnostic still needs edition
 review and phase checking and is not a full ES2015 conformance result. Further
 pattern/scope fixes are being validated separately. Other platforms have not
 been revalidated for this batch.
+
+
+The pattern/realm/strict-block follow-up preserves **28,582/28,582 pinned ES6**
+and **11,540/11,540 ES5**, plus all four macOS arm64 build/package/desktop gates,
+Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla. Strict
+block functions now have lexical scope and entry initialization; pattern,
+contextual-arrow, foreign-realm eval and RegExp identity-escape cases are fixed.
+The phase-aware later-ID diagnostic improves to 5,833 passes and 19 failures;
+those are not conformance counts. Broader coverage confirms that proper tail
+calls remain unfinished. Cache version is 63. See `js/tests/es6/README.md` for
+reports, host APIs and the remaining coverage review. Other platforms were not
+revalidated for this batch.

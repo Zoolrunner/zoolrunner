@@ -405,6 +405,11 @@ Track the conformance corpus, failures and implementation status in
 runtime semantics, modules and asynchronous behavior; unsupported cases remain
 unfinished work and must not be excluded to obtain a passing result. Preserve
 the complete ES5.1 regression gate and historical application compatibility.
+Keep the later Test262 diagnostic separate from the pinned historical gate.
+Metadata and feature tags select review candidates, not edition exemptions.
+Verify modern negative-test phases with isolated host realms and keep harness
+errors visible. Preserve `test262-realms.js`, `test-later-runner.py` and wide
+block-function XDR/source round trips when changing those paths.
 Keep explicit legacy language versions and historical XUL/component script
 loading behavior usable while implementing the modern language semantics.
 The initial ES2015 boundary uses `JSVERSION_ECMA_2015` (2015), selected by

@@ -2919,8 +2919,19 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 todo = Sprint(&ss->sprinter, ss_format, VarPrefix(sn), rval);
                 break;
 
-              case JSOP_SETCONSTLOCAL:
               case JSOP_INITLOCAL:
+                sn = js_GetSrcNote(jp->script, pc);
+                if (sn && SN_TYPE(sn) == SRC_HIDDEN) {
+                    /* Hoisted block-function initialization has no source
+                     * statement here; SRC_FUNCDEF retains its declaration. */
+                    LOCAL_ASSERT(pc[len] == JSOP_POP);
+                    (void)POP_STR();
+                    len += JSOP_POP_LENGTH;
+                    todo = -2;
+                    break;
+                }
+                /* FALL THROUGH */
+              case JSOP_SETCONSTLOCAL:
               case JSOP_SETLOCAL:
               case JSOP_SETLOCALPOP:
                 i = GET_UINT16(pc);

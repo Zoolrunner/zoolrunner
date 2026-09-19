@@ -1436,6 +1436,12 @@ ParseTerm(CompilerState *state)
                  */
                 state->cp = termStart;
                 if (c >= '8') {
+                    if (JS_VERSION_IS_ES2015(state->context)) {
+                        /* Annex B IdentityEscape consumes the digit, not
+                         * the backslash; following decimal digits remain. */
+                        state->cp = termStart + 1;
+                        goto doFlat;
+                    }
                     /* Treat this as flat. termStart - 1 is the \. */
                     c = '\\';
                     goto asFlat;

@@ -1496,12 +1496,19 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     direct = caller && fp->down == caller && caller->pc &&
              (*caller->pc == JSOP_EVAL ||
               (*caller->pc == JSOP_CALLSPREAD && GET_UINT16(caller->pc) == 2));
-    inheritedStrict = direct && caller->script->strictMode;
-    if (direct && !js_HasNewTargetEnvironment(cx, caller, &hasNewTarget))
-        return JS_FALSE;
     global = OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(argv[-2]));
     if (!global) global = cx->globalObject;
     while ((outer = OBJ_GET_PARENT(cx, global)) != NULL) global = outer;
+    if (direct) {
+        /* An eval intrinsic borrowed from another realm is indirect even
+         * when the syntactic reference is named eval (12.3.4.1). */
+        outer = caller->scopeChain;
+        while (OBJ_GET_PARENT(cx, outer)) outer = OBJ_GET_PARENT(cx, outer);
+        direct = outer == global;
+    }
+    inheritedStrict = direct && caller->script->strictMode;
+    if (direct && !js_HasNewTargetEnvironment(cx, caller, &hasNewTarget))
+        return JS_FALSE;
     if (direct) {
         if (caller->fun && !caller->callobj && !js_GetCallObject(cx, caller, NULL))
             return JS_FALSE;

@@ -1422,7 +1422,8 @@ ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     tc->initializingParameters = JS_TRUE;
     if (!FUN_IS_ARROW(fun)) ts->flags |= TSF_NEW_TARGET_ALLOWED;
     ts->flags = (ts->flags & ~TSF_GENERATOR) |
-                (FUN_IS_GENERATOR(fun) ? TSF_GENERATOR : 0);
+                ((FUN_IS_GENERATOR(fun) || (FUN_IS_ARROW(fun) && generatorFlags))
+                 ? TSF_GENERATOR : 0);
     if (!js_MatchToken(cx, ts, bare ? TOK_EOF : TOK_RP)) {
         for (;;) {
             memset(&data, 0, sizeof data);
@@ -1503,6 +1504,47 @@ ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     return ok;
 }
 
+/* Materialize the lexical scope surrounding a strict block function, just as
+ * the first let declaration in that statement list would. */
+static JSObject *
+EnsureFunctionBlockScope(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+                         JSStmtInfo *stmt)
+{
+    JSObject *obj;
+    JSAtom *atom;
+    JSParseNode *node;
+    JSStmtInfo **link, *walk;
+    if (stmt->flags & SIF_SCOPE)
+        return ATOM_TO_OBJECT(stmt->atom);
+    obj = js_NewBlockObject(cx);
+    if (!obj) return NULL;
+    atom = js_AtomizeObject(cx, obj, 0);
+    if (!atom) return NULL;
+    link = &tc->topScopeStmt;
+    for (walk = tc->topStmt; walk != stmt; walk = walk->down) {
+        if (walk == *link) link = &walk->downScope;
+    }
+    stmt->flags |= SIF_SCOPE;
+    if (stmt != *link) {
+        stmt->downScope = *link;
+        *link = stmt;
+    }
+    OBJ_SET_PARENT(cx, obj, tc->blockChain);
+    tc->blockChain = obj;
+    stmt->atom = atom;
+    node = NewParseNode(cx, ts, PN_NAME, tc);
+    if (!node) return NULL;
+    node->pn_type = TOK_LEXICALSCOPE;
+    node->pn_op = JSOP_LEAVEBLOCK;
+    node->pn_pos = tc->blockNode->pn_pos;
+    node->pn_atom = atom;
+    node->pn_expr = tc->blockNode;
+    node->pn_slot = -1;
+    node->pn_attrs = 0;
+    tc->blockNode = node;
+    return obj;
+}
+
 static JSParseNode *
 FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             JSBool lambda)
@@ -1521,7 +1563,9 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     JSParseNode *item, *list = NULL;
 #endif
 
-    JSBool generator;
+    JSBool generator, lexicalFunction = JS_FALSE;
+    JSStmtInfo *functionBlock;
+    JSObject *functionScope;
     uintN outerGenerator = ts->flags & TSF_GENERATOR;
     uintN outerSuper = ts->flags & TSF_SUPER_ALLOWED;
     uintN outerSuperCall = ts->flags & TSF_SUPER_CALL_ALLOWED;
@@ -1574,6 +1618,26 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     if (!lambda && funAtom) {
         if (!RecordDeclaration(cx, ts, tc, funAtom, JSOP_CLOSURE))
             return NULL;
+        functionBlock = tc->topStmt;
+        while (functionBlock && !STMT_MAYBE_SCOPE(functionBlock))
+            functionBlock = functionBlock->down;
+        lexicalFunction = JS_VERSION_IS_ES2015(cx) &&
+            (tc->flags & TCF_STRICT_MODE) && functionBlock &&
+            !(functionBlock->flags & SIF_BODY_BLOCK);
+        if (lexicalFunction) {
+            functionScope = EnsureFunctionBlockScope(cx, ts, tc, functionBlock);
+            if (!functionScope) return NULL;
+            if (OBJ_BLOCK_COUNT(cx, functionScope) >= JS_BIT(16)) {
+                LexicalSyntaxError(cx, ts);
+                return NULL;
+            }
+            if (!js_DefineNativeProperty(cx, functionScope, ATOM_TO_JSID(funAtom),
+                JSVAL_UNINITIALIZED, NULL, NULL, JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                SPROP_HAS_SHORTID, OBJ_BLOCK_COUNT(cx, functionScope), NULL))
+                return NULL;
+        }
+    }
+    if (!lambda && funAtom && !lexicalFunction) {
         ATOM_LIST_SEARCH(ale, &tc->decls, funAtom);
         if (ale) {
             prevop = ALE_JSOP(ale);
@@ -1904,7 +1968,9 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     }
 
     result = pn;
-    if (lambda) {
+    if (lexicalFunction) {
+        op = JSOP_ANONFUNOBJ;
+    } else if (lambda) {
         /*
          * ECMA ed. 3 standard: function expression, possibly anonymous.
          */
@@ -1940,6 +2006,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_body = body;
     pn->pn_flags = (funtc.flags & (TCF_FUN_FLAGS | TCF_HAS_DEFXMLNS)) |
                    ((fun->flags & JSFUN_STRICT) ? TCF_STRICT_MODE : 0);
+    if (lexicalFunction) pn->pn_flags |= PNF_BLOCK_FUNCTION;
     pn->pn_tryCount = funtc.tryCount;
     pn->pn_restSlot = funtc.restSlot;
     pn->pn_parameters = funtc.parameters;
@@ -2015,7 +2082,7 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         JSBool parsed;
         if (!formalTS) goto bad;
         formalTS->flags |= ts->flags & (TSF_STRICT_MODE | TSF_SUPER_ALLOWED |
-                                       TSF_SUPER_CALL_ALLOWED | TSF_MODULE | TSF_NEW_TARGET_ALLOWED);
+                                       TSF_SUPER_CALL_ALLOWED | TSF_MODULE | TSF_NEW_TARGET_ALLOWED | TSF_GENERATOR);
         parsed = ModernFunctionParameters(cx, formalTS, fun, &funtc, &pn->pn_source, JS_FALSE);
         if (parsed && js_GetToken(cx, formalTS) != TOK_EOF)
             parsed = LexicalSyntaxError(cx, formalTS);
@@ -2944,7 +3011,7 @@ CheckDestructuring(JSContext *cx, BindData *data,
      * the historical constant-key grammar and cannot validate these patterns. */
     if (JS_VERSION_IS_ES2015(cx)) {
         right = NULL;
-        left->pn_extra &= ~(PNX_COVERINIT | PNX_COVERREST);
+        left->pn_extra &= ~(PNX_COVERINIT | PNX_COVERREST | PNX_COVERPROTO);
     }
     if (left->pn_type == TOK_ARRAYCOMP) {
         js_ReportCompileErrorNumber(cx, left, JSREPORT_PN | JSREPORT_ERROR,
@@ -4104,7 +4171,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             if (TOKEN_TYPE_IS_DECL(tt)
                 ? (pn1->pn_count > 1 || pn1->pn_op == JSOP_DEFCONST
 #if JS_HAS_DESTRUCTURING
-                   || (pn->pn_op == JSOP_FORIN &&
+                   || (!JS_VERSION_IS_ES2015(cx) && pn->pn_op == JSOP_FORIN &&
                        (pn1->pn_head->pn_type == TOK_RC ||
                         (pn1->pn_head->pn_type == TOK_RB &&
                          pn1->pn_head->pn_count != 2) ||
@@ -4116,7 +4183,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 : (pn1->pn_type != TOK_NAME &&
                    pn1->pn_type != TOK_DOT &&
 #if JS_HAS_DESTRUCTURING
-                   ((pn->pn_op == JSOP_FORIN)
+                   ((!JS_VERSION_IS_ES2015(cx) && pn->pn_op == JSOP_FORIN)
                     ? (pn1->pn_type != TOK_RB || pn1->pn_count != 2)
                     : (pn1->pn_type != TOK_RB && pn1->pn_type != TOK_RC)) &&
 #endif
@@ -4186,8 +4253,9 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 if (pn1 == pn2 && !CheckDestructuring(cx, NULL, pn2, NULL, tc))
                     return NULL;
 
-                /* Destructuring for-in requires [key, value] enumeration. */
-                if (!forOf && pn->pn_op != JSOP_FOREACH)
+                /* Historical destructuring enumerates [key, value] pairs. */
+                if (!JS_VERSION_IS_ES2015(cx) && !forOf &&
+                    pn->pn_op != JSOP_FOREACH)
                     pn->pn_op = JSOP_FOREACHKEYVAL;
                 break;
 #endif
@@ -7542,8 +7610,9 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 if (JS_VERSION_IS_ES2015(cx) && propertyKind == 1 &&
                     (previousKind & 1) &&
                     propertyAtom == cx->runtime->atomState.protoAtom) {
-                    StrictSyntaxError(cx, ts);
-                    return NULL;
+                    /* Assignment/binding patterns allow repeated property
+                     * names; reject only if this remains an object literal. */
+                    pn->pn_extra |= PNX_COVERPROTO;
                 }
                 if (!JS_VERSION_IS_ES2015(cx) &&
                     (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
@@ -8193,7 +8262,7 @@ js_FoldConstants(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
     }
 
     if (pn->pn_arity == PN_LIST && pn->pn_type == TOK_RC &&
-        (pn->pn_extra & PNX_COVERINIT)) {
+        (pn->pn_extra & (PNX_COVERINIT | PNX_COVERPROTO))) {
         js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
                                     JSMSG_STRICT_SYNTAX);
         return JS_FALSE;

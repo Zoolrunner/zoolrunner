@@ -6,6 +6,42 @@ Preserve the classic JSAPI, historical XUL applications and explicitly selected
 legacy JavaScript versions. Keep the [ES5.1 regression gate](../es5/README.md)
 and application checks alongside this work.
 
+
+## Later coverage diagnostics
+
+`diagnose-later-test262.py` runs explicitly selected candidates from the clean
+later checkout at `35d566604512cba908054eec49f85e64a59f3091`. The default
+`--selection es6id` includes every case retaining that metadata key.
+`--selection es2015-features` selects cases mentioning implemented/required ES6
+feature tags, including cases that also use newer features. Neither selection
+is a complete ES2015 inventory or an edition decision. Every selected failure
+remains in the report; no outcomes are converted into exclusions.
+
+The shell's `createTest262Realm()` returns an isolated standard global with
+`$262.global`, `evalScript`, `createRealm`, `gc` and explicit module hooks. Its
+opaque `compileScript`/`executeScript` pair separates compilation from execution,
+retains scripts through GC, and rejects execution through another realm's host.
+Harness setup is a separate script in the tested realm; bookkeeping stays in
+the shell realm, so a test can make its global nonextensible. Negative tests
+must throw the expected realm's constructor in their specified parse, resolution
+or runtime phase. Harness failures cannot satisfy a negative expectation.
+The runner has 16 executable phase, isolation, Unicode, module and async controls:
+
+```sh
+python3 js/tests/es6/test-later-runner.py --shell /path/to/frozen/xpcshell
+python3 js/tests/es6/diagnose-later-test262.py \
+  --suite /path/to/test262-later --shell /path/to/frozen/xpcshell \
+  --selection es6id --report /tmp/later-es6id-diagnostic.json
+```
+
+A nonzero diagnostic exit retains all results, including expected edition
+conflicts, for review. The initial module host supports self-import fixtures;
+other dependencies report an explicit host error. Detachment/agent and other
+modern host capabilities are not implied. Missing hosts and later syntax must
+be investigated, not counted as ES2015 passes. Broader ES6-tagged coverage
+already confirms that proper tail-call execution remains unfinished; the
+historical corpus's complete pass does not cover it.
+
 ## Reproducible initial baseline
 
 The initial corpus is official TC39 Test262 at
@@ -3110,3 +3146,37 @@ and 32 failures, without harness errors. That diagnostic still needs edition
 review and phase checking and is not a full ES2015 conformance result. Further
 pattern/scope fixes are being validated separately. Other platforms have not
 been revalidated for this batch.
+
+
+### Pattern, realm and strict block-function follow-up
+
+ES2015 for-in destructuring now consumes property-name strings while explicit
+legacy editions retain key/value enumeration. Duplicate `__proto__` keys are
+allowed in patterns but rejected in object literals. Arrow formals inherit the
+outer generator grammar and reject yield expressions. Foreign-realm eval
+intrinsics perform indirect eval. Non-Unicode `\8`/`\9` identity escapes
+consume their digit when there is no matching capture. Strict block and switch
+functions now initialize lexical bindings at scope entry, retain closures and
+do not leak into the surrounding variable environment. Their source declarations
+remain at their original positions when decompiled. Cache version is **63** for
+the updated hidden initialization/source-note behavior.
+
+The integrated macOS arm64 run preserves **28,582/28,582 ES6** and
+**11,540/11,540 ES5**, with zero failures, unsupported cases, harness errors,
+crashes or timeouts. All four applications pass root builds, packages and
+relocated desktop checks, Calendar views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. Reports: `artifacts/es6/pattern-scope-final-*`. All
+four libraries and the frozen conformance runtime share SHA-256
+`546397d516c9e9d3f3b0239dbaf77f4b529789d1addc85e1265662be0c62ec18`.
+C89 checks pass. Focused coverage includes 21 pattern/escape checks, nine strict
+block-function checks, 16 realm/phase checks, 16 runner controls, 107 pinned
+block-scope modes, and 17 native wide-function checks including GC, XDR, source
+round trips and execution in another global. Other platforms were not revalidated.
+
+The phase-aware later `es6id` diagnostic reports **5,833 passes and 19 failures**,
+without harness errors. These remain diagnostic results, with edition review
+pending, rather than conformance totals. The broader tail-call-tagged selection
+has 35 modes (one pass and 34 failures, including two later coalescing cases);
+proper ES2015 tail-call execution is still required. The separate expanded
+feature-tagged run includes 37,972 modes, retains mixed newer features, and must
+not be described as a reviewed ES2015 suite. Full ES2015 completion remains open.

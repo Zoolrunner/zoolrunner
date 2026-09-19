@@ -2625,6 +2625,40 @@ EmitNumberOp(JSContext *cx, jsdouble dval, JSCodeGenerator *cg)
     return EmitAtomIndexOp(cx, JSOP_NUMBER, ALE_INDEX(ale), cg);
 }
 
+/* Initialize strict block functions on scope entry, including declarations in
+ * switch cases which execution may never reach. Keep source declarations at
+ * their original positions for decompilation. */
+static JSBool
+EmitBlockFunctions(JSContext *cx, JSCodeGenerator *cg, JSParseNode *list,
+                   JSObject *block)
+{
+    JSParseNode *item;
+    JSFunction *fun;
+    JSScopeProperty *property;
+    jsuint slot;
+    if (list->pn_arity != PN_LIST) return JS_TRUE;
+    for (item = list->pn_head; item; item = item->pn_next) {
+        if (item->pn_type == TOK_CASE || item->pn_type == TOK_DEFAULT) {
+            if (!EmitBlockFunctions(cx, cg, item->pn_right, block))
+                return JS_FALSE;
+        } else if (item->pn_type == TOK_FUNCTION &&
+                   (item->pn_flags & PNF_BLOCK_FUNCTION)) {
+            if (!js_EmitTree(cx, cg, item)) return JS_FALSE;
+            item->pn_flags |= PNF_BLOCK_EMITTED;
+            fun = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(item->pn_funAtom));
+            property = SCOPE_GET_PROPERTY(OBJ_SCOPE(block), ATOM_TO_JSID(fun->atom));
+            JS_ASSERT(property && (property->flags & SPROP_HAS_SHORTID));
+            slot = OBJ_BLOCK_DEPTH(cx, block) + (uint16)property->shortid;
+            if (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0) return JS_FALSE;
+            EMIT_UINT16_IMM_OP(JSOP_INITLOCAL, slot);
+            if (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                js_Emit1(cx, cg, JSOP_POP) < 0)
+                return JS_FALSE;
+        }
+    }
+    return JS_TRUE;
+}
+
 static JSBool
 EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
            JSStmtInfo *stmtInfo)
@@ -2728,6 +2762,9 @@ EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 
         /* Advance pn2 to refer to the switch case list. */
         pn2 = pn2->pn_expr;
+        if (!EmitBlockFunctions(cx, cg, pn2, obj)) return JS_FALSE;
+        top = CG_OFFSET(cg);
+        stmtInfo->update = top;
     }
 #endif
 
@@ -4575,6 +4612,14 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             break;
         }
 #endif
+
+        if (pn->pn_flags & PNF_BLOCK_EMITTED) {
+            ale = js_IndexAtom(cx, pn->pn_funAtom, &cg->atomList);
+            if (!ale || js_NewSrcNote2(cx, cg, SRC_FUNCDEF, ALE_INDEX(ale)) < 0 ||
+                js_Emit1(cx, cg, JSOP_NOP) < 0)
+                return JS_FALSE;
+            break;
+        }
 
         /* Generate code for the function's body. */
         cg2mark = JS_ARENA_MARK(cg->codePool);
@@ -6744,6 +6789,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             return JS_FALSE;
         JS_ASSERT(CG_OFFSET(cg) == top);
         EMIT_ATOM_INDEX_OP(JSOP_ENTERBLOCK, ALE_INDEX(ale));
+        if (!EmitBlockFunctions(cx, cg, pn->pn_expr, obj)) return JS_FALSE;
 
         if (!js_EmitTree(cx, cg, pn->pn_expr))
             return JS_FALSE;

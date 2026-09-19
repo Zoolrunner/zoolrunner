@@ -323,6 +323,9 @@ struct JSParseNode {
     JSAtom              *pn_source;     /* saved source for decompilation */
 };
 
+#define PNF_BLOCK_FUNCTION 0x10000U /* strict block lexical declaration */
+#define PNF_BLOCK_EMITTED  0x20000U /* initialization emitted at scope entry */
+
 #define pn_funAtom      pn_u.func.funAtom
 #define pn_body         pn_u.func.body
 #define pn_flags        pn_u.func.flags
@@ -360,6 +363,7 @@ struct JSParseNode {
 #define PNX_ENDCOMMA    0x10            /* array literal has comma at end */
 #define PNX_XMLROOT     0x20            /* top-most node in XML literal tree */
 #define PNX_GROUPINIT   0x40            /* var [a, b] = [c, d]; unit list */
+#define PNX_COVERPROTO 0x800           /* duplicate prototype setter in cover grammar */
 #define PNX_COVERREST  0x400           /* unresolved array rest cover */
 #define PNX_COVERINIT  0x200           /* unresolved object cover initializer */
 #define PNX_CONST      0x100           /* modern lexical const declaration */
