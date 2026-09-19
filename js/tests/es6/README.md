@@ -3212,3 +3212,40 @@ application libraries and the frozen conformance runtime have SHA-256
 Focused checks cover 13 original-range/edition cases and five detachment-host
 cases. This is local macOS arm64 validation, not new Windows/Linux validation.
 Proper tail calls and the reviewed later ES2015 inventory remain unfinished.
+
+
+## Conversion and built-in metadata follow-up
+
+Modern globals expose `Number.parseInt` and `Number.parseFloat` as aliases of
+their global functions. `DataView.length` is 1, excluding optional arguments;
+the constructor explicitly handles an omitted offset. The local binary-data
+fixture's old arity assertion was corrected to the ES2015 requirement.
+
+Modern primitive conversion skips non-callable fallback methods, propagates
+accessor exceptions and calls ordinary `valueOf` with no arguments. A primitive
+`null` returned by conversion is stringified as `"null"`. Modern
+`isPrototypeOf` checks a primitive argument before coercing its receiver and
+preserves an existing object receiver without invoking legacy class conversion.
+Explicit legacy callers retain the historical `valueOf` hint convention;
+modern built-ins work with values from legacy globals. Native class conversion
+hooks and legacy XML conversion remain available.
+
+The final macOS arm64 validation passes **28,582/28,582 pinned ES6** and
+**11,540/11,540 ES5**, with zero failures, unsupported cases, harness errors,
+crashes or timeouts. All four root builds, packages and relocated desktop
+checks pass, including Calendar's four views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. Reports: `artifacts/es6/conversion-builtins-final-*`.
+All four libraries and the frozen runtime share SHA-256
+`3c3f6180fb722504b5aaeb447f1f825ebcd64e5797d2ac65cd2ebccab45f1387`.
+C89 checks, 18 focused conversion checks and 18 native cross-realm/embedding
+checks pass. Initial failures involving optional arguments and Date prototype
+receivers were fixed before this final validation. Other platforms were not
+revalidated. Tail-call implementation is still separate, unfinished work.
+
+The expanded later feature-tag diagnostic, before these conversion fixes,
+reports 18,971 passes, 18,697 failures and 304 host/harness errors across 37,972
+modes. Report: `artifacts/es6/later-expanded-generated-diagnostic.json`.
+This is not an ES2015 conformance score: the selection includes many later
+features and normative changes, and edition review remains pending. Unknown
+host flags, unsupported module fixtures and newer harness syntax remain visible.
+No upstream assertions or required modes were changed.

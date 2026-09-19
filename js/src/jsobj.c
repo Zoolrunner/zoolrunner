@@ -1949,6 +1949,29 @@ obj_isPrototypeOf(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     return JS_TRUE;
 }
 
+/* ES2015 checks the argument before coercing the receiver. */
+static JSBool
+ObjectIsPrototypeOfES2015(JSContext *cx, JSObject *obj, uintN argc,
+                          jsval *argv, jsval *rval)
+{
+    JSBool result, ok;
+    JSTempValueRooter root;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) {
+        *rval = JSVAL_FALSE;
+        return JS_TRUE;
+    }
+    /* ToObject preserves an existing object without invoking the classic
+     * embedding's JSTYPE_OBJECT conversion hook. */
+    obj = JSVAL_IS_PRIMITIVE(argv[-1])
+          ? js_ValueToNonNullObject(cx, argv[-1]) : JSVAL_TO_OBJECT(argv[-1]);
+    if (!obj) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &root);
+    ok = js_IsDelegate(cx, obj, argv[0], &result);
+    if (ok) *rval = BOOLEAN_TO_JSVAL(result);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 /* Proposed ECMA 15.2.4.7. */
 static JSBool
 obj_propertyIsEnumerable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
@@ -2738,6 +2761,10 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
     fun = (JSFunction *) JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
     fun->flags &= ~JSFUN_REQUIRE_THIS;
     if (modern) {
+        if (!JS_GetProperty(cx, proto, js_isPrototypeOf_str, &method)) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
+        fun->u.n.native = ObjectIsPrototypeOfES2015;
+        fun->flags = (fun->flags | JSFUN_STRICT) & ~JSFUN_REQUIRE_THIS;
         if (!JS_GetProperty(cx, proto, "toLocaleString", &method)) return NULL;
         fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
         fun->u.n.native = ObjectLocaleStringES2015;
@@ -5566,11 +5593,27 @@ js_ValueToNonNullObject(JSContext *cx, jsval v)
     return obj;
 }
 
+static JSBool
+ModernPrimitiveConversion(JSContext *cx, JSObject *obj)
+{
+#if JS_HAS_XML_SUPPORT
+    if (OBJECT_IS_XML(cx, obj)) return JS_FALSE;
+#endif
+    return JS_VERSION_IS_ES2015(cx) ||
+           js_IsModernGlobal(cx, JS_GetGlobalForObject(cx, obj)) ||
+           (cx->fp && cx->fp->callee &&
+            js_IsModernGlobal(cx, JS_GetGlobalForObject(cx, cx->fp->callee)));
+}
+
 JSBool
 js_TryValueOf(JSContext *cx, JSObject *obj, JSType type, jsval *rval)
 {
     jsval argv[1];
 
+    if ((type == JSTYPE_VOID || type == JSTYPE_STRING || type == JSTYPE_NUMBER) &&
+        ModernPrimitiveConversion(cx, obj))
+        return js_TryMethod(cx, obj, cx->runtime->atomState.valueOfAtom,
+                            0, NULL, rval);
     argv[0] = ATOM_KEY(cx->runtime->atomState.typeAtoms[type]);
     return js_TryMethod(cx, obj, cx->runtime->atomState.valueOfAtom, 1, argv,
                         rval);
@@ -5596,6 +5639,14 @@ js_TryMethod(JSContext *cx, JSObject *obj, JSAtom *atom,
      * returned failure.  We propagate failure in this case to make exceptions
      * behave properly.
      */
+    /* Modern ordinary conversion propagates accessor errors and skips
+     * non-callable methods. Keep the historical embedding fallback below. */
+    if (ModernPrimitiveConversion(cx, obj)) {
+        if (!OBJ_GET_PROPERTY(cx, obj, ATOM_TO_JSID(atom), &fval))
+            return JS_FALSE;
+        return !js_IsCallable(cx, fval) ||
+               js_InternalCall(cx, obj, fval, argc, argv, rval);
+    }
     older = JS_SetErrorReporter(cx, NULL);
     id = ATOM_TO_JSID(atom);
     fval = JSVAL_VOID;

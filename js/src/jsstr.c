@@ -3310,6 +3310,8 @@ js_ValueToString(JSContext *cx, jsval v)
         if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_STRING, &v))
             return NULL;
     }
+    if (JSVAL_IS_NULL(v))
+        return ATOM_TO_STRING(cx->runtime->atomState.nullAtom);
     if (JSVAL_IS_SYMBOL(v)) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
                              JSMSG_SYMBOL_CONVERSION, "string");

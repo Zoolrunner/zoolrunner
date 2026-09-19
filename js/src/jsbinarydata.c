@@ -172,7 +172,8 @@ js_DataViewConstructor(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv
     buffer = GetBuffer(cx, argv[0]);
     if (!buffer) return BinaryTypeError(cx);
     /* Corrected ES2015: the optional offset uses ToInteger (TC39 #4516). */
-    if (!js_ValueToNumber(cx, argv[1], &offset)) return JS_FALSE;
+    if (!js_ValueToNumber(cx, argc > 1 ? argv[1] : JSVAL_VOID, &offset))
+        return JS_FALSE;
     offset = js_DoubleToInteger(offset);
     if (offset < 0) return BinaryRangeError(cx);
     if (buffer->detached) return BinaryTypeError(cx);
@@ -448,7 +449,7 @@ js_InitDataViewClass(JSContext *cx, JSObject *global)
     uintN i;
     char name[24];
     proto = JS_InitClass(cx, global, NULL, &js_DataViewClass,
-                         js_DataViewConstructor, 3, NULL, NULL, NULL, NULL);
+                         js_DataViewConstructor, 1, NULL, NULL, NULL, NULL);
     if (!proto) return NULL;
     JS_PUSH_TEMP_ROOT_OBJECT(cx, proto, &root);
     ctor = JS_GetConstructor(cx, proto);

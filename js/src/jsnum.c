@@ -716,6 +716,16 @@ js_InitNumberClass(JSContext *cx, JSObject *obj)
                            JSFUN_THISP_NUMBER | JSFUN_NO_CONSTRUCT |
                            JSFUN_REQUIRE_THIS))
         return NULL;
+    if (js_IsModernGlobal(cx, obj)) {
+        jsval parser;
+        const char *names[2] = {js_parseInt_str, js_parseFloat_str};
+        uintN i;
+        for (i = 0; i < 2; ++i) {
+            if (!JS_GetProperty(cx, obj, names[i], &parser) ||
+                !JS_DefineProperty(cx, ctor, names[i], parser, NULL, NULL, 0))
+                return NULL;
+        }
+    }
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_ZERO);
     if (!JS_DefineConstDoubles(cx, ctor, number_constants))
         return NULL;

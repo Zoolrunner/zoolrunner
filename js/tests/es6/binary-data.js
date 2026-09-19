@@ -73,6 +73,6 @@
     var descriptor = Object.getOwnPropertyDescriptor(DataView.prototype, 'getInt8');
     check(descriptor.writable && descriptor.configurable && !descriptor.enumerable, 'method descriptor');
     throws(TypeError, function () { new v.getInt8(); });
-    check(ArrayBuffer.length === 1 && DataView.length === 3 && v.getInt8.length === 1 && v.setInt8.length === 2, 'arities');
+    check(ArrayBuffer.length === 1 && DataView.length === 1 && v.getInt8.length === 1 && v.setInt8.length === 2, 'arities');
     print('ES6-BINARY-DATA checks=' + checks + ' failures=0');
 }());

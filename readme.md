@@ -898,3 +898,14 @@ now backs the isolated Test262 host. The later diagnostic runner recognizes
 upstream's informational `generated` flag; 18 runner controls pass. See the
 ES6 guide for reports and edition differences. Full ES2015 completion remains
 open, and this batch does not revalidate other platforms.
+
+
+The conversion/built-in follow-up adds modern Number parser aliases, corrects
+DataView arity and omitted-offset handling, and fixes conversion fallback,
+exception propagation and `isPrototypeOf` receiver ordering. Legacy conversion
+conventions and native embedding hooks have explicit cross-realm coverage.
+Final validation again passes **28,582/28,582 pinned ES6**, **11,540/11,540 ES5**
+and all four macOS arm64 build/package/application gates, including Calendar
+views and Browser/ChatZilla integration. See the ES6 guide for exact reports,
+expanded diagnostic limitations and unfinished tail-call/coverage work.
+This is not a new Windows or Linux validation result.

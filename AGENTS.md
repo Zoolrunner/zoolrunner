@@ -410,6 +410,10 @@ Metadata and feature tags select review candidates, not edition exemptions.
 Verify modern negative-test phases with isolated host realms and keep harness
 errors visible. Preserve `test262-realms.js`, `test-later-runner.py` and wide
 block-function XDR/source round trips when changing those paths.
+For primitive-conversion changes, preserve `conversion-builtin-edges.js` and
+`TestConversionRealms.c`: modern calls must handle foreign legacy values while
+explicit legacy callers retain their historical conversion convention and
+native embedding class conversion hooks remain usable.
 Keep explicit legacy language versions and historical XUL/component script
 loading behavior usable while implementing the modern language semantics.
 The initial ES2015 boundary uses `JSVERSION_ECMA_2015` (2015), selected by
