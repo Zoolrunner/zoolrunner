@@ -168,5 +168,8 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                            'chrome://zooltest/content/compatibility-overlay.xul\n')
         run([executable, '-profile', profile], 'calendar-window',
             'CALENDAR-WINDOW views=4 failures=0')
+    run(['python3', root / 'build/linux/test-es6.py', a.arch,
+         '--root', root, '--objdir', root / objname, '--runtime', runtime,
+         '--logs', logs / 'es6'], 'es6', 'ES2015 PASS:', timeout=2400)
 (logs / 'runtime-result.txt').write_text('PASS: ' + a.arch + ' ' + a.toolkit + ' ' + a.app + '\n')
 print(a.arch + ' ' + a.toolkit + ' ' + a.app + ': packaged runtime checks passed')

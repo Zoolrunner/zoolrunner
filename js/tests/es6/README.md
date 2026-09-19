@@ -3738,8 +3738,13 @@ Reports use `date-numeric-x86-final-*`; all eight Date-batch package archives an
 checksums were preserved before the next parser build. Linux aarch64 Suite GTK2
 also passes its local `act` workflow at commit `57e7022a`: compilation, ABI checks,
 packaging, relocated runtime tests and both artifact uploads. Its complete pinned
-ES5 run passes 11,540 cases. Additional full ES6 package testing is running
-separately; Windows remains unvalidated for this batch. Linux reports are under
+ES5 run passes 11,540 cases. Additional package testing passes all 28,582 ES6
+modes with a 60-second per-case limit and an unchanged runtime. Its first full
+run with the default 10-second limit had 28,578 passes and four exhaustive
+URI-decoding timeouts. Both modes of each timed-out test passed separately,
+then the entire unchanged corpus passed on retry. The first report remains in
+`extra/es6.json`; the clean complete retry is `extra-full-retry/es6.json`.
+Windows remains unvalidated for this batch. Linux reports are under
 `artifacts/es6/linux-date-act-suite-gtk2/`.
 
 The complete later Date directory records 1,194 diagnostic passes and 42
@@ -3774,5 +3779,87 @@ and all four build/package/relocated runtime gates, Calendar views, Browser
 navigation and Suite/XULRunner ChatZilla. The package checks now include 116
 focused fixtures and 68 native fixtures. Its four application engines share
 SHA-256 `46ef2c22ed4d21898f607322abe8b7940bc3eeab7d3df2ddadccef611785350b`;
-reports use `artifacts/es6/contextual-final-*`. Fresh x86_64 validation is running;
-Linux and Windows have not been revalidated for this parser change.
+reports use `artifacts/es6/contextual-final-*`. Fresh x86_64 validation also passes
+all 28,582 ES6 modes and 11,540 ES5 modes with zero errors. Its four build/package
+gates and relocated desktop checks pass; the engine SHA-256 is
+`d7546eee8009f4a43032976cd6822349313cd0070994f1185591a191ca739999`.
+The extra Calendar view check initially produced no completion marker, and the
+XULRunner ChatZilla check initially timed out at 20 seconds. Unchanged packages
+passed on retry (Calendar at its original 45-second limit, ChatZilla at 60 seconds
+with overlay/load diagnostics); causes remain unconfirmed. Browser navigation
+and Suite ChatZilla also pass. Preserve `contextual-x86-final-*` original logs
+and retry logs; the original desktop coordinator exited unsuccessfully. All eight
+archives were preserved under `contextual-package-archives/`.
+Linux aarch64 Suite GTK2 passes its local `act` workflow at `b7551120`, including
+build, ABI, package, runtime, full ES5 and both uploads. Supplemental checks passed 116 focused fixtures and 63 native probes; five
+private-probe links failed, and the external runner then hit a Git worktree-path
+error. The queue stopped with those failures retained. The expanded Linux
+workflow now tests private probes against production objects and is undergoing
+fresh validation with the subsequent emitter correction. Windows remains
+unvalidated for this parser batch.
+
+### Discarded derived-this reads
+
+The later class diagnostic exposed a real original-ES2015 regression: the
+emitter treated a bare `this;` expression as effect-free and could discard it,
+suppressing the required ReferenceError before `super()`. Modern discarded
+reads now retain their evaluation, including arrow captures and unary, comma,
+loop-initializer and delete expressions. Legacy optimization is unchanged.
+The [original GetThisBinding rule](https://262.ecma-international.org/6.0/#sec-function-environment-records-getthisbinding)
+requires the exception even when the value is unused. Emitted code changes,
+so the embedding bytecode cache version advances to 66.
+
+The isolated correction passes 43 focused checks, 13 native checks, both modes
+of the upstream null-heritage regression, all 116 existing focused fixtures
+and 68 existing native fixtures, and C89 checks. Coverage includes a captured
+binding before/after `super()`, callbacks/GC, exact exception type, legacy
+receivers, decompilation and XDR execution across editions. Both macOS architectures now pass the complete pinned ES2015 corpus
+(28,582/28,582) and ES5.1 corpus (11,540/11,540), with zero failures, timeouts,
+crashes, unsupported cases or harness errors. All four applications build,
+package and pass their relocated desktop checks on each architecture, including
+Calendar four-view checks, Browser navigation (169 checks), and Suite/XULRunner
+ChatZilla coverage. All eight archives and engine hashes are retained under
+`artifacts/es6/this-effects-package-archives` and
+`this-effects-both-architectures-hashes.json`. Logs use the `this-effects-final`
+and `this-effects-x86-final` prefixes.
+
+Native Linux aarch64 Suite GTK2 also passes the actual local `act` workflow:
+build, ABI probe, package, runtime, both complete pinned suites, all 117 focused
+fixtures, all 69 native probes and artifact uploads. The five internal probes
+link production objects; the other probes use the packaged engine. Its unchanged
+engine hash is `71f48aacb0965649ebf27ddc133627312ef23b4b4abb8ac21bc04816bda47ff7`.
+The exact source snapshot, patch and copied-source verification are retained
+under `artifacts/es6/linux-this-effects-snapshot` and
+`linux-this-effects-act-suite-gtk2`. This is one Linux matrix entry, not the full
+expanded Linux matrix. Linux x86, other aarch64 entries and Windows remain
+unvalidated for this batch; GitHub-hosted results are not claimed.
+
+The complete later class-directory diagnostic before this correction retained
+3,478 passes, 5,184 failures and four unavailable-IsHTMLDDA host errors across
+8,666 modes. This mixes many later language features and is not an ES6
+conformance total. Manual review of 27 failing files with original-only or
+absent feature tags identified the discarded-this regression plus later syntax,
+later class-name insertion order, later default-constructor argument forwarding,
+later omitted ArrayBuffer lengths, and assumptions about exact function source.
+Original ES2015 permits equivalent function representations; the classic
+decompiler preserves strict class-created functions with an explicit directive.
+No upstream assertions or report outcomes were changed. The edition ledger now
+contains 229 records with verified source hashes and original-specification
+anchors, and remains incomplete.
+
+The first integrated package attempt caught a stale expected cache-version
+constant in `TestRegExpConstructor.c`; both logs remain as
+`this-effects-*.cache-assertion-failure`. The assertion now checks version 66,
+matching the intentional header change. Fresh validation retains the complete
+fixture table. Linux now runs it and the full pinned ES2015 corpus inside the
+workflow, linking the five private-interface probes against production objects
+while public embedding probes continue to use the packaged shared library; see
+[Linux gate](../../../build/linux/README.md#es2015-regression-gate).
+
+The separate class-expression diagnostic retains 3,028 diagnostic passes and
+4,999 failures across 8,027 modes. Manual review of 25 original-tagged or
+untagged failing files found later grammar, exact-source assumptions, omitted
+ArrayBuffer length behavior and anonymous-class own-name requirements. Original
+ES2015 class-expression evaluation adds the name here only for a present
+BindingIdentifier. These source-hashed reviews neither change the diagnostic
+results nor establish a complete edition inventory.

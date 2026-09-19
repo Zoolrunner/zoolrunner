@@ -181,3 +181,40 @@ arguments for Oracle Linux 8. No upstream ES5 tests or assertions were changed.
 
 This validates the listed application and component regressions, not every
 historical application's behavior or exhaustive ECMAScript conformance.
+
+## ES2015 regression gate
+
+The runtime stage now also calls `test-es6.py` for every application, architecture
+and backend. Both container recipes install Oracle Linux's Python YAML package
+for the pinned ES2015 runner. The gate runs the shared focused fixture table,
+native probes and all 28,582 required modes at Test262 revision
+`5e653f2e6ca14ac1ad8e801955a709cae7ac8a11`, in America/Los_Angeles. It uses four
+workers and a 60-second per-case limit. Reports are retained under `logs/es6`;
+no subset or reviewed later-edition result substitutes for the complete run.
+
+Most native probes link against the relocated package's `libmozjs.so`. Five
+unit probes intentionally call private engine interfaces: ClassRuntime,
+GlobalLexicalStore, MethodHome, SuperReference and TypedArrays. Those link a
+temporary archive of the production Makefile's exact `OBJS` into standalone
+test executables. This does not export private functions or link a second
+engine into an application. The gate records object hashes and requires the
+packaged engine to match the build providing them. Generated target headers
+and target compiler flags are used, including `-m32` for i686.
+
+The expanded workflow passes native aarch64 Suite GTK2 through local `act` for
+the discarded-derived-this correction: build, target ABI, package, runtime,
+11,540/11,540 ES5.1 cases, 28,582/28,582 ES2015 modes, 117 focused fixtures,
+69 native probes and both artifact uploads. Logs, original reports and the
+source snapshot are retained under `artifacts/es6/linux-this-effects-act-suite-gtk2`
+and `linux-this-effects-snapshot`. Other entries have not yet been validated with
+this expanded gate. The earlier eight-job table above records the ES5-era gate,
+not this new ES2015 gate. Supplemental
+testing of the Suite GTK2 package at `57e7022a` passes the full ES2015 corpus.
+Its first attempt recorded four exhaustive URI-decoding timeouts with the
+10-second default. The unchanged corpus passed in full with the 60-second
+limit; both reports remain under `artifacts/es6/linux-date-act-suite-gtk2`.
+The parser follow-up's Suite workflow at `b7551120` also passes its existing
+gate. Its supplemental run passed 116 focused fixtures and 63 packaged native
+probes, but five private-probe links failed and the external harness encountered
+a Git worktree-path error. Those failures remain recorded; they motivated
+running internal probes while production build objects are still available.

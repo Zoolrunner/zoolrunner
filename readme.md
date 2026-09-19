@@ -993,5 +993,12 @@ for the explicit date-only parsing compatibility policy and remaining checks.
 
 A parser follow-up rejects escaped modern modifiers and malformed class method
 parameter lists while preserving legacy accessor syntax and escaped property
-names. Both pinned suites and all four application gates pass on macOS arm64;
-x86_64 validation is running. See [contextual grammar checks](js/tests/es6/README.md#contextual-modifiers-and-class-parameter-lists).
+names. Both pinned suites pass on macOS arm64 and x86_64; application checks
+also pass, with the recorded x86_64 Calendar/ChatZilla retries. See [contextual grammar checks](js/tests/es6/README.md#contextual-modifiers-and-class-parameter-lists).
+
+A further emitter correction preserves the exception from a discarded `this`
+read before `super()`, without changing legacy optimization. Both pinned suites
+and all four applications pass on both macOS architectures. Native Linux
+aarch64 Suite GTK2 passes the expanded local `act` gate, including complete
+ES5/ES6 runs and focused/native probes. Other Linux entries and Windows remain
+unvalidated for this batch; see [derived-this validation](js/tests/es6/README.md#discarded-derived-this-reads).

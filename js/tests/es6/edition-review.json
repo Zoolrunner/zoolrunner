@@ -703,6 +703,76 @@
       "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
     },
     {
+      "test": "language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-arrow-function-expression.js",
+      "sha256": "7446770c3c4fa039579a6726d70a8f9ce9a63688c8db3ad88d4c351b613ef18e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The test relies on identical exact source strings for functions created inside a strict class and outside it. Original ES2015 permits implementation-dependent equivalent function representations; the classic decompiler retains the strict directive in the class-created function."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-async-arrow-function-expression.js",
+      "sha256": "8a6627988e98cbe86471d46061715fe0cfb4ff43e9cd0f36549f38aa6bb79f6e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-expression-coalesce.js",
+      "sha256": "2d9f264b8c4c900d82a9445f298e8e1d0292e32c84d3634ed82cea40a7bb9e75",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-function-expression.js",
+      "sha256": "701def3353c68a6887d5b7d42f121d399d284c045a44ba14d0fc882d44186ef0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The test relies on identical exact source strings for functions created inside a strict class and outside it. Original ES2015 permits implementation-dependent equivalent function representations; the classic decompiler retains the strict directive in the class-created function."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-integer-separators.js",
+      "sha256": "ea20b7b6d4948b397cd57228db38314d12a14dafdf200e3f112a73cb8d6afaf4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-computed-property-name-from-arrow-function-expression.js",
+      "sha256": "4613aa67f4fe12c716dde9612a1bd5de92ae7c3e5f630f9922031959f4d42279",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The test relies on identical exact source strings for functions created inside a strict class and outside it. Original ES2015 permits implementation-dependent equivalent function representations; the classic decompiler retains the strict directive in the class-created function."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-computed-property-name-from-async-arrow-function-expression.js",
+      "sha256": "63b9fa7914a1def01a5da3adb26ef9229de980dedd37b3af7d9d79cc1fa765d8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-computed-property-name-from-expression-coalesce.js",
+      "sha256": "0127252de7f5a6b8e57bd6db31c1044f29be3f469775509278fb29766f355ebd",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-computed-property-name-from-function-expression.js",
+      "sha256": "4d76a902b01bb9c5cb91db0d64c6f748d483a6277c919ec75a68156fa8ba1df5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The test relies on identical exact source strings for functions created inside a strict class and outside it. Original ES2015 permits implementation-dependent equivalent function representations; the classic decompiler retains the strict directive in the class-created function."
+    },
+    {
+      "test": "language/expressions/class/cpn-class-expr-computed-property-name-from-integer-separators.js",
+      "sha256": "c390d33dec030387c1521c4bebfc16b7528f1a1fe866d088c39e06cc80de2569",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
       "test": "language/expressions/class/elements/private-accessor-name/inst-private-escape-sequence-ZWJ.js",
       "sha256": "05c26e51780e678b60eae90ada5e0fe1a6b149f0b8eadabfa6c180d9f9a16fd6",
       "decision": "later-requirement",
@@ -843,6 +913,111 @@
       "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
     },
     {
+      "test": "language/expressions/class/gen-method-static/dflt-params-trailing-comma.js",
+      "sha256": "311b1ce83f1f53842f5675341e9d4c0f521fdd74c4e36c70b9b9601d0839112b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/gen-method-static/params-trailing-comma-multiple.js",
+      "sha256": "5054eb70b5ca4c35e6e65206b20d989a1dcf0e0776872f6bb24f579897e2bdd8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/gen-method-static/params-trailing-comma-single.js",
+      "sha256": "9e72d84b07f1855327233c8be60b09f2c0c56d43cf6efb2a4f56f8ac3b10c4e4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/gen-method/dflt-params-trailing-comma.js",
+      "sha256": "67a7038d2da325ed09f94efa045ff14c5e4a4d6469ef8641c7662b31484b02f6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/gen-method/params-trailing-comma-multiple.js",
+      "sha256": "a182d9cc3a2da140f527b55d42c719f307d4494d085011c645f0c4b9492eaa9b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/gen-method/params-trailing-comma-single.js",
+      "sha256": "9259444f49e0c4e9865dfde6710052eae20d2ae82bad4a39d9e1fb4aba00035b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/heritage-async-arrow-function.js",
+      "sha256": "86b895c69bcd8a794153aabaa6c32a0c5c5d9fce05cde0f7ade0d9fbeeb57f42",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-language-expressions",
+      "reason": "This source uses later async-arrow, nullish-coalescing or numeric-separator grammar, despite original-only or absent feature metadata."
+    },
+    {
+      "test": "language/expressions/class/method-static/dflt-params-trailing-comma.js",
+      "sha256": "a3cc4c09299bfb466ab314e95a1b189b2c3810a61c539f27b35130631aa1ee77",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/method-static/params-trailing-comma-multiple.js",
+      "sha256": "313e9865f2d11c0499c140d4ca3f4a12d6aebc9a6b1033d83aa8db52b6db067e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/method-static/params-trailing-comma-single.js",
+      "sha256": "88cbd9b06569747b87ccc3c5a49ad83c7b3840c560469f9c9997d247c804b009",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/method/dflt-params-trailing-comma.js",
+      "sha256": "5d4d820dbf8cb48dd1cde907879ec2823135ba1ab24900489197917ce16b0204",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/method/params-trailing-comma-multiple.js",
+      "sha256": "c519c9e9497538dea99976b660c49f00951521a37754c84c2ba0accb9806dba0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/method/params-trailing-comma-single.js",
+      "sha256": "477a9df96366140f35f76ba73516ef1bff4b4c51114d80a85964f6e27f62df3e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Trailing commas in formal parameter lists were added after ES2015. The absence of a newer feature tag does not change the grammar required by this source."
+    },
+    {
+      "test": "language/expressions/class/name.js",
+      "sha256": "8e38a11b44c8660ed02178f89bfc66b4932100ac9e2876308983638b5bf87aa1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions-runtime-semantics-evaluation",
+      "reason": "Original ES2015 sets the own class name here only when a BindingIdentifier is present. This test also requires an own empty name for anonymous class expressions, a later requirement."
+    },
+    {
+      "test": "language/expressions/class/subclass-builtins/subclass-ArrayBuffer.js",
+      "sha256": "7e230a93f17446514e49d661a56ed18d8649bd3d084f39aac0417b217b41867c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-arraybuffer-length",
+      "reason": "Original ES2015 converts an omitted length with ToNumber, then rejects the NaN versus zero SameValueZero mismatch. This later test expects an omitted length to produce an empty buffer."
+    },
+    {
       "test": "language/expressions/function/eval-var-scope-syntax-err.js",
       "sha256": "cf5fa31bc3a7bd1b42e8451aa97dace02aad66843df66cc747211a19b959cdd0",
       "decision": "later-requirement",
@@ -918,6 +1093,90 @@
       "decision": "original-es2015-regression",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
       "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-accessors-computed-property-name-from-arrow-function-expression.js",
+      "sha256": "86c3169b81c656b2de6cdb1f5771f7baaf08aca38f6b11af12db4a7d946bdf4c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The assertions require functions with identical source spelling in strict class code and non-strict surrounding code to stringify to identical property keys. Original ES2015 permits a functionally equivalent implementation-dependent representation; ZoolRunner preserves strictness with an explicit directive in the class-created functions. Later exact-source rules remove this distinction. The original diagnostic failure is retained."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-accessors-computed-property-name-from-async-arrow-function-expression.js",
+      "sha256": "bccccc1c078bc0237adf38c1ce78c38e679264a8c65c6543539450f0d52f2ba3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-arrow-function-definitions",
+      "reason": "This test uses async arrow syntax even though its metadata only names computed-property-names. Original ES2015 ArrowFunction grammar has no async modifier."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-accessors-computed-property-name-from-expression-coalesce.js",
+      "sha256": "cf3e5278821bb1693ebadea84db5a17e188afde3b56c7dcd230b530add8d010f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-binary-logical-operators",
+      "reason": "The computed property expressions use the later nullish-coalescing operator, absent from the original ES2015 expression grammar."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-accessors-computed-property-name-from-function-expression.js",
+      "sha256": "5ee5f7974b5be6d0fc03695c9362075f27c36192b2dcf3d73d8c78d2c9676f83",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The assertions require functions with identical source spelling in strict class code and non-strict surrounding code to stringify to identical property keys. Original ES2015 permits a functionally equivalent implementation-dependent representation; ZoolRunner preserves strictness with an explicit directive in the class-created functions. Later exact-source rules remove this distinction. The original diagnostic failure is retained."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-accessors-computed-property-name-from-integer-separators.js",
+      "sha256": "c3e8bb115da2630e1909ac8ec5faa0c3193089220a58ef751073d175f27301eb",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-numeric-literals",
+      "reason": "The computed property expressions use numeric separators, which are absent from original ES2015 NumericLiteral grammar."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-computed-property-name-from-arrow-function-expression.js",
+      "sha256": "ed979296693aa9e261d12292df8e976b966cef9590c987fc32eea48681aa19ec",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The assertions require functions with identical source spelling in strict class code and non-strict surrounding code to stringify to identical property keys. Original ES2015 permits a functionally equivalent implementation-dependent representation; ZoolRunner preserves strictness with an explicit directive in the class-created functions. Later exact-source rules remove this distinction. The original diagnostic failure is retained."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-computed-property-name-from-async-arrow-function-expression.js",
+      "sha256": "0a556e281a7695df9a61cd8661f7975fe65d414843bd3b7f8b9fb2f6d8d3d07c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-arrow-function-definitions",
+      "reason": "This test uses async arrow syntax even though its metadata only names computed-property-names. Original ES2015 ArrowFunction grammar has no async modifier."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-computed-property-name-from-expression-coalesce.js",
+      "sha256": "4363ab6ec7a05f545dde8fcbed86fca7f9739c456b4836c95f25354c9caf2b37",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-binary-logical-operators",
+      "reason": "The computed property expressions use the later nullish-coalescing operator, absent from the original ES2015 expression grammar."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-computed-property-name-from-function-expression.js",
+      "sha256": "4f2daaae945e642b8498a21309c1db2b2dcb422ebc56248c1b83d96c8776c169",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "The assertions require functions with identical source spelling in strict class code and non-strict surrounding code to stringify to identical property keys. Original ES2015 permits a functionally equivalent implementation-dependent representation; ZoolRunner preserves strictness with an explicit directive in the class-created functions. Later exact-source rules remove this distinction. The original diagnostic failure is retained."
+    },
+    {
+      "test": "language/statements/class/cpn-class-decl-computed-property-name-from-integer-separators.js",
+      "sha256": "8a912fe036fea0fcfdec4f656a7f3ba37982656baa9bd63101be9bacfdb9bd22",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-numeric-literals",
+      "reason": "The computed property expressions use numeric separators, which are absent from original ES2015 NumericLiteral grammar."
+    },
+    {
+      "test": "language/statements/class/definition/fn-length-static-precedence-order.js",
+      "sha256": "d458a34ee5f434f71eb6750a5fe4b7a1e813ab65571aec8410337a0219681b73",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-runtime-semantics-bindingclassdeclarationevaluation",
+      "reason": "Original ES2015 creates the prototype and static properties before BindingClassDeclarationEvaluation conditionally supplies the class name. The later test requires the name property to precede prototype and static methods in creation order."
+    },
+    {
+      "test": "language/statements/class/definition/fn-name-static-precedence-order.js",
+      "sha256": "1fc4a2531c3e20219cf15e71fc186d0867fecee7cebcba43341c94af281cba7b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-runtime-semantics-bindingclassdeclarationevaluation",
+      "reason": "Original ES2015 creates the prototype and static properties before BindingClassDeclarationEvaluation conditionally supplies the class name. The later test requires the name property to precede prototype and static methods in creation order."
     },
     {
       "test": "language/statements/class/elements/private-accessor-name/inst-private-escape-sequence-ZWJ.js",
@@ -1058,6 +1317,111 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
       "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/gen-method-static/dflt-params-trailing-comma.js",
+      "sha256": "831149af3bfa4575f6512bfb712527f1a67f435689b92f1e6d345653b80334f9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/gen-method-static/params-trailing-comma-multiple.js",
+      "sha256": "df335b19e49f18b5c854dd1256571af4cf58c188e8c70e226d6187ee8d117334",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/gen-method-static/params-trailing-comma-single.js",
+      "sha256": "17b026124b6235c2c4d31e0c4b94006af5b6dc43fa7fb36c35c6fc32502add93",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/gen-method/dflt-params-trailing-comma.js",
+      "sha256": "9f444febf1cdc140d19e53071f8e477ce9c1daf0cef17555473f0f766806cb63",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/gen-method/params-trailing-comma-multiple.js",
+      "sha256": "6192200bf062dbe65ad8c8d11ed51d27534b85ddca22bad9bc0f1c8d88f4f0d3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/gen-method/params-trailing-comma-single.js",
+      "sha256": "13d793ea4bee51ad2b8244e83aacad89674f4134103eeee47b90c0cb1151f254",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/method-static/dflt-params-trailing-comma.js",
+      "sha256": "2802c9d707de6bcd87c7938f21affb3bd6adf0c77141f2750b7090710c99dd4f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/method-static/params-trailing-comma-multiple.js",
+      "sha256": "4a835fbdac22b652e703bc585dc4061e1b5ef8a0f0f7a988c4697bff0dca4b33",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/method-static/params-trailing-comma-single.js",
+      "sha256": "49115eeafd49da3ae1253debb62e53888843578b85fffa4f22ccb0a9825b09a3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/method/dflt-params-trailing-comma.js",
+      "sha256": "0e2d0440ac0b3892c948d2750a06983f49b8d4d3d80b73716f8ecb218e2f2cfb",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/method/params-trailing-comma-multiple.js",
+      "sha256": "16ba6ed4ea75500743961398f6c1c1340cb56471c30255b1a892e7d6bae9d045",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/method/params-trailing-comma-single.js",
+      "sha256": "cb0299562027f79e65f19fca596b12787880c27c13775ce6f89cd78e2c75257f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions",
+      "reason": "Original ES2015 FormalParameters does not permit a trailing comma after the final ordinary or default parameter. This later generated class-method test requires the subsequent parameter-list extension."
+    },
+    {
+      "test": "language/statements/class/subclass-builtins/subclass-ArrayBuffer.js",
+      "sha256": "44a3c04c720f413a16e0958c7b35787bc50f4a728b9d5a5808e516fb496de4f0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-arraybuffer-length",
+      "reason": "The subclass supplies no length. Original ES2015 ArrayBuffer converts undefined to NaN, converts that to length zero, and rejects their SameValueZero mismatch. The later test relies on the subsequent omitted-length behavior."
+    },
+    {
+      "test": "language/statements/class/subclass/class-definition-null-proto-this.js",
+      "sha256": "e5e5aa089957cb931da00feb790dfedebc457a231ad77a0c089400d8cd05ff78",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-environment-records-getthisbinding",
+      "reason": "Original ES2015 GetThisBinding throws while the derived this binding is uninitialized. Discarding an expression result must not remove that read or its ReferenceError. The emitter correction preserves modern this reads, including those inside arrows, while leaving legacy optimization unchanged."
+    },
+    {
+      "test": "language/statements/class/subclass/default-constructor-spread-override.js",
+      "sha256": "4e15b3eb84bc6b869246c6dd2dcd87edc178d58d26306682050e4060112bc1fb",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-runtime-semantics-classdefinitionevaluation",
+      "reason": "Original ES2015 synthesizes a default derived constructor with rest parameters and a super spread call. That spread observes Array.prototype[Symbol.iterator]; the later test requires forwarding arguments without that iterator lookup."
     },
     {
       "test": "language/statements/for-of/iterator-close-throw-get-method-abrupt.js",

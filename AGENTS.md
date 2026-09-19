@@ -1691,3 +1691,17 @@ must be followed immediately by their parameter list; the shared FunctionExpr
 parser must not consume a second function name or generator marker. Run
 `contextual-escapes.js` and `TestContextualEscapes.c`, including exact parse
 SyntaxErrors, legacy accessors and collected source/cache roundtrips.
+
+Preserve the observable exception from modern `this` reads before derived
+constructor initialization, even when an expression result is discarded.
+Exercise bare/unary/comma/delete reads, arrows before and after `super()`,
+callbacks/GC and cross-edition source/XDR round trips with
+`derived-this-effects.js` and `TestDerivedThisEffects.c`. Emission changes
+invalidate embedding bytecode caches (version 66 for this correction);
+legacy effect analysis remains unchanged.
+
+Linux ES2015 validation uses `build/linux/test-es6.py`: keep complete pinned
+reports separate from focused/native results. Private engine unit probes link
+the production Makefile's objects in standalone executables; do not export
+private interfaces merely to link tests against a package. Preserve the
+object hashes, packaged-library identity check and generated target headers.

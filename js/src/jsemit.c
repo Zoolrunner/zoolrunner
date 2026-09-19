@@ -2361,8 +2361,13 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
         break;
 
       case PN_NULLARY:
-        if (pn->pn_type == TOK_DEBUGGER)
+        if (pn->pn_type == TOK_DEBUGGER ||
+            (JS_VERSION_IS_ES2015(cx) && pn->pn_op == JSOP_THIS)) {
+            /* A derived constructor's lexical this may be uninitialized.
+             * Reading it can throw even when its value is discarded, including
+             * inside an arrow or a delete/void expression. */
             *answer = JS_TRUE;
+        }
         break;
     }
     return ok;
