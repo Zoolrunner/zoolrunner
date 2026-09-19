@@ -779,3 +779,11 @@ timeouts. All **11,540 ES5 cases** and all four application build/package/deskto
 checks pass. Full ES2015 compliance remains unfinished; other platforms have
 not been revalidated for this batch. See the
 [spread validation notes](js/tests/es6/README.md#array-call-and-constructor-spread).
+
+Persistent global and fresh eval lexical environments pass macOS arm64
+validation: **28,213 ES2015 passes**, **355 failures**, and **14 unsupported
+modules**, with 14 gained and zero lost passes, harness errors, crashes or
+timeouts. All **11,540 ES5 cases** and all four application build/package/desktop
+checks pass. Full ES2015 compliance remains unfinished; other platforms have not
+been revalidated for this batch. See the
+[lexical binding notes](js/tests/es6/README.md#persistent-global-and-eval-lexical-bindings).

@@ -177,6 +177,7 @@ struct JSTreeContext {              /* tree context for semantic checks */
     JSParseNode     *blockNode;     /* parse node for a lexical scope.
                                        XXX combine with blockChain? */
     JSAtomList      decls;          /* function, const, and var declarations */
+    JSAtom        *globalLexicalAtom; /* script/eval binding template */
     JSAtomList      lexicalDecls;  /* ES2015 script-level declarations */
     JSAtomList      varDecls;      /* script-level var declarations */
     JSParseNode     *nodeList;      /* list of recyclable parse-node structs */
@@ -203,6 +204,7 @@ struct JSTreeContext {              /* tree context for semantic checks */
      (tc)->restSlot = -1,                                                  \
      (tc)->tryCount = (tc)->globalUses = (tc)->loopyGlobalUses = 0,           \
      (tc)->topStmt = (tc)->topScopeStmt = NULL,                               \
+     (tc)->globalLexicalAtom = NULL,                                         \
      (tc)->blockChain = NULL,                                                 \
      ATOM_LIST_INIT(&(tc)->lexicalDecls),                                     \
      ATOM_LIST_INIT(&(tc)->varDecls),                                         \

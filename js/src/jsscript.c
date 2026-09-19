@@ -573,10 +573,20 @@ XDRScriptBody(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
     oldscript = xdr->script;
     xdr->script = script;
     if (!JS_XDRBytes(xdr, (char *)script->code, length * sizeof(jsbytecode)) ||
-        !XDRAtomMap(xdr, &script->atomMap)) {
+        !XDRAtomMap(xdr, &script->atomMap) ||
+        !JS_XDRUint32(xdr, &script->globalLexicalIndex)) {
         goto error;
     }
 
+    if (script->globalLexicalIndex != (uint32)-1 &&
+        (script->globalLexicalIndex >= script->atomMap.length ||
+         !ATOM_IS_OBJECT(script->atomMap.vector[script->globalLexicalIndex]) ||
+         !ATOM_TO_OBJECT(script->atomMap.vector[script->globalLexicalIndex]) ||
+         OBJ_GET_CLASS(cx, ATOM_TO_OBJECT(script->atomMap.vector[script->globalLexicalIndex]))
+         != &js_BlockClass)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_SCRIPT_MAGIC);
+        goto error;
+    }
     if (magic < JSXDR_MAGIC_SCRIPT_5) {
         if (xdr->mode == JSXDR_DECODE) {
             /*
@@ -1372,6 +1382,7 @@ js_NewScript(JSContext *cx, uint32 length, uint32 nsrcnotes, uint32 ntrynotes)
     if (!script)
         return NULL;
     memset(script, 0, sizeof(JSScript));
+    script->globalLexicalIndex = (uint32)-1;
     script->code = script->main = (jsbytecode *)(script + 1);
     script->length = length;
     script->version = cx->version;
@@ -1390,6 +1401,7 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
     uint32 mainLength, prologLength, nsrcnotes, ntrynotes;
     JSScript *script;
     const char *filename;
+    JSAtomListElement *lexicalEntry;
 
     mainLength = CG_OFFSET(cg);
     prologLength = CG_PROLOG_OFFSET(cg);
@@ -1408,6 +1420,11 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
                          (fun && (fun->flags & JSFUN_STRICT));
     script->needsArguments =
         (cg->treeContext.flags & (TCF_FUN_USES_ARGUMENTS | TCF_FUN_HEAVYWEIGHT)) != 0;
+    if (cg->treeContext.globalLexicalAtom) {
+        lexicalEntry = js_IndexAtom(cx, cg->treeContext.globalLexicalAtom, &cg->atomList);
+        if (!lexicalEntry) goto bad;
+        script->globalLexicalIndex = ALE_INDEX(lexicalEntry);
+    }
     if (!js_InitAtomMap(cx, &script->atomMap, &cg->atomList))
         goto bad;
 

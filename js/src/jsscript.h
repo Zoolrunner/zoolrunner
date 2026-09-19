@@ -79,6 +79,7 @@ struct JSScript {
     JSTryNote    *trynotes;     /* exception table for this script */
     JSPrincipals *principals;   /* principals for this script */
     JSObject     *object;       /* optional Script-class object wrapper */
+    uint32       globalLexicalIndex; /* atom-map template index, or UINT32_MAX */
 };
 
 /* No need to store script->notes now that it is allocated right after code. */

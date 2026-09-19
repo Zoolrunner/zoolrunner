@@ -1539,3 +1539,14 @@ crashes or timeouts. All four applications pass build/package/runtime checks,
 including Calendar views and Suite/XULRunner ChatZilla. Other platforms remain
 unvalidated for this batch. Spread expressions, whole-parameter defaults,
 parameter environments, classes and modules remain unfinished.
+
+Preserve persistent ES2015 global lexical records separately from global object
+properties. Functions compiled before a later lexical declaration must capture
+the same record. Eval-local declarations need fresh records; keep declared-var
+history distinct from property deletion and retain explicit legacy scope rules.
+Run `global-lexical.js`, `TestGlobalLexicalCompiler.c`,
+`TestGlobalLexicalStore.c` and `TestGlobalLexicalWide.c` for scope changes,
+including cross-script window fixtures, GC, source/XDR round trips and split
+prolog/body execution. Internal lexical records must remain hidden from the
+historical `__parent__` accessor. Report the complete conformance and four-app
+results separately from focused probe totals.

@@ -59,6 +59,7 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsrealm.h"
 #include "jsiteres6.h"
 #include "jsproxy.h"
 #include "jsbinarydata.h"
@@ -1731,11 +1732,17 @@ AppendArrayLiteral(JSContext *cx, JSObject *array, jsval input, uintN kind)
 
 /* Validate global declarations before the prolog creates any bindings. */
 static JSBool
-IsModernGlobalDeclaration(JSContext *cx, JSObject *obj)
+IsNativeGlobalObject(JSContext *cx, JSObject *obj)
 {
-    return JS_VERSION_IS_ES2015(cx) && obj && OBJ_IS_NATIVE(obj) &&
+    return obj && OBJ_IS_NATIVE(obj) &&
            ((OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) ||
             obj == cx->globalObject);
+}
+
+static JSBool
+IsModernGlobalDeclaration(JSContext *cx, JSObject *obj)
+{
+    return JS_VERSION_IS_ES2015(cx) && IsNativeGlobalObject(cx, obj);
 }
 
 static JSBool
@@ -1848,6 +1855,110 @@ CheckGlobalDeclarations(JSContext *cx, JSStackFrame *fp)
     return ok;
 }
 
+/* A lexical record is separate from the host's global object. Every modern
+ * global script captures it, even when a later script creates its bindings. */
+static JSBool
+PrepareScriptLexicalEnvironment(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *env;
+    if ((fp->script->version & JSVERSION_MASK) < JSVERSION_ECMA_2015)
+        return JS_TRUE;
+    if (IsNativeGlobalObject(cx, fp->scopeChain)) {
+        env = js_GlobalLexicalEnvironment(cx, fp->scopeChain, JS_TRUE);
+        if (!env) return JS_FALSE;
+        fp->scopeChain = env;
+    }
+    if ((fp->flags & JSFRAME_EVAL) ||
+        (fp->script->globalLexicalIndex != (uint32)-1 &&
+         !js_IsLexicalEnvironment(cx, fp->scopeChain))) {
+        env = js_NewLexicalEnvironment(cx, fp->scopeChain);
+        if (!env) return JS_FALSE;
+        fp->scopeChain = env;
+    }
+    return JS_TRUE;
+}
+
+static JSBool
+CheckScriptDeclarations(JSContext *cx, JSStackFrame *fp)
+{
+    JSScript *script = fp->script;
+    JSObject *env = fp->scopeChain, *bindings = NULL, *scope, *record;
+    JSScopeProperty *property;
+    jsbytecode *pc;
+    jsint length;
+    jsatomid index;
+    JSOp op;
+    JSAtom *atom;
+    jsid id;
+    JSBool conflict;
+    if ((script->version & JSVERSION_MASK) < JSVERSION_ECMA_2015)
+        return CheckGlobalDeclarations(cx, fp);
+    if (script->globalLexicalIndex != (uint32)-1) {
+        bindings = ATOM_TO_OBJECT(js_GetAtom(cx, &script->atomMap,
+                                             script->globalLexicalIndex));
+        JS_ASSERT(js_IsLexicalEnvironment(cx, env));
+        if (js_IsGlobalLexicalEnvironment(cx, env)) {
+            for (property = OBJ_SCOPE(bindings)->lastProp; property; property = property->parent) {
+                if (!js_CanDeclareGlobalLexicalBinding(cx, env, property->id))
+                    return JS_FALSE;
+            }
+        }
+    }
+    if (IsModernGlobalDeclaration(cx, fp->varobj) ||
+        ((fp->flags & JSFRAME_EVAL) && !script->strictMode)) {
+        for (pc = script->code; pc < script->main; pc += length) {
+            op = js_GetEffectiveOpcode(cx, script, pc, &length, &index);
+            if (length <= 0) return JS_FALSE;
+            if (op != JSOP_DEFVAR && op != JSOP_DEFFUN) continue;
+            atom = js_GetAtom(cx, &script->atomMap, index);
+            if (op == JSOP_DEFFUN)
+                atom = ((JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(atom)))->atom;
+            id = ATOM_TO_JSID(atom);
+            for (scope = env; scope && scope != fp->varobj;
+                 scope = OBJ_GET_PARENT(cx, scope)) {
+                record = scope;
+                if (OBJ_GET_CLASS(cx, scope) == &js_BlockClass) {
+                    record = OBJ_GET_PROTO(cx, scope);
+                    if (!record) continue;
+                    JS_LOCK_OBJ(cx, record);
+                    property = SCOPE_GET_PROPERTY(OBJ_SCOPE(record), id);
+                    conflict = property &&
+                        OBJ_GET_SLOT(cx, record, property->slot) == JSVAL_UNINITIALIZED;
+                    JS_UNLOCK_OBJ(cx, record);
+                } else if (js_IsLexicalEnvironment(cx, scope)) {
+                    JS_LOCK_OBJ(cx, scope);
+                    conflict = SCOPE_GET_PROPERTY(OBJ_SCOPE(scope), id) != NULL;
+                    JS_UNLOCK_OBJ(cx, scope);
+                } else {
+                    continue;
+                }
+                if (conflict) {
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_STRICT_SYNTAX);
+                    return JS_FALSE;
+                }
+            }
+        }
+    }
+    if (!CheckGlobalDeclarations(cx, fp)) return JS_FALSE;
+    if (bindings) {
+        for (property = OBJ_SCOPE(bindings)->lastProp; property; property = property->parent) {
+            if (!js_DefineLexicalBinding(cx, env, property->id,
+                                         (property->flags & SPROP_IS_CONST) != 0))
+                return JS_FALSE;
+        }
+    }
+    return JS_TRUE;
+}
+
+static JSBool
+RecordGlobalDeclaration(JSContext *cx, JSObject *global, jsid id)
+{
+    JSObject *env;
+    if (!IsModernGlobalDeclaration(cx, global)) return JS_TRUE;
+    env = js_GlobalLexicalEnvironment(cx, global, JS_TRUE);
+    return env && js_RecordGlobalVarBinding(cx, env, id);
+}
+
 JSBool
 js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
            JSStackFrame *down, uintN flags, jsval *result)
@@ -1943,14 +2054,15 @@ js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
     }
 
     cx->fp = &frame;
-    if (hook)
+    ok = PrepareScriptLexicalEnvironment(cx, &frame);
+    if (ok && hook)
         hookData = hook(cx, &frame, JS_TRUE, 0, cx->runtime->executeHookData);
 
     /*
      * Use frame.rval, not result, so the last result stays rooted across any
      * GC activations nested within this js_Interpret.
      */
-    ok = js_Interpret(cx, script->code, &frame.rval);
+    if (ok) ok = js_Interpret(cx, script->code, &frame.rval);
     *result = frame.rval;
 
     if (hookData) {
@@ -2794,7 +2906,7 @@ js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
 #endif
         goto out;
     }
-    if (pc == script->code && !CheckGlobalDeclarations(cx, fp)) {
+    if (pc == script->code && !CheckScriptDeclarations(cx, fp)) {
         ok = JS_FALSE;
         goto out;
     }
@@ -3620,6 +3732,17 @@ interrupt:
             obj = NULL;
           END_LITOPX_CASE(JSOP_GETREF)
 
+          BEGIN_LITOPX_CASE(JSOP_EXTENDED, 0)
+            SAVE_SP_AND_PC(fp);
+            obj = JSVAL_TO_OBJECT(FETCH_OPND(-3));
+            rval = FETCH_OPND(-1);
+            ok = js_InitializeLexicalBinding(cx, obj, ATOM_TO_JSID(atom), rval);
+            if (!ok) goto out;
+            sp -= 2;
+            STORE_OPND(-1, rval);
+            obj = NULL;
+          END_LITOPX_CASE(JSOP_EXTENDED)
+
           BEGIN_LITOPX_CASE(JSOP_SETREF, 0)
             SAVE_SP_AND_PC(fp);
             if (script->strictMode && FETCH_OPND(-2) == JSVAL_FALSE)
@@ -4124,6 +4247,13 @@ interrupt:
                 ok = OBJ_DELETE_PROPERTY(cx, obj, id, &rval);
                 if (!ok)
                     goto out;
+            }
+            if (rval == JSVAL_TRUE && IsModernGlobalDeclaration(cx, obj)) {
+                obj2 = js_GlobalLexicalEnvironment(cx, obj, JS_FALSE);
+                if (obj2 && !js_ForgetGlobalVarBinding(cx, obj2, id)) {
+                    ok = JS_FALSE;
+                    goto out;
+                }
             }
             PUSH_OPND(rval);
           END_CASE(JSOP_DELNAME)
@@ -4843,6 +4973,7 @@ interrupt:
             clasp = OBJ_GET_CLASS(cx, obj);
             if (clasp == &js_CallClass || clasp == &js_BlockClass ||
                 clasp == &js_DeclarativeScopeClass ||
+                js_IsLexicalEnvironment(cx, obj) ||
                 (clasp != &js_WithClass && !OBJ_GET_PARENT(cx, obj)))
                 obj = NULL;
             else if (clasp == &js_WithClass && JS_VERSION_IS_ES2015(cx) &&
@@ -4915,6 +5046,7 @@ interrupt:
               case JSOP_BINDREF:      goto do_JSOP_BINDREF;
               case JSOP_GETREF:       goto do_JSOP_GETREF;
               case JSOP_SETREF:       goto do_JSOP_SETREF;
+              case JSOP_EXTENDED:     goto do_JSOP_EXTENDED;
               case JSOP_CLOSURE:      goto do_JSOP_CLOSURE;
               case JSOP_CONSTASSIGN:  goto do_JSOP_CONSTASSIGN;
               case JSOP_FORNAME:      goto do_JSOP_FORNAME;
@@ -5646,6 +5778,10 @@ interrupt:
             }
 
             OBJ_DROP_PROPERTY(cx, obj2, prop);
+            if (op == JSOP_DEFVAR && !RecordGlobalDeclaration(cx, obj, id)) {
+                ok = JS_FALSE;
+                goto out;
+            }
           END_CASE(JSOP_DEFVAR)
 
           BEGIN_LITOPX_CASE(JSOP_DEFFUN, 0)
@@ -5762,6 +5898,10 @@ interrupt:
             }
 #endif
             OBJ_DROP_PROPERTY(cx, parent, prop);
+            if (!RecordGlobalDeclaration(cx, parent, id)) {
+                ok = JS_FALSE;
+                goto out;
+            }
           END_LITOPX_CASE(JSOP_DEFFUN)
 
           BEGIN_LITOPX_CASE(JSOP_DEFLOCALFUN, VARNO_LEN)

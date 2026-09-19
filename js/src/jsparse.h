@@ -342,6 +342,7 @@ struct JSParseNode {
 #define pn_expr         pn_u.name.expr
 #define pn_slot         pn_u.name.slot
 #define pn_attrs        pn_u.name.attrs
+#define PN_GLOBAL_LEXICAL 0x10000U /* declaration target, not property attrs */
 #define pn_dval         pn_u.dval
 #define pn_atom2        pn_u.apair.atom2
 

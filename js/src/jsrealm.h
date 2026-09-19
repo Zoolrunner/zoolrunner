@@ -20,6 +20,7 @@ typedef enum JSRealmIntrinsic {
     JS_INTRINSIC_GENERATOR_CONSTRUCTOR,
     JS_INTRINSIC_TYPED_ARRAY_PROTO,
     JS_INTRINSIC_TYPED_ARRAY_CONSTRUCTOR,
+    JS_INTRINSIC_GLOBAL_LEXICAL,
     JS_INTRINSIC_LIMIT
 } JSRealmIntrinsic;
 extern JSObject *js_GetCachedIntrinsic(JSContext *cx, JSObject *global,
@@ -30,6 +31,18 @@ extern JSObject *js_GetCachedClassObject(JSContext *cx, JSObject *global,
                                          JSProtoKey key);
 extern JSBool js_CacheClassObject(JSContext *cx, JSObject *global,
                                   JSProtoKey key, JSObject *constructor);
+extern JSObject *js_GlobalLexicalEnvironment(JSContext *cx, JSObject *global,
+                                             JSBool create);
+extern JSObject *js_NewLexicalEnvironment(JSContext *cx, JSObject *outer);
+extern JSBool js_IsLexicalEnvironment(JSContext *cx, JSObject *obj);
+extern JSBool js_IsGlobalLexicalEnvironment(JSContext *cx, JSObject *obj);
+extern JSBool js_RecordGlobalVarBinding(JSContext *cx, JSObject *env, jsid id);
+extern JSBool js_ForgetGlobalVarBinding(JSContext *cx, JSObject *env, jsid id);
+extern JSBool js_CanDeclareGlobalLexicalBinding(JSContext *cx, JSObject *env, jsid id);
+extern JSBool js_DefineLexicalBinding(JSContext *cx, JSObject *env,
+                                            jsid id, JSBool immutable);
+extern JSBool js_InitializeLexicalBinding(JSContext *cx, JSObject *env,
+                                                jsid id, jsval value);
 extern void js_MarkCachedClassObjects(JSContext *cx, JSObject *global);
 extern void js_SweepCachedClassObjects(JSRuntime *rt);
 extern void js_ClearCachedClassObjects(JSContext *cx, JSObject *global);

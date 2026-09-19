@@ -2468,7 +2468,9 @@ BindDestructuringVar(JSContext *cx, BindData *data, JSParseNode *pn,
      */
     pn->pn_op = (data->op == JSOP_DEFCONST && data->binder != BindLet)
                 ? JSOP_SETCONST : JSOP_SETNAME;
-    pn->pn_attrs = data->binder == BindLet ? 0 : data->u.var.attrs;
+    pn->pn_attrs = data->binder == BindLet
+                   ? (tc->globalLexicalAtom && data->obj == ATOM_TO_OBJECT(tc->globalLexicalAtom)
+                      ? PN_GLOBAL_LEXICAL : 0) : data->u.var.attrs;
     return JS_TRUE;
 }
 
@@ -4107,6 +4109,18 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             JS_ASSERT(tc->blockChain == ATOM_TO_OBJECT(stmt->atom));
             obj = tc->blockChain;
         } else {
+            if (!stmt && JS_VERSION_IS_ES2015(cx)) {
+                if (!tc->globalLexicalAtom) {
+                    obj = js_NewBlockObject(cx);
+                    if (!obj) return NULL;
+                    tc->globalLexicalAtom = js_AtomizeObject(cx, obj, 0);
+                    if (!tc->globalLexicalAtom) return NULL;
+                }
+                pn = Variables(cx, ts, tc);
+                if (!pn) return NULL;
+                pn->pn_extra |= PNX_POPVAR;
+                break;
+            }
             if (!stmt) {
                 /*
                  * FIXME: https://bugzilla.mozilla.org/show_bug.cgi?id=346749
@@ -4374,7 +4388,7 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
             JS_ASSERT(!STMT_MAYBE_SCOPE(scopeStmt));
             scopeStmt = scopeStmt->downScope;
         }
-        JS_ASSERT(scopeStmt);
+        JS_ASSERT(scopeStmt || tc->globalLexicalAtom);
     }
 
     data.pn = NULL;
@@ -4406,8 +4420,8 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
      */
     fp = cx->fp;
     if (let) {
-        JS_ASSERT(tc->blockChain == ATOM_TO_OBJECT(scopeStmt->atom));
-        data.obj = tc->blockChain;
+        JS_ASSERT(!scopeStmt || tc->blockChain == ATOM_TO_OBJECT(scopeStmt->atom));
+        data.obj = scopeStmt ? tc->blockChain : ATOM_TO_OBJECT(tc->globalLexicalAtom);
         data.u.let.index = OBJ_BLOCK_COUNT(cx, data.obj);
         data.u.let.overflow = JSMSG_TOO_MANY_FUN_VARS;
     } else {
@@ -4482,7 +4496,7 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn2->pn_atom = atom;
         pn2->pn_expr = NULL;
         pn2->pn_slot = -1;
-        pn2->pn_attrs = let ? 0 : data.u.var.attrs;
+        pn2->pn_attrs = let ? (!scopeStmt ? PN_GLOBAL_LEXICAL : 0) : data.u.var.attrs;
         PN_APPEND(pn, pn2);
 
         if (js_MatchToken(cx, ts, TOK_ASSIGN)) {

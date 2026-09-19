@@ -1931,6 +1931,8 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
     JSScopeProperty *sprop;
 
     JS_ASSERT(pn->pn_type == TOK_NAME);
+    if (pn->pn_attrs & PN_GLOBAL_LEXICAL)
+        return JS_TRUE;
     if (pn->pn_slot >= 0 || pn->pn_op == JSOP_ARGUMENTS)
         return JS_TRUE;
 
@@ -2011,7 +2013,7 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
          * in unambiguous contexts, or failing that, if least half of all the
          * uses of global vars/consts/functions are in loops.
          */
-        optimizeGlobals = (tc->globalUses >= 100 ||
+        optimizeGlobals = !JS_VERSION_IS_ES2015(cx) && (tc->globalUses >= 100 ||
                            (tc->loopyGlobalUses &&
                             tc->loopyGlobalUses >= tc->globalUses / 2));
         if (!optimizeGlobals)
@@ -3283,7 +3285,8 @@ MaybeEmitVarDecl(JSContext *cx, JSCodeGenerator *cg, JSOp prologOp,
         atomIndex = ALE_INDEX(ale);
     }
 
-    if ((js_CodeSpec[pn->pn_op].format & JOF_TYPEMASK) == JOF_CONST &&
+    if (!(pn->pn_attrs & PN_GLOBAL_LEXICAL) &&
+        (js_CodeSpec[pn->pn_op].format & JOF_TYPEMASK) == JOF_CONST &&
         (!(cg->treeContext.flags & TCF_IN_FUNCTION) ||
          (cg->treeContext.flags & TCF_FUN_HEAVYWEIGHT))) {
         /* Emit a prolog bytecode to predefine the variable. */
@@ -3553,7 +3556,7 @@ EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
     }
     store = CG_OFFSET(cg);
     if (target->pn_type == TOK_NAME) {
-        EMIT_ATOM_INDEX_OP(JSOP_SETREF, atomIndex);
+        EMIT_ATOM_INDEX_OP((target->pn_attrs & PN_GLOBAL_LEXICAL) ? JSOP_EXTENDED : JSOP_SETREF, atomIndex);
     } else if (js_Emit1(cx, cg, JSOP_SETELEM) < 0) return JS_FALSE;
     if (js_Emit1(cx, cg, JSOP_POP) < 0 || js_Emit1(cx, cg, JSOP_POP) < 0 ||
         js_Emit1(cx, cg, JSOP_POP) < 0) return JS_FALSE;
@@ -4024,7 +4027,7 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 
         if (!BindNameToSlot(cx, &cg->treeContext, pn2, let))
             return JS_FALSE;
-        JS_ASSERT(pn2->pn_slot >= 0 || !let);
+        JS_ASSERT(pn2->pn_slot >= 0 || !let || (pn2->pn_attrs & PN_GLOBAL_LEXICAL));
 
         op = pn2->pn_op;
         if (op == JSOP_ARGUMENTS) {
@@ -4057,9 +4060,9 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 #endif
 
                 if (op == JSOP_SETNAME) {
-                    JS_ASSERT(!let);
+                    JS_ASSERT(!let || (pn2->pn_attrs & PN_GLOBAL_LEXICAL));
                     if (JS_VERSION_IS_ES2015(cx)) {
-                        op = JSOP_SETREF;
+                        op = (pn2->pn_attrs & PN_GLOBAL_LEXICAL) ? JSOP_EXTENDED : JSOP_SETREF;
                         EMIT_ATOM_INDEX_OP(JSOP_BINDREF, atomIndex);
                     } else {
                         EMIT_ATOM_INDEX_OP(JSOP_BINDNAME, atomIndex);
@@ -4137,6 +4140,11 @@ EmitVariables(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                            ? SRC_DECL_VAR
                            : SRC_DECL_LET) < 0) {
             return JS_FALSE;
+        }
+        if ((pn2->pn_attrs & PN_GLOBAL_LEXICAL) && !pn3) {
+            EMIT_ATOM_INDEX_OP(JSOP_BINDREF, atomIndex);
+            if (js_Emit1(cx, cg, JSOP_PUSH) < 0) return JS_FALSE;
+            op = JSOP_EXTENDED;
         }
         if (let && JS_VERSION_IS_ES2015(cx)) {
             if (op == JSOP_SETLOCAL)

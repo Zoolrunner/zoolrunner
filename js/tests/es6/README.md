@@ -2800,3 +2800,45 @@ All four application engine hashes match the frozen conformance runtime:
 The earlier corpus runs alone missed the wide-argument regression; the added
 wide and native collection probes cover it. Full ES2015 compliance remains
 unfinished; validation of this batch is macOS arm64 only.
+
+## Persistent global and eval lexical bindings
+
+The validated implementation stores modern global `let`/`const` bindings in a
+private environment retained by the owning global. They are absent from the
+global object's properties, and functions from earlier scripts capture the same
+environment. Reads, writes and `typeof` observe uninitialized bindings until the
+declaration executes. Fresh eval records isolate eval-local declarations while
+retaining captured closures. Non-strict eval checks intervening lexical records;
+global declared-var history is independent of ordinary property deletion.
+Explicitly selected legacy declarations and embedding object receivers retain
+their existing paths. The historical `__parent__` accessor hides these private
+records, as it already hides function/block environments.
+
+Script metadata records the binding template in the atom map. Bytecode cache
+version 59 includes that metadata and an atom-directed extended instruction for
+binding initialization, including destructuring. Source reconstruction and XDR
+cover wide atom indices. The split prolog/body JSAPI path gives the prolog its own
+STOP instruction: truncating the script length alone did not stop the threaded
+interpreter from executing the body. The body does not instantiate bindings a
+second time.
+
+Focused script checks pass 17 assertions. Native probes pass 55 compiler/scope,
+49 record-lifetime and 13 wide-atom checks, including GC, multiple globals,
+nonextensible globals, failed initializers, mixed caller editions, source/XDR
+round trips and separate prolog/body execution. The contextual-keyword fixture
+now assigns distinct global names to its independent shadowing cases; all 84
+assertions remain. Real-window fixtures exercise lexical declarations across
+separate scripts in both chrome and content globals.
+
+The initial complete macOS arm64 diagnostic run passes **28,213 ES2015 modes**,
+with **355 failures**, **14 unsupported modules** and no harness errors, crashes
+or timeouts: **14 gained, zero lost**. All **11,540 ES5 cases** pass. These reports
+use `artifacts/es6/global-lexical-compiler-*`. The final corrected runtime retains
+those totals and the 14 gained/zero lost result. All four applications pass root
+builds, packaging and relocated desktop checks, including Calendar's four views,
+169 Browser navigation/layout checks and ChatZilla in Suite and XULRunner.
+Final reports use `artifacts/es6/global-lexical-final-*`. All four engine hashes
+match the frozen conformance runtime:
+`28ca09fd4b1a86436944ece57598ac3cdb316c25c7b7bc00ad2bb0fa90b6ac21`.
+C89 checks pass. Full ES2015 compliance remains unfinished; this batch's
+validation is macOS arm64 only.

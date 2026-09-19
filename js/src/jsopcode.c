@@ -1509,8 +1509,8 @@ DecompilePatternReference(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc, JS
     if (storeOp == JSOP_LITOPX) {
         atomIndex = GET_LITERAL_INDEX(store);
         storeOp = (JSOp)store[1 + LITERAL_INDEX_LEN];
-    } else atomIndex = storeOp == JSOP_SETREF ? GET_ATOM_INDEX(store) : 0;
-    named = storeOp == JSOP_SETREF;
+    } else atomIndex = (storeOp == JSOP_SETREF || storeOp == JSOP_EXTENDED) ? GET_ATOM_INDEX(store) : 0;
+    named = storeOp == JSOP_SETREF || storeOp == JSOP_EXTENDED;
     ss->sprinter.offset += PAREN_SLOP;
     if (!Decompile(ss, pc+1, (intN)(keyEnd-pc-1))) goto out;
     key = JS_strdup(cx, PopStr(ss, JSOP_NOP));
@@ -3442,6 +3442,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               case JSOP_CONSTASSIGN:
               case JSOP_SETNAME:
               case JSOP_SETREF:
+              case JSOP_EXTENDED:
               case JSOP_SETGVAR:
                 atomIndex = GET_ATOM_INDEX(pc);
 
@@ -3453,9 +3454,9 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 if (!lval)
                     return NULL;
                 rval = POP_STR();
-                if (op == JSOP_SETNAME || op == JSOP_SETREF)
+                if (op == JSOP_SETNAME || op == JSOP_SETREF || op == JSOP_EXTENDED)
                     (void) PopOff(ss, op);
-                if (op == JSOP_SETREF)
+                if (op == JSOP_SETREF || op == JSOP_EXTENDED)
                     (void) PopOff(ss, op);
 
               do_setlval:
@@ -3995,7 +3996,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 }
                 if (op == JSOP_BINDREF)
                     goto do_bindref;
-                if (op == JSOP_GETREF || op == JSOP_SETREF) {
+                if (op == JSOP_GETREF || op == JSOP_SETREF || op == JSOP_EXTENDED) {
                     atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
                     if (op == JSOP_GETREF)
                         goto do_name;

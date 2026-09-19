@@ -1,5 +1,7 @@
 /* Loaded with an explicit ES2015 MIME version in XUL and HTML. */
 "use strict";
+let modernPersistentBinding = 37;
+const modernPersistentConstant = 5;
 function modernWindowEdition() {
     let radixValue = 0b101 + 0o17;
     var caught = false;
@@ -40,7 +42,9 @@ function modernWindowEdition() {
         Object.isFrozen(tagged.template) && Object.isFrozen(tagged.template.raw) &&
         `${radixValue}` === "20" && String.raw`a\n${3}b` === "a\\n3b";
 
-    return templateChecks && radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
+    return modernPersistentBinding === 37 && modernPersistentConstant === 5 &&
+           !Object.prototype.hasOwnProperty.call(Function("return this")(), "modernPersistentBinding") &&
+           templateChecks && radixValue === 20 && Number("0b101") === 5 && caught && conflict && ({value:1,value:2}).value === 2 &&
            constructed.target === WindowConstructor && constructed.evaluated === WindowConstructor &&
            WindowConstructor().target === undefined &&
            (function() { var order = [], object = {}, key = {

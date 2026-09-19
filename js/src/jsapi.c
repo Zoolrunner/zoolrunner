@@ -4383,14 +4383,33 @@ JS_ExecuteScriptPart(JSContext *cx, JSObject *obj, JSScript *script,
     JSScript tmp;
     JSRuntime *rt;
     JSBool ok;
+    jsbytecode *prolog = NULL;
+    size_t prologLength;
 
-    /* Make a temporary copy of the JSScript structure and farble it a bit. */
+    /* The threaded interpreter terminates on STOP, not script->length.
+     * Give a separately executed prolog its own terminating bytecode without
+     * modifying a script that another frame may currently be executing. */
     tmp = *script;
     if (part == JSEXEC_PROLOG) {
-        tmp.length = PTRDIFF(tmp.main, tmp.code, jsbytecode);
+        prologLength = (size_t)(tmp.main - tmp.code);
+        if (prologLength > (size_t)-1 - 2) {
+            JS_ReportOutOfMemory(cx);
+            return JS_FALSE;
+        }
+        prolog = (jsbytecode *)JS_malloc(cx, prologLength + 2);
+        if (!prolog) return JS_FALSE;
+        memcpy(prolog, tmp.code, prologLength);
+        prolog[prologLength] = JSOP_STOP;
+        prolog[prologLength + 1] = 0; /* source-note terminator */
+        tmp.code = prolog;
+        tmp.main = prolog + prologLength;
+        tmp.length = prologLength + 1;
+        tmp.trynotes = NULL;
     } else {
         tmp.length -= PTRDIFF(tmp.main, tmp.code, jsbytecode);
         tmp.code = tmp.main;
+        /* The separate prolog already instantiated script lexical bindings. */
+        tmp.globalLexicalIndex = (uint32)-1;
     }
 
     /* Tell the debugger about our temporary copy of the script structure. */
@@ -4404,6 +4423,7 @@ JS_ExecuteScriptPart(JSContext *cx, JSObject *obj, JSScript *script,
     ok = JS_ExecuteScript(cx, obj, &tmp, rval);
     if (rt->destroyScriptHook)
         rt->destroyScriptHook(cx, &tmp, rt->destroyScriptHookData);
+    if (prolog) JS_free(cx, prolog);
     return ok;
 }
 

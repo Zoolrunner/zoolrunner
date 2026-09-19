@@ -80,7 +80,11 @@ var shadowing = [
     '{function shadow(){}} let shadow;'
 ];
 for(i=0;i<shadowing.length;i++) {
-    check(compileIn(2015, shadowing[i]+' true'), 'independent scope '+i);
-    check(compileIn(2015, '"use strict"; '+shadowing[i]+' true'), 'strict independent scope '+i);
+    /* These are independent scripts. Persistent global lexical declarations
+     * must not collide with a prior case's global var or lexical binding. */
+    var ordinaryCase = shadowing[i].replace(/shadow/g, 'shadowCase' + i + 'Plain');
+    var strictCase = shadowing[i].replace(/shadow/g, 'shadowCase' + i + 'Strict');
+    check(compileIn(2015, ordinaryCase+' true'), 'independent scope '+i);
+    check(compileIn(2015, '"use strict"; '+strictCase+' true'), 'strict independent scope '+i);
 }
 print('ES6-CONTEXTUAL-KEYWORDS checks='+checks+' failures=0');

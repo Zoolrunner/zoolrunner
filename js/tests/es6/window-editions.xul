@@ -2,7 +2,11 @@
 <window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
         title="Mixed edition window test" onload="setTimeout(runEditions, 1000)">
   <browser id="content" type="content" src="chrome://es6window/content/window-editions.html"/>
-  <script type="application/javascript;version=2015" src="edition-modern.js"/>
+  <script type="application/javascript;version=2015">function modernEarlyLexicalReader() { return modernPersistentBinding; }</script>
+<script type="application/javascript;version=2015" src="edition-modern.js"/>
+<script type="application/javascript;version=2015"><![CDATA[
+var modernWindowLexicalAcrossScripts = modernEarlyLexicalReader() === 37 && modernPersistentConstant === 5 && eval("let modernPersistentBinding=8;modernPersistentBinding") === 8 && modernPersistentBinding === 37;
+]]></script>
   <script><![CDATA[
 var checks = 0, failures = 0;
 function check(value, label) {
@@ -12,14 +16,14 @@ function check(value, label) {
 }
 function runEditions() {
     try {
-        check(modernWindowLoaded && modernWindowEdition(), "modern XUL script and eval");
+        check(modernWindowLoaded && modernWindowLexicalAcrossScripts && modernWindowEdition(), "modern XUL script and eval");
         var legacy = {set value() {this.saved=arguments[0];}};
         legacy.value = 42;
         check(legacy.saved === 42, "unversioned XUL setter preserved");
         check(/a/("a")[0] === "a", "legacy caller edition restored");
         var w = document.getElementById("content").contentWindow;
         w = w.wrappedJSObject || w;
-        check(w.modernWindowLoaded && w.modernWindowEdition(), "modern content script and eval");
+        check(w.modernWindowLoaded && w.modernWindowLexicalAcrossScripts && w.modernWindowEdition(), "modern content script and eval");
         check(w.contentEditionsLoaded && w.legacyContentEdition(), "default content grammar preserved");
     } catch (e) { check(false, String(e)); }
     dump("ES6-WINDOW-EDITIONS checks=" + checks + " failures=" + failures + "\n");

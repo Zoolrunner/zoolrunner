@@ -199,7 +199,8 @@ obj_getSlot(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
     pobj = JSVAL_TO_OBJECT(*vp);
     if (pobj) {
         clasp = OBJ_GET_CLASS(cx, pobj);
-        if (clasp == &js_CallClass || clasp == &js_BlockClass) {
+        if (clasp == &js_CallClass || clasp == &js_BlockClass ||
+            js_IsLexicalEnvironment(cx, pobj)) {
             /* Censor activations and lexical scopes per ECMA-262. */
             *vp = JSVAL_NULL;
         } else if (clasp->flags & JSCLASS_IS_EXTENDED) {
@@ -1505,7 +1506,9 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         outer = js_GetScopeChain(cx, caller);
         if (!outer) return JS_FALSE;
     } else {
-        outer = global;
+        outer = JS_VERSION_IS_ES2015(cx)
+                ? js_GlobalLexicalEnvironment(cx, global, JS_TRUE) : global;
+        if (!outer) return JS_FALSE;
     }
     /* An empty lexical environment is transparent for non-strict eval.
      * Strict declarations use it as their variable environment as well. */
