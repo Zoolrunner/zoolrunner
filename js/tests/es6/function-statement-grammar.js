@@ -28,7 +28,9 @@
         try { Function('"use strict"; return function () {' + bodies[i] + '};'); }
         catch (e) { threw = e instanceof SyntaxError; }
         check(threw, 'inherited strict ' + i);
-        check(typeof Function(bodies[i]) === 'function', 'sloppy extension ' + i);
+        threw = false;
+        try { Function(bodies[i]); } catch (e) { threw = e instanceof SyntaxError; }
+        check(threw === (i >= 2 && i <= 5), 'ES2015 sloppy position ' + i);
     }
     check(Function('"use strict"; function f(){return 7;} return f();')() === 7,
           'function body declaration');
@@ -39,6 +41,10 @@
     var saved = version();
     try {
         version(170);
+        for (var j = 0; j < bodies.length; ++j)
+            check(typeof evaluate('(function(){' + bodies[j] + '})',
+                                  'legacy-function-position') === 'function',
+                  'legacy extension ' + j);
         check(evaluate('if(true) function historical(){return 10;} historical()',
                        'legacy-function-statement') === 10, 'legacy statement');
     } finally { version(saved); }

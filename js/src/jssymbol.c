@@ -215,6 +215,13 @@ symbol_constructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
 {
     JSString *description = NULL;
     JSSymbol *symbol;
+    /* ES2015 permits Symbol as a superclass, but construction itself throws
+     * before converting the description (19.4.1.1). */
+    if (JS_IsConstructing(cx)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_CONSTRUCTOR, "Symbol");
+        return JS_FALSE;
+    }
     if (argc && !JSVAL_IS_VOID(argv[0])) {
         description = js_ValueToString(cx, argv[0]);
         if (!description)
@@ -440,7 +447,6 @@ JSObject *
 js_InitSymbolClass(JSContext *cx, JSObject *global)
 {
     JSObject *proto, *ctor;
-    JSFunction *fun;
     JSSymbol *symbol;
     JSString *tag;
     JSTempValueRooter root;
@@ -455,8 +461,6 @@ js_InitSymbolClass(JSContext *cx, JSObject *global)
     ctor = JS_GetConstructor(cx, proto);
     if (!ctor)
         goto out;
-    fun = (JSFunction *)JS_GetPrivate(cx, ctor);
-    fun->flags |= JSFUN_NO_CONSTRUCT;
     if (!JS_DefineFunction(cx, ctor, "for", symbol_for, 1, JSFUN_NO_CONSTRUCT) ||
         !JS_DefineFunction(cx, ctor, "keyFor", symbol_keyFor, 1, JSFUN_NO_CONSTRUCT) ||
         !JS_DefineFunction(cx, proto, "toString", symbol_toString, 0,

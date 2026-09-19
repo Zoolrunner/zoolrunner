@@ -3086,3 +3086,27 @@ Reports: `artifacts/es6/module-context-final-*`. Focused coverage includes
 9 contextual-keyword, 8 module-production and 12 `new.target` checks, plus
 24 native module checks across five scripts. C89 checks pass. Other platforms
 remain unvalidated for this batch; the later-test review remains open.
+
+
+The later built-in/statement edge batch preserves **28,582/28,582 pinned ES6**
+and **11,540/11,540 ES5**, with zero failures, unsupported cases, crashes,
+timeouts or harness errors on macOS arm64. It corrects Number.toString and
+RegExp.compile arity in modern globals, undefined substr lengths in ES2015,
+Symbol subclass definition versus constructor rejection, statement-position
+function restrictions, and duplicate catch-binding SyntaxErrors. Explicit
+legacy statement forms still pass in JavaScript 1.7. The local statement
+fixture now distinguishes Annex B's permitted positions from legacy extensions;
+no upstream tests were changed. There are 21 new built-in checks and 24 new
+statement checks, plus 39 updated statement/edition checks.
+
+All four applications pass root builds, packages and relocated desktop checks,
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Reports use `artifacts/es6/later-edges-final-*`. C89 checks pass; adding the
+missing realm-helper header produces byte-identical libraries across all four
+applications and the frozen conformance runtime (SHA-256
+`0edb98fd8de17b868885d7125a17ad309d79dca89ea76375ad2700ea48e6cc9c`).
+The later 5,852-mode diagnostic with isolated realms improves to 5,820 passes
+and 32 failures, without harness errors. That diagnostic still needs edition
+review and phase checking and is not a full ES2015 conformance result. Further
+pattern/scope fixes are being validated separately. Other platforms have not
+been revalidated for this batch.

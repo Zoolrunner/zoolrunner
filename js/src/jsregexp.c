@@ -5609,6 +5609,9 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
     }
 
     if (modern) {
+        if (!JS_DefineFunction(cx, proto, "compile", regexp_compile, 2,
+                               JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+            goto bad;
         fun = (JSFunction *)JS_GetPrivate(cx, ctor);
         fun->clasp = &js_RegExpClass;
         if (!InitRegExpAccessors(cx, obj, proto) ||

@@ -2124,7 +2124,8 @@ str_substr(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             begin = length;
         }
 
-        if (argc == 1) {
+        if (argc == 1 ||
+            (JS_VERSION_IS_ES2015(cx) && JSVAL_IS_VOID(argv[1]))) {
             end = length;
         } else {
             if (!js_ValueToNumber(cx, argv[1], &d))

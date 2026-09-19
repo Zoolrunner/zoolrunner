@@ -2451,7 +2451,7 @@ BindLet(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
         return JS_FALSE;
     blockObj = data->obj;
     sprop = SCOPE_GET_PROPERTY(OBJ_SCOPE(blockObj), ATOM_TO_JSID(atom));
-    if (sprop && data->lexicalDeclaration)
+    if (sprop && (data->lexicalDeclaration || JS_VERSION_IS_ES2015(cx)))
         return LexicalSyntaxError(cx, data->ts);
     ATOM_LIST_SEARCH(ale, &tc->decls, atom);
     if (sprop || (!data->lexicalDeclaration && ale &&
@@ -3769,10 +3769,14 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         if (tt == TOK_DBLCOLON)
             goto expression;
 #endif
-        /* Declarations are StatementListItems, not strict Statement bodies.
-         * Keep the selected historical grammar and sloppy extensions intact. */
+        /* Annex B permits sloppy functions directly in if arms and labelled
+         * items, but not arbitrary iteration/with Statement bodies. */
         if (JS_VERSION_IS_ES2015(cx) && !allowLexical &&
-            ((tc->flags & TCF_STRICT_MODE) || js_PeekToken(cx, ts) == TOK_STAR)) {
+            ((tc->flags & TCF_STRICT_MODE) || js_PeekToken(cx, ts) == TOK_STAR ||
+             !tc->topStmt ||
+             (tc->topStmt->type != STMT_IF &&
+              tc->topStmt->type != STMT_ELSE &&
+              tc->topStmt->type != STMT_LABEL))) {
             LexicalSyntaxError(cx, ts);
             return NULL;
         }
@@ -4874,6 +4878,19 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             pn = Statement(cx, ts, tc, JS_FALSE);
             if (!pn)
                 return NULL;
+
+            /* A labelled function may be a StatementListItem, but cannot
+             * be the body of if/iteration/with (13.13.5 IsLabelledFunction). */
+            if (JS_VERSION_IS_ES2015(cx) && !allowLexical &&
+                (!stmtInfo.down || stmtInfo.down->type != STMT_LABEL)) {
+                pn3 = pn;
+                while (pn3->pn_type == TOK_COLON)
+                    pn3 = pn3->pn_expr;
+                if (pn3->pn_type == TOK_FUNCTION) {
+                    LexicalSyntaxError(cx, ts);
+                    return NULL;
+                }
+            }
 
             /* Normalize empty statement to empty block for the decompiler. */
             if (pn->pn_type == TOK_SEMI && !pn->pn_kid) {

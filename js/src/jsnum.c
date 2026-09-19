@@ -64,6 +64,7 @@
 #include "jsobj.h"
 #include "jsopcode.h"
 #include "jsprf.h"
+#include "jsrealm.h"
 #include "jsstr.h"
 
 static JSBool
@@ -709,6 +710,11 @@ js_InitNumberClass(JSContext *cx, JSObject *obj)
                                   JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS) ||
         !js_SetBuiltinMethodFlags(cx, ctor, number_static_methods,
                                   JSFUN_NO_CONSTRUCT))
+        return NULL;
+    if (js_IsModernGlobal(cx, obj) &&
+        !JS_DefineFunction(cx, proto, js_toString_str, num_toString, 1,
+                           JSFUN_THISP_NUMBER | JSFUN_NO_CONSTRUCT |
+                           JSFUN_REQUIRE_THIS))
         return NULL;
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_ZERO);
     if (!JS_DefineConstDoubles(cx, ctor, number_constants))
