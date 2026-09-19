@@ -85,12 +85,16 @@ def records(suite, selection, category="es6id"):
     for directory in ROOTS:
         for path in sorted((suite / 'test' / directory).rglob('*.js')):
             name = path.relative_to(suite / 'test').as_posix()
+            # Apply the existing path restriction before reading/parsing
+            # unrelated metadata. This does not change the selected cases.
+            if selection not in name:
+                continue
             source = path.read_text(encoding='utf-8-sig')
             match = re.search(r'/\*---(.*?)---\*/', source, re.S)
             metadata = (yaml.safe_load(match.group(1)) or {}) if match else {}
             selected = ('es6id' in metadata if category == 'es6id' else
                         bool(ES2015_FEATURES.intersection(metadata.get('features', []))))
-            if not selected or selection not in name:
+            if not selected:
                 continue
             flags = set(metadata.get('flags', []))
             modes = ['module'] if 'module' in flags else ['raw'] if 'raw' in flags else (
