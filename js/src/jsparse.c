@@ -3154,7 +3154,7 @@ CheckDestructuring(JSContext *cx, BindData *data,
             pn = lhs, pn2 = rhs;
             if (!data) {
                 /* Skip parenthesization if not in a variable declaration. */
-                while (pn->pn_type == TOK_RP)
+                while (!JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RP)
                     pn = pn->pn_kid;
                 if (pn2) {
                     while (pn2->pn_type == TOK_RP)
@@ -3226,7 +3226,7 @@ CheckDestructuring(JSContext *cx, BindData *data,
             pn = lhs->pn_right;
             if (!data) {
                 /* Skip parenthesization if not in a variable declaration. */
-                while (pn->pn_type == TOK_RP)
+                while (!JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RP)
                     pn = pn->pn_kid;
             }
 
@@ -3887,7 +3887,10 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     if (JS_VERSION_IS_ES2015(cx) && (tt == TOK_IMPORT || tt == TOK_EXPORT))
         return ModuleStatement(cx, ts, tc, tt, allowLexical);
 
-    if (IsLexicalLet(cx, ts)) {
+    /* A single Statement only excludes the `let [` expression prefix.
+     * Other contextual-let forms may terminate through ordinary ASI. */
+    if (IsLexicalLet(cx, ts) &&
+        (allowLexical || js_PeekToken(cx, ts) == TOK_LB)) {
         if (!allowLexical) {
             LexicalSyntaxError(cx, ts);
             return NULL;
@@ -4269,8 +4272,13 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             } else {
                 pn1 = Expr(cx, ts, tc);
                 if (pn1) {
-                    while (pn1->pn_type == TOK_RP)
-                        pn1 = pn1->pn_kid;
+                    pn2 = pn1;
+                    while (pn2->pn_type == TOK_RP)
+                        pn2 = pn2->pn_kid;
+                    /* Parenthesized patterns are not assignment patterns. */
+                    if (!JS_VERSION_IS_ES2015(cx) ||
+                        (pn2->pn_type != TOK_RB && pn2->pn_type != TOK_RC))
+                        pn1 = pn2;
                 }
             }
             tc->flags &= ~TCF_IN_FOR_INIT;
@@ -4329,7 +4337,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     : (pn1->pn_type != TOK_RB && pn1->pn_type != TOK_RC)) &&
 #endif
 #if JS_HAS_LVALUE_RETURN
-                   pn1->pn_type != TOK_LP &&
+                   (JS_VERSION_IS_ES2015(cx) || pn1->pn_type != TOK_LP) &&
 #endif
 #if JS_HAS_XML_SUPPORT
                    (pn1->pn_type != TOK_UNARYOP ||
@@ -5442,6 +5450,11 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 #if JS_HAS_DESTRUCTURING
       case TOK_RB:
       case TOK_RC:
+        if (JS_VERSION_IS_ES2015(cx) && pn != pn2) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_BAD_LEFTSIDE_OF_ASS);
+            return NULL;
+        }
         if (op != JSOP_NOP) {
             js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                         JSMSG_BAD_DESTRUCT_ASS);
@@ -5454,6 +5467,11 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 #endif
 #if JS_HAS_LVALUE_RETURN
       case TOK_LP:
+        if (JS_VERSION_IS_ES2015(cx)) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_BAD_LEFTSIDE_OF_ASS);
+            return NULL;
+        }
         JS_ASSERT(pn2->pn_op == JSOP_CALL || pn2->pn_op == JSOP_EVAL);
         pn2->pn_op = JSOP_SETCALL;
         break;

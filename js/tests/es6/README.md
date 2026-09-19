@@ -30,7 +30,7 @@ Harness setup is a separate script in the tested realm; bookkeeping stays in
 the shell realm, so a test can make its global nonextensible. Negative tests
 must throw the expected realm's constructor in their specified parse, resolution
 or runtime phase. Harness failures cannot satisfy a negative expectation.
-The runner has 33 executable phase, isolation, Unicode, module-graph, async, metadata and host-fixture controls:
+The runner has 38 executable phase, isolation, Unicode, module-graph, async, metadata and host-fixture controls:
 
 ```sh
 python3 js/tests/es6/test-later-runner.py --shell /path/to/frozen/xpcshell
@@ -4165,3 +4165,68 @@ Those candidates are not part of this cache-68 application result. The RegExp
 candidate passes the complete pinned ES2015 suite; the combined candidate's full
 runs are still in progress. The later diagnostic remains nonzero and incompletely
 reviewed. Full ES2015 compliance has not yet been established.
+
+### Large RegExp counts and assignment/method grammar edges
+
+The next integrated revision removes the modern RegExp parser's 65,535 bound
+ceiling. Two explicit 32-bit limbs avoid target/compiler integer-width changes;
+larger decimal bounds remain positive within the matcher's checked repetition
+budget. Decimal spans are compared exactly, including values beyond double
+precision and leading zeros. Wide bytecode operands use a fixed byte encoding;
+small bounds retain their compact encoding. Empty children without captures or
+alternatives can complete immediately. Other nullable children retain matching,
+backtracking and cancellation behavior. The saved RegExp grammar edition still
+controls parsing, including cloning and XDR; explicit legacy parsing is unchanged.
+
+Modern assignment parsing now rejects call targets and parenthesized object or
+array patterns before evaluation, with original ES2015 ReferenceError versus
+SyntaxError rules. Earlier editions retain their historical runtime call-target
+and parenthesized-pattern behavior. A separate pre-existing emitter defect for
+parenthesized local destructuring defaults is corrected. Local and reference
+stores retain parentheses in source notes, so decompilation cannot introduce an
+anonymous default function/class name. Native wide-atom source/XDR round trips
+exercise the changed paths. This batch advances the bytecode cache to 69.
+
+Modern non-strict methods no longer materialize own caller/arguments properties
+when queried. Their inherited restricted accessors remain intact; ordinary
+functions and explicit legacy functions retain the optional historical fields.
+The contextual-let parser also applies the expression-statement lookahead rule
+in single-statement positions: a newline can terminate a let identifier before
+an identifier or block, while let followed by an opening square bracket remains
+restricted. Statement lists still recognize lexical declarations, including
+newline/yield cases; legacy let-block grammar remains unchanged.
+
+The frozen RegExp/assignment/method candidate passes all 28,582 pinned ES2015
+modes and all 11,540 pinned ES5.1 cases with zero failures. The additional let
+candidate passes all 133 previous focused fixtures and 79 previous native probes.
+The four new JavaScript fixtures pass 106, 127, 121 and 72 assertions; four new
+native fixtures pass 24, 15, 17 and 19 checks. They include reentrant RegExp
+matching and collection during successful/cancelled repetitions, two-global
+cache round trips, native cloning and more than 65,535 atom operands. All changed
+compilation units pass C89 declaration checks. These are isolated candidate
+results. The resulting cache-69 production revision now passes all eight macOS
+arm64/x86_64 build, package and desktop jobs, each with 137 focused fixtures and
+83 native probes. Both frozen architecture runtimes pass all 28,582 pinned
+ES2015 modes and 11,540 pinned ES5.1 cases with zero failures. Calendar's four
+views, Browser navigation/reflection and Suite/XULRunner ChatZilla checks pass
+on both architectures. All eight archives and runtime hashes are preserved;
+normalized engine payload comparisons pass across the applications. The 38
+later-runner host controls also pass on both production architectures.
+
+The frozen Linux aarch64 source for this revision is queued for all eight
+application/backend jobs after the macOS checks. Its results remain separate
+from the earlier successful Linux revision; current Windows validation is still
+outstanding. A fresh complete 93,197-mode later diagnostic is running against
+the frozen arm64 cache-69 runtime, retaining every failure and host error.
+
+Exact later diagnostics pass both large-quantifier modes, both method-own-field
+cases and 14 original contextual-let statement cases. The two additional
+for-await-of cases remain later-edition failures. The assignment-target diagnostic
+records 149 passes and 485 failures: original ES2015 early ReferenceError rules
+and later SyntaxError/runtime-call-target rules differ. Its complete transitions
+are retained; it is not a zero-failure gate. The review ledger now holds 313
+source-hashed records, including original regressions and later changes to
+Promise resolve lookup, anonymous built-in names, RegExp prototype accessors and
+template cache identity/escape grammar. The ledger is incomplete and does not
+convert any failing execution into a pass. Full ES2015 compliance and current
+cross-platform application validation remain unfinished.

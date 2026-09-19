@@ -1359,6 +1359,7 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
     const char *lval, *xval;
     ptrdiff_t todo;
     JSAtom *atom;
+    jssrcnote *targetNote;
 
     *hole = JS_FALSE;
     cx = ss->sprinter.context;
@@ -1441,7 +1442,10 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
         if (atom)
             lval = js_AtomToPrintableString(cx, atom);
         LOCAL_ASSERT(lval);
-        todo = SprintCString(&ss->sprinter, lval);
+        targetNote = js_GetSrcNote(jp->script, pc);
+        todo = targetNote && SN_TYPE(targetNote) == SRC_PARENLEFT
+               ? Sprint(&ss->sprinter, "(%s)", lval)
+               : SprintCString(&ss->sprinter, lval);
         if (op != JSOP_SETLOCALPOP) {
             pc += oplen;
             if (pc == endpc)
@@ -1574,8 +1578,13 @@ DecompilePatternReference(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc, JS
     if (objectPattern) off = Sprint(&ss->sprinter, "[(%s)]: ", key);
     else if (GET_UINT16(refEnd + JSOP_GETLOCAL_LENGTH) == 2)
         off = SprintCString(&ss->sprinter, "...");
-    if (off >= 0) off = named ? SprintCString(&ss->sprinter, name)
-                              : Sprint(&ss->sprinter, "%s[%s]", base, name);
+    if (off >= 0) {
+        jssrcnote *targetNote = js_GetSrcNote(ss->printer->script, store);
+        off = named ? (targetNote && SN_TYPE(targetNote) == SRC_PARENLEFT
+                       ? Sprint(&ss->sprinter, "(%s)", name)
+                       : SprintCString(&ss->sprinter, name))
+                    : Sprint(&ss->sprinter, "%s[%s]", base, name);
+    }
     if (off < 0 || (initializer &&
         Sprint(&ss->sprinter, " = (%s)", initializer) < 0)) goto out;
     pc = store + js_CodeSpec[*store].length;

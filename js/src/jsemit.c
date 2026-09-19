@@ -3508,6 +3508,7 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                      JSBool wantpop, JSOp declOp)
 {
     jsuint slot;
+    JSBool parenthesized = JS_FALSE;
     ptrdiff_t start, note, branch;
 
     /* Skip any parenthesization. */
@@ -3527,6 +3528,8 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             !js_SetSrcNoteOffset(cx, cg, (uintN)note, 0, CG_OFFSET(cg)-start))
             return JS_FALSE;
         pn = pn->pn_left;
+        parenthesized = pn->pn_type == TOK_RP;
+        while (pn->pn_type == TOK_RP) pn = pn->pn_kid;
     }
     if (cg->treeContext.initializingParameters && pn->pn_type == TOK_NAME) {
         if (!EmitAtomOp(cx, pn, JSOP_STRING, cg) ||
@@ -3553,6 +3556,8 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             return JS_FALSE;
         }
 
+        if (parenthesized && pn->pn_type == TOK_NAME &&
+            js_NewSrcNote(cx, cg, SRC_PARENLEFT) < 0) return JS_FALSE;
         if (JS_VERSION_IS_ES2015(cx) &&
             (declOp == JSOP_SETNAME || declOp == JSOP_POP || declOp == JSOP_POPV) &&
             pn->pn_type == TOK_NAME && pn->pn_slot >= 0 &&
@@ -3641,7 +3646,7 @@ static JSBool EmitExtended(JSContext *cx, JSCodeGenerator *cg, jsint selector);
 
 static JSBool
 EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
-                     JSParseNode *target, JSParseNode *initializer, JSBool rest)
+                     JSParseNode *target, JSParseNode *initializer, JSBool rest, JSBool parenthesized)
 {
     JSParseNode key;
     JSAtomListElement *ale;
@@ -3710,6 +3715,8 @@ EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
             return JS_FALSE;
     }
     store = CG_OFFSET(cg);
+    if (parenthesized && target->pn_type == TOK_NAME &&
+        js_NewSrcNote(cx, cg, SRC_PARENLEFT) < 0) return JS_FALSE;
     if (target->pn_type == TOK_NAME) {
         EMIT_ATOM_INDEX_OP((target->pn_attrs & PN_GLOBAL_LEXICAL) ? JSOP_EXTENDED : JSOP_SETREF, atomIndex);
     } else if (IsSuperProperty(target)) {
@@ -3728,7 +3735,7 @@ EmitArrayPattern(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn, JSOp declO
     JSParseNode *item, *target, *initializer;
     jsuint depth = cg->stackDepth;
     ptrdiff_t start, note, begin, end, handler, skip;
-    JSBool hole, rest;
+    JSBool hole, rest, parenthesized;
     if (depth >= JS_BIT(16)-1) {
         ReportStatementTooLarge(cx, cg);
         return JS_FALSE;
@@ -3746,6 +3753,7 @@ EmitArrayPattern(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn, JSOp declO
             initializer = target->pn_right;
             target = target->pn_left;
         }
+        parenthesized = initializer && target->pn_type == TOK_RP;
         while (target->pn_type == TOK_RP) target = target->pn_kid;
         if (target->pn_type == TOK_NAME &&
             !BindNameToSlot(cx, &cg->treeContext, target, JS_FALSE)) return JS_FALSE;
@@ -3753,7 +3761,7 @@ EmitArrayPattern(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn, JSOp declO
              !cg->treeContext.initializingParameters) ||
             target->pn_type == TOK_DOT || target->pn_type == TOK_LB) {
             if (js_Emit1(cx, cg, JSOP_DUP) < 0 ||
-                !EmitPatternReference(cx, cg, NULL, target, initializer, rest)) return JS_FALSE;
+                !EmitPatternReference(cx, cg, NULL, target, initializer, rest, parenthesized)) return JS_FALSE;
         } else {
             hole = target->pn_type == TOK_COMMA && target->pn_arity == PN_NULLARY;
             EMIT_UINT16_IMM_OP(JSOP_PATTERNSTEP, rest ? 2 : !hole);
@@ -3791,7 +3799,7 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 {
     jsuint index;
     JSParseNode *pn2, *pn3, *target, *initializer;
-    JSBool doElemOp;
+    JSBool doElemOp, parenthesized;
     ptrdiff_t keyStart, keyNote;
 
 #ifdef DEBUG
@@ -3832,6 +3840,7 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                 initializer = target->pn_right;
                 target = target->pn_left;
             }
+            parenthesized = initializer && target->pn_type == TOK_RP;
             while (target->pn_type == TOK_RP) target = target->pn_kid;
             if (target->pn_type == TOK_NAME &&
                 !BindNameToSlot(cx, &cg->treeContext, target, JS_FALSE))
@@ -3839,7 +3848,7 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             if ((target->pn_type == TOK_NAME && target->pn_slot < 0 &&
              !cg->treeContext.initializingParameters) ||
                 target->pn_type == TOK_DOT || target->pn_type == TOK_LB) {
-                if (!EmitPatternReference(cx, cg, pn2->pn_left, target, initializer, JS_FALSE))
+                if (!EmitPatternReference(cx, cg, pn2->pn_left, target, initializer, JS_FALSE, parenthesized))
                     return JS_FALSE;
                 ++index;
                 continue;

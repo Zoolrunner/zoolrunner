@@ -151,11 +151,80 @@ typedef enum REOp {
     REOP_ENDALT        = 56, /* end of final alternate */
     REOP_CONCAT        = 57, /* concatenation of terms (parse time only) */
 
-    REOP_END
+    REOP_END,
+    REOP_BIGQUANT,
+    REOP_BIGMINIMALQUANT
 } REOp;
 
 #define REOP_IS_SIMPLE(op) ((unsigned)((op)-REOP_SIMPLE_START) <= \
                             (unsigned)(REOP_SIMPLE_END-REOP_SIMPLE_START))
+
+/* Two explicit limbs keep quantifier arithmetic independent of host word
+ * size. A larger decimal bound remains positive throughout the matcher's
+ * finite repetition budget; it is never rounded down to a smaller count. */
+typedef struct RECount {
+    uint32 low, high;
+    JSPackedBool huge;
+} RECount;
+
+static RECount
+MakeCount(uint32 value, JSBool huge)
+{
+    RECount count;
+    count.low = value;
+    count.high = 0;
+    count.huge = huge;
+    return count;
+}
+
+static JSBool
+CountIsZero(const RECount *count)
+{
+    return !count->huge && !count->low && !count->high;
+}
+
+static JSBool
+CountLessEqual(const RECount *left, const RECount *right)
+{
+    return right->huge || (!left->huge &&
+           (left->high < right->high ||
+            (left->high == right->high && left->low <= right->low)));
+}
+
+static void
+DecrementCount(RECount *count)
+{
+    if (count->huge) return;
+    JS_ASSERT(!CountIsZero(count));
+    if (!count->low) --count->high;
+    --count->low;
+}
+
+static jsbytecode *
+WriteCount(jsbytecode *pc, const RECount *count)
+{
+    pc[0] = (jsbytecode)(count->high >> 24);
+    pc[1] = (jsbytecode)(count->high >> 16);
+    pc[2] = (jsbytecode)(count->high >> 8);
+    pc[3] = (jsbytecode)count->high;
+    pc[4] = (jsbytecode)(count->low >> 24);
+    pc[5] = (jsbytecode)(count->low >> 16);
+    pc[6] = (jsbytecode)(count->low >> 8);
+    pc[7] = (jsbytecode)count->low;
+    pc[8] = count->huge;
+    return pc + 9;
+}
+
+static jsbytecode *
+ReadCount(jsbytecode *pc, RECount *count)
+{
+    count->high = ((uint32)pc[0] << 24) | ((uint32)pc[1] << 16) |
+                  ((uint32)pc[2] << 8) | pc[3];
+    count->low = ((uint32)pc[4] << 24) | ((uint32)pc[5] << 16) |
+                 ((uint32)pc[6] << 8) | pc[7];
+    count->huge = pc[8];
+    return pc + 9;
+}
 
 struct RENode {
     REOp            op;         /* r.e. op bytecode */
@@ -168,7 +237,8 @@ struct RENode {
         struct {                /* or a quantifier range */
             uintN  min;
             uintN  max;
-            JSPackedBool greedy;
+            JSPackedBool greedy, wide;
+            RECount bigMin, bigMax;
         } range;
         struct {                /* or a character class */
             size_t  startIndex;
@@ -326,8 +396,8 @@ typedef struct REProgState {
     size_t parenSoFar;              /* highest indexed paren started */
     union {
         struct {
-            uintN min;             /* current quantifier limits */
-            uintN max;
+            RECount min;           /* current quantifier limits */
+            RECount max;
         } quantifier;
         struct {
             size_t top;             /* backtrack stack state */
@@ -356,6 +426,7 @@ typedef struct REGlobalData {
     JSRegExp *regexp;               /* the RE in execution */
     JSBool ok;                      /* runtime error (out_of_memory only?) */
     JSBool sticky;                  /* match only at the requested offset */
+    uint32 repeatLow, repeatHigh;   /* checked per-match repetition budget */
     size_t start;                   /* offset to start at */
     ptrdiff_t skipped;              /* chars skipped anchoring this r.e. */
     const jschar    *cpbegin;       /* text base address */
@@ -419,6 +490,7 @@ NewRENode(CompilerState *state, REOp op)
     ren->op = op;
     ren->next = NULL;
     ren->kid = NULL;
+    if (op == REOP_QUANT) ren->u.range.wide = JS_FALSE;
     return ren;
 }
 
@@ -1760,8 +1832,10 @@ ParseQuantifier(CompilerState *state)
             const jschar *errp = state->cp;
 
             err = ParseMinMaxQuantifier(state, JS_FALSE);
-            if (err == 0)
+            if (err == 0) {
+                if (!state->result) return JS_FALSE;
                 goto quantifier;
+            }
             if (err == -1) {
                 if (state->flags & JSREG_UNICODE) return UnicodeRegExpError(state);
                 return JS_TRUE;
@@ -1801,13 +1875,103 @@ quantifier:
     return JS_TRUE;
 }
 
+static RECount
+ParseCountDigits(CompilerState *state)
+{
+    RECount count = MakeCount(0, JS_FALSE);
+    uint32 low, middle, carry;
+    while (state->cp < state->cpend && JS7_ISDEC(*state->cp)) {
+        if (!count.huge) {
+            low = (count.low & 0xffff) * 10 + (*state->cp - '0');
+            middle = (count.low >> 16) * 10 + (low >> 16);
+            carry = middle >> 16;
+            if (count.high > (((uint32)-1) - carry) / 10)
+                count.huge = JS_TRUE;
+            else {
+                count.high = count.high * 10 + carry;
+                count.low = (middle << 16) | (low & 0xffff);
+            }
+        }
+        ++state->cp;
+    }
+    return count;
+}
+
+static JSBool
+DecimalGreater(const jschar *left, const jschar *leftEnd,
+               const jschar *right, const jschar *rightEnd)
+{
+    while (left < leftEnd && *left == '0') ++left;
+    while (right < rightEnd && *right == '0') ++right;
+    if (leftEnd - left != rightEnd - right)
+        return leftEnd - left > rightEnd - right;
+    while (left < leftEnd) {
+        if (*left != *right) return *left > *right;
+        ++left; ++right;
+    }
+    return JS_FALSE;
+}
+
+static intN
+ParseModernMinMaxQuantifier(CompilerState *state, JSBool ignoreValues)
+{
+    const jschar *start = state->cp++, *minStart, *minEnd, *maxStart, *maxEnd;
+    RECount min, max;
+    JSBool unbounded = JS_FALSE, wide;
+    uintN smallMin, smallMax;
+    size_t extra;
+    if (state->cp == state->cpend || !JS7_ISDEC(*state->cp)) goto not_quantifier;
+    minStart = state->cp;
+    min = ParseCountDigits(state);
+    minEnd = state->cp;
+    maxStart = minStart; maxEnd = minEnd; max = min;
+    if (state->cp < state->cpend && *state->cp == ',') {
+        ++state->cp;
+        if (state->cp < state->cpend && JS7_ISDEC(*state->cp)) {
+            maxStart = state->cp;
+            max = ParseCountDigits(state);
+            maxEnd = state->cp;
+        } else {
+            max = MakeCount(0, JS_TRUE);
+            unbounded = JS_TRUE;
+        }
+    }
+    if (state->cp == state->cpend || *state->cp != '}') goto not_quantifier;
+    if (!ignoreValues && !unbounded &&
+        DecimalGreater(minStart, minEnd, maxStart, maxEnd))
+        return JSMSG_OUT_OF_ORDER;
+    state->result = NewRENode(state, REOP_QUANT);
+    if (!state->result) return JS_FALSE;
+    wide = min.huge || min.high || min.low > 0xffff ||
+           (!unbounded && (max.huge || max.high || max.low > 0xffff));
+    smallMin = min.low;
+    smallMax = unbounded ? (uintN)-1 : max.low;
+    state->result->u.range.min = smallMin;
+    state->result->u.range.max = smallMax;
+    state->result->u.range.wide = wide;
+    state->result->u.range.bigMin = min;
+    state->result->u.range.bigMax = max;
+    extra = 1 + (wide ? 18 : GetCompactIndexWidth(smallMin) +
+                            GetCompactIndexWidth(smallMax + 1)) + 3;
+    if (state->progLength > (size_t)-1 - extra)
+        return JSMSG_REGEXP_TOO_COMPLEX;
+    state->progLength += extra;
+    return 0;
+not_quantifier:
+    state->cp = start;
+    return -1;
+}
+
 static intN
 ParseMinMaxQuantifier(CompilerState *state, JSBool ignoreValues)
 {
     uintN min, max;
     jschar c;
-    const jschar *errp = state->cp++;
+    const jschar *errp;
 
+    if (state->modern)
+        return ParseModernMinMaxQuantifier(state, ignoreValues);
+    errp = state->cp++;
     c = *state->cp;
     if (JS7_ISDEC(c)) {
         ++state->cp;
@@ -2134,7 +2298,11 @@ EmitREBytecode(CompilerState *state, JSRegExp *re, size_t treeDepth,
 
         case REOP_QUANT:
             JS_ASSERT(emitStateSP);
-            if (t->u.range.min == 0 && t->u.range.max == (uintN)-1) {
+            if (t->u.range.wide) {
+                pc[-1] = t->u.range.greedy ? REOP_BIGQUANT : REOP_BIGMINIMALQUANT;
+                pc = WriteCount(pc, &t->u.range.bigMin);
+                pc = WriteCount(pc, &t->u.range.bigMax);
+            } else if (t->u.range.min == 0 && t->u.range.max == (uintN)-1) {
                 pc[-1] = (t->u.range.greedy) ? REOP_STAR : REOP_MINIMALSTAR;
             } else if (t->u.range.min == 0 && t->u.range.max == 1) {
                 pc[-1] = (t->u.range.greedy) ? REOP_OPT : REOP_MINIMALOPT;
@@ -2253,6 +2421,11 @@ NewRegExpWithEdition(JSContext *cx, JSTokenStream *ts,
     } else {
         if (!ParseRegExp(&state))
             goto out;
+    }
+    if (state.progLength > (size_t)-1 - offsetof(JSRegExp, program) - 1) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_REGEXP_TOO_COMPLEX);
+        re = NULL;
+        goto out;
     }
     resize = offsetof(JSRegExp, program) + state.progLength + 1;
     re = (JSRegExp *) JS_malloc(cx, resize);
@@ -3111,6 +3284,15 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
 
     JSBranchCallback onbranch = gData->cx->branchCallback;
     uintN onbranchCalls = 0;
+#define CHECK_REPEAT_BUDGET()                                                  \
+    JS_BEGIN_MACRO                                                            \
+        if (++gData->repeatLow == 0 && ++gData->repeatHigh == 0) {              \
+            JS_ReportErrorNumber(gData->cx, js_GetErrorMessage, NULL,          \
+                                 JSMSG_REGEXP_TOO_COMPLEX);                    \
+            gData->ok = JS_FALSE;                                             \
+            return NULL;                                                      \
+        }                                                                     \
+    JS_END_MACRO
 #define ONBRANCH_CALLS_MASK             127
 #define CHECK_BRANCH()                                                         \
     JS_BEGIN_MACRO                                                             \
@@ -3351,27 +3533,37 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 break;
 
             case REOP_STAR:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto quantcommon;
             case REOP_PLUS:
-                curState->u.quantifier.min = 1;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(1, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto quantcommon;
             case REOP_OPT:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = 1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(1, JS_FALSE);
+                goto quantcommon;
+            case REOP_BIGQUANT:
+                pc = ReadCount(pc, &curState->u.quantifier.min);
+                pc = ReadCount(pc, &curState->u.quantifier.max);
                 goto quantcommon;
             case REOP_QUANT:
                 pc = ReadCompactIndex(pc, &k);
-                curState->u.quantifier.min = k;
+                curState->u.quantifier.min = MakeCount((uint32)k, JS_FALSE);
                 pc = ReadCompactIndex(pc, &k);
                 /* max is k - 1 to use one byte for (uintN)-1 sentinel. */
-                curState->u.quantifier.max = k - 1;
-                JS_ASSERT(curState->u.quantifier.min
-                          <= curState->u.quantifier.max);
+                curState->u.quantifier.max = MakeCount((uint32)(k - 1), k == 0);
+                JS_ASSERT(CountLessEqual(&curState->u.quantifier.min,
+                                         &curState->u.quantifier.max));
             quantcommon:
-                if (curState->u.quantifier.max == 0) {
+                if (gData->regexp->modern && pc[ARG_LEN] == REOP_ENDCHILD) {
+                    pc += GET_OFFSET(pc);
+                    op = (REOp)*pc++;
+                    result = x;
+                    continue;
+                }
+                if (CountIsZero(&curState->u.quantifier.max)) {
                     pc = pc + GET_OFFSET(pc);
                     op = (REOp) *pc++;
                     result = x;
@@ -3383,7 +3575,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 startcp = x->cp;
                 if (REOP_IS_SIMPLE(op)) {
                     if (!SimpleMatch(gData, x, op, &nextpc, JS_TRUE)) {
-                        if (curState->u.quantifier.min == 0)
+                        if (CountIsZero(&curState->u.quantifier.min))
                             result = x;
                         else
                             result = NULL;
@@ -3398,7 +3590,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 curState->continue_pc = pc;
                 curState->parenSoFar = parenSoFar;
                 PUSH_STATE_STACK(gData);
-                if (curState->u.quantifier.min == 0 &&
+                if (CountIsZero(&curState->u.quantifier.min) &&
                     !PushBackTrackState(gData, REOP_REPEAT, pc, x, startcp,
                                         0, 0)) {
                     return NULL;
@@ -3412,28 +3604,30 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 continue;
 
             case REOP_REPEAT:
-                CHECK_BRANCH();
+                if (!gData->regexp->modern) CHECK_BRANCH();
                 --curState;
                 do {
+                    CHECK_REPEAT_BUDGET();
+                    if (gData->regexp->modern) CHECK_BRANCH();
                     if(gData->stateStackTop)
                         --gData->stateStackTop;
                     if (!result) {
                         /* Failed, see if we have enough children. */
-                        if (curState->u.quantifier.min == 0)
+                        if (CountIsZero(&curState->u.quantifier.min))
                             goto repeatDone;
                         goto break_switch;
                     }
-                    if (curState->u.quantifier.min == 0 &&
+                    if (CountIsZero(&curState->u.quantifier.min) &&
                         x->cp == gData->cpbegin + curState->index) {
                         /* matched an empty string, that'll get us nowhere */
                         result = NULL;
                         goto break_switch;
                     }
-                    if (curState->u.quantifier.min != 0)
-                        curState->u.quantifier.min--;
-                    if (curState->u.quantifier.max != (uintN) -1)
-                        curState->u.quantifier.max--;
-                    if (curState->u.quantifier.max == 0)
+                    if (!CountIsZero(&curState->u.quantifier.min))
+                        DecrementCount(&curState->u.quantifier.min);
+                    if (!curState->u.quantifier.max.huge)
+                        DecrementCount(&curState->u.quantifier.max);
+                    if (CountIsZero(&curState->u.quantifier.max))
                         goto repeatDone;
                     nextpc = pc + ARG_LEN;
                     nextop = (REOp) *nextpc;
@@ -3441,7 +3635,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     if (REOP_IS_SIMPLE(nextop)) {
                         nextpc++;
                         if (!SimpleMatch(gData, x, nextop, &nextpc, JS_TRUE)) {
-                            if (curState->u.quantifier.min == 0)
+                            if (CountIsZero(&curState->u.quantifier.min))
                                 goto repeatDone;
                             result = NULL;
                             goto break_switch;
@@ -3450,7 +3644,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     }
                     curState->index = startcp - gData->cpbegin;
                     PUSH_STATE_STACK(gData);
-                    if (curState->u.quantifier.min == 0 &&
+                    if (CountIsZero(&curState->u.quantifier.min) &&
                         !PushBackTrackState(gData, REOP_REPEAT,
                                             pc, x, startcp,
                                             curState->parenSoFar,
@@ -3470,30 +3664,40 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 goto break_switch;
 
             case REOP_MINIMALSTAR:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto minimalquantcommon;
             case REOP_MINIMALPLUS:
-                curState->u.quantifier.min = 1;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(1, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto minimalquantcommon;
             case REOP_MINIMALOPT:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = 1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(1, JS_FALSE);
+                goto minimalquantcommon;
+            case REOP_BIGMINIMALQUANT:
+                pc = ReadCount(pc, &curState->u.quantifier.min);
+                pc = ReadCount(pc, &curState->u.quantifier.max);
                 goto minimalquantcommon;
             case REOP_MINIMALQUANT:
                 pc = ReadCompactIndex(pc, &k);
-                curState->u.quantifier.min = k;
+                curState->u.quantifier.min = MakeCount((uint32)k, JS_FALSE);
                 pc = ReadCompactIndex(pc, &k);
                 /* See REOP_QUANT comments about k - 1. */
-                curState->u.quantifier.max = k - 1;
-                JS_ASSERT(curState->u.quantifier.min
-                          <= curState->u.quantifier.max);
+                curState->u.quantifier.max = MakeCount((uint32)(k - 1), k == 0);
+                JS_ASSERT(CountLessEqual(&curState->u.quantifier.min,
+                                         &curState->u.quantifier.max));
             minimalquantcommon:
+                if (gData->regexp->modern && pc[ARG_LEN] == REOP_ENDCHILD) {
+                    pc += GET_OFFSET(pc);
+                    op = (REOp)*pc++;
+                    result = x;
+                    continue;
+                }
                 curState->index = x->cp - gData->cpbegin;
                 curState->parenSoFar = parenSoFar;
                 PUSH_STATE_STACK(gData);
-                if (curState->u.quantifier.min != 0) {
+                if (!CountIsZero(&curState->u.quantifier.min)) {
                     curState->continue_op = REOP_MINIMALREPEAT;
                     curState->continue_pc = pc;
                     /* step over <next> */
@@ -3512,6 +3716,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 continue;
 
             case REOP_MINIMALREPEAT:
+                CHECK_REPEAT_BUDGET();
                 CHECK_BRANCH();
                 if(gData->stateStackTop)
                   --gData->stateStackTop;
@@ -3521,8 +3726,8 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     /*
                      * Non-greedy failure - try to consume another child.
                      */
-                    if (curState->u.quantifier.max == (uintN) -1 ||
-                        curState->u.quantifier.max > 0) {
+                    if (curState->u.quantifier.max.huge ||
+                        !CountIsZero(&curState->u.quantifier.max)) {
                         curState->index = x->cp - gData->cpbegin;
                         curState->continue_op = REOP_MINIMALREPEAT;
                         curState->continue_pc = pc;
@@ -3536,17 +3741,17 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     /* Don't need to adjust pc since we're going to pop. */
                     break;
                 }
-                if (curState->u.quantifier.min == 0 &&
+                if (CountIsZero(&curState->u.quantifier.min) &&
                     x->cp == gData->cpbegin + curState->index) {
                     /* Matched an empty string, that'll get us nowhere. */
                     result = NULL;
                     break;
                 }
-                if (curState->u.quantifier.min != 0)
-                    curState->u.quantifier.min--;
-                if (curState->u.quantifier.max != (uintN) -1)
-                    curState->u.quantifier.max--;
-                if (curState->u.quantifier.min != 0) {
+                if (!CountIsZero(&curState->u.quantifier.min))
+                    DecrementCount(&curState->u.quantifier.min);
+                if (!curState->u.quantifier.max.huge)
+                    DecrementCount(&curState->u.quantifier.max);
+                if (!CountIsZero(&curState->u.quantifier.min)) {
                     curState->continue_op = REOP_MINIMALREPEAT;
                     curState->continue_pc = pc;
                     pc += ARG_LEN;
@@ -3686,6 +3891,7 @@ InitMatch(JSContext *cx, REGlobalData *gData, JSRegExp *re)
     gData->cx = cx;
     gData->regexp = re;
     gData->ok = JS_TRUE;
+    gData->repeatLow = gData->repeatHigh = 0;
 
     JS_ARENA_ALLOCATE_CAST(result, REMatchState *,
                            &gData->pool,

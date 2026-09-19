@@ -1762,3 +1762,25 @@ without reading a public property or dispatching its setter. Preserve computed
 keys, shorthand members, methods, accessors and earlier-edition behavior. Run
 `literal-prototype.js` and `TestLiteralPrototype.c`, including rooted prototype
 values across embedding callbacks, collection and saved-edition round trips.
+
+
+Large modern RegExp quantifiers must preserve exact decimal range ordering and
+saved grammar editions. Keep wide counter encoding independent of target word
+size; do not wrap or silently clamp bounds. Run `regexp-large-quantifiers.js`
+and `TestRegExpLarge.c`, including nullable children, captures, reentrant
+collection, cancellation and successful long matches. Keep legacy grammar and
+native callback behavior stable. The combined quantifier/pattern-note revision
+advances the bytecode cache to 69; rebuild XPConnect loaders and libraries.
+For assignment grammar and default emission, run `assignment-targets.js`,
+`TestAssignmentTargets.c` and `TestAssignmentTargetsWide.c`. Preserve original
+ES2015 early-error classes, legacy call-target behavior, parenthesized valid
+references and default function-name semantics through decompilation and XDR.
+Modern methods must not acquire own caller/arguments properties from the
+ordinary-function resolver extension. Run `method-function-fields.js` and
+`TestMethodFields.c`, preserving inherited restricted accessors and earlier
+editions, saved editions and native cloning.
+For contextual let, distinguish single Statements from statement lists; retain
+the let-square-bracket lookahead restriction and ordinary ASI elsewhere. Run
+`let-statement-newline.js`, `generator-let-newline.js` and existing lexical and
+embedding probes. Do not turn newline-separated lexical declarations in a
+statement list into expression statements.

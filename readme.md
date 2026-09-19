@@ -1040,3 +1040,13 @@ and desktop checks on macOS arm64 and x86_64. This cache-68 revision also passes
 Calendar's four views, Browser navigation and ChatZilla coverage. The latest
 Linux revision and Windows remain unvalidated; additional isolated RegExp,
 assignment-target and method-field corrections are still being tested. See [block functions and prototype literals](js/tests/es6/README.md#non-strict-block-functions-and-prototype-initializer-syntax).
+
+
+The cache-69 ES2015 revision integrates large RegExp counts, assignment-target
+early errors, parenthesized default emission, method own-field restrictions and
+contextual-let statement parsing. All eight macOS arm64/x86_64 build, package
+and application checks pass; both architectures pass 28,582 pinned ES2015 modes
+and 11,540 ES5.1 cases with zero failures. Each package passes 137 focused
+fixtures and 83 native probes. Current Linux validation and the broader later
+Test262 review are still running; Windows remains unvalidated for this revision. See the
+[edge-case validation details](js/tests/es6/README.md#large-regexp-counts-and-assignmentmethod-grammar-edges).

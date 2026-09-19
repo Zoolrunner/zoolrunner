@@ -1430,7 +1430,8 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
             return JS_TRUE;
         }
         if (fun && !FUN_IS_ARROW(fun) && !FUN_IS_GENERATOR(fun) &&
-            (fun->edition < JSVERSION_ECMA_2015 || FUN_INTERPRETED(fun)) &&
+            (fun->edition < JSVERSION_ECMA_2015 ||
+             (FUN_INTERPRETED(fun) && !(fun->flags & JSFUN_NO_CONSTRUCT))) &&
             !(fun->flags & (JSFUN_STRICT | JSFUN_BOUND_FUNCTION)) &&
             OBJ_GET_PROTO(cx, obj) &&
             js_IsModernFunction(cx, OBJ_GET_PROTO(cx, obj))) {

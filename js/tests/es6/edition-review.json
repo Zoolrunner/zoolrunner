@@ -10,6 +10,27 @@
       "decision": "original-regression"
     },
     {
+      "test": "annexB/language/expressions/assignmenttargettype/callexpression-as-for-in-lhs.js",
+      "sha256": "3d0cef1781caaad11de14bf4e6b89eec6d2eda7661c94987e0597b20e19c996b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-for-in-and-for-of-statements-static-semantics-early-errors",
+      "reason": "Original ES2015 requires an early error for this invalid call target. This test requires the later Runtime Errors for Function Call Assignment Targets Annex B extension, including observable call execution. Explicit earlier language editions retain their historical behavior; the ES2015 correction does not import the later extension."
+    },
+    {
+      "test": "annexB/language/expressions/assignmenttargettype/callexpression-in-compound-assignment.js",
+      "sha256": "659947683f9ae9af80e4be938c1b4ee9be6e14078ab5df8e4a64eba0b6a592cf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "Original ES2015 requires an early error for this invalid call target. This test requires the later Runtime Errors for Function Call Assignment Targets Annex B extension, including observable call execution. Explicit earlier language editions retain their historical behavior; the ES2015 correction does not import the later extension."
+    },
+    {
+      "test": "annexB/language/expressions/assignmenttargettype/callexpression.js",
+      "sha256": "0224a2f184ad0a3625ad7f853cb32b60b9c35365898e242a65096934752ee966",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "Original ES2015 requires an early error for this invalid call target. This test requires the later Runtime Errors for Function Call Assignment Targets Annex B extension, including observable call execution. Explicit earlier language editions retain their historical behavior; the ES2015 correction does not import the later extension."
+    },
+    {
       "test": "annexB/language/function-code/block-decl-func-skip-arguments.js",
       "sha256": "8a225aefbeb41d9a8f5630403141e3b718330d1e946c15a9fb35678da9a90d01",
       "decision": "later-requirement",
@@ -598,6 +619,34 @@
       "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
     },
     {
+      "test": "built-ins/Promise/all/invoke-resolve-get-once-multiple-calls.js",
+      "sha256": "2891a318699250c806a2fb556936fc0a67f50bfd6421f172d51d089a3114b203",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-performpromiseall",
+      "reason": "Original ES2015 invokes the constructor resolve property separately for each iterated value and does not read it for an empty iterator. This test requires the later GetPromiseResolve operation before iteration and one cached lookup for the whole operation."
+    },
+    {
+      "test": "built-ins/Promise/all/invoke-resolve-get-once-no-calls.js",
+      "sha256": "327f9835af85b17dd87c0a7ddbe86fb7c65970a3bd27a90319ab1953897ff0f9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-performpromiseall",
+      "reason": "Original ES2015 invokes the constructor resolve property separately for each iterated value and does not read it for an empty iterator. This test requires the later GetPromiseResolve operation before iteration and one cached lookup for the whole operation."
+    },
+    {
+      "test": "built-ins/Promise/all/resolve-element-function-name.js",
+      "sha256": "d40f512f2d27547403ec0276b21d3d111e57a1786e6e077664bf9aa9d0bd2192",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-standard-built-in-objects",
+      "reason": "Original ES2015 clause 17 excludes anonymous built-in functions from its required own name property; clause 25.4.4.1.2 identifies this resolve-element function as anonymous. This test requires the later universal own-name rule."
+    },
+    {
+      "test": "built-ins/Promise/all/resolve-element-function-property-order.js",
+      "sha256": "718cf9a693331cf31ebfccbdd584e8f7b0383a99eaa610abfc33e8a21533ac2c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-standard-built-in-objects",
+      "reason": "Original ES2015 clause 17 excludes anonymous built-in functions from its required own name property; clause 25.4.4.1.2 identifies this resolve-element function as anonymous. This test requires the later universal own-name rule and associated property ordering."
+    },
+    {
       "test": "built-ins/Promise/all/resolve-non-callable.js",
       "sha256": "155b8850155c0ab3f4efe0693d4bfb038b5273bea7389d39d3369e6433422455",
       "decision": "later-requirement",
@@ -610,6 +659,20 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-promise.race",
       "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
+    },
+    {
+      "test": "built-ins/Promise/race/invoke-resolve-get-once-multiple-calls.js",
+      "sha256": "833a193abdeeaaf1d2d2dd05790643df9d96041be05636fafa46e0a94adb20e2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-performpromiserace",
+      "reason": "Original ES2015 invokes the constructor resolve property separately for each iterated value and does not read it for an empty iterator. This test requires the later GetPromiseResolve operation before iteration and one cached lookup for the whole operation."
+    },
+    {
+      "test": "built-ins/Promise/race/invoke-resolve-get-once-no-calls.js",
+      "sha256": "7946d42066315d6e25596d3864a9493046811ae0e3f638c8ea3da0e94d610a65",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-performpromiserace",
+      "reason": "Original ES2015 invokes the constructor resolve property separately for each iterated value and does not read it for an empty iterator. This test requires the later GetPromiseResolve operation before iteration and one cached lookup for the whole operation."
     },
     {
       "test": "built-ins/Promise/race/resolve-non-callable.js",
@@ -710,6 +773,41 @@
       "reason": "Original ES2015 RegExpBuiltinExec resets lastIndex on search exhaustion. This later test requires preserving it for a non-global, non-sticky unsuccessful search."
     },
     {
+      "test": "built-ins/RegExp/prototype/flags/this-val-regexp-prototype.js",
+      "sha256": "75092b906fe19c165aa0ec534cfda5cc06a3f0a534d6758abdb675414d817e25",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.flags",
+      "reason": "Original ES2015 flags reads the ordinary global property first; the original global accessor throws when RegExp.prototype lacks OriginalFlags. This test requires the later prototype-accessor exception that allows flags to return the empty string."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/global/this-val-regexp-prototype.js",
+      "sha256": "5eda6b47aa090a3731099031398e829847f7a5539affa55c84171e782b324e44",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.global",
+      "reason": "Original ES2015 RegExp accessors require the relevant internal slots and have no special return for RegExp.prototype. This test requires the later intrinsic-prototype exception."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/ignoreCase/this-val-regexp-prototype.js",
+      "sha256": "60fa1eba475ffb36daa193cd3ab065dcd554ed2827be14216cbcc0e85c246f55",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.ignorecase",
+      "reason": "Original ES2015 RegExp accessors require the relevant internal slots and have no special return for RegExp.prototype. This test requires the later intrinsic-prototype exception."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/multiline/this-val-regexp-prototype.js",
+      "sha256": "6229ef947bfddce6951442261b43a38ad0ce217c2803ba15c1c438de5d0f4f20",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.multiline",
+      "reason": "Original ES2015 RegExp accessors require the relevant internal slots and have no special return for RegExp.prototype. This test requires the later intrinsic-prototype exception."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/source/this-val-regexp-prototype.js",
+      "sha256": "3fb3811e2b6b01395287149ff6b0e510e4bf10904796dfce19979ebab2ef8ee1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.source",
+      "reason": "Original ES2015 RegExp accessors require the relevant internal slots and have no special return for RegExp.prototype. This test requires the later intrinsic-prototype exception."
+    },
+    {
       "test": "built-ins/RegExp/prototype/sticky/this-val-non-obj.js",
       "sha256": "5b4c590c563824da3a308188337541911349d4298be8dd7f7790949119d063c4",
       "decision": "later-requirement",
@@ -717,11 +815,32 @@
       "reason": "This revised test includes a BigInt literal (4n), outside the original ES2015 grammar. Its source is retained unchanged in the diagnostic; focused original primitive-receiver checks remain separate."
     },
     {
+      "test": "built-ins/RegExp/prototype/sticky/this-val-regexp-prototype.js",
+      "sha256": "5fbd67052e16ad8d14591f507d3088c7e3ae8486d4bd4c576c729072835e3e29",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.sticky",
+      "reason": "Original ES2015 RegExp accessors require the relevant internal slots and have no special return for RegExp.prototype. This test requires the later intrinsic-prototype exception."
+    },
+    {
       "test": "built-ins/RegExp/prototype/unicode/this-val-non-obj.js",
       "sha256": "5d3ee9642539eba3fe97eb6f9a51e49994274db0bb34c542608576c8f1ec563e",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-numeric-literals",
       "reason": "This revised test includes a BigInt literal (4n), outside the original ES2015 grammar. Its source is retained unchanged in the diagnostic; focused original primitive-receiver checks remain separate."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/unicode/this-val-regexp-prototype.js",
+      "sha256": "3c4919cea12eff8371a49b430201dc50630358cfb3e53630b8718b2bd937bf48",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-get-regexp.prototype.unicode",
+      "reason": "Original ES2015 RegExp accessors require the relevant internal slots and have no special return for RegExp.prototype. This test requires the later intrinsic-prototype exception."
+    },
+    {
+      "test": "built-ins/RegExp/quantifier-integer-limit.js",
+      "sha256": "4605bdc13b1d7de3945afcb6ba4d10d66f2ed2df2f7ff38222a176a865b6e78b",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-patterns",
+      "reason": "Original ES2015 DecimalDigits quantifier bounds have no 16-bit ceiling. The isolated wider-counter parser and matcher accept large magnitudes, compare range bounds exactly and retain the saved RegExp grammar edition."
     },
     {
       "test": "built-ins/String/prototype/localeCompare/15.5.4.9_CE.js",
@@ -953,6 +1072,13 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
       "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-callexpression-as-for-in-lhs.js",
+      "sha256": "7a7e7fbf6beccc00190386023110fe96f7408b22ccbaf81aade46dc0f6621836",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-for-in-and-for-of-statements-static-semantics-early-errors",
+      "reason": "Original ES2015 requires a SyntaxError for a call expression used as a for-in assignment target. The isolated parser correction rejects it before evaluating any script statements, preserving older editions."
     },
     {
       "test": "language/expressions/class/accessor-name-inst/literal-string-default-escaped-ext.js",
@@ -1319,6 +1445,20 @@
       "reason": "Original Annex B prototype initializer syntax invokes the internal prototype operation without reading or calling a public __proto__ accessor. The isolated modern correction uses the existing internal reflection helper and preserves earlier-edition assignment behavior."
     },
     {
+      "test": "language/expressions/object/method-definition/forbidden-ext/b1/meth-forbidden-ext-direct-access-prop-arguments.js",
+      "sha256": "950ee5fea43f6b423046b20c4c086e6cb56c46cf2e60c2fe226ce7e1d7f35dc1",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-forbidden-extensions",
+      "reason": "Original ES2015 forbids creating own caller or arguments properties on syntactic methods, including non-strict methods. The isolated resolver correction excludes modern non-constructible interpreted functions from the optional ordinary-function extension; inherited restricted accessors and legacy functions retain their behavior."
+    },
+    {
+      "test": "language/expressions/object/method-definition/forbidden-ext/b1/meth-forbidden-ext-direct-access-prop-caller.js",
+      "sha256": "ae81de5e13b5cca2827e3a7db904eb33880dc528b51a518b1101bd283327ddff",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-forbidden-extensions",
+      "reason": "Original ES2015 forbids creating own caller or arguments properties on syntactic methods, including non-strict methods. The isolated resolver correction excludes modern non-constructible interpreted functions from the optional ordinary-function extension; inherited restricted accessors and legacy functions retain their behavior."
+    },
+    {
       "test": "language/expressions/object/method-definition/gen-meth-eval-var-scope-syntax-err.js",
       "sha256": "fd7493592238c30ff4ae6a84740d92d2b38f9ff8f5c3392e76756a88b0580810",
       "decision": "later-requirement",
@@ -1345,6 +1485,69 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
       "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-differing-expressions-eval.js",
+      "sha256": "943f004c1a54e3d481076fa8a033d18deb85ab121a63f92c9f801597881c8f66",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-differing-expressions-new-function.js",
+      "sha256": "e4b24504bbd389f7c14d1228892a4d50adb35beb6fc62b065032d31fc0cf2610",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-differing-expressions.js",
+      "sha256": "cb79874ecc0392f98fc17c59dc924559481029a3890f526fe173d9c984b438be",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-eval-inner-function.js",
+      "sha256": "16925bb7e47b1fcdca0e7f66bd7175756f39e3cc452da19bd3d454bb6b1db949",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-identical-source-eval.js",
+      "sha256": "08a530bc5122b3172f624a1132d2ced94f78056df1111ac4b755c663c4b3163e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-identical-source-new-function.js",
+      "sha256": "254f85741af71fab6706e7f904b46ce6b9fc23fb35dd1146043adf72d1322ec2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/cache-identical-source.js",
+      "sha256": "cb5bb34b155a3d548f123c2f9da85e1b05b25ef2d8f37aaca32fc221397b4e41",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
+    },
+    {
+      "test": "language/expressions/tagged-template/invalid-escape-sequences.js",
+      "sha256": "28d6fe7e9ef74bddc9a2c5017ecb45803c29fa623acda93f48e028a746ef9ee2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-template-literal-lexical-components",
+      "reason": "Original ES2015 template grammar rejects these malformed escapes, including in tagged templates. This test requires the later tagged-template grammar relaxation and undefined cooked values."
+    },
+    {
+      "test": "language/expressions/tagged-template/template-object-template-map.js",
+      "sha256": "ce16a6bc5e27912cf83c6c87d3041dbeb5996772519f433185824446e6a7914f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-gettemplateobject",
+      "reason": "Original ES2015 GetTemplateObject compares the ordered raw string values in the current realm registry. These sites have identical raw strings and therefore reuse a template object. This test requires the later parse-site identity cache key."
     },
     {
       "test": "language/module-code/namespace/Symbol.toStringTag.js",
@@ -1711,6 +1914,20 @@
       "reason": "Original ES2015 synthesizes a default derived constructor with rest parameters and a super spread call. That spread observes Array.prototype[Symbol.iterator]; the later test requires forwarding arguments without that iterator lookup."
     },
     {
+      "test": "language/statements/for-in/let-block-with-newline.js",
+      "sha256": "a9204e52364e56c7ea38c24406dcefcdb94ec2abc667862812a829b75a87c8d9",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/for-in/let-identifier-with-newline.js",
+      "sha256": "a852b0e3ec0c91488ed5a004885cebd51c66fd59f8631a7478bdcac23931ebc8",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
       "test": "language/statements/for-of/iterator-close-throw-get-method-abrupt.js",
       "sha256": "770848caa62e596adcc1125cb0021e7dc864076ce8da37b218c89ddf9f00ca04",
       "decision": "later-requirement",
@@ -1732,6 +1949,34 @@
       "reason": "Original IteratorNext invokes the next property on each step. The later iterator-record algorithm caches the method."
     },
     {
+      "test": "language/statements/for-of/let-block-with-newline.js",
+      "sha256": "7ed01dc91284f3ef41f558b43bdc64e344da0c1795dc782940b5935d31c54f8a",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/for-of/let-identifier-with-newline.js",
+      "sha256": "bdfc6bafdca2827acaf122ebcf5f02b39655b3926b77f2836f1d725003b2105f",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/for/let-block-with-newline.js",
+      "sha256": "73a6d383c765037a38a03a941aa71edd2e05b5893d6361d6b882bdc1093f8cd5",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/for/let-identifier-with-newline.js",
+      "sha256": "33188cc83a8a85bd6b82c514ef425aee1123d0b4f18fe452ee7a37c455560b79",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
       "test": "language/statements/function/eval-var-scope-syntax-err.js",
       "sha256": "794cb526b9757815d020a52fa99e711b9e62aae573caaf40dcbf8d84f3ce3581",
       "decision": "later-requirement",
@@ -1744,6 +1989,34 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
       "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/statements/if/let-block-with-newline.js",
+      "sha256": "f493ed8d9a13534d7e0e5923849af316328ef86b4c64355f9f9be017fe823f5a",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/if/let-identifier-with-newline.js",
+      "sha256": "c4994ce35f50ca389b400c9c517f0b899f9e7f8028780e0ad0a2319cde04869e",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/labeled/let-block-with-newline.js",
+      "sha256": "5e7e266863f651ece5d51bfc7e7053d6bdab35374bebe6c3f1461b4d1df5ffd3",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/labeled/let-identifier-with-newline.js",
+      "sha256": "2289ec33c5c37b317fbf76892150cb5b29ceedca2017704dd2af0a2b6f7a67cf",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
     },
     {
       "test": "language/statements/let/syntax/let-newline-yield-in-generator-function.js",
@@ -1837,6 +2110,20 @@
       "reason": "Parameter initialization precedes Block evaluation and its distinct lexical environment. Fixed in the staged catch environment candidate; later diagnostic passes unchanged."
     },
     {
+      "test": "language/statements/while/let-block-with-newline.js",
+      "sha256": "e65c73b49c344d23aab9d78d1a4ad7fec51e58b1d917df6826e8eec9a76c8bb6",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/while/let-identifier-with-newline.js",
+      "sha256": "a05f826e052ed2145102fc97bddeeda7b10479036dc6bdec79769cd6161ac371",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
       "test": "language/statements/with/get-binding-value-call-with-proxy-env.js",
       "sha256": "fa512d709219d5ed2fb04a5408bc1881b105ebce64db9ef2a8feff28ade8d121",
       "decision": "original-regression",
@@ -1856,6 +2143,20 @@
       "decision": "original-regression",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-getbindingvalue-n-s",
       "reason": "Original ES2015 GetBindingValue performs HasProperty after HasBinding and its unscopables lookup. The test exposes a missing second check, including the required ReferenceError when a resolved binding disappears before a strict read."
+    },
+    {
+      "test": "language/statements/with/let-block-with-newline.js",
+      "sha256": "8512c63aea09a2efba3f229854d90641db3d280423712f59b4bd459c8d0b646a",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
+    },
+    {
+      "test": "language/statements/with/let-identifier-with-newline.js",
+      "sha256": "141caf9d7bfe7aa2d13034cf07d1764d190d8c20865719211428db63eb5a4f65",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-expression-statement",
+      "reason": "Original ES2015 ExpressionStatement only excludes let followed by an opening square bracket. In a single-Statement position this contextual let identifier may terminate through ASI before an identifier or block. The isolated parser correction retains lexical-declaration recognition in statement lists and preserves legacy keyword grammar."
     },
     {
       "test": "language/statements/with/set-mutable-binding-binding-deleted-in-get-unscopables-strict-mode.js",
