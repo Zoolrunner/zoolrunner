@@ -985,3 +985,8 @@ with legacy method behavior and grammar retained. The ES6 result required a
 complete retry after one shell-bootstrap error; both reports are retained.
 RegExp cache records now preserve their compilation edition (cache version 65).
 See [String/RegExp edge validation](js/tests/es6/README.md#canonical-comparison-and-incomplete-regexp-escapes).
+
+Date numeric and callback edge fixes pass both complete pinned suites and all
+four macOS arm64 application gates. Modern methods preserve conversion order
+and Date snapshots while legacy methods retain their behavior; see [Date validation](js/tests/es6/README.md#date-arithmetic-and-callback-order)
+for the explicit date-only parsing compatibility policy and remaining checks.

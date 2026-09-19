@@ -3700,3 +3700,42 @@ reports a harness error when a test requires `$262.IsHTMLDDA`, which this shell
 host does not supply. This prevents an absent fixture from being mistaken for
 an ordinary undefined value or satisfying an expected TypeError. All selected
 rows remain in the report. The expanded host controls pass all 33 checks.
+
+### Date arithmetic and callback order
+
+Modern Date construction, UTC and setters use separate native entry points to
+preserve their behavior through cloned methods and calls from legacy scripts.
+Arithmetic now truncates before the year offset, honors zero/negative days,
+rejects nonfinite fields after required conversions, avoids unchecked wide-year
+casts and clips negative fractions to positive zero. Setter callbacks operate
+on a snapshot of the original Date value; exceptions retain callback mutations,
+while ordinary completion stores the original ES2015 result. This intentionally
+differs from later invalid-Date early-return rules. Legacy globals keep their
+historical methods and parsing behavior.
+
+Offsetless ISO date-times now use local time in modern globals. Date-only forms
+retain UTC, matching inherited pinned cases and later corrected specifications.
+This is an explicit compatibility policy rather than the published original
+ES2015 date-only interpretation; see [TC39's discussion](https://github.com/tc39/ecma262/issues/87).
+
+The isolated candidate passes 164 focused checks in America/Los_Angeles, UTC
+and America/New_York, and 44 native checks including JSAPI dates, cloned methods,
+callback GC and independent legacy globals. All 898 pinned Date modes pass.
+Final integrated macOS arm64 validation passes all 28,582 pinned ES6 modes and
+11,540 ES5 modes with zero failures, unsupported cases, timeouts, crashes or
+harness errors. All four builds, packages and relocated desktop checks pass,
+including Calendar's four views, Browser navigation/layout and Suite/XULRunner
+ChatZilla. There are 115 focused fixtures and 67 native fixtures; C89 checks
+pass. All four engines and the frozen runtime share SHA-256
+`b419a6d4e0ba5cd48280648e3c6a5a64e81b0cd384d1a964b3039d96db7aa349`.
+Reports use `artifacts/es6/date-numeric-final-*`. Fresh x86_64 validation is in
+progress; Linux and Windows have not been revalidated for this batch.
+
+The complete later Date directory records 1,194 diagnostic passes and 42
+failures (`date-local-parse-later.json`). Compared with the prior engine it gains
+32 modes and loses eight. Those eight require a later invalid-Date early return;
+the original ES2015 final store is now tested explicitly instead. Remaining
+failures include those later setter rules, Temporal and the newer no-argument
+UTC requirement. Every selected row is retained. The ledger now has 177 reviewed
+records with matching pinned source hashes and original-specification anchors;
+it remains incomplete and does not turn diagnostic failures into passes.

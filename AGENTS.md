@@ -1670,3 +1670,16 @@ the compilation edition, and XDR stores it independently of the decoding
 context. Cache version 65 invalidates the older regexp record format. Run
 `regexp-incomplete-hex.js` and `TestRegExpHex.c`, including standalone-object
 and script cache roundtrips in both edition directions, source and GC checks.
+
+Modern Date arithmetic must convert all supplied fields before rejecting a
+nonfinite value, truncate before the two-digit year offset, preserve explicit
+zero/negative days and add positive zero after TimeClip truncation. Keep the
+historical method policy in legacy globals and retain modern native entry
+points through JSAPI clones. Date setters snapshot the old value before
+callbacks. Original ES2015 stores the final NaN even when argument conversion
+mutates an invalid Date; do not adopt the later early-return rule silently.
+Run `date-numeric.js` and `TestDateNumeric.c`, including callback collection,
+exceptions, large fields and multiple timezones. Modern offsetless ISO
+date-times use local time. Date-only forms retain UTC for compatibility with
+the inherited pinned cases and later corrections; document this distinction
+from the published original ES2015 wording. Legacy parsing remains unchanged.

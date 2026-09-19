@@ -38,6 +38,202 @@
       "reason": "Original ES2015 sort performs ToObject and length conversion before its sorting operations. This test requires the later entry-time comparator check to precede a throwing length getter."
     },
     {
+      "test": "built-ins/Date/UTC/infinity-make-day.js",
+      "sha256": "14dcb4527da98be273e869f770c46f7a67f2fb58901c6982aea3976d91f964c9",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.utc",
+      "reason": "Original ES2015 converts all supplied fields before MakeDay/MakeTime, truncates finite values toward zero, offsets years after truncation, and retains explicit zero or negative day values. The modern Date arithmetic candidate corrects these cases without changing legacy methods."
+    },
+    {
+      "test": "built-ins/Date/UTC/infinity-make-time.js",
+      "sha256": "1d3d21408c5387eebaae765c5b4023b54c91a488b22c6fc5fe6e53b3b6a09fc4",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.utc",
+      "reason": "Original ES2015 converts all supplied fields before MakeDay/MakeTime, truncates finite values toward zero, offsets years after truncation, and retains explicit zero or negative day values. The modern Date arithmetic candidate corrects these cases without changing legacy methods."
+    },
+    {
+      "test": "built-ins/Date/UTC/no-arg.js",
+      "sha256": "4f3fc9a76c6f288afd7adb0ff31717d8436a4322e5cc014b5f6a5f19504b7e52",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.utc",
+      "reason": "Original ES2015 explicitly makes calls with fewer than two arguments implementation-dependent. This test instead requires NaN for the no-argument call; the retained historical default is permitted by the original edition."
+    },
+    {
+      "test": "built-ins/Date/UTC/non-integer-values.js",
+      "sha256": "22ace93f5d2a77e873cd38ca9ef2462fee8cecc8f287b8a36957af78153bcf30",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.utc",
+      "reason": "Original ES2015 converts all supplied fields before MakeDay/MakeTime, truncates finite values toward zero, offsets years after truncation, and retains explicit zero or negative day values. The modern Date arithmetic candidate corrects these cases without changing legacy methods."
+    },
+    {
+      "test": "built-ins/Date/UTC/overflow-make-day.js",
+      "sha256": "b295b24a9dee5ef7c34d5cdf35d0edbb2e8686be84dae2c5b130ae9f499dac63",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.utc",
+      "reason": "Original ES2015 converts all supplied fields before MakeDay/MakeTime, truncates finite values toward zero, offsets years after truncation, and retains explicit zero or negative day values. The modern Date arithmetic candidate corrects these cases without changing legacy methods."
+    },
+    {
+      "test": "built-ins/Date/UTC/year-offset.js",
+      "sha256": "10702599c49de1ac3eaa0748b236d60df48e068b1c9b95163c93ac068db22171",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.utc",
+      "reason": "Original ES2015 converts all supplied fields before MakeDay/MakeTime, truncates finite values toward zero, offsets years after truncation, and retains explicit zero or negative day values. The modern Date arithmetic candidate corrects these cases without changing legacy methods."
+    },
+    {
+      "test": "built-ins/Date/parse/without-utc-offset.js",
+      "sha256": "903aaf9fd5a8eb1f983ac0096b52ce3b61b12c1de5b0cc0ce21564c74d03bebc",
+      "decision": "mixed-edition-compatibility-policy",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date-time-string-format",
+      "reason": "The modern Date path implements original ES2015 local interpretation for offsetless date-times. It retains UTC for date-only forms, as required by the inherited pinned ES5 case and later corrected specifications. This is an explicit compatibility policy, not an exact implementation of the published original date-only wording. See https://github.com/tc39/ecma262/issues/87 ."
+    },
+    {
+      "test": "built-ins/Date/prototype/setDate/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "4587cf678f6c3020c77b72fcb5c88fd3f7c98c0d1f31e66097522a72c6911d35",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setdate",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setHours/arg-coercion-order.js",
+      "sha256": "d59164a3af0f984da60529f8e3faebd00d162d2bdd400d2a23de4ac6446bd831",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.sethours",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setHours/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "da4137dec92bd5197f86b4c06b500e6d81fd1fa8ddef93f51e9bd51202d31a8e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.sethours",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setMilliseconds/arg-coercion-order.js",
+      "sha256": "8b60dad55dd37857d2ac79dae6fb946e9b9c0b2afbe5220d15c896f113117ad2",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setmilliseconds",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setMilliseconds/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "0a7fdd025bec239cb1afca9e7a8d983b48101757f197c133f0f7032cd9f0847a",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setmilliseconds",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setMinutes/arg-coercion-order.js",
+      "sha256": "4dbbd860337d2d43b116c673b8d3140277484875f6d123f300d7f64ad5acaa4e",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setminutes",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setMinutes/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "5fe1a1311820875d0a17563e5e5a94b98bc60d0830430d29d1f5d9f34a35b07f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setminutes",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setMonth/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "fcafff0913f308621e6e84772eeb96a271b1603c99337ad48136d141d93935ea",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setmonth",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setSeconds/arg-coercion-order.js",
+      "sha256": "318195e972c086cf81fe6d37032c585df4cd5f52a26b30dbbebc25740971a2bd",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setseconds",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setSeconds/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "9a78676d747c5a38b3dc7f12912805c030351d68fa86428a0f73dc6357445c3c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setseconds",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCDate/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "dbf270688bb0232b80302da9d6b06c411506dafc51d7349bd935c65f8147f7ae",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcdate",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCHours/arg-coercion-order.js",
+      "sha256": "e4aca96d8d4774f806faea834b153a0ee55e9b0941da8f1f8285eaa76f284546",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutchours",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCHours/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "3336f02d9598526f9f1da10bf9ba71d74bc557b42fbbc585df5290d2a15a7cf8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutchours",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCMilliseconds/arg-coercion-order.js",
+      "sha256": "a9d3b175bad5213ad78172da5c60a49f5c9ed4779bfcd745a985b668462586af",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcmilliseconds",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCMilliseconds/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "e5b25cf86c6e506f29831e8761da45b05d484ae51a49c72910edf3157db8191b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcmilliseconds",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCMinutes/arg-coercion-order.js",
+      "sha256": "85ba3f82035afc4b14eb27c388e356afe66dd37211a76bb6a00bb7777edc3a4a",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcminutes",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCMinutes/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "78cf695bc58ec8a8b2a6ccad4176e83119908f05327a2248e42df418308e0312",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcminutes",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCMonth/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "4215c8afe0b93c30344881f570c3d449b2945c47f165504d32672db149deae85",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcmonth",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCSeconds/arg-coercion-order.js",
+      "sha256": "d5f2f7718ba33a48cbf8550b9f70042e53780991e2d33bd0d24a728f6068dee9",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcseconds",
+      "reason": "Original ES2015 snapshots the Date value and converts supplied arguments, including when that value is NaN. The modern candidate preserves callback order, exceptions and final DateValue assignment."
+    },
+    {
+      "test": "built-ins/Date/prototype/setUTCSeconds/date-value-read-before-tonumber-when-date-is-invalid.js",
+      "sha256": "e1592c2a40636339248e9cd62b5242d2c93fae6010f6395f2a0401e3b4cf92af",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-date.prototype.setutcseconds",
+      "reason": "This 2024 test requires an early NaN return after argument conversion that retains a callback replacement of DateValue. Original ES2015 continues arithmetic and stores the NaN result, overwriting that callback mutation. Keep the original final store; do not change the test or count it as passing."
+    },
+    {
+      "test": "built-ins/Date/prototype/valueOf/S9.4_A3_T1.js",
+      "sha256": "0c109d62ef245765564092c07ee89681de9a5634d632888f05e8f6a6af715b22",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-timeclip",
+      "reason": "Original ES2015 adds positive zero after ToInteger, so clipping a negative fraction cannot retain negative zero. Modern Date construction and setters now follow that ordering; legacy methods retain historical behavior."
+    },
+    {
       "test": "built-ins/Function/prototype/toString/proxy-arrow-function.js",
       "sha256": "edf647e1538d6ccc6291b4f69954d0b21b1a0e13466746336387f8674c3b9a3b",
       "decision": "later-requirement",
