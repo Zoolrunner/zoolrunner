@@ -129,11 +129,16 @@ def records(suite, selection, category="es6id"):
             # unrelated metadata. This does not change the selected cases.
             if selection not in name:
                 continue
+            # Upstream INTERPRETING.md: _FIXTURE files are dependencies,
+            # never standalone tests, including when they have metadata.
+            if '_FIXTURE' in path.name:
+                continue
             source = path.read_text(encoding='utf-8-sig')
             match = re.search(r'/\*---(.*?)---\*/', source, re.S)
             metadata = (yaml.safe_load(match.group(1)) or {}) if match else {}
-            selected = ('es6id' in metadata if category == 'es6id' else
-                        bool(ES2015_FEATURES.intersection(metadata.get('features', []))))
+            selected = (category == 'all' or
+                        ('es6id' in metadata if category == 'es6id' else
+                         bool(ES2015_FEATURES.intersection(metadata.get('features', [])))))
             if not selected:
                 continue
             flags = set(metadata.get('flags', []))
@@ -205,7 +210,7 @@ def main():
     parser.add_argument('--suite', type=Path, required=True)
     parser.add_argument('--shell', type=Path, required=True)
     parser.add_argument('--report', type=Path, required=True)
-    parser.add_argument('--selection', choices=('es6id', 'es2015-features'), default='es6id',
+    parser.add_argument('--selection', choices=('es6id', 'es2015-features', 'all'), default='es6id',
                         help='Diagnostic candidate selection; never an edition decision')
     parser.add_argument('--filter', default='', help='Additional path substring restriction')
     parser.add_argument('--jobs', type=int, default=2)
@@ -227,7 +232,7 @@ def main():
             if len(results) % 500 == 0:
                 print(len(results), 'complete', flush=True)
     counts = dict(collections.Counter(row['status'] for row in results))
-    report = dict(purpose='Unreviewed metadata-selected diagnostic only; not full ES2015 conformance.',
+    report = dict(purpose='Unreviewed later diagnostic only; not full ES2015 conformance.',
                   revision=revision, selection=args.selection, filter=args.filter,
                   timezone='America/Los_Angeles', files=len({case['test'] for case in cases}),
                   counts=counts, results=results, runtime_sha256=before,

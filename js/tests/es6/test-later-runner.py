@@ -79,6 +79,29 @@ def main():
         case['record']['flags'].append('unknownControlFlag')
         assert later.run_case(case, suite, shell, 15)['status'] == 'diagnostic-harness-error'
         checks += 1
+    # Untagged tests need a diagnostic path too. Helper fixtures remain
+    # dependencies, while upstream mode flags and source hashes stay intact.
+    with tempfile.TemporaryDirectory(prefix='zool-later-selection-') as temporary:
+        suite = Path(temporary)
+        directory = suite / 'test/language'
+        directory.mkdir(parents=True)
+        (directory / 'untagged.js').write_text('/*---\ndescription: untagged\n---*/\nvar x=1;')
+        (directory / 'tagged.js').write_text('/*---\nfeatures: [Map]\nflags: [noStrict]\n---*/\nvar x=2;')
+        (directory / 'numbered.js').write_text('/*---\nes6id: 1\nflags: [onlyStrict]\n---*/\nvar x=3;')
+        (directory / 'dep_FIXTURE.js').write_text('/*---\nes6id: 1\nfeatures: [Map]\n---*/\nvar x=4;')
+        all_cases = list(later.records(suite, '', 'all'))
+        assert {(r['test'], r['mode']) for r in all_cases} == {
+            ('language/untagged.js', 'non-strict'), ('language/untagged.js', 'strict'),
+            ('language/tagged.js', 'non-strict'), ('language/numbered.js', 'strict')}
+        checks += 1
+        assert [r['test'] for r in later.records(suite, '', 'es6id')] == ['language/numbered.js']
+        checks += 1
+        assert [r['test'] for r in later.records(suite, '', 'es2015-features')] == ['language/tagged.js']
+        checks += 1
+        filtered = list(later.records(suite, 'untagged', 'all'))
+        assert [(r['test'], r['mode'], r['sha256']) for r in filtered] == [
+            (r['test'], r['mode'], r['sha256']) for r in all_cases if 'untagged' in r['test']]
+        checks += 1
     print('LATER-RUNNER-CONTROLS checks=' + str(checks) + ' failures=0')
 
 

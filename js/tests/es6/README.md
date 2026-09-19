@@ -13,9 +13,14 @@ and application checks alongside this work.
 later checkout at `35d566604512cba908054eec49f85e64a59f3091`. The default
 `--selection es6id` includes every case retaining that metadata key.
 `--selection es2015-features` selects cases mentioning implemented/required ES6
-feature tags, including cases that also use newer features. Neither selection
-is a complete ES2015 inventory or an edition decision. Every selected failure
-remains in the report; no outcomes are converted into exclusions.
+feature tags, including cases that also use newer features. `--selection all`
+permits inspecting untagged tests too; combine it with `--filter` for a bounded
+path review. None of these selections is an edition decision. Every selected
+failure remains in the report; no outcomes are converted into exclusions.
+As required by upstream `INTERPRETING.md`, files named with `_FIXTURE` are
+module dependencies rather than standalone tests. They remain available to
+the diagnostic module loader. The existing two metadata selections retain
+exactly the same source/mode sets.
 
 The shell's `createTest262Realm()` returns an isolated standard global with
 `$262.global`, `evalScript`, `createRealm`, `gc`, `detachArrayBuffer` and explicit module hooks. Its
@@ -3551,3 +3556,21 @@ and the unchanged frozen conformance runtime share SHA-256
 The broader later-Test262 edition inventory remains incomplete; these results
 are not a claim of complete specification correctness or other-platform runtime
 validation.
+
+### Untagged later-test diagnostics
+
+The diagnostic host now supports `--selection all` without changing the pinned
+conformance gates. All 30 phase/isolation/selection controls pass, including
+untagged strict/non-strict modes, filtered source hashes and module fixtures.
+The existing metadata selections retain their 5,852 and 37,972 source/mode
+sets. A full identifiers-directory diagnostic records 415 passes and 120
+failures (`artifacts/es6/later-all-identifiers.json`); every failure requires
+later private class fields, while the ordinary and escaped identifier cases
+pass. This remains a bounded diagnostic, not an edition-completeness claim.
+
+The refreshed 37,972-mode diagnostic against the committed environment fixes
+records 19,105 passes, 18,567 failures and 300 harness errors. Seven original
+switch/with modes gained and no previously passing modes were lost, with an
+unchanged runtime (`later-expanded-environment.json` and
+`later-environment-comparison.json`). Mixed later requirements and harness
+limitations remain visible; this is not an ES2015 conformance score.
