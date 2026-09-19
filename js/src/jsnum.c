@@ -316,9 +316,11 @@ static JSBool
 num_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsval v;
-    jsdouble d;
+    jsdouble d, radix;
     jsint base;
     JSString *str;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
     if (JSVAL_IS_NUMBER((jsval)obj)) {
         v = (jsval)obj;
@@ -331,8 +333,25 @@ num_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     d = JSVAL_IS_INT(v) ? (jsdouble)JSVAL_TO_INT(v) : *JSVAL_TO_DOUBLE(v);
     base = 10;
     if (argc != 0 && !JSVAL_IS_VOID(argv[0])) {
-        if (!js_ValueToECMAInt32(cx, argv[0], &base))
+        if (standard) {
+            if (!js_ValueToNumber(cx, argv[0], &radix))
+                return JS_FALSE;
+            radix = js_DoubleToInteger(radix);
+            if (!(radix >= 2 && radix <= 36)) {
+                char radixBuf[DTOSTR_STANDARD_BUFFER_SIZE];
+                char *radixStr = JS_dtostr(radixBuf, sizeof radixBuf,
+                                          DTOSTR_STANDARD, 0, radix);
+                if (!radixStr)
+                    JS_ReportOutOfMemory(cx);
+                else
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                         JSMSG_BAD_RADIX_RANGE, radixStr);
+                return JS_FALSE;
+            }
+            base = (jsint)radix;
+        } else if (!js_ValueToECMAInt32(cx, argv[0], &base)) {
             return JS_FALSE;
+        }
         if (base < 2 || base > 36) {
             char numBuf[12];
             char *numStr = IntToString(base, numBuf, sizeof numBuf);
@@ -487,6 +506,11 @@ num_to(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSDTo
     jsval v;
     jsdouble d, precision;
     JSString *str;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
+    JSBool shortest = standard && JSVAL_IS_VOID(argv[0]) &&
+                      zeroArgMode == DTOSTR_STANDARD_EXPONENTIAL;
+    char *exponent, *dot, *end;
     char buf[DTOSTR_VARIABLE_BUFFER_SIZE(MAX_PRECISION+1)], *numStr; /* Use MAX_PRECISION+1 because precisionOffset can be 1 */
 
     if (JSVAL_IS_NUMBER((jsval)obj)) {
@@ -506,7 +530,13 @@ num_to(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSDTo
         if (!js_ValueToNumber(cx, argv[0], &precision))
             return JS_FALSE;
         precision = js_DoubleToInteger(precision);
-        if (precision < precisionMin || precision > precisionMax) {
+        if (standard && zeroArgMode != DTOSTR_FIXED &&
+            !JSDOUBLE_IS_FINITE(d)) {
+            /* Precision conversion is observable, but its range is irrelevant
+             * for non-finite exponential/precision receivers. */
+            precision = 0;
+            oneArgMode = DTOSTR_STANDARD;
+        } else if (precision < precisionMin || precision > precisionMax) {
             numStr = JS_dtostr(buf, sizeof buf, DTOSTR_STANDARD, 0, precision);
             if (!numStr)
                 JS_ReportOutOfMemory(cx);
@@ -520,6 +550,17 @@ num_to(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSDTo
     if (!numStr) {
         JS_ReportOutOfMemory(cx);
         return JS_FALSE;
+    }
+    if (shortest && (exponent = strchr(numStr, 'e')) != NULL &&
+        (dot = strchr(numStr, '.')) != NULL && dot < exponent) {
+        /* The legacy dtoa integer fast path may retain trailing zeros. Only
+         * undefined-precision standard calls require their shortest spelling. */
+        end = exponent;
+        while (end > dot + 1 && end[-1] == '0')
+            --end;
+        if (end == dot + 1)
+            --end;
+        memmove(end, exponent, strlen(exponent) + 1);
     }
     str = JS_NewStringCopyZ(cx, numStr);
     if (!str)

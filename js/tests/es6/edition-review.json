@@ -3,6 +3,13 @@
   "revision": "35d566604512cba908054eec49f85e64a59f3091",
   "records": [
     {
+      "test": "annexB/language/comments/multi-line-html-close.js",
+      "sha256": "d07c9b1501f3dcbf1257172c7741760a4db90d54446361b7dbe4329a2522fa30",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-html-like-comments",
+      "reason": "Original Annex B permits an HTML close comment following a multiline comment containing a line terminator. Modern scanning now resets line-start state there; modules still reject HTML comments and legacy scanning remains unchanged.",
+      "decision": "original-regression"
+    },
+    {
       "test": "annexB/language/function-code/function-redeclaration-block.js",
       "sha256": "8d4a3f259dabceeee101959aac117a19f5bfe9e374e1178b45f45a1142195d9e",
       "decision": "later-requirement",
@@ -297,6 +304,62 @@
       "reason": "Original ES2015 requires Math to inherit from its own realm Object.prototype. Eager initialization recursively resolved a second Math object as the prototype, unlike the initial shell global. Explicit Object prototype selection and intrinsic caching correct the original requirement; both exact later-test modes pass on the isolated runtime."
     },
     {
+      "test": "built-ins/Number/prototype/toExponential/infinity.js",
+      "sha256": "7aae86e77d076a9e44f3017606a762a13286f24d838291d84d14396df6b026ee",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.toexponential",
+      "reason": "Original formatting converts precision before handling NaN/Infinity and performs precision range checks only for finite values. Standard exponential/precision calls now preserve that observable order; fixed and explicit legacy formatting retain their rules.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Number/prototype/toExponential/nan.js",
+      "sha256": "78cabb5ecd466fbcd921f12526486ec65cea5b50f5774e0747bad7e44c647292",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.toexponential",
+      "reason": "Original formatting converts precision before handling NaN/Infinity and performs precision range checks only for finite values. Standard exponential/precision calls now preserve that observable order; fixed and explicit legacy formatting retain their rules.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Number/prototype/toExponential/undefined-fractiondigits.js",
+      "sha256": "06c4fa779951b6f81feb82e63cd837c49420c4de0c76dea5e4ff5e3117ca9ddb",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.toexponential",
+      "reason": "Original undefined exponential precision requires the shortest representation. Standard calls now trim redundant fractional zeros from the formatter result while preserving shared dtoa and legacy behavior.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Number/prototype/toFixed/range.js",
+      "sha256": "3261b218349443f9cca5b0120237b328e3c966ab48b0d2a95f0fdbc1f7873f78",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.tofixed",
+      "reason": "Original ES2015 explicitly permits extensions below zero and above twenty; this later test requires RangeError at -1 and a mandatory range 0..100. The legacy negative-precision extension remains permitted by the original specification."
+    },
+    {
+      "test": "built-ins/Number/prototype/toFixed/toFixed-tonumber-throws-typeerror-bigint.js",
+      "sha256": "adb32873acc337de9486df6a53f8ecf57efb49f355bc63f7fb7a197dd0759f93",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-numeric-literals",
+      "reason": "The exact source requires the BigInt literal 0n and its ToNumber TypeError, neither present in original ES2015 numeric syntax or value types."
+    },
+    {
+      "test": "built-ins/Number/prototype/toPrecision/infinity.js",
+      "sha256": "f552be0138328686265b47d9da636607b5ae27ae65e439c1ff955234518956fe",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.toprecision",
+      "reason": "Original formatting converts precision before handling NaN/Infinity and performs precision range checks only for finite values. Standard exponential/precision calls now preserve that observable order; fixed and explicit legacy formatting retain their rules.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Number/prototype/toPrecision/nan.js",
+      "sha256": "424d2482f54dfebb688b8c91305e84b5a0c8db3674f7023d60396349b26ae272",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.toprecision",
+      "reason": "Original formatting converts precision before handling NaN/Infinity and performs precision range checks only for finite values. Standard exponential/precision calls now preserve that observable order; fixed and explicit legacy formatting retain their rules.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Number/prototype/toString/numeric-literal-tostring-radix-1.js",
+      "sha256": "e29958cb550193008b9d48e47565aea852183fb9c16f1a3c82f137f971e11943",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-number.prototype.tostring",
+      "reason": "Original Number toString applies ToInteger to radix and throws RangeError outside 2..36. Standard calls now preserve large radix magnitude and use the required exception; explicit legacy conversion remains unchanged.",
+      "decision": "original-regression"
+    },
+    {
       "test": "built-ins/Object/getOwnPropertyNames/proxy-invariant-duplicate-symbol-entry.js",
       "sha256": "8ddef6ea9958a8cdcf2a3137b441393ca943ba4c3c46ed10545c8a48e13e1a00",
       "decision": "later-requirement",
@@ -316,6 +379,27 @@
       "decision": "original-regression",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-math-object",
       "reason": "The Math prototype requirement predates ES2015 and applies to eagerly initialized realms as well as lazy shell globals. The isolated correction passes both modes of this exact later test; the pinned historical case only exercised the initial global."
+    },
+    {
+      "test": "built-ins/Object/internals/DefineOwnProperty/consistent-value-function-arguments.js",
+      "sha256": "5e3b7791efe154b33803aaedb586446c61dde3a64354af7ff59b20b2a75862a8",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-invariants-of-the-essential-internal-methods",
+      "reason": "Original essential internal-method invariants require a non-writable non-configurable data property to retain its value. Standard descriptor changes now snapshot optional native function/RegExp fields when they become immutable, preserving explicit legacy behavior and other native hooks.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Object/internals/DefineOwnProperty/consistent-value-function-caller.js",
+      "sha256": "02e3d0061d597999aeb54238fc2a86fae70d52dc4f512fbcdacfb5a2edaf4edf",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-invariants-of-the-essential-internal-methods",
+      "reason": "Original essential internal-method invariants require a non-writable non-configurable data property to retain its value. Standard descriptor changes now snapshot optional native function/RegExp fields when they become immutable, preserving explicit legacy behavior and other native hooks.",
+      "decision": "original-regression"
+    },
+    {
+      "test": "built-ins/Object/internals/DefineOwnProperty/consistent-value-regexp-dollar1.js",
+      "sha256": "dbc6e07623d23abe574137a8f82be8524ef53f5568936ff336abb996f46a6d4a",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-invariants-of-the-essential-internal-methods",
+      "reason": "Original essential internal-method invariants require a non-writable non-configurable data property to retain its value. Standard descriptor changes now snapshot optional native function/RegExp fields when they become immutable, preserving explicit legacy behavior and other native hooks.",
+      "decision": "original-regression"
     },
     {
       "test": "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values-__proto__.js",

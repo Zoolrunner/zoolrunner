@@ -324,3 +324,5 @@ MSG_DEF(JSMSG_CLASS_CALL, 240, 0, JSEXN_TYPEERR, "class constructor requires new
 MSG_DEF(JSMSG_UNINITIALIZED_THIS, 241, 0, JSEXN_REFERENCEERR, "this is uninitialized")
 MSG_DEF(JSMSG_INITIALIZED_THIS, 242, 0, JSEXN_REFERENCEERR, "this is already initialized")
 MSG_DEF(JSMSG_DERIVED_RETURN, 243, 0, JSEXN_TYPEERR, "derived constructor returned a primitive")
+
+MSG_DEF(JSMSG_BAD_RADIX_RANGE, 244, 1, JSEXN_RANGEERR, "illegal radix {0}")

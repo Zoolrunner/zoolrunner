@@ -202,4 +202,6 @@ js_GetLastIndex(JSContext *cx, JSObject *obj, jsdouble *lastIndex);
 extern JSBool
 js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex);
 
+extern JSBool js_IsRegExpStaticPropertyHook(JSPropertyOp getter);
+
 #endif /* jsregexp_h___ */

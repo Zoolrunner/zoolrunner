@@ -1783,8 +1783,11 @@ storage. An internal native detachment hook supports embedding lifetime tests.
 Constructors follow the pinned ES2015 edition, including its stricter ArrayBuffer
 length/index conversion rules. Optional DataView offsets follow the
 [TC39 #4516 correction](https://tc39.es/archives/bugzilla/4516/); setters convert
-values before final bounds checks, following the
-[TC39 #4536 correction](https://tc39.es/archives/bugzilla/4536/) in the pinned suite.
+values before final bounds checks as explicitly required by the pinned suite's
+`range-check-after-value-conversion.js` fixtures.
+[TC39 #4536](https://tc39.es/archives/bugzilla/4536/) records the published
+algorithm's missing value conversion; that issue's proposed ordering alone is
+not the retained pinned-test policy.
 NewTarget prototype lookup occurs after argument conversion. ArrayBuffer slicing
 honors species, copies independent storage, and rejects detached/undersized/same
 result buffers. Deleted global bindings stay deleted without losing intrinsics.
@@ -4042,3 +4045,65 @@ correction passes all 26 affected modes, 79 new focused checks, 15 native
 source/XDR checks, all 126 existing focused fixtures and all 73 existing native
 probes. It is not part of this URI/Math matrix and still needs complete
 conformance/application validation.
+
+### HTML comments, Number formatting and immutable native fields
+
+The next integrated correction recognizes original Annex B HTML close comments
+after line terminators inside multiline comments, while retaining explicit
+legacy scanning and module rejection. Default ES5/ES2015 Number formatting now
+uses ToInteger and RangeError for invalid radix, converts precision before
+returning nonfinite exponential/precision results, and removes redundant zeros
+from undefined-precision exponential output. Shared dtoa and explicit legacy
+formatting remain unchanged. Original ES2015 permits the existing negative
+fixed-precision extension; later BigInt syntax remains outside this edition.
+
+Standard immutable descriptor changes snapshot the optional native function
+caller/arguments and RegExp capture fields when they become non-writable and
+non-configurable. Mutable fields, explicit legacy behavior, accessor properties
+and other native embedding hooks retain their contracts.
+
+The isolated candidate passes 79 HTML-comment checks, 146 Number checks in each
+standard mode, 18 immutable-property checks in each standard mode and three
+15-check native source/XDR/edition probes. The combined candidate also passes
+all 126 prior focused fixtures, 73 prior native probes and the complete 11,540
+required ES5.1 cases and all 28,582 pinned ES2015 modes, with zero failures.
+The integrated revision also passes both complete suites on macOS arm64 and
+x86_64, with unchanged frozen runtimes. All eight application builds, packages
+and relocated desktop runs pass, including Calendar's four views, Browser
+navigation/reflection and Suite/XULRunner ChatZilla. Package gates require
+131 focused fixtures and 76 native probes. These parser/runtime changes retain
+cache version 67.
+
+Evidence is in `artifacts/es6/html-number-final-coordinator.log` and the matching
+`html-number[-x86]-final` reports. All eight archives are independently preserved
+under `html-number-package-archives`, with the two-architecture hash manifest and
+normalized package/build payload comparison beside them. This revision's Linux
+coordinator was deferred before starting any jobs, so the next combined
+block-function/prototype revision can receive the follow-up matrix. Windows
+remains unvalidated for this revision.
+
+Supplemental later diagnostics pass all 13 comment modes and all six selected
+immutable-native modes. Number/prototype reports 332 passes and four failures:
+two modes impose later fixed-precision requirements and two require BigInt.
+Exact-source reviews are recorded separately; the ledger now has 244 entries,
+is incomplete and never converts a failure into a passing result. The full
+93,197-mode mixed-edition diagnostic has not been rerun with these corrections.
+
+A separate confirmed original ES2015 gap remains in non-strict block functions:
+entry-time lexical initialization and eligible function-body Annex B variable
+bindings are incomplete. Script/eval blocks can leak declarations. Large RegExp
+quantifiers also remain under investigation. Neither the pinned-suite result
+nor this review ledger establishes full ES2015 compliance.
+
+The preceding discarded-effects/cache-67 revision has now completed all eight
+native Linux aarch64 local `act` workflows: Suite, Browser, Calendar and XULRunner
+on GTK2 and Xlib. Each passes build, package, runtime, upload, 28,582 pinned ES2015
+modes, 11,540 ES5.1 cases, 122 focused fixtures and 70 native probes. The original
+XULRunner GTK2 attempt's two ten-second ES5 timeouts remain recorded; its full
+retry passes with the uniform sixty-second ES5 budget. Evidence is
+`artifacts/es6/linux-discarded-effects-matrix-complete.json` and the retry driver
+log. This older matrix does not validate the subsequent arguments-order,
+URI/Math or current HTML/Number/native-property engine revisions. Their combined
+Linux matrix was deferred before any jobs started; the unused frozen source
+manifest remains at `linux-html-number-snapshot/source.json`. Its waiting
+coordinator cancellation is recorded in `linux-html-number-matrix-deferred.json`.

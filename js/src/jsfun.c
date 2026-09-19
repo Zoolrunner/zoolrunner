@@ -1383,6 +1383,12 @@ fun_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
     return JS_TRUE;
 }
 
+JSBool
+js_IsFunctionPropertyHook(JSPropertyOp getter)
+{
+    return getter == fun_getProperty;
+}
+
 static JSBool
 fun_enumerate(JSContext *cx, JSObject *obj)
 {

@@ -1024,3 +1024,12 @@ macOS arm64 and x86_64. Their Linux validation is deferred to the next combined
 revision; Windows remains unvalidated for these changes. The complete later diagnostic remains mixed-edition and nonzero; its
 unreviewed failures are not a completed ES2015 inventory. See
 [URI and Math validation](js/tests/es6/README.md#uri-decoding-and-eager-math-initialization).
+
+Further HTML-comment, Number-formatting and immutable native-property fixes pass
+both complete pinned suites and all four applications' build, package and
+desktop checks on macOS arm64 and x86_64. The preceding engine revision has also
+completed all eight native Linux aarch64 local workflows; the latest Linux
+follow-up is deferred to the next combined revision. Non-strict block-function
+scope/initialization and
+large RegExp quantifiers remain confirmed follow-up work; full ES2015 compliance
+is not yet established. See the [current regression work](js/tests/es6/README.md#html-comments-number-formatting-and-immutable-native-fields).

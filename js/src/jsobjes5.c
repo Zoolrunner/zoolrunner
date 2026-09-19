@@ -831,6 +831,16 @@ DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
                     setter = sprop->setter ? sprop->setter : JS_PropertyStub;
                     flags |= sprop->flags;
                     shortid = sprop->shortid;
+                    /* Freeze the observable value of these optional legacy
+                     * fields when a standard descriptor makes them immutable.
+                     * Array/arguments/embedding hooks retain their contracts. */
+                    if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                         JS_VERSION_IS_ES2015(cx)) &&
+                        (attrs & (JSPROP_READONLY | JSPROP_PERMANENT)) ==
+                        (JSPROP_READONLY | JSPROP_PERMANENT) &&
+                        (js_IsFunctionPropertyHook(getter) ||
+                         js_IsRegExpStaticPropertyHook(getter)))
+                        getter = JS_PropertyStub;
                 }
                 OBJ_DROP_PROPERTY(cx, owner, prop);
             }

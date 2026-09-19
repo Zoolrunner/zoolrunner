@@ -2268,7 +2268,10 @@ skipline:
         if (MatchChar(ts, '*')) {
             while ((c = GetChar(ts)) != EOF &&
                    !(c == '*' && MatchChar(ts, '/'))) {
-                /* Ignore all characters until comment close. */
+                /* A line terminator inside a block comment also permits
+                 * the following Annex B HTML close comment in ES2015. */
+                if (c == '\n' && JS_VERSION_IS_ES2015(cx))
+                    ts->flags &= ~TSF_DIRTYLINE;
             }
             if (c == EOF) {
                 js_ReportCompileErrorNumber(cx, ts,

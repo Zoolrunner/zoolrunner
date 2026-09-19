@@ -255,6 +255,8 @@ extern void js_LeaveParameterInitializer(JSContext *cx, JSStackFrame *fp);
 extern JSBool js_FinishParameterBindings(JSContext *cx, JSStackFrame *fp);
 extern JSBool js_IsParameterProperty(JSFunction *fun, JSScopeProperty *property);
 
+extern JSBool js_IsFunctionPropertyHook(JSPropertyOp getter);
+
 JS_END_EXTERN_C
 
 #endif /* jsfun_h___ */

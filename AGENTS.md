@@ -1731,3 +1731,16 @@ Eager Math initialization must select the target realm Object prototype without
 recursively resolving Math as its own class prototype. Run
 `math-realm-prototype.js` and `TestMathRealmPrototype.c`, preserving explicit
 legacy initialization and testing independent globals and collection.
+
+Number formatting changes must preserve explicit legacy radix/precision behavior
+while default ES5/ES2015 use ToInteger radix validation and the specified
+nonfinite/precision conversion order. Run `number-formatting.js` in both standard
+modes and `TestNumberFormatting.c`; keep shared dtoa behavior and permitted
+legacy fixed-precision extensions intact.
+For HTML close comments, preserve line terminators inside block comments, module
+rejection and saved editions. Run `html-close-comments.js` and
+`TestHTMLCloseComments.c`.
+Immutable native data properties must retain their frozen values in standard
+modes. Run `frozen-native-properties.js` in both standard modes and
+`TestFrozenNativeProperties.c`; preserve explicit legacy behavior, live mutable
+fields, accessor properties and array/arguments/embedding native hooks.

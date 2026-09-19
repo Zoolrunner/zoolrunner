@@ -4319,6 +4319,12 @@ regexp_static_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
     return JS_TRUE;
 }
 
+JSBool
+js_IsRegExpStaticPropertyHook(JSPropertyOp getter)
+{
+    return getter == regexp_static_getProperty;
+}
+
 static JSBool
 regexp_static_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
