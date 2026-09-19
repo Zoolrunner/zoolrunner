@@ -17,7 +17,7 @@ static JSBool Detach(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 {
     if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) return JS_FALSE;
     *rval = JSVAL_VOID;
-    return js_DetachArrayBuffer(cx, JSVAL_TO_OBJECT(argv[0]));
+    return JS_DetachArrayBuffer(cx, JSVAL_TO_OBJECT(argv[0]));
 }
 static JSBool Collect(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 { JS_GC(cx); *rval = JSVAL_VOID; return JS_TRUE; }

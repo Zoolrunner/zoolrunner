@@ -17,7 +17,7 @@ static JSBool Detach(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsva
 {
     if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) return JS_FALSE;
     *rval = JSVAL_VOID;
-    return js_DetachArrayBuffer(cx, JSVAL_TO_OBJECT(argv[0]));
+    return JS_DetachArrayBuffer(cx, JSVAL_TO_OBJECT(argv[0]));
 }
 static JSBool Collect(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
@@ -28,7 +28,7 @@ static JSBool Branch(JSContext *cx, JSScript *script)
     if (!script) {
         ++interrupted;
         JS_GC(cx);
-        if (detachOnBranch) return js_DetachArrayBuffer(cx, detachOnBranch);
+        if (detachOnBranch) return JS_DetachArrayBuffer(cx, detachOnBranch);
         if (stopOnBranch) return JS_FALSE;
     }
     return JS_TRUE;

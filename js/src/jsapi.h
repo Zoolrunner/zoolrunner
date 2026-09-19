@@ -1644,11 +1644,18 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
                                 const jschar *chars, size_t length,
                                 const char *filename, uintN lineno);
 
+/* Explicit host detachment; existing views observe their detached buffer.
+ * The object must be an ArrayBuffer, including one from another realm. */
+extern JS_PUBLIC_API(JSBool)
+JS_DetachArrayBuffer(JSContext *cx, JSObject *buffer);
+
+
 /* Modules are opt-in Unicode compilation units. The returned record is a
  * GC object: root it while the host resolves its requested dependencies.
  * Compilation preserves the context's selected classic-script edition.
  * The host supplies resolution explicitly; no file/network loader is implied.
  * Records own their scripts and are not ordinary script/XDR cache objects. */
+
 extern JS_PUBLIC_API(JSObject *)
 JS_CompileUCModule(JSContext *cx, JSObject *global, JSPrincipals *principals,
                    const jschar *source, size_t length,

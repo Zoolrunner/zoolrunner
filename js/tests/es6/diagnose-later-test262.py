@@ -123,7 +123,9 @@ def run_case(case, suite, shell, timeout):
                   negative_phase_verified=False)
     try:
         flags = set(case['record'].get('flags', []))
-        if flags - {'noStrict', 'onlyStrict', 'raw', 'module', 'async'} or {'noStrict', 'onlyStrict'} <= flags:
+        # Upstream INTERPRETING.md defines generated as provenance only;
+        # it imposes no execution-mode or host requirement.
+        if flags - {'noStrict', 'onlyStrict', 'raw', 'module', 'async', 'generated'} or {'noStrict', 'onlyStrict'} <= flags:
             raise ValueError('Unknown/conflicting host flags: ' + repr(flags))
         negative = case['record'].get('negative')
         if negative and (not isinstance(negative, dict) or

@@ -647,6 +647,23 @@ RealmLinkModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
 }
 
 JS_STATIC_DLL_CALLBACK(JSBool)
+DetachArrayBuffer(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) {
+        /* Let the engine supply the standard TypeError for a wrong object. */
+        return JS_DetachArrayBuffer(cx, NULL);
+    }
+    *rval = JSVAL_VOID;
+    return JS_DetachArrayBuffer(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmDetachArrayBuffer(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, DetachArrayBuffer);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
 CreateTest262Realm(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     JSObject *global = NULL, *host = NULL, *previous = JS_GetGlobalObject(cx);
@@ -667,6 +684,7 @@ CreateTest262Realm(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
         { "executeScript", RealmExecuteScript, 1 },
         { "createRealm", CreateTest262Realm, 0 },
         { "gc", GC, 0 },
+        { "detachArrayBuffer", RealmDetachArrayBuffer, 1 },
         { "compileModule", RealmCompileModule, 1 },
         { "instantiateModule", RealmInstantiateModule, 1 },
         { "evaluateModule", RealmEvaluateModule, 1 },

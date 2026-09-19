@@ -18,14 +18,14 @@ is a complete ES2015 inventory or an edition decision. Every selected failure
 remains in the report; no outcomes are converted into exclusions.
 
 The shell's `createTest262Realm()` returns an isolated standard global with
-`$262.global`, `evalScript`, `createRealm`, `gc` and explicit module hooks. Its
+`$262.global`, `evalScript`, `createRealm`, `gc`, `detachArrayBuffer` and explicit module hooks. Its
 opaque `compileScript`/`executeScript` pair separates compilation from execution,
 retains scripts through GC, and rejects execution through another realm's host.
 Harness setup is a separate script in the tested realm; bookkeeping stays in
 the shell realm, so a test can make its global nonextensible. Negative tests
 must throw the expected realm's constructor in their specified parse, resolution
 or runtime phase. Harness failures cannot satisfy a negative expectation.
-The runner has 16 executable phase, isolation, Unicode, module and async controls:
+The runner has 18 executable phase, isolation, Unicode, module, async and metadata controls:
 
 ```sh
 python3 js/tests/es6/test-later-runner.py --shell /path/to/frozen/xpcshell
@@ -36,8 +36,11 @@ python3 js/tests/es6/diagnose-later-test262.py \
 
 A nonzero diagnostic exit retains all results, including expected edition
 conflicts, for review. The initial module host supports self-import fixtures;
-other dependencies report an explicit host error. Detachment/agent and other
-modern host capabilities are not implied. Missing hosts and later syntax must
+other dependencies report an explicit host error. Buffer detachment uses the
+additive native `JS_DetachArrayBuffer` API and reports errors in the host method's
+own realm. Agent and other modern host capabilities are not implied. The
+informational `generated` flag does not change execution; unknown flags remain
+explicit harness failures. Missing hosts and later syntax must
 be investigated, not counted as ES2015 passes. Broader ES6-tagged coverage
 already confirms that proper tail-call execution remains unfinished; the
 historical corpus's complete pass does not cover it.
@@ -3180,3 +3183,32 @@ has 35 modes (one pass and 34 failures, including two later coalescing cases);
 proper ES2015 tail-call execution is still required. The separate expanded
 feature-tagged run includes 37,972 modes, retains mixed newer features, and must
 not be described as a reviewed ES2015 suite. Full ES2015 completion remains open.
+
+
+## Original RegExp ranges and buffer-detachment host follow-up
+
+Non-Unicode range endpoints now follow the original ES2015 Annex B
+`ClassAtomInRange` identity-escape fallback. For example, `[a-\\d]` denotes
+`a` through `d`; Unicode mode still rejects the non-singleton endpoint.
+Constructor realm selection also governs this grammar and decimal identity
+escapes when modern RegExp constructors are called from legacy code. Existing
+legacy constructors retain their historical grammar. Lazy bitmap creation
+preserves the parse decision. This intentionally does not implement the later
+`CharacterRangeOrUnion` semantics required by some current Test262 cases.
+
+The additive `JS_DetachArrayBuffer` API supports the isolated test host's
+`$262.detachArrayBuffer`; native binary-data tests use the public entry point.
+The diagnostic runner accepts upstream's informational `generated` flag and
+continues to reject unknown flags. Its executable control suite now has 18
+checks. No upstream test assertions or required-mode policies were changed.
+
+Validation on macOS arm64: **28,582/28,582 pinned ES6** and **11,540/11,540
+ES5**, zero failures, unsupported cases, harness errors, crashes or timeouts.
+All four root builds, packages and relocated desktop checks pass, including
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Reports: `artifacts/es6/ranges-detach-final-*`; C89 checks pass. All four
+application libraries and the frozen conformance runtime have SHA-256
+`8035311985f7ebffc32dca9aaa9f8d68675b5fa3e65aeeb14fefa501f803baec`.
+Focused checks cover 13 original-range/edition cases and five detachment-host
+cases. This is local macOS arm64 validation, not new Windows/Linux validation.
+Proper tail calls and the reviewed later ES2015 inventory remain unfinished.

@@ -197,6 +197,7 @@ struct RENode {
 #define CLASS_CACHE_SIZE    4
 
 typedef struct CompilerState {
+    JSBool modern;                 /* grammar edition, independent of caller */
     JSContext       *context;
     JSTokenStream   *tokenStream; /* For reporting errors */
     const jschar    *cpbegin;
@@ -1173,6 +1174,12 @@ lexHex:
                 break;
             case 'd':
                 if (inRange || (src < end - 1 && *src == '-')) {
+                    if (state->modern) {
+                        /* Original ES2015 Annex B ClassAtomInRange falls
+                         * back to IdentityEscape for a non-singleton set. */
+                        localMax = c;
+                        break;
+                    }
                     JS_ReportErrorNumber(state->context,
                                          js_GetErrorMessage, NULL,
                                          JSMSG_BAD_CLASS_RANGE);
@@ -1186,6 +1193,12 @@ lexHex:
             case 'w':
             case 'W':
                 if (inRange || (src < end - 1 && *src == '-')) {
+                    if (state->modern) {
+                        /* Original ES2015 Annex B ClassAtomInRange falls
+                         * back to IdentityEscape for a non-singleton set. */
+                        localMax = c;
+                        break;
+                    }
                     JS_ReportErrorNumber(state->context,
                                          js_GetErrorMessage, NULL,
                                          JSMSG_BAD_CLASS_RANGE);
@@ -1436,7 +1449,7 @@ ParseTerm(CompilerState *state)
                  */
                 state->cp = termStart;
                 if (c >= '8') {
-                    if (JS_VERSION_IS_ES2015(state->context)) {
+                    if (state->modern) {
                         /* Annex B IdentityEscape consumes the digit, not
                          * the backslash; following decimal digits remain. */
                         state->cp = termStart + 1;
@@ -2165,9 +2178,9 @@ EmitREBytecode(CompilerState *state, JSRegExp *re, size_t treeDepth,
 }
 
 
-JSRegExp *
-js_NewRegExp(JSContext *cx, JSTokenStream *ts,
-             JSString *str, uintN flags, JSBool flat)
+static JSRegExp *
+NewRegExpWithEdition(JSContext *cx, JSTokenStream *ts,
+                      JSString *str, uintN flags, JSBool flat, JSBool modern)
 {
     JSRegExp *re;
     void *mark;
@@ -2183,6 +2196,7 @@ js_NewRegExp(JSContext *cx, JSTokenStream *ts,
     mark = JS_ARENA_MARK(&cx->tempPool);
     len = JSSTRING_LENGTH(str);
 
+    state.modern = modern;
     state.context = cx;
     state.tokenStream = ts;
     state.cp = js_UndependString(cx, str);
@@ -2282,6 +2296,14 @@ out:
     return re;
 }
 
+JSRegExp *
+js_NewRegExp(JSContext *cx, JSTokenStream *ts,
+             JSString *str, uintN flags, JSBool flat)
+{
+    return NewRegExpWithEdition(cx, ts, str, flags, flat,
+                                JS_VERSION_IS_ES2015(cx));
+}
+
 static JSRegExp *
 NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
               JSString *str, JSString *opt, JSBool flat, JSBool modern)
@@ -2330,7 +2352,7 @@ NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
             flags |= flag;
         }
     }
-    return js_NewRegExp(cx, ts, str, flags, flat);
+    return NewRegExpWithEdition(cx, ts, str, flags, flat, modern);
 }
 
 JSRegExp *
@@ -2688,30 +2710,47 @@ ProcessCharSet(REGlobalData *gData, RECharSet *charSet)
                 break;
 
             case 'd':
+            case 'D':
+            case 's':
+            case 'S':
+            case 'w':
+            case 'W':
+                /* Such endpoints are accepted only by the ES2015 parser;
+                 * retain that decision when lazily building the bitmap from
+                 * a different caller edition. Unicode uses UnicodeClass. */
+                if (inRange || (src < end - 1 && *src == '-')) {
+                    thisCh = c;
+                    break;
+                }
+                if (c == 'D') goto class_non_digit;
+                if (c == 's') goto class_space;
+                if (c == 'S') goto class_non_space;
+                if (c == 'w') goto class_word;
+                if (c == 'W') goto class_non_word;
                 AddCharacterRangeToCharSet(charSet, '0', '9');
                 continue;   /* don't need range processing */
-            case 'D':
+            class_non_digit:
                 AddCharacterRangeToCharSet(charSet, 0, '0' - 1);
                 AddCharacterRangeToCharSet(charSet,
                                            (jschar)('9' + 1),
                                            (jschar)charSet->length);
                 continue;
-            case 's':
+            class_space:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (JS_ISSPACE(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
                 continue;
-            case 'S':
+            class_non_space:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (!JS_ISSPACE(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
                 continue;
-            case 'w':
+            class_word:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (JS_ISWORD(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
                 continue;
-            case 'W':
+            class_non_word:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (!JS_ISWORD(i))
                         AddCharacterToCharSet(charSet, (jschar)i);

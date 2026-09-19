@@ -412,6 +412,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("later-pattern-edges.js", "LATER-PATTERN-EDGES checks=21 failures=0"),
                 ("strict-block-functions.js", "STRICT-BLOCK-FUNCTIONS checks=9 failures=0"),
                 ("test262-realms.js", "TEST262-REALM checks=16 failures=0"),
+                ("test262-detachment.js", "DETACH-HOST checks=5 failures=0"),
+                ("regexp-original-ranges.js", "ORIGINAL-REGEXP-RANGES checks=13 failures=0"),
                 ("statement-function-edges.js", "STATEMENT-FUNCTION-EDGES checks=24 failures=0"),
                 ("class-source.js", "CLASS-SOURCE PASS checks=8"),
                 ("global-lexical.js", "GLOBAL-LEXICAL-COMPILER PASS checks=17"),

@@ -49,6 +49,18 @@ def main():
     control('Promise.resolve().then(function(){$DONE()})', 'pass', flags=['async'])
     control('$DONE();$DONE()', 'fail', flags=['async'])
     control('$DONE(new TypeError("async"))', 'pass', ('runtime', 'TypeError'), flags=['async'])
+    # Exercise metadata validation too: generated describes file provenance,
+    # whereas an unknown flag must remain an explicit harness failure.
+    with tempfile.TemporaryDirectory(prefix='zool-later-flags-') as temporary:
+        suite = Path(temporary)
+        case = dict(source='var generatedControl=1;', mode='raw',
+                    test='generated-control.js', sha256='control',
+                    record=dict(flags=['raw', 'generated']))
+        assert later.run_case(case, suite, shell, 15)['status'] == 'diagnostic-pass'
+        checks += 1
+        case['record']['flags'].append('unknownControlFlag')
+        assert later.run_case(case, suite, shell, 15)['status'] == 'diagnostic-harness-error'
+        checks += 1
     print('LATER-RUNNER-CONTROLS checks=' + str(checks) + ' failures=0')
 
 

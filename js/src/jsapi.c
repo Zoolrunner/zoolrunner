@@ -4046,6 +4046,13 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
     return script;
 }
 
+JS_PUBLIC_API(JSBool)
+JS_DetachArrayBuffer(JSContext *cx, JSObject *buffer)
+{
+    CHECK_REQUEST(cx);
+    return js_DetachArrayBuffer(cx, buffer);
+}
+
 JS_PUBLIC_API(JSObject *)
 JS_CompileUCModule(JSContext *cx, JSObject *global, JSPrincipals *principals,
                    const jschar *source, size_t length,

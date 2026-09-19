@@ -887,3 +887,14 @@ those are not conformance counts. Broader coverage confirms that proper tail
 calls remain unfinished. Cache version is 63. See `js/tests/es6/README.md` for
 reports, host APIs and the remaining coverage review. Other platforms were not
 revalidated for this batch.
+
+
+The original-ES2015 RegExp range and buffer-detachment follow-up preserves
+**28,582/28,582 pinned ES6** and **11,540/11,540 ES5**, with all four macOS arm64
+build/package/desktop gates, Calendar views, Browser navigation/layout and
+Suite/XULRunner ChatZilla passing. Modern RegExp grammar follows its constructor
+realm even when called from legacy code. The native `JS_DetachArrayBuffer` API
+now backs the isolated Test262 host. The later diagnostic runner recognizes
+upstream's informational `generated` flag; 18 runner controls pass. See the
+ES6 guide for reports and edition differences. Full ES2015 completion remains
+open, and this batch does not revalidate other platforms.
