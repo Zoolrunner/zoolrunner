@@ -64,7 +64,13 @@ var done=0, doneError, unit;
 function finish(kind, phase, error) {
   var detail='';try{detail=error===undefined?'':stringify(error)}catch(_){}
   var matches=false;try{matches=!!expected && error.constructor===expected}catch(_){}
-  emit(p.marker+encode({kind:kind,phase:phase,matches:matches,detail:detail}));
+  // The historical shell's print path is byte-oriented. Keep the protocol
+  // ASCII so Unicode exception text cannot become JSON control characters.
+  var result=encode({kind:kind,phase:phase,matches:matches,detail:detail});
+  emit(p.marker+result.replace(/[\u007f-\uffff]/g,function(c){
+    var hex=c.charCodeAt(0).toString(16);
+    return '\\u'+'0000'.slice(hex.length)+hex;
+  }));
 }
 if(p.async_) realm.global.$DONE=function(error){done++;if(error!==undefined)doneError=error;};
 try{realm.evalScript(p.harness)}catch(e){finish('harness-error','harness',e);return;}

@@ -36,6 +36,7 @@ def main():
     control('var =', 'pass', ('parse', 'SyntaxError'))
     control('throw new SyntaxError("runtime")', 'fail', ('parse', 'SyntaxError'))
     control('throw new SyntaxError("runtime")', 'pass', ('runtime', 'SyntaxError'))
+    control('throw new Error("\\u0108\\u0122\\u0323\\ud83d\\ude00")', 'pass', ('runtime', 'Error'))
     control('var =', 'fail', ('runtime', 'SyntaxError'))
     control('throw new TypeError("wrong type")', 'fail', ('runtime', 'SyntaxError'))
     control('throw new SyntaxError("body")', 'harness-error', ('runtime', 'SyntaxError'), harness='var =')

@@ -3614,3 +3614,10 @@ the fix records 268 passes and 62 failures across 330 modes
 and are not conformance scores. The edition ledger now has 147 exact-source
 records, including the JSON defects and reviewed later changes to Proxy
 invariants, revoked Proxy construction, Object.prototype and sort ordering.
+
+The later diagnostic protocol now escapes non-ASCII result text before sending
+it through the historical shell's byte-oriented `print` path. This preserves
+Unicode exceptions instead of corrupting their JSON completion record. All 31
+runner controls pass. Rechecking the canonical-equivalence localeCompare case
+now records two real diagnostic failures, previously obscured by transport
+errors (`later-unicode-localecompare.json`); the engine issue remains under review.
