@@ -199,6 +199,11 @@ function modernWindowEdition() {
                          Object.setPrototypeOf(o,base);
                          return o.m()()===9 && o.e()===9 &&
                                 (o.value=12)===12 && o.e()===12; })() &&
+           (function() { class Base {constructor(x){this.x=x}m(){return this.x}}
+                         class Child extends Base {constructor(x){(()=>super(x))()}
+                             m(){return super.m()+1}}
+                         var restored=eval('('+Child.toString()+')');
+                         return new Child(4).m()===5 && new restored(6).m()===7; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

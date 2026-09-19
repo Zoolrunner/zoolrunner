@@ -2904,3 +2904,43 @@ ChatZilla. The frozen conformance runtime remains unchanged, and all four
 engine hashes match: `fca775a9ee16720547e1373307306ccddd6dd85899649a6a6e73668d25577515`.
 C89 checks pass. This batch is validated on macOS arm64 only; full ES2015
 compliance remains unfinished.
+
+
+## Classes and derived constructors
+
+ES2015 class declarations and expressions now support heritage, default and
+explicit constructors, instance/static methods, accessors, generators, computed
+keys, inner class-name bindings and `super()` through arrows and direct eval.
+Derived receivers remain uninitialized until a successful super call; object
+returns, primitive-return errors and repeated initialization follow separate
+paths. Constructor and method descriptors retain their ES2015 ordering.
+
+Cache version 61 records the new function kinds and complete class source.
+The public function decompiler retains class expressions, including nested and
+Unicode source; enclosing script decompilation reconstructs class instructions.
+Source recording covers memory and file token streams in ES2015 mode. Explicit
+legacy editions keep their existing parser paths.
+
+The first isolated full run records **28,509 passes, 59 failures, 14 unsupported
+modules**, no harness errors/crashes/timeouts, **278 gained and zero lost**.
+ES5 passes all **11,540 cases**. Subsequent class-name fixes pass **322/324**
+class-related modes; the other two require parameter defaults. Reports are
+`artifacts/es6/class-first-*` and `class-names-fixed-subset.json`. These are
+intermediate results. Final integrated reports under `artifacts/es6/classes-reviewed-*`
+record **28,519 passes, 49 failures, 14 unsupported modules**, zero harness errors,
+crashes or timeouts: **288 gained, zero lost**. All **11,540 ES5 cases** pass.
+Focused probes cover 53 class assertions, eight source cases, 47 native
+constructor checks and 16 wide-operand/cache/collection checks. Ten repeated
+wide runs pass with allocation scribbling; 157 additional class behavior cases
+agree with Node. C89 checks pass.
+
+Real content-window validation exposed an initialization path that looked up
+internal constructor-state classes by name. Their objects now use the cached
+built-in prototype, matching the other private engine records. All four macOS
+arm64 applications pass root build, packaging and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout assertions and
+ChatZilla in Suite and XULRunner. All four engine hashes match the unchanged
+frozen conformance runtime:
+`b0a096716f708d35d39719f0426b603c9f657f75ba311be3da6c30af6e0bdfa5`.
+Other platforms are not revalidated for this batch. Full parameter environments,
+module execution and full ES2015 conformance remain unfinished.

@@ -67,6 +67,7 @@ struct JSFunction {
     } u;
     JSAtom       *atom;         /* name for diagnostics and decompiling */
     JSClass      *clasp;        /* if non-null, constructor for this class */
+    JSAtom       *classSource;  /* complete class expression, traced and XDR */
     JSAtom       *inferredName; /* modern metadata, never a lexical binding */
 };
 
@@ -75,9 +76,19 @@ struct JSFunction {
 #define JSFUN_KIND_REST     2
 #define JSFUN_KIND_GENERATOR 4
 #define JSFUN_KIND_HOME_OBJECT 8
+#define JSFUN_KIND_CLASS 16
+#define JSFUN_KIND_DERIVED 32
+#define JSFUN_KIND_SUPER_CALL 64
+#define FUN_HAS_SUPER_CALL(fun) (FUN_IS_DERIVED(fun) || ((fun)->kind & JSFUN_KIND_SUPER_CALL))
+#define FUN_IS_DERIVED(fun) (((fun)->kind & JSFUN_KIND_DERIVED) != 0)
+#define FUN_IS_CLASS(fun) (((fun)->kind & JSFUN_KIND_CLASS) != 0)
 #define FUN_HAS_HOME_OBJECT(fun) (((fun)->kind & JSFUN_KIND_HOME_OBJECT) != 0)
 #define JSFUN_HOME_SLOT(fun) (2 + (fun)->u.i.nregexps + \
     (((fun)->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0) + (FUN_IS_ARROW(fun) ? 1 : 0))
+extern JSBool js_InitDerivedBindings(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_GetSuperCallEnvironment(JSContext *cx, JSStackFrame *fp, JSObject **constructor, JSObject **target, JSObject **cell);
+extern JSBool js_BindDerivedThis(JSContext *cx, JSObject *cell, JSObject *receiver);
+extern JSBool js_InitClassConstructor(JSContext *cx, JSObject *function, jsval heritage, JSBool hasHeritage);
 extern JSBool js_SetFunctionHomeObject(JSContext *, JSObject *, JSObject *);
 extern JSBool js_GetFunctionHomeObject(JSContext *, JSObject *, JSObject **);
 extern JSBool js_GetFunctionSuperBase(JSContext *, JSObject *, JSObject **);

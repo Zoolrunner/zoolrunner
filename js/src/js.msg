@@ -319,3 +319,8 @@ MSG_DEF(JSMSG_ARGUMENT_LIST_LIMIT,  236, 0, JSEXN_RANGEERR, "argument list excee
 MSG_DEF(JSMSG_PROMISE_OPERATION,    237, 0, JSEXN_TYPEERR, "incompatible Promise receiver or callback")
 MSG_DEF(JSMSG_UNINITIALIZED_LEXICAL, 238, 0, JSEXN_REFERENCEERR, "cannot access an uninitialized lexical binding")
 MSG_DEF(JSMSG_DELETE_SUPER, 239, 0, JSEXN_REFERENCEERR, "cannot delete a super property")
+
+MSG_DEF(JSMSG_CLASS_CALL, 240, 0, JSEXN_TYPEERR, "class constructor requires new")
+MSG_DEF(JSMSG_UNINITIALIZED_THIS, 241, 0, JSEXN_REFERENCEERR, "this is uninitialized")
+MSG_DEF(JSMSG_INITIALIZED_THIS, 242, 0, JSEXN_REFERENCEERR, "this is already initialized")
+MSG_DEF(JSMSG_DERIVED_RETURN, 243, 0, JSEXN_TYPEERR, "derived constructor returned a primitive")

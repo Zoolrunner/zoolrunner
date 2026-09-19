@@ -808,3 +808,14 @@ ES5 cases** and all four applications' build/package/desktop checks pass,
 including Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla.
 Full ES2015 compliance remains unfinished; other platforms are not revalidated
 for this batch.
+
+
+ES2015 classes and derived constructors now include class source/cache round
+trips, inherited methods and lexical `super()` calls. The integrated macOS arm64
+run passes **28,519 cases**, with **49 failures**, **14 unsupported modules**,
+zero harness errors/crashes/timeouts, and **288 gained, zero lost**. All **11,540
+ES5 cases** and all four applications' build/package/desktop checks pass,
+including Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+See `js/tests/es6/README.md`. Full parameter environments, module execution and
+full ES2015 compliance remain unfinished; other platforms are not revalidated
+for this batch.

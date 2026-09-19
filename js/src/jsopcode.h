@@ -53,6 +53,17 @@ JS_BEGIN_EXTERN_C
  * JS operation bytecodes.
  */
 /* Integer selectors for the atom-directed extended opcode. */
+#define JS_EXT_SUPER_CALL_REF 9
+#define JS_EXT_SUPER_CALL 10
+#define JS_EXT_CLASS_START 16
+#define JS_EXT_CLASS_EXTENDS 17
+#define JS_EXT_CLASS_END 18
+#define JS_EXT_CLASS_BIND 19
+#define JS_EXT_CLASS_METHOD 20
+#define JS_EXT_CLASS_GETTER 21
+#define JS_EXT_CLASS_SETTER 22
+#define JS_EXT_CLASS_STATIC 4
+
 #define JS_EXT_SUPER_REF 1
 #define JS_EXT_SUPER_GET 2
 #define JS_EXT_SUPER_SET 3

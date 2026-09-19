@@ -69,6 +69,7 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsreflect.h"
 #include "jssymbol.h"
 #include "jsopcode.h"
 #include "jsscan.h"
@@ -1244,6 +1245,11 @@ have_fun:
             ok = JS_FALSE;
             goto out2;
         }
+        if (FUN_IS_CLASS(fun) && !(flags & JSINVOKE_CONSTRUCT)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CLASS_CALL);
+            ok = JS_FALSE;
+            goto out2;
+        }
         nslots = (fun->nargs > argc) ? fun->nargs - argc : 0;
         if (FUN_INTERPRETED(fun)) {
             native = NULL;
@@ -1256,6 +1262,10 @@ have_fun:
             nslots += fun->u.n.extra;
         }
 
+        if (FUN_IS_DERIVED(fun) && (flags & JSINVOKE_CONSTRUCT)) {
+            thisp = NULL;
+            goto init_frame;
+        }
         if (FUN_IS_ARROW(fun)) {
             if (!js_GetArrowBindings(cx, funobj, &vp[1], &newTarget)) {
                 ok = JS_FALSE;
@@ -1505,7 +1515,22 @@ have_fun:
             ok = JS_FALSE;
             goto out;
         }
+        if (FUN_IS_DERIVED(fun) && (flags & JSINVOKE_CONSTRUCT) &&
+            !js_InitDerivedBindings(cx, &frame)) {
+            ok = JS_FALSE;
+            goto out;
+        }
         ok = js_Interpret(cx, script->code, &v);
+        if (ok && FUN_IS_DERIVED(fun) && (flags & JSINVOKE_CONSTRUCT) &&
+            JSVAL_IS_PRIMITIVE(frame.rval)) {
+            if (!JSVAL_IS_VOID(frame.rval)) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_DERIVED_RETURN);
+                ok = JS_FALSE;
+            } else if (frame.argv[-1] == JSVAL_UNINITIALIZED) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_UNINITIALIZED_THIS);
+                ok = JS_FALSE;
+            } else frame.rval = frame.argv[-1];
+        }
     } else {
         /* fun might be onerror trying to report a syntax error in itself. */
         frame.scopeChain = NULL;
@@ -2425,6 +2450,11 @@ InvokeConstructorWithFlags(JSContext *cx, jsval *vp, uintN argc,
         return ok;
     }
 
+    if (fun && FUN_IS_DERIVED(fun)) {
+        vp[1] = JSVAL_UNINITIALIZED;
+        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags,
+                                   newTarget ? newTarget : obj2);
+    }
     if (fun && FUN_NATIVE(fun) == js_ProxyConstructor) {
         /* ProxyCreate does not read newTarget.prototype or allocate an
          * ordinary receiver. The native constructor returns its own object. */
@@ -2529,7 +2559,7 @@ js_InternalInvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
 
 static JSBool
 InvokeSpread(JSContext *cx, jsval callee, jsval receiver, JSObject *array,
-             JSBool construct, jsval *result)
+             JSBool construct, jsval *result, JSObject *newTarget)
 {
     JSStackFrame *frame = cx->fp;
     jsval *base, *oldsp;
@@ -2550,7 +2580,7 @@ InvokeSpread(JSContext *cx, jsval callee, jsval receiver, JSObject *array,
     }
     oldsp = frame->sp;
     frame->sp = base + count + 2;
-    ok = construct ? InvokeConstructorWithFlags(cx, base, count, NULL, JSINVOKE_INTERNAL)
+    ok = construct ? InvokeConstructorWithFlags(cx, base, count, newTarget, JSINVOKE_INTERNAL)
                    : js_Invoke(cx, count, JSINVOKE_INTERNAL);
     if (ok) *result = base[0];
     frame->sp = oldsp;
@@ -2630,6 +2660,33 @@ InternNonIntElementId(JSContext *cx, jsval idval, jsid *idp)
 /* SetFunctionName for a computed anonymous function definition. Set an own
  * property on this closure, never the shared template's inferred-name atom. */
 static JSBool
+ClassHasOwnName(JSContext *cx, JSObject *obj, JSBool *has)
+{
+    JSObject *owner;
+    JSProperty *property;
+    if (!js_LookupOwnProperty(cx, obj,
+            ATOM_TO_JSID(cx->runtime->atomState.nameAtom), &owner, &property))
+        return JS_FALSE;
+    *has = property != NULL && owner == obj;
+    if (property) OBJ_DROP_PROPERTY(cx, owner, property);
+    return JS_TRUE;
+}
+
+static JSBool
+FinishClassName(JSContext *cx, JSObject *obj)
+{
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, obj);
+    JSAtom *name = fun->atom ? fun->atom : fun->inferredName;
+    JSBool has;
+    if (!name) return JS_TRUE;
+    if (!ClassHasOwnName(cx, obj, &has)) return JS_FALSE;
+    if (has) return JS_TRUE;
+    return js_DefineNativeProperty(cx, obj,
+        ATOM_TO_JSID(cx->runtime->atomState.nameAtom), ATOM_KEY(name),
+        NULL, NULL, JSPROP_READONLY, 0, 0, NULL);
+}
+
+static JSBool
 SetComputedFunctionName(JSContext *cx, JSObject *function, jsval key, JSOp kind)
 {
     JSString *name;
@@ -2637,7 +2694,12 @@ SetComputedFunctionName(JSContext *cx, JSObject *function, jsval key, JSOp kind)
     jschar *chars;
     size_t length;
     JSTempValueRooter root;
-    JSBool ok;
+    JSBool ok, has;
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, function);
+    if (fun && FUN_IS_CLASS(fun)) {
+        if (!ClassHasOwnName(cx, function, &has)) return JS_FALSE;
+        if (has) return JS_TRUE;
+    }
     if (JSVAL_IS_SYMBOL(key)) {
         symbol = (JSSymbol *)JSVAL_TO_STRING(key);
         if (!symbol->hasDescription) {
@@ -2719,6 +2781,100 @@ DefineComputedAccessor(JSContext *cx, JSObject *obj, jsval key,
                      isGetter ? (JSPropertyOp)function : NULL,
                      isGetter ? NULL : (JSPropertyOp)function, attrs, NULL);
     JS_POP_TEMP_ROOT(cx, &root.root);
+    return ok;
+}
+
+static JSClass superCallReferenceClass = {
+    "Super Call Reference", JSCLASS_HAS_RESERVED_SLOTS(3) | JSCLASS_IS_ANONYMOUS |
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSObject *
+NewSuperCallReference(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *constructor, *target, *cell, *reference = NULL;
+    jsval roots[4];
+    JSTempValueRooter root;
+    if (!js_GetSuperCallEnvironment(cx, fp, &constructor, &target, &cell)) return NULL;
+    roots[0] = OBJECT_TO_JSVAL(constructor);
+    roots[1] = OBJECT_TO_JSVAL(target);
+    roots[2] = OBJECT_TO_JSVAL(cell);
+    roots[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    reference = js_NewObject(cx, &superCallReferenceClass, NULL, cx->globalObject);
+    if (reference) {
+        roots[3] = OBJECT_TO_JSVAL(reference);
+        if (!JS_SetPrototype(cx, reference, NULL) ||
+            !JS_SetReservedSlot(cx, reference, 0, roots[0]) ||
+            !JS_SetReservedSlot(cx, reference, 1, roots[1]) ||
+            !JS_SetReservedSlot(cx, reference, 2, roots[2])) reference = NULL;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return reference;
+}
+
+static JSBool
+InvokeSuperReference(JSContext *cx, JSObject *reference, JSObject *array, jsval *result)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!JS_GetReservedSlot(cx, reference, 0, &roots[0]) ||
+        !JS_GetReservedSlot(cx, reference, 1, &roots[1]) ||
+        !JS_GetReservedSlot(cx, reference, 2, &roots[2])) return JS_FALSE;
+    roots[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    ok = InvokeSpread(cx, roots[0], JSVAL_NULL, array, JS_TRUE, &roots[3], JSVAL_TO_OBJECT(roots[1]));
+    if (ok) ok = js_BindDerivedThis(cx, JSVAL_TO_OBJECT(roots[2]), JSVAL_TO_OBJECT(roots[3]));
+    if (ok) *result = roots[3];
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+DefineClassMethod(JSContext *cx, JSObject *constructor, jsval key,
+                   JSObject *method, jsint selector)
+{
+    jsval roots[4], accepted;
+    JSTempValueRooter root;
+    JSObject *target, *descriptor;
+    JSBool ok = JS_FALSE;
+    JSOp kind;
+    roots[0] = OBJECT_TO_JSVAL(constructor);
+    roots[1] = key;
+    roots[2] = JSVAL_VOID;
+    roots[3] = OBJECT_TO_JSVAL(method);
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    if (selector >= JS_EXT_CLASS_METHOD + JS_EXT_CLASS_STATIC) {
+        selector -= JS_EXT_CLASS_STATIC;
+    } else if (!JS_GetProperty(cx, constructor, "prototype", &roots[0])) goto out;
+    target = JSVAL_TO_OBJECT(roots[0]);
+    kind = selector == JS_EXT_CLASS_GETTER ? JSOP_INITGETTERCOMPUTED :
+           selector == JS_EXT_CLASS_SETTER ? JSOP_INITSETTERCOMPUTED : JSOP_INITMETHODCOMPUTED;
+    if (!SetComputedFunctionName(cx, method, key, kind) ||
+        !js_SetFunctionHomeObject(cx, method, target)) goto out;
+    descriptor = js_NewObject(cx, &js_ObjectClass, NULL, cx->globalObject);
+    if (!descriptor) goto out;
+    roots[2] = OBJECT_TO_JSVAL(descriptor);
+    if (!JS_SetPrototype(cx, descriptor, NULL) ||
+        !JS_DefineProperty(cx, descriptor, "enumerable", JSVAL_FALSE, NULL, NULL, 0) ||
+        !JS_DefineProperty(cx, descriptor, "configurable", JSVAL_TRUE, NULL, NULL, 0)) goto out;
+    if (selector == JS_EXT_CLASS_METHOD) {
+        if (!JS_DefineProperty(cx, descriptor, "value", roots[3], NULL, NULL, 0) ||
+            !JS_DefineProperty(cx, descriptor, "writable", JSVAL_TRUE, NULL, NULL, 0)) goto out;
+    } else if (!JS_DefineProperty(cx, descriptor,
+                                selector == JS_EXT_CLASS_GETTER ? "get" : "set",
+                                roots[3], NULL, NULL, 0)) goto out;
+    ok = js_ReflectDefineProperty(cx, NULL, 3, roots, &accepted);
+    if (ok && accepted != JSVAL_TRUE) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+        ok = JS_FALSE;
+    }
+ out:
+    JS_POP_TEMP_ROOT(cx, &root);
     return ok;
 }
 
@@ -3750,6 +3906,43 @@ interrupt:
             SAVE_SP_AND_PC(fp);
             if (ATOM_IS_INT(atom)) {
                 switch (ATOM_TO_INT(atom)) {
+                  case JS_EXT_SUPER_CALL_REF:
+                    obj = NewSuperCallReference(cx, fp);
+                    rval = OBJECT_TO_JSVAL(obj);
+                    ok = obj != NULL;
+                    break;
+                  case JS_EXT_SUPER_CALL:
+                    ok = InvokeSuperReference(cx, JSVAL_TO_OBJECT(FETCH_OPND(-3)),
+                                                JSVAL_TO_OBJECT(FETCH_OPND(-2)), &rval);
+                    break;
+                  case JS_EXT_CLASS_START:
+                  case JS_EXT_CLASS_EXTENDS:
+                    rval = FETCH_OPND(-2);
+                    ok = js_InitClassConstructor(cx, JSVAL_TO_OBJECT(rval), FETCH_OPND(-3),
+                                                   ATOM_TO_INT(atom) == JS_EXT_CLASS_EXTENDS);
+                    break;
+                  case JS_EXT_CLASS_END:
+                    rval = FETCH_OPND(-3);
+                    ok = FinishClassName(cx, JSVAL_TO_OBJECT(rval));
+                    break;
+                  case JS_EXT_CLASS_BIND:
+                    rval = FETCH_OPND(-3);
+                    i = JSVAL_TO_INT(FETCH_OPND(-2));
+                    JS_ASSERT(i >= 0 && i < depth);
+                    GC_POKE(cx, fp->spbase[i]);
+                    fp->spbase[i] = rval;
+                    ok = JS_TRUE;
+                    break;
+                  case JS_EXT_CLASS_METHOD:
+                  case JS_EXT_CLASS_GETTER:
+                  case JS_EXT_CLASS_SETTER:
+                  case JS_EXT_CLASS_METHOD + JS_EXT_CLASS_STATIC:
+                  case JS_EXT_CLASS_GETTER + JS_EXT_CLASS_STATIC:
+                  case JS_EXT_CLASS_SETTER + JS_EXT_CLASS_STATIC:
+                    rval = FETCH_OPND(-3);
+                    ok = DefineClassMethod(cx, JSVAL_TO_OBJECT(rval), FETCH_OPND(-2),
+                                            JSVAL_TO_OBJECT(FETCH_OPND(-1)), ATOM_TO_INT(atom));
+                    break;
                   case JS_EXT_SUPER_REF:
                     obj = js_NewSuperReference(cx, fp->callee, FETCH_OPND(-3),
                                                 FETCH_OPND(-2), script->strictMode);
@@ -4703,7 +4896,7 @@ interrupt:
             SAVE_SP_AND_PC(fp);
             ok = InvokeSpread(cx, FETCH_OPND(-3), FETCH_OPND(-2),
                               JSVAL_TO_OBJECT(FETCH_OPND(-1)), GET_UINT16(pc) == 1,
-                              &rval);
+                              &rval, NULL);
             LOAD_BRANCH_CALLBACK(cx);
             LOAD_INTERRUPT_HANDLER(rt);
             if (!ok) goto out;
@@ -4733,6 +4926,12 @@ interrupt:
                 jsval *rvp;
                 JSInlineFrame *newifp;
                 JSInterpreterHook hook;
+
+                if (FUN_IS_CLASS(fun)) {
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CLASS_CALL);
+                    ok = JS_FALSE;
+                    goto out;
+                }
 
                 /* Restrict recursion of lightweight functions. */
                 if (inlineCallCount == MAX_INLINE_CALL_COUNT) {
@@ -5362,7 +5561,22 @@ interrupt:
                     ok = JS_FALSE;
                     goto out;
                 }
+                if (rval == JSVAL_UNINITIALIZED) {
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_UNINITIALIZED_THIS);
+                    ok = JS_FALSE;
+                    goto out;
+                }
                 PUSH_OPND(rval);
+                obj = NULL;
+                DO_NEXT_OP(JSOP_THIS_LENGTH);
+            }
+            if (fp->fun && FUN_IS_DERIVED(fp->fun) && fp->argv) {
+                if (fp->argv[-1] == JSVAL_UNINITIALIZED) {
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_UNINITIALIZED_THIS);
+                    ok = JS_FALSE;
+                    goto out;
+                }
+                PUSH_OPND(fp->argv[-1]);
                 obj = NULL;
                 DO_NEXT_OP(JSOP_THIS_LENGTH);
             }

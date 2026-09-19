@@ -1566,3 +1566,10 @@ Scripted setters must preserve assignment results in standard editions while
 retaining explicit legacy result behavior and native property-hook contracts.
 Run `setter-result.js` in default ES5 and ES2015 modes and `TestSetterResult.c`
 for mixed caller/setter editions, strict callers, callbacks and GC.
+
+Preserve ES2015 class home objects, derived-constructor this initialization,
+lexical super calls through arrows/direct eval, and the distinction between
+mutable declaration bindings and immutable inner class names. Retain complete
+class source across collection and XDR, including file-backed compilation.
+Run `classes.js`, `class-source.js`, `TestClassRuntime.c` and `TestClassWide.c`,
+plus the chrome/content edition fixture. Keep explicit legacy parsing unchanged.

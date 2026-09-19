@@ -2176,6 +2176,10 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
     ok = JS_TRUE;
     if (!pn || *answer)
         return ok;
+    if (pn->pn_type == TOK_SUPER_CALL || pn->pn_type == TOK_CLASS) {
+        *answer = JS_TRUE;
+        return JS_TRUE;
+    }
 
     switch (pn->pn_arity) {
       case PN_FUNC:
@@ -4402,6 +4406,57 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
     }
 
     switch (pn->pn_type) {
+      case TOK_SUPER_CALL:
+      {
+        JSParseNode *argument;
+        uintN index = 0, kind;
+        if (js_Emit1(cx, cg, JSOP_PUSH) < 0 || js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, cg, JSOP_PUSH) < 0 || !EmitExtended(cx, cg, JS_EXT_SUPER_CALL_REF))
+            return JS_FALSE;
+        EMIT_UINT16_IMM_OP(JSOP_INTRINSIC, JSProto_Array);
+        if (js_Emit1(cx, cg, JSOP_PUSHOBJ) < 0 || js_Emit1(cx, cg, JSOP_NEWINIT) < 0)
+            return JS_FALSE;
+        for (argument = pn->pn_head->pn_next; argument; argument = argument->pn_next) {
+            kind = argument->pn_type == TOK_ELLIPSIS ? 2 : 0;
+            if (!js_EmitTree(cx, cg, kind ? argument->pn_kid : argument)) return JS_FALSE;
+            EMIT_UINT16_IMM_OP(JSOP_ARRAYAPPEND, kind | (index ? 4 : 0));
+            ++index;
+        }
+        ok = js_Emit1(cx, cg, JSOP_ENDINIT) >= 0 && js_Emit1(cx, cg, JSOP_PUSH) >= 0 &&
+             EmitExtended(cx, cg, JS_EXT_SUPER_CALL);
+        break;
+      }
+
+      case TOK_CLASS:
+      {
+        JSParseNode *element, *constructor = pn->pn_kid3->pn_head;
+        jsint selector;
+        if (pn->pn_kid2) {
+            if (!js_EmitTree(cx, cg, pn->pn_kid2)) return JS_FALSE;
+        } else if (js_Emit1(cx, cg, JSOP_PUSH) < 0) return JS_FALSE;
+        if (!js_EmitTree(cx, cg, constructor) ||
+            !js_EmitTree(cx, cg, pn->pn_kid1) ||
+            !EmitExtended(cx, cg, pn->pn_kid2 ? JS_EXT_CLASS_EXTENDS : JS_EXT_CLASS_START))
+            return JS_FALSE;
+        for (element = constructor->pn_next; element; element = element->pn_next) {
+            selector = element->pn_op == JSOP_GETTER ? JS_EXT_CLASS_GETTER :
+                       element->pn_op == JSOP_SETTER ? JS_EXT_CLASS_SETTER : JS_EXT_CLASS_METHOD;
+            if (element->pn_val == JSVAL_TRUE) selector += JS_EXT_CLASS_STATIC;
+            if (!js_EmitTree(cx, cg, element->pn_left) ||
+                js_Emit1(cx, cg, JSOP_PROPERTYKEY) < 0 ||
+                !js_EmitTree(cx, cg, element->pn_right) || !EmitExtended(cx, cg, selector))
+                return JS_FALSE;
+        }
+        if (JSSTRING_LENGTH(ATOM_TO_STRING(pn->pn_kid1->pn_atom))) {
+            if (!EmitNumberOp(cx, OBJ_BLOCK_DEPTH(cx, cg->treeContext.blockChain), cg) ||
+                js_Emit1(cx, cg, JSOP_PUSH) < 0 || !EmitExtended(cx, cg, JS_EXT_CLASS_BIND))
+                return JS_FALSE;
+        }
+        ok = js_Emit1(cx, cg, JSOP_PUSH) >= 0 && js_Emit1(cx, cg, JSOP_PUSH) >= 0 &&
+             EmitExtended(cx, cg, JS_EXT_CLASS_END);
+        break;
+      }
+
       case TOK_FUNCTION:
       {
         void *cg2mark;
@@ -6560,7 +6615,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          */
         noteIndex = -1;
         type = pn->pn_expr->pn_type;
-        if (type != TOK_CATCH && type != TOK_LET && type != TOK_FOR &&
+        if (type != TOK_CATCH && type != TOK_LET && type != TOK_FOR && type != TOK_CLASS &&
             (!(stmt = stmtInfo.down)
              ? !(cg->treeContext.flags & TCF_IN_FUNCTION)
              : stmt->type == STMT_BLOCK)) {
@@ -6779,6 +6834,11 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 if (value->pn_type == TOK_FUNCTION && value->pn_op == JSOP_ANONFUNOBJ) {
                     JSFunction *valueFun = (JSFunction *)JS_GetPrivate(cx,
                                                 ATOM_TO_OBJECT(value->pn_funAtom));
+                    infer = !valueFun->atom && !valueFun->inferredName;
+                }
+                if (value->pn_type == TOK_CLASS) {
+                    JSFunction *valueFun = (JSFunction *)JS_GetPrivate(cx,
+                        ATOM_TO_OBJECT(value->pn_kid3->pn_head->pn_funAtom));
                     infer = !valueFun->atom && !valueFun->inferredName;
                 }
                 if (!js_EmitTree(cx, cg, pn3->pn_kid) ||

@@ -148,6 +148,7 @@ typedef enum JSTokenType {
     TOK_TEMPLATE_OBJECT,                /* tagged-template record */
     TOK_TEMPLATE_SEGMENT,               /* cooked/raw AST atom pair */
     TOK_FOROFVALUE,                     /* internal for-of binding RHS */
+    TOK_CLASS, TOK_EXTENDS, TOK_SUPER_CALL,
     TOK_SUPER,                         /* ES2015 method super reference */
     TOK_LIMIT                           /* domain size */
 } JSTokenType;
@@ -208,6 +209,7 @@ struct JSTokenPos {
 struct JSToken {
     JSTokenType         type;           /* char value or above enumerator */
     uintN               flags;          /* lexical facts retained by lookahead */
+    size_t              sourceBegin, sourceEnd; /* normalized source offsets */
     JSTokenPos          pos;            /* token position in file */
     jschar              *ptr;           /* beginning of token in line buffer */
     union {
@@ -252,6 +254,9 @@ struct JSTokenStream {
     ptrdiff_t           linepos;        /* linebuf offset in physical line */
     JSTokenBuf          linebuf;        /* line buffer for diagnostics */
     JSTokenBuf          userbuf;        /* user input buffer if !file */
+    JSStringBuffer      sourcebuf;      /* ES2015 source for class decompilation */
+    size_t              sourceCursor;
+    JSBool              retainSource;
     JSStringBuffer      tokenbuf;       /* current token string buffer */
     const char          *filename;      /* input filename or null */
     FILE                *file;          /* stdio stream if reading from file */
@@ -272,6 +277,8 @@ struct JSTokenStream {
 #define TOKF_ESCAPE 0x02 /* raw string contains an escape or continuation */
 #define TOKF_GENERATOR_METHOD 0x08
 #define TOKF_METHOD 0x10
+#define TOKF_DERIVED_CONSTRUCTOR 0x20
+#define TSF_SUPER_CALL_ALLOWED 0x40000
 #define TSF_SUPER_ALLOWED 0x20000
 #define TSF_GENERATOR 0x10000
 #define TSF_STRICT_MODE 0x8000          /* ES5 strict lexical grammar */

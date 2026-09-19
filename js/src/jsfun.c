@@ -98,7 +98,7 @@ enum {
     ((fp)->flags |= JS_BIT(JSFRAME_OVERRIDE_SHIFT - ((tinyid) + 1)))
 
 /* The kind occupies existing alignment padding on supported 32/64-bit ABIs. */
-JS_STATIC_ASSERT(sizeof(JSFunction) == 6 * sizeof(void *) + 8);
+JS_STATIC_ASSERT(sizeof(JSFunction) == 7 * sizeof(void *) + 8);
 
 static JSBool
 DefinePoisonProperties(JSContext *cx, JSObject *obj, const char *first,
@@ -1107,6 +1107,8 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
                                 INT_TO_JSVAL(fun->nargs), NULL, NULL,
                                 JSPROP_READONLY, 0, 0, NULL))
         return JS_FALSE;
+    if (FUN_IS_CLASS(fun))
+        return JS_TRUE;
     /* Anonymous function expressions acquire a name only where the language
      * explicitly infers one. Function.prototype itself has the empty name. */
     name = fun->atom ? fun->atom : fun->inferredName;
@@ -1440,7 +1442,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
     JSContext *cx;
     JSFunction *fun;
     uint32 nullAtom;            /* flag to indicate if fun->atom is NULL */
-    uint32 nullInferredName;
+    uint32 nullInferredName, nullClassSource;
     JSTempValueRooter tvr;
     uint32 flagsword;           /* originally only flags was JS_XDRUint8'd */
     JSAtom *propAtom;
@@ -1471,6 +1473,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         }
         nullAtom = !fun->atom;
         nullInferredName = !fun->inferredName;
+        nullClassSource = !fun->classSource;
         flagsword = ((uint32)fun->u.i.nregexps << 16) | fun->flags;
     } else {
         fun = js_NewFunction(cx, NULL, NULL, 0, 0, NULL, NULL);
@@ -1490,6 +1493,10 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         (!nullInferredName && !js_XDRStringAtom(xdr, &fun->inferredName)))
         goto bad;
 
+    if (!JS_XDRUint32(xdr, &nullClassSource) ||
+        (!nullClassSource && !js_XDRStringAtom(xdr, &fun->classSource)))
+        goto bad;
+
     if (!JS_XDRUint16(xdr, &fun->nargs) ||
         !JS_XDRUint16(xdr, &fun->edition) ||
         !JS_XDRUint16(xdr, &fun->kind) ||
@@ -1498,8 +1505,15 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         goto bad;
     }
 
-    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR | JSFUN_KIND_HOME_OBJECT) ||
-        (FUN_IS_ARROW(fun) && FUN_IS_GENERATOR(fun))) {
+    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR | JSFUN_KIND_HOME_OBJECT | JSFUN_KIND_CLASS | JSFUN_KIND_DERIVED | JSFUN_KIND_SUPER_CALL) ||
+        (FUN_IS_ARROW(fun) && FUN_IS_GENERATOR(fun)) ||
+        (FUN_IS_CLASS(fun) &&
+         (FUN_IS_ARROW(fun) || FUN_IS_GENERATOR(fun) || !FUN_HAS_HOME_OBJECT(fun) ||
+          !(flagsword & JSFUN_STRICT) || (flagsword & JSFUN_NO_CONSTRUCT))) ||
+        (FUN_IS_DERIVED(fun) &&
+         (!FUN_IS_CLASS(fun) || !(flagsword & JSFUN_HEAVYWEIGHT))) ||
+        ((fun->kind & JSFUN_KIND_SUPER_CALL) &&
+         (!FUN_IS_ARROW(fun) || !FUN_HAS_HOME_OBJECT(fun)))) {
         JS_ReportError(cx, "invalid serialized function kind");
         goto bad;
     }
@@ -1810,6 +1824,8 @@ fun_mark(JSContext *cx, JSObject *obj, void *arg)
         GC_MARK(cx, fun, "private");
         if (fun->atom)
             GC_MARK_ATOM(cx, fun->atom);
+        if (fun->classSource)
+            GC_MARK_ATOM(cx, fun->classSource);
         if (fun->inferredName)
             GC_MARK_ATOM(cx, fun->inferredName);
         if (FUN_INTERPRETED(fun) && fun->u.i.script)
@@ -2805,11 +2821,86 @@ bad:
  * the cell in the CallObject avoids changing the classic native frame ABI and
  * permits derived-constructor initialization to update a shared this binding. */
 static JSClass arrowBindingClass = {
-    "ArrowBinding", JSCLASS_HAS_RESERVED_SLOTS(2),
+    "ArrowBinding", JSCLASS_HAS_RESERVED_SLOTS(4) | JSCLASS_IS_ANONYMOUS |
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
     JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
     JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
+
+/* Derived constructors create the lexical this cell before their body.
+ * Arrows retain the same cell and its owner after the activation returns. */
+JSBool
+js_InitDerivedBindings(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *cell;
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_ASSERT(fp->callobj && fp->callee && FUN_IS_DERIVED(fp->fun));
+    cell = js_NewObject(cx, &arrowBindingClass, NULL, cx->globalObject);
+    if (!cell) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, cell, &root);
+    ok = JS_SetPrototype(cx, cell, NULL) &&
+         JS_SetReservedSlot(cx, cell, 0, JSVAL_UNINITIALIZED) &&
+         JS_SetReservedSlot(cx, cell, 1, OBJECT_TO_JSVAL(fp->newTarget)) &&
+         JS_SetReservedSlot(cx, cell, 2, OBJECT_TO_JSVAL(fp->callee)) &&
+         JS_SetReservedSlot(cx, cell, 3, OBJECT_TO_JSVAL(fp->callobj)) &&
+         JS_SetReservedSlot(cx, fp->callobj, 0, OBJECT_TO_JSVAL(cell));
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_GetSuperCallEnvironment(JSContext *cx, JSStackFrame *fp,
+                           JSObject **constructor, JSObject **target,
+                           JSObject **cell)
+{
+    jsval value, owner;
+    JSFunction *fun;
+    if (fp->fun && FUN_IS_ARROW(fp->fun)) {
+        if (!JS_GetReservedSlot(cx, fp->callee, JSFUN_ARROW_SLOT(fp->fun), &value))
+            return JS_FALSE;
+    } else if (fp->callobj) {
+        if (!JS_GetReservedSlot(cx, fp->callobj, 0, &value)) return JS_FALSE;
+    } else value = JSVAL_VOID;
+    if (JSVAL_IS_PRIMITIVE(value) ||
+        OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(value)) != &arrowBindingClass)
+        goto bad;
+    *cell = JSVAL_TO_OBJECT(value);
+    if (!JS_GetReservedSlot(cx, *cell, 2, &owner) ||
+        !JS_GetReservedSlot(cx, *cell, 1, &value)) return JS_FALSE;
+    if (!VALUE_IS_FUNCTION(cx, owner)) goto bad;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(owner));
+    if (!FUN_IS_DERIVED(fun) || JSVAL_IS_PRIMITIVE(value)) goto bad;
+    *target = JSVAL_TO_OBJECT(value);
+    *constructor = OBJ_GET_PROTO(cx, JSVAL_TO_OBJECT(owner));
+    return JS_TRUE;
+ bad:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_UNINITIALIZED_THIS);
+    return JS_FALSE;
+}
+
+JSBool
+js_BindDerivedThis(JSContext *cx, JSObject *cell, JSObject *receiver)
+{
+    jsval value;
+    JSObject *call;
+    JSStackFrame *owner;
+    if (!JS_GetReservedSlot(cx, cell, 0, &value)) return JS_FALSE;
+    if (value != JSVAL_UNINITIALIZED) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INITIALIZED_THIS);
+        return JS_FALSE;
+    }
+    if (!JS_GetReservedSlot(cx, cell, 3, &value)) return JS_FALSE;
+    call = JSVAL_TO_OBJECT(value);
+    if (!JS_SetReservedSlot(cx, cell, 0, OBJECT_TO_JSVAL(receiver))) return JS_FALSE;
+    owner = (JSStackFrame *)JS_GetPrivate(cx, call);
+    if (owner) {
+        owner->argv[-1] = OBJECT_TO_JSVAL(receiver);
+        owner->thisp = receiver;
+    }
+    return JS_TRUE;
+}
 
 /* Home objects belong to function instances, not shared compiler templates.
  * Traced reserved slots keep them alive without exposing a JS property. */
@@ -2850,6 +2941,58 @@ js_GetFunctionSuperBase(JSContext *cx, JSObject *function, JSObject **base)
         *base = OBJ_GET_PROTO(cx, home);
         ok = JS_TRUE;
     }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* Prepare the two prototype links and constructor descriptor for a fresh
+ * class function. The parser supplies a strict interpreted constructor with
+ * CLASS and HOME_OBJECT kinds before it can be called or cloned. */
+JSBool
+js_InitClassConstructor(JSContext *cx, JSObject *function, jsval heritage,
+                         JSBool hasHeritage)
+{
+    jsval roots[5];
+    JSTempValueRooter root;
+    JSObject *global, *parentPrototype, *constructorParent, *prototype;
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, function);
+    JSBool ok = JS_FALSE;
+    JS_ASSERT(FUN_INTERPRETED(fun) && FUN_IS_CLASS(fun) && FUN_HAS_HOME_OBJECT(fun));
+    roots[0] = OBJECT_TO_JSVAL(function);
+    roots[1] = heritage;
+    roots[2] = roots[3] = roots[4] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 5, roots, &root);
+    global = JS_GetGlobalForObject(cx, function);
+    constructorParent = js_BuiltinPrototype(cx, global, JSProto_Function);
+    if (!constructorParent) goto out;
+    roots[2] = OBJECT_TO_JSVAL(constructorParent);
+    if (!hasHeritage) {
+        parentPrototype = js_BuiltinPrototype(cx, global, JSProto_Object);
+        if (!parentPrototype) goto out;
+        roots[3] = OBJECT_TO_JSVAL(parentPrototype);
+    } else if (JSVAL_IS_NULL(heritage)) {
+        parentPrototype = NULL;
+    } else {
+        if (!js_IsConstructor(cx, heritage)) goto bad;
+        constructorParent = JSVAL_TO_OBJECT(heritage);
+        roots[2] = heritage;
+        if (!JS_GetProperty(cx, constructorParent, "prototype", &roots[3])) goto out;
+        if (!JSVAL_IS_OBJECT(roots[3])) goto bad;
+        parentPrototype = JSVAL_TO_OBJECT(roots[3]);
+    }
+    prototype = js_NewObject(cx, &js_ObjectClass, parentPrototype, global);
+    if (!prototype) goto out;
+    roots[4] = OBJECT_TO_JSVAL(prototype);
+    ok = JS_SetPrototype(cx, prototype, parentPrototype) &&
+         JS_SetPrototype(cx, function, constructorParent) &&
+         JS_DefineProperty(cx, function, "prototype", roots[4], NULL, NULL,
+                           JSPROP_PERMANENT | JSPROP_READONLY) &&
+         JS_DefineProperty(cx, prototype, "constructor", roots[0], NULL, NULL, 0) &&
+         js_SetFunctionHomeObject(cx, function, prototype);
+    goto out;
+ bad:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+ out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
 }
@@ -3043,7 +3186,9 @@ js_CaptureArrowBindings(JSContext *cx, JSObject *function, JSStackFrame *fp)
             if (!JS_SetReservedSlot(cx, cell, 0, roots[3]) ||
                 !JS_SetReservedSlot(cx, cell, 1,
                     (fp->flags & JSFRAME_NEW_TARGET)
-                    ? OBJECT_TO_JSVAL(fp->newTarget) : JSVAL_VOID))
+                    ? OBJECT_TO_JSVAL(fp->newTarget) : JSVAL_VOID) ||
+                !JS_SetReservedSlot(cx, cell, 2, OBJECT_TO_JSVAL(fp->callee)) ||
+                !JS_SetReservedSlot(cx, cell, 3, OBJECT_TO_JSVAL(call)))
                 goto out;
             if (call) {
                 /* Allocation hooks can create another arrow from this frame. */
@@ -3122,6 +3267,7 @@ js_NewFunction(JSContext *cx, JSObject *funobj, JSNative native, uintN nargs,
     fun->u.n.extra = 0;
     fun->u.n.spare = 0;
     fun->atom = atom;
+    fun->classSource = NULL;
     fun->inferredName = NULL;
     fun->clasp = NULL;
 

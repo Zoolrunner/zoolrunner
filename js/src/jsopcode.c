@@ -3470,7 +3470,35 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     rval = POP_STR();
                     xval = POP_STR();
                     lval = POP_STR();
-                    if (i == JS_EXT_SUPER_REF)
+                    if (i == JS_EXT_SUPER_CALL_REF) {
+                        todo = SprintCString(&ss->sprinter, "super");
+                    } else if (i == JS_EXT_SUPER_CALL) {
+                        size_t argsLength = strlen(xval);
+                        if (argsLength < 2) return NULL;
+                        todo = Sprint(&ss->sprinter, "super(%.*s)", (int)(argsLength - 2), xval + 1);
+                    } else if (i == JS_EXT_CLASS_START || i == JS_EXT_CLASS_EXTENDS) {
+                        const char *args = strchr(xval, '(');
+                        size_t nameLength = strlen(rval);
+                        if (!args || nameLength < 2) return NULL;
+                        todo = Sprint(&ss->sprinter, "class %.*s%s%s { constructor%s",
+                                      (int)(nameLength - 2), rval + 1,
+                                      i == JS_EXT_CLASS_EXTENDS ? " extends " : "",
+                                      i == JS_EXT_CLASS_EXTENDS ? lval : "", args);
+                    } else if (i == JS_EXT_CLASS_END) {
+                        todo = Sprint(&ss->sprinter, "%s }", lval);
+                    } else if (i == JS_EXT_CLASS_BIND) {
+                        todo = SprintCString(&ss->sprinter, lval);
+                    } else if (i >= JS_EXT_CLASS_METHOD) {
+                        const char *args = strchr(rval, '(');
+                        JSBool isStatic = i >= JS_EXT_CLASS_METHOD + JS_EXT_CLASS_STATIC;
+                        JSBool generator = !strncmp(rval, "function*", 9);
+                        if (!args) return NULL;
+                        if (isStatic) i -= JS_EXT_CLASS_STATIC;
+                        todo = Sprint(&ss->sprinter, "%s %s%s%s[(%s)]%s", lval,
+                                      isStatic ? "static " : "", generator ? "*" : "",
+                                      i == JS_EXT_CLASS_GETTER ? "get " :
+                                      i == JS_EXT_CLASS_SETTER ? "set " : "", xval, args);
+                    } else if (i == JS_EXT_SUPER_REF)
                         todo = Sprint(&ss->sprinter, "super[%s]", xval);
                     else if (i == JS_EXT_SUPER_GET)
                         todo = SprintCString(&ss->sprinter, lval);
@@ -4123,6 +4151,18 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                                             &val)) {
                         return NULL;
                     }
+                } else if (FUN_IS_CLASS((JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(atom)))) {
+                    /* Class assembly below needs the constructor body; the
+                     * public function decompiler returns the complete class. */
+                    fun = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(atom));
+                    jp2 = js_NewPrinter(cx, JS_GetFunctionName(fun),
+                                        JS_IN_GROUP_CONTEXT, JS_FALSE);
+                    if (!jp2) return NULL;
+                    ok = js_DecompileFunction(jp2, fun);
+                    str = ok ? js_GetPrinterOutput(jp2) : NULL;
+                    js_DestroyPrinter(jp2);
+                    if (!str) return NULL;
+                    val = STRING_TO_JSVAL(str);
                 } else {
                     if (!js_fun_toString(cx, ATOM_TO_OBJECT(atom),
                                          JS_IN_GROUP_CONTEXT |

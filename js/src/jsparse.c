@@ -500,6 +500,9 @@ js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
     if ((flags & JSFRAME_EVAL_COMPILER) && cx->fp->callee &&
         FUN_HAS_HOME_OBJECT((JSFunction *)JS_GetPrivate(cx, cx->fp->callee)))
         ts->flags |= TSF_SUPER_ALLOWED;
+    if ((flags & JSFRAME_EVAL_COMPILER) && cx->fp->callee &&
+        FUN_HAS_SUPER_CALL((JSFunction *)JS_GetPrivate(cx, cx->fp->callee)))
+        ts->flags |= TSF_SUPER_CALL_ALLOWED;
     cx->fp->flags = flags |
                     (JS_HAS_COMPILE_N_GO_OPTION(cx)
                      ? JSFRAME_COMPILING | JSFRAME_COMPILE_N_GO
@@ -1349,7 +1352,10 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     JSBool generator;
     uintN outerGenerator = ts->flags & TSF_GENERATOR;
     uintN outerSuper = ts->flags & TSF_SUPER_ALLOWED;
+    uintN outerSuperCall = ts->flags & TSF_SUPER_CALL_ALLOWED;
     JSBool method = JS_VERSION_IS_ES2015(cx) && (CURRENT_TOKEN(ts).flags & TOKF_METHOD);
+    ts->flags = (ts->flags & ~TSF_SUPER_CALL_ALLOWED) |
+                ((CURRENT_TOKEN(ts).flags & TOKF_DERIVED_CONSTRUCTOR) ? TSF_SUPER_CALL_ALLOWED : 0);
     ts->flags = (ts->flags & ~TSF_SUPER_ALLOWED) | (method ? TSF_SUPER_ALLOWED : 0);
     generator = JS_VERSION_IS_ES2015(cx) &&
                 (CURRENT_TOKEN(ts).flags & TOKF_GENERATOR_METHOD);
@@ -1758,7 +1764,8 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_tryCount = funtc.tryCount;
     pn->pn_restSlot = funtc.restSlot;
     TREE_CONTEXT_FINISH(&funtc);
-    ts->flags = (ts->flags & ~(TSF_GENERATOR | TSF_SUPER_ALLOWED)) | outerGenerator | outerSuper;
+    ts->flags = (ts->flags & ~(TSF_GENERATOR | TSF_SUPER_ALLOWED | TSF_SUPER_CALL_ALLOWED)) |
+                outerGenerator | outerSuper | outerSuperCall;
     return result;
 }
 
@@ -1807,7 +1814,8 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                          cx->fp->varobj, NULL);
     if (!fun)
         return NULL;
-    fun->kind = JSFUN_KIND_ARROW | ((ts->flags & TSF_SUPER_ALLOWED) ? JSFUN_KIND_HOME_OBJECT : 0);
+    fun->kind = JSFUN_KIND_ARROW | ((ts->flags & TSF_SUPER_ALLOWED) ? JSFUN_KIND_HOME_OBJECT : 0) |
+                ((ts->flags & TSF_SUPER_CALL_ALLOWED) ? JSFUN_KIND_SUPER_CALL : 0);
     atom = js_AtomizeObject(cx, fun->object, 0);
     if (!atom)
         return NULL;
@@ -1888,6 +1896,13 @@ InferFunctionName(JSContext *cx, JSParseNode *pn, JSAtom *name, JSOp prefix)
         return JS_TRUE;
     while (pn && pn->pn_type == TOK_RP)
         pn = pn->pn_kid;
+    if (pn && pn->pn_type == TOK_CLASS &&
+        !JSSTRING_LENGTH(ATOM_TO_STRING(pn->pn_kid1->pn_atom))) {
+        JSFunction *constructor = (JSFunction *)JS_GetPrivate(cx,
+                                  ATOM_TO_OBJECT(pn->pn_kid3->pn_head->pn_funAtom));
+        constructor->inferredName = name;
+        return JS_TRUE;
+    }
     if (!pn || pn->pn_type != TOK_FUNCTION || pn->pn_op != JSOP_ANONFUNOBJ)
         return JS_TRUE;
     fun = (JSFunction *) JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
@@ -3138,6 +3153,9 @@ IsLexicalLet(JSContext *cx, JSTokenStream *ts)
 }
 
 static JSParseNode *
+ClassDefinition(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSAtom *declName, size_t sourceBegin);
+
+static JSParseNode *
 Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
           JSBool allowLexical)
 {
@@ -3145,6 +3163,7 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     JSParseNode *pn, *pn1, *pn2, *pn3, *pn4;
     JSStmtInfo stmtInfo, *stmt, *stmt2;
     JSAtom *label;
+    JSBool classDeclaration = JS_FALSE;
 
     CHECK_RECURSION();
 
@@ -4070,6 +4089,11 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         break;
 
 #if JS_HAS_BLOCK_SCOPE
+      case TOK_CLASS:
+        if (!allowLexical) { LexicalSyntaxError(cx, ts); return NULL; }
+        classDeclaration = JS_TRUE;
+        /* Class declarations use the enclosing lexical declaration record. */
+        /* FALL THROUGH */
       case TOK_LET:
       lexical_declaration:
       {
@@ -4348,6 +4372,8 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         break;
     }
 
+    if (classDeclaration) return pn;
+
     /* Check termination of this primitive statement. */
     if (ON_CURRENT_LINE(ts, pn->pn_pos)) {
         ts->flags |= TSF_OPERAND;
@@ -4370,12 +4396,13 @@ static JSParseNode *
 Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
 {
     JSTokenType tt;
-    JSBool let;
+    JSBool let, classDeclaration;
     JSStmtInfo *scopeStmt;
     BindData data;
     JSParseNode *pn, *pn2;
     JSStackFrame *fp;
     JSAtom *atom;
+    size_t sourceBegin = CURRENT_TOKEN(ts).sourceBegin;
 
     /*
      * The three options here are:
@@ -4384,7 +4411,8 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
      * - Otherwise, we're parsing var declarations.
      */
     tt = CURRENT_TOKEN(ts).type;
-    let = (tt == TOK_LET || tt == TOK_LP);
+    classDeclaration = tt == TOK_CLASS;
+    let = (tt == TOK_LET || tt == TOK_LP || classDeclaration);
     JS_ASSERT(let || tt == TOK_VAR);
 
     /* Make sure that Statement set the tree context up correctly. */
@@ -4412,6 +4440,7 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     pn->pn_op = let ? JSOP_NOP
                    : data.op == JSOP_NOP ? JSOP_DEFVAR : data.op;
     PN_INIT_LIST(pn);
+    if (classDeclaration) pn->pn_type = TOK_LET;
     if (let && data.op == JSOP_DEFCONST)
         pn->pn_extra |= PNX_CONST;
 
@@ -4455,7 +4484,7 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     do {
         tt = js_GetToken(cx, ts);
 #if JS_HAS_DESTRUCTURING
-        if (tt == TOK_LB || tt == TOK_LC) {
+        if (!classDeclaration && (tt == TOK_LB || tt == TOK_LC)) {
             pn2 = PrimaryExpr(cx, ts, tc, tt, JS_FALSE);
             if (!pn2)
                 return NULL;
@@ -4504,6 +4533,14 @@ Variables(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn2->pn_slot = -1;
         pn2->pn_attrs = let ? (!scopeStmt ? PN_GLOBAL_LEXICAL : 0) : data.u.var.attrs;
         PN_APPEND(pn, pn2);
+
+        if (classDeclaration) {
+            pn2->pn_expr = ClassDefinition(cx, ts, tc, atom, sourceBegin);
+            if (!pn2->pn_expr) return NULL;
+            pn2->pn_op = JSOP_SETNAME;
+            pn2->pn_pos.end = pn2->pn_expr->pn_pos.end;
+            break;
+        }
 
         if (js_MatchToken(cx, ts, TOK_ASSIGN)) {
             if (CURRENT_TOKEN(ts).t_op != JSOP_NOP)
@@ -5215,6 +5252,10 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         pn2 = MemberExpr(cx, ts, tc, JS_FALSE);
         if (!pn2)
             return NULL;
+        if (pn2->pn_type == TOK_SUPER) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
         pn->pn_op = JSOP_NEW;
         PN_INIT_LIST_1(pn, pn2);
         pn->pn_pos.begin = pn2->pn_pos.begin;
@@ -5380,6 +5421,7 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             }
 
             PN_INIT_LIST_1(pn2, pn);
+            if (pn->pn_type == TOK_SUPER) pn2->pn_type = TOK_SUPER_CALL;
             pn2->pn_pos.begin = pn->pn_pos.begin;
 
             if (!ArgumentList(cx, ts, tc, pn2))
@@ -6122,6 +6164,229 @@ TemplateLiteral(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
     return pn;
 }
 
+static JSTokenType
+ClassKeyToken(JSContext *cx, JSTokenStream *ts)
+{
+    JSTokenType tt;
+    ts->flags |= TSF_KEYWORD_IS_NAME;
+    tt = js_GetToken(cx, ts);
+    ts->flags &= ~TSF_KEYWORD_IS_NAME;
+    return tt;
+}
+
+static JSBool
+ClassKeyEquals(JSParseNode *key, const char *name)
+{
+    return key->pn_type == TOK_STRING &&
+           !strcmp(JS_GetStringBytes(ATOM_TO_STRING(key->pn_atom)), name);
+}
+
+/* A class expression has a private immutable name scope. Its body retains
+ * method keys in source order; the constructor is emitted before those keys. */
+static JSParseNode *
+ClassDefinition(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSAtom *declName, size_t sourceBegin)
+{
+    JSParseNode *pn, *scope = NULL, *nameNode, *heritage = NULL, *methods;
+    JSParseNode *constructor = NULL, *key, *method, *entry, *body;
+    JSFunction *fun;
+    JSAtom *name = cx->runtime->atomState.emptyAtom;
+    JSStmtInfo stmt;
+    BindData binding;
+    JSTokenType tt;
+    uintN oldStrict = tc->flags & TCF_STRICT_MODE;
+    uintN oldScanStrict = ts->flags & TSF_STRICT_MODE;
+    JSBool isStatic, generator, computed, isConstructor;
+    JSOp accessor;
+    pn = NewParseNode(cx, ts, PN_TERNARY, tc);
+    if (!pn) return NULL;
+    pn->pn_type = TOK_CLASS;
+    tc->flags |= TCF_STRICT_MODE;
+    ts->flags |= TSF_STRICT_MODE;
+    tt = declName ? TOK_NAME : js_GetToken(cx, ts);
+    if (tt == TOK_NAME) {
+        name = declName ? declName : CURRENT_TOKEN(ts).t_atom;
+        if (RestrictedBinding(cx, name)) goto bad;
+        scope = PushLexicalScope(cx, ts, tc, &stmt);
+        if (!scope) return NULL;
+        scope->pn_op = JSOP_LEAVEBLOCKEXPR;
+        memset(&binding, 0, sizeof binding);
+        binding.ts = ts;
+        binding.obj = tc->blockChain;
+        binding.op = JSOP_DEFCONST;
+        binding.lexicalDeclaration = JS_TRUE;
+        binding.u.let.overflow = JSMSG_TOO_MANY_FUN_VARS;
+        if (!BindLet(cx, &binding, name, tc)) return NULL;
+        tt = js_GetToken(cx, ts);
+    }
+    nameNode = NewParseNode(cx, ts, PN_NULLARY, tc);
+    if (!nameNode) return NULL;
+    nameNode->pn_type = TOK_STRING;
+    nameNode->pn_op = JSOP_STRING;
+    nameNode->pn_atom = name;
+    if (tt == TOK_EXTENDS) {
+        heritage = MemberExpr(cx, ts, tc, JS_TRUE);
+        if (!heritage) return NULL;
+        tt = js_GetToken(cx, ts);
+    }
+    if (tt != TOK_LC) goto bad;
+    methods = NewParseNode(cx, ts, PN_LIST, tc);
+    if (!methods) return NULL;
+    methods->pn_type = TOK_RC;
+    PN_INIT_LIST(methods);
+    for (;;) {
+        tt = ClassKeyToken(cx, ts);
+        if (tt == TOK_RC) break;
+        if (tt == TOK_SEMI) continue;
+        isStatic = generator = computed = JS_FALSE;
+        accessor = JSOP_NOP;
+        if (tt == TOK_NAME &&
+            !strcmp(JS_GetStringBytes(ATOM_TO_STRING(CURRENT_TOKEN(ts).t_atom)), "static")) {
+            tt = ClassKeyToken(cx, ts);
+            if (tt == TOK_LP) { js_UngetToken(ts); tt = TOK_NAME; }
+            else isStatic = JS_TRUE;
+        }
+        if (tt == TOK_STAR) {
+            generator = JS_TRUE;
+            tt = ClassKeyToken(cx, ts);
+        }
+        if (!generator && tt == TOK_NAME &&
+            (CURRENT_TOKEN(ts).t_atom == cx->runtime->atomState.getAtom ||
+             CURRENT_TOKEN(ts).t_atom == cx->runtime->atomState.setAtom)) {
+            JSAtom *a = CURRENT_TOKEN(ts).t_atom;
+            tt = ClassKeyToken(cx, ts);
+            if (tt == TOK_LP) { js_UngetToken(ts); tt = TOK_NAME; }
+            else accessor = a == cx->runtime->atomState.getAtom ? JSOP_GETTER : JSOP_SETTER;
+        }
+        if (tt == TOK_LB) {
+            computed = JS_TRUE;
+            key = AssignExpr(cx, ts, tc);
+            if (!key) return NULL;
+            MUST_MATCH_TOKEN(TOK_RB, JSMSG_BRACKET_AFTER_LIST);
+        } else if (tt == TOK_NAME || tt == TOK_STRING || tt == TOK_NUMBER) {
+            key = NewParseNode(cx, ts, PN_NULLARY, tc);
+            if (!key) return NULL;
+            if (tt == TOK_NUMBER) {
+                key->pn_type = TOK_NUMBER;
+                key->pn_dval = CURRENT_TOKEN(ts).t_dval;
+            } else {
+                key->pn_type = TOK_STRING;
+                key->pn_op = JSOP_STRING;
+                key->pn_atom = CURRENT_TOKEN(ts).t_atom;
+            }
+        } else goto bad;
+        isConstructor = !isStatic && !computed && ClassKeyEquals(key, "constructor");
+        if ((!computed && isStatic && ClassKeyEquals(key, "prototype")) ||
+            (isConstructor && (constructor || generator || accessor != JSOP_NOP)))
+            goto bad;
+        CURRENT_TOKEN(ts).type = TOK_FUNCTION;
+        CURRENT_TOKEN(ts).t_op = JSOP_NOP;
+        CURRENT_TOKEN(ts).flags = TOKF_METHOD | (generator ? TOKF_GENERATOR_METHOD : 0);
+        if (isConstructor && heritage) CURRENT_TOKEN(ts).flags |= TOKF_DERIVED_CONSTRUCTOR;
+        method = FunctionExpr(cx, ts, tc);
+        if (!method) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(method->pn_funAtom));
+        fun->kind |= JSFUN_KIND_HOME_OBJECT;
+        if (accessor != JSOP_NOP &&
+            (FUN_HAS_REST(fun) || fun->nargs != (accessor == JSOP_GETTER ? 0 : 1)))
+            goto bad;
+        if (isConstructor) {
+            fun->kind |= JSFUN_KIND_CLASS;
+            fun->inferredName = name == cx->runtime->atomState.emptyAtom ? NULL : name;
+            if (heritage) {
+                fun->kind |= JSFUN_KIND_DERIVED;
+                fun->flags |= JSFUN_HEAVYWEIGHT;
+                method->pn_flags |= TCF_FUN_HEAVYWEIGHT;
+            }
+            constructor = method;
+        } else {
+            if (!generator) fun->flags |= JSFUN_NO_CONSTRUCT;
+            entry = NewBinary(cx, TOK_COLON, accessor, key, method, tc);
+            if (!entry) return NULL;
+            entry->pn_val = BOOLEAN_TO_JSVAL(isStatic);
+            PN_APPEND(methods, entry);
+        }
+    }
+    if (!constructor) {
+        constructor = NewParseNode(cx, ts, PN_FUNC, tc);
+        body = NewParseNode(cx, ts, PN_LIST, tc);
+        if (!constructor || !body) return NULL;
+        body->pn_type = TOK_LC;
+        PN_INIT_LIST(body);
+        fun = js_NewFunction(cx, NULL, NULL, 0,
+                             JSFUN_LAMBDA | JSFUN_INTERPRETED | JSFUN_STRICT,
+                             cx->fp->varobj, NULL);
+        if (!fun) return NULL;
+        fun->flags |= JSFUN_INTERPRETED;
+        fun->kind = JSFUN_KIND_CLASS | JSFUN_KIND_HOME_OBJECT;
+        fun->inferredName = name == cx->runtime->atomState.emptyAtom ? NULL : name;
+        if (heritage) { fun->kind |= JSFUN_KIND_DERIVED; fun->flags |= JSFUN_HEAVYWEIGHT; }
+        constructor->pn_funAtom = js_AtomizeObject(cx, fun->object, 0);
+        if (!constructor->pn_funAtom) return NULL;
+        constructor->pn_type = TOK_FUNCTION;
+        constructor->pn_op = JSOP_ANONFUNOBJ;
+        constructor->pn_body = body;
+        constructor->pn_flags = TCF_STRICT_MODE | (heritage ? TCF_FUN_HEAVYWEIGHT : 0);
+        constructor->pn_tryCount = 0;
+        if (heritage) {
+            JSTreeContext resttc;
+            JSAtom *args = js_Atomize(cx, "args", 4, 0);
+            JSParseNode *call, *callee, *spread, *argument, *statement;
+            TREE_CONTEXT_INIT(&resttc);
+            if (!args || !js_BindRestParameter(cx, ts, fun, args, &resttc)) return NULL;
+            constructor->pn_restSlot = resttc.restSlot;
+            TREE_CONTEXT_FINISH(&resttc);
+            call = NewParseNode(cx, ts, PN_LIST, tc);
+            callee = NewParseNode(cx, ts, PN_NULLARY, tc);
+            spread = NewParseNode(cx, ts, PN_UNARY, tc);
+            argument = NewParseNode(cx, ts, PN_NAME, tc);
+            statement = NewParseNode(cx, ts, PN_UNARY, tc);
+            if (!call || !callee || !spread || !argument || !statement) return NULL;
+            call->pn_type = TOK_SUPER_CALL;
+            callee->pn_type = TOK_SUPER;
+            PN_INIT_LIST_1(call, callee);
+            call->pn_extra = PNX_COVERREST;
+            spread->pn_type = TOK_ELLIPSIS;
+            argument->pn_type = TOK_NAME;
+            argument->pn_op = JSOP_GETVAR;
+            argument->pn_atom = args;
+            argument->pn_slot = constructor->pn_restSlot;
+            argument->pn_attrs = 0;
+            argument->pn_expr = NULL;
+            spread->pn_kid = argument;
+            PN_APPEND(call, spread);
+            statement->pn_type = TOK_RETURN;
+            statement->pn_op = JSOP_RETURN;
+            statement->pn_kid = call;
+            PN_APPEND(body, statement);
+        }
+    }
+    fun = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(constructor->pn_funAtom));
+    JS_ASSERT(ts->retainSource && CURRENT_TOKEN(ts).sourceEnd >= sourceBegin);
+    fun->classSource = js_AtomizeChars(cx, ts->sourcebuf.base + sourceBegin,
+                                      CURRENT_TOKEN(ts).sourceEnd - sourceBegin, 0);
+    if (!fun->classSource) return NULL;
+    constructor->pn_next = methods->pn_head;
+    methods->pn_head = constructor;
+    if (!methods->pn_count) methods->pn_tail = &constructor->pn_next;
+    ++methods->pn_count;
+    pn->pn_kid1 = nameNode;
+    pn->pn_kid2 = heritage;
+    pn->pn_kid3 = methods;
+    pn->pn_pos.end = CURRENT_TOKEN(ts).pos.end;
+    if (scope) {
+        scope->pn_expr = pn;
+        scope->pn_pos = pn->pn_pos;
+        js_PopStatement(tc);
+        pn = scope;
+    }
+    tc->flags = (tc->flags & ~TCF_STRICT_MODE) | oldStrict;
+    ts->flags = (ts->flags & ~TSF_STRICT_MODE) | oldScanStrict;
+    return pn;
+ bad:
+    LexicalSyntaxError(cx, ts);
+    return NULL;
+}
+
 static JSParseNode *
 PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             JSTokenType tt, JSBool afterDot)
@@ -6154,9 +6419,12 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif
 
     switch (tt) {
+      case TOK_CLASS:
+        return ClassDefinition(cx, ts, tc, NULL, CURRENT_TOKEN(ts).sourceBegin);
       case TOK_SUPER:
         if (!(ts->flags & TSF_SUPER_ALLOWED) ||
-            (js_PeekToken(cx, ts) != TOK_DOT && js_PeekToken(cx, ts) != TOK_LB)) {
+            (js_PeekToken(cx, ts) != TOK_DOT && js_PeekToken(cx, ts) != TOK_LB &&
+             !((ts->flags & TSF_SUPER_CALL_ALLOWED) && js_PeekToken(cx, ts) == TOK_LP))) {
             LexicalSyntaxError(cx, ts);
             return NULL;
         }

@@ -551,4 +551,4 @@ OPDEF(JSOP_CALLSPREAD,254,"callspread",NULL,3,3,1,18,JOF_UINT16)
 
 /* Extensible atom-directed operation. String atoms initialize lexical bindings;
  * operands are environment, reference marker and initial value. */
-OPDEF(JSOP_EXTENDED,255,"extended",NULL,3,3,1,3,JOF_CONST|JOF_SET)
+OPDEF(JSOP_EXTENDED,255,"extended",NULL,3,3,1,3,JOF_CONST)

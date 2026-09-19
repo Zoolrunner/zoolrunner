@@ -4332,6 +4332,8 @@ JS_DecompileFunction(JSContext *cx, JSFunction *fun, uintN indent)
     JSString *str;
 
     CHECK_REQUEST(cx);
+    if (FUN_IS_CLASS(fun) && fun->classSource)
+        return ATOM_TO_STRING(fun->classSource);
     jp = js_NewPrinter(cx, JS_GetFunctionName(fun),
                        indent & ~JS_DONT_PRETTY_PRINT,
                        !(indent & JS_DONT_PRETTY_PRINT));

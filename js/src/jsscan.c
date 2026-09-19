@@ -227,6 +227,9 @@ js_NewBufferTokenStream(JSContext *cx, const jschar *base, size_t length)
     ts->userbuf.base = (jschar *)base;
     ts->userbuf.limit = (jschar *)base + length;
     ts->userbuf.ptr = (jschar *)base;
+    ts->retainSource = JS_VERSION_IS_ES2015(cx);
+    ts->sourcebuf.grow = GrowTokenBuf;
+    ts->sourcebuf.data = cx;
     ts->tokenbuf.grow = GrowTokenBuf;
     ts->tokenbuf.data = cx;
     ts->listener = cx->runtime->sourceHandler;
@@ -303,7 +306,7 @@ js_fgets(char *buf, int size, FILE *file)
 }
 
 static int32
-GetChar(JSTokenStream *ts)
+GetCharUnrecorded(JSTokenStream *ts)
 {
     int32 c;
     ptrdiff_t i, j, len, olen;
@@ -422,7 +425,7 @@ GetChar(JSTokenStream *ts)
                                  * case, so we'll fall into buffer-filling
                                  * code.
                                  */
-                                return GetChar(ts);
+                                return GetCharUnrecorded(ts);
                             }
                         } else {
                             ts->linebuf.base[len-1] = '\n';
@@ -465,11 +468,41 @@ GetChar(JSTokenStream *ts)
     return c;
 }
 
+static void FastAppendChar(JSStringBuffer *sb, jschar c);
+
+/* Record each logical character once, including file-backed compilations.
+ * The cursor follows character lookahead independently of token lookahead. */
+static int32
+GetChar(JSTokenStream *ts)
+{
+    int32 c = GetCharUnrecorded(ts);
+    if (c != EOF && ts->retainSource) {
+        size_t length;
+        if (!STRING_BUFFER_OK(&ts->sourcebuf)) return EOF;
+        length = ts->sourcebuf.base
+                 ? (size_t)(ts->sourcebuf.ptr - ts->sourcebuf.base) : 0;
+        if (ts->sourceCursor == length) {
+            jschar sourceChar = (jschar)c;
+            if (c == '\n' && (ts->lineTerminator == LINE_SEPARATOR ||
+                               ts->lineTerminator == PARA_SEPARATOR))
+                sourceChar = ts->lineTerminator;
+            FastAppendChar(&ts->sourcebuf, sourceChar);
+            if (!STRING_BUFFER_OK(&ts->sourcebuf)) {
+                ts->flags |= TSF_ERROR;
+                return EOF;
+            }
+        }
+        ++ts->sourceCursor;
+    }
+    return c;
+}
+
 static void
 UngetChar(JSTokenStream *ts, int32 c)
 {
     if (c == EOF)
         return;
+    if (ts->retainSource && ts->sourceCursor) --ts->sourceCursor;
     JS_ASSERT(ts->ungetpos < sizeof ts->ungetbuf / sizeof ts->ungetbuf[0]);
     if (c == '\n')
         ts->lineno--;
@@ -1125,6 +1158,8 @@ NewToken(JSTokenStream *ts, ptrdiff_t adjust)
     ts->cursor = (ts->cursor + 1) & NTOKENS_MASK;
     tp = &CURRENT_TOKEN(ts);
     tp->flags = 0;
+    tp->sourceBegin = ts->sourceCursor + adjust;
+    tp->sourceEnd = ts->sourceCursor;
     tp->ptr = ts->linebuf.ptr + adjust;
     tp->pos.begin.index = ts->linepos +
                           PTRDIFF(tp->ptr, ts->linebuf.base, jschar) -
@@ -1555,6 +1590,12 @@ retry:
             TOKENBUF_OK() &&
             (kw = FindKeyword(TOKENBUF_BASE(), TOKENBUF_LENGTH()))) {
             if (kw->tokentype == TOK_RESERVED) {
+                if (JS_VERSION_IS_ES2015(cx) && !hadUnicodeEscape &&
+                    (!strcmp(kw->chars, "class") || !strcmp(kw->chars, "extends"))) {
+                    tt = !strcmp(kw->chars, "class") ? TOK_CLASS : TOK_EXTENDS;
+                    tp->t_op = JSOP_NOP;
+                    goto out;
+                }
                 if (JS_VERSION_IS_ES2015(cx) && !hadUnicodeEscape &&
                     !strcmp(kw->chars, "super")) {
                     tt = TOK_SUPER;
@@ -2418,6 +2459,7 @@ eol_out:
     tp->pos.end.index = ts->linepos +
                         PTRDIFF(ts->linebuf.ptr, ts->linebuf.base, jschar) -
                         ts->ungetpos;
+    tp->sourceEnd = ts->sourceCursor;
     tp->type = tt;
     return tt;
 
