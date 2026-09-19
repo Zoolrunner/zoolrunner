@@ -656,6 +656,19 @@ out:
     return ok;
 }
 
+static JSBool
+ConvertArrayLengthValue(JSContext *cx, ES5Descriptor *d, jsuint *length)
+{
+    jsdouble number;
+    if (!JS_ValueToECMAUint32(cx, d->v[D_VALUE], length) ||
+        !JS_ValueToNumber(cx, d->v[D_VALUE], &number)) return JS_FALSE;
+    if (number != (jsdouble)*length) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH);
+        return JS_FALSE;
+    }
+    return JS_NewNumberValue(cx, *length, &d->v[D_VALUE]);
+}
+
 /* Descriptor conversion is finished before this function mutates the target. */
 static JSBool
 DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
@@ -671,9 +684,8 @@ DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
     uintN attrs = 0, flags = JSDNP_REPLACE, checkedAttrs, i;
     intN shortid = 0;
     JSBool exists, access, oldAccess, ok = JS_FALSE, arrayLength = JS_FALSE;
-    JSBool blocked = JS_FALSE;
+    JSBool blocked = JS_FALSE, lengthConverted = JS_FALSE;
     jsuint oldLength = 0, newLength = 0, index;
-    jsdouble number;
     jsid lengthId = ATOM_TO_JSID(cx->runtime->atomState.lengthAtom);
 
     if (accepted) *accepted = JS_TRUE;
@@ -719,6 +731,14 @@ DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
         }
         target = js_TypedArrayExpando(cx, target);
     }
+    /* ES2015 reads the current length descriptor after both coercions.
+     * A valueOf callback may have made the length non-writable. Keep the
+     * earlier-edition ordering for explicitly selected legacy code. */
+    if (JS_VERSION_IS_ES2015(cx) && OBJ_GET_CLASS(cx, target) == &js_ArrayClass &&
+        id == lengthId && (d->present & D_BIT(D_VALUE))) {
+        if (!ConvertArrayLengthValue(cx, d, &newLength)) goto out;
+        lengthConverted = JS_TRUE;
+    }
     callargs[0] = OBJECT_TO_JSVAL(target);
     callargs[1] = ID_TO_VALUE(id);
     JS_PUSH_TEMP_ROOT(cx, 2, callargs, &callRoot);
@@ -739,13 +759,8 @@ DefineOwnInternal(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d,
     if (OBJ_GET_CLASS(cx, target) == &js_ArrayClass) {
         arrayLength = (id == lengthId);
         if (arrayLength && (d->present & D_BIT(D_VALUE))) {
-            if (!JS_ValueToECMAUint32(cx, d->v[D_VALUE], &newLength) ||
-                !JS_ValueToNumber(cx, d->v[D_VALUE], &number)) goto out;
-            if (number != (jsdouble)newLength) {
-                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH);
+            if (!lengthConverted && !ConvertArrayLengthValue(cx, d, &newLength))
                 goto out;
-            }
-            if (!JS_NewNumberValue(cx, newLength, &d->v[D_VALUE])) goto out;
             if (!js_GetLengthProperty(cx, target, &oldLength)) goto out;
         } else if (js_IdIsIndex(ID_TO_VALUE(id), &index)) {
             if (!js_GetLengthProperty(cx, target, &oldLength) ||

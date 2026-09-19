@@ -3310,3 +3310,41 @@ C89 checks pass for the engine, JSD changes and native fixture. Three later
 generator shorthand diagnostic modes also pass. This batch has not been
 revalidated on Windows or Linux. The reviewed later ES2015 inventory is still unfinished;
 this is not a full ES2015 completion claim.
+
+
+## Property queries and reentrant array-length conversion
+
+Modern `hasOwnProperty` and `propertyIsEnumerable` convert their property key
+before boxing or rejecting the receiver. The converted key stays rooted across
+boxing; existing embedding objects retain their identity. Explicit legacy
+globals keep their existing built-ins.
+
+ES2015 array-length definition now reads the current descriptor after both
+numeric conversions, so a conversion callback that makes `length` non-writable
+cannot be overwritten using stale attributes. Direct length assignment checks
+that changed state before shrinking the array. Strict assignments throw;
+non-strict assignments leave its elements intact; Reflect operations report
+rejection. Earlier-edition descriptor ordering remains unchanged.
+
+Modern assignment expressions preserve their original right-hand-side value
+when a native setter normalizes its storage value. This covers named, computed,
+unqualified and global assignments. The native JSAPI still receives the
+normalized value, and explicitly selected legacy scripts retain that historical
+result convention. This changes no opcode or cache format.
+
+The isolated candidate passes **28,582/28,582 pinned ES6** and **11,540/11,540
+ES5**, 99 prior focused fixtures, 22 new shell checks and 18 native checks.
+The native checks exercise collection, compound assignments, prefix/postfix
+updates, JSAPI writes and explicit legacy execution. Six relevant later
+upstream diagnostic modes pass unchanged. Reports:
+`artifacts/es6/property-coercion-fixed-*`, `property-coercion-later-*`, and
+`native-setter-result-stage.log`. The final integrated runtime also passes both
+complete pinned suites with the same counts and zero failures. All four macOS
+arm64 applications pass root build, packaging and relocated desktop checks,
+including Calendar's four views, Browser navigation/layout and Suite/XULRunner
+ChatZilla. C89 checks pass. Final reports are
+`artifacts/es6/property-coercion-final-*`; all four application engine libraries
+match the frozen conformance runtime's SHA-256:
+`97f9d03208bca7f43113e05d65694e57c31d129ea66e4d52c9d4c683a7e66d87`.
+Property-order replacement is being tested separately. The complete later
+ES2015 inventory and validation on other operating systems remain unfinished.

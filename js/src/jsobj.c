@@ -2040,6 +2040,45 @@ obj_propertyIsEnumerable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     return ok;
 }
 
+/* Convert the property key before boxing this, as required by ES2015.
+ * Keep existing embedding objects intact and root the key across boxing. */
+static JSBool
+ObjectOwnQueryES2015(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
+                     JSBool enumerable)
+{
+    jsval values[2] = {argc ? argv[0] : JSVAL_VOID, argv[-1]};
+    JSTempValueRooter root;
+    jsid id;
+    JSObject *obj;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    if (!js_ValueToPropertyId(cx, values[0], &id)) goto out;
+    values[0] = ID_TO_VALUE(id);
+    obj = JSVAL_IS_PRIMITIVE(values[1])
+          ? js_ValueToNonNullObject(cx, values[1]) : JSVAL_TO_OBJECT(values[1]);
+    if (!obj) goto out;
+    values[1] = OBJECT_TO_JSVAL(obj);
+    ok = enumerable ? obj_propertyIsEnumerable(cx, obj, 1, values, rval)
+                    : obj_hasOwnProperty(cx, obj, 1, values, rval);
+out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ObjectHasOwnPropertyES2015(JSContext *cx, JSObject *obj, uintN argc,
+                          jsval *argv, jsval *rval)
+{
+    return ObjectOwnQueryES2015(cx, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+ObjectPropertyIsEnumerableES2015(JSContext *cx, JSObject *obj, uintN argc,
+                                jsval *argv, jsval *rval)
+{
+    return ObjectOwnQueryES2015(cx, argc, argv, rval, JS_TRUE);
+}
+
 #if JS_HAS_GETTER_SETTER
 static JSBool
 obj_defineGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
@@ -2771,6 +2810,14 @@ js_InitObjectClass(JSContext *cx, JSObject *obj)
     fun = (JSFunction *) JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
     fun->flags &= ~JSFUN_REQUIRE_THIS;
     if (modern) {
+        if (!JS_GetProperty(cx, proto, js_hasOwnProperty_str, &method)) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
+        fun->u.n.native = ObjectHasOwnPropertyES2015;
+        fun->flags = (fun->flags | JSFUN_STRICT) & ~JSFUN_REQUIRE_THIS;
+        if (!JS_GetProperty(cx, proto, js_propertyIsEnumerable_str, &method)) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
+        fun->u.n.native = ObjectPropertyIsEnumerableES2015;
+        fun->flags = (fun->flags | JSFUN_STRICT) & ~JSFUN_REQUIRE_THIS;
         if (!JS_GetProperty(cx, proto, js_isPrototypeOf_str, &method)) return NULL;
         fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(method));
         fun->u.n.native = ObjectIsPrototypeOfES2015;

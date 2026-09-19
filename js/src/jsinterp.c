@@ -4308,6 +4308,10 @@ interrupt:
             CACHED_SET(OBJ_SET_PROPERTY(cx, obj, id, &rval));
             if (!ok)
                 goto out;
+            /* Native setters may normalize their storage value. The modern
+             * assignment expression still produces its original RHS. */
+            if ((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)
+                rval = FETCH_OPND(-1);
             sp -= 2;
             STORE_OPND(-1, rval);
             obj = NULL;
@@ -4335,6 +4339,10 @@ interrupt:
             CACHED_SET(OBJ_SET_PROPERTY(cx, obj, id, &rval));
             if (!ok)
                 goto out;
+            /* Native setters may normalize their storage value. The modern
+             * assignment expression still produces its original RHS. */
+            if ((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)
+                rval = FETCH_OPND(-1);
             sp--;
             STORE_OPND(-1, rval);
             obj = NULL;
@@ -5121,6 +5129,10 @@ interrupt:
                 else
                     CACHED_SET(OBJ_SET_PROPERTY(cx, obj, id, &rval));
             });
+            /* Native setters may normalize their storage value. The modern
+             * assignment expression still produces its original RHS. */
+            if ((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)
+                rval = FETCH_OPND(-1);
             sp--;
             STORE_OPND(-1, rval);
             obj = NULL;
@@ -5156,6 +5168,10 @@ interrupt:
                 else
                     CACHED_SET(OBJ_SET_PROPERTY(cx, obj, id, &rval));
             });
+            /* Native setters may normalize their storage value. The modern
+             * assignment expression still produces its original RHS. */
+            if ((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)
+                rval = FETCH_OPND(-1);
             sp -= 2;
             STORE_OPND(-1, rval);
             obj = NULL;
@@ -6307,6 +6323,8 @@ interrupt:
                 CACHED_SET(OBJ_SET_PROPERTY(cx, obj, id, &rval));
                 if (!ok)
                     goto out;
+                if ((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)
+                    rval = FETCH_OPND(-1);
                 STORE_OPND(-1, rval);
             } else {
                 slot = JSVAL_TO_INT(lval);

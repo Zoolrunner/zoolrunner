@@ -920,3 +920,13 @@ idle-debugger hook handling and strict-function stack visibility. Final macOS ar
 views, Browser navigation/layout and Suite/XULRunner ChatZilla. Focused coverage
 adds 101 shell checks and 20 native checks; C89 checks pass. Other operating
 systems have not been revalidated for this batch. See [tail-call validation](js/tests/es6/README.md#tail-call-execution-and-generator-shorthand).
+
+
+The property-conversion follow-up fixes key/receiver conversion ordering and
+array-length callbacks that change writability during coercion. Modern
+assignments preserve their original value while native storage and legacy
+JSAPI conventions remain intact. Both complete pinned suites pass (28,582 ES6 and 11,540 ES5 cases), as do
+all four macOS arm64 application builds, packages and relocated runtime checks,
+Calendar’s four views, Browser navigation and Suite/XULRunner ChatZilla.
+Other operating systems have not been revalidated for this batch.
+See [property-conversion validation](js/tests/es6/README.md#property-queries-and-reentrant-array-length-conversion).

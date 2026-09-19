@@ -394,6 +394,10 @@ historical object receiver. Run `legacy-application.js`, the embedding/window
 checks, and `calendar/test/run-compatibility.py` against Calendar. Exercise
 Calendar startup and all four views as well as shell tests; compilation and
 Test262 alone do not establish application compatibility.
+Native setter and descriptor changes must preserve modern assignment results
+without changing the native JSAPI's normalized output or explicit legacy
+behavior. Run `property-coercion.js` and `TestNativeSetterResult.c`, including
+collection and array-length callbacks that change descriptor attributes.
 Tail-call changes must preserve captured arguments/locals, direct eval,
 legacy editions and balanced debugger hooks. Run the `tail-call-*.js` fixtures
 and `TestTailCalls.c`, including branch cancellation, collection and script

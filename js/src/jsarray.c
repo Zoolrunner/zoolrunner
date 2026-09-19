@@ -62,6 +62,7 @@
 #include "jsproxy.h"
 #include "jsrealm.h"
 #include "jsstr.h"
+#include "jsscript.h"
 #include "jssymbol.h"
 
 /* 2^32 - 1 as a number and a string */
@@ -405,11 +406,25 @@ static JSBool
 array_length_setter(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
     jsuint newlen, oldlen;
-    JSBool blocked;
+    JSBool blocked, found;
+    uintN attrs;
     if (!ValueIsLength(cx, *vp, &newlen) ||
         !js_GetLengthProperty(cx, obj, &oldlen) ||
         !IndexToValue(cx, newlen, vp))
         return JS_FALSE;
+    if (JS_VERSION_IS_ES2015(cx) && newlen != oldlen) {
+        /* Conversion may have frozen length since the outer Set checked it.
+         * Reject before deleting elements or storing through the old slot. */
+        if (!JS_GetPropertyAttributes(cx, obj, "length", &attrs, &found))
+            return JS_FALSE;
+        if (found && (attrs & JSPROP_READONLY)) {
+            if (cx->fp && cx->fp->script && cx->fp->script->strictMode) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+                return JS_FALSE;
+            }
+            return IndexToValue(cx, oldlen, vp);
+        }
+    }
     /* A failed non-strict assignment stops at the first undeletable index.
      * js_ShrinkArray returns the resulting length in vp for NativeSet. */
     return newlen >= oldlen || js_ShrinkArray(cx, obj, newlen, vp, &blocked);
