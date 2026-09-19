@@ -1493,7 +1493,8 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return JS_TRUE;
     str = JSVAL_TO_STRING(*rval);
     caller = JS_GetScriptedCaller(cx, fp);
-    direct = caller && fp->down == caller && caller->pc &&
+    direct = !(fp->flags & JSFRAME_TAIL_FORWARD) &&
+             caller && fp->down == caller && caller->pc &&
              (*caller->pc == JSOP_EVAL ||
               (*caller->pc == JSOP_CALLSPREAD && GET_UINT16(caller->pc) == 2));
     global = OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(argv[-2]));
@@ -1565,6 +1566,15 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 out:
     JS_POP_TEMP_ROOT(cx, &scopeRoot);
     return ok;
+}
+
+JSBool
+js_IsBuiltinEval(JSContext *cx, jsval value)
+{
+    JSFunction *fun;
+    if (!VALUE_IS_FUNCTION(cx, value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    return fun && !FUN_INTERPRETED(fun) && FUN_NATIVE(fun) == obj_eval;
 }
 
 static JSBool

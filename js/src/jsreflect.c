@@ -112,6 +112,10 @@ ReflectInvoke(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSBool constr
     for (i = 0; i < count; ++i) {
         if (!JS_GetElement(cx, list, i, &base[2 + i])) goto out;
     }
+    if (!construct && (frame->flags & JSFRAME_TAIL_FORWARD)) {
+        ok = js_RequestTailCall(cx, base[0], base[1], count, base + 2, rval);
+        goto out;
+    }
     oldsp = frame->sp;
     frame->sp = base + count + 2;
     ok = construct ? js_InternalInvokeConstructorWithNewTarget(cx, base, count, newTarget)

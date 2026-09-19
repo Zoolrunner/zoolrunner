@@ -126,11 +126,11 @@ jsd_NewThreadState(JSDContext* jsdc, JSContext *cx )
         jsuword  pc = (jsuword) JS_GetFramePC(cx, fp);
 
         /*
-         * don't construct a JSDStackFrame for dummy frames (those without a
-         * |this| object, or native frames, if JSD_INCLUDE_NATIVE_FRAMES
-         * isn't set.
+         * Strict functions may have an undefined/null receiver. A function
+         * frame is real even without a |this| object; dummy embedding frames
+         * have neither. Include native frames only when requested.
          */
-        if (JS_GetFrameThis(cx, fp) &&
+        if ((JS_GetFrameThis(cx, fp) || JS_GetFrameFunction(cx, fp)) &&
             ((jsdc->flags & JSD_INCLUDE_NATIVE_FRAMES) ||
              !JS_IsNativeFrame(cx, fp)))
         {

@@ -315,6 +315,26 @@ jsd_ClearThrowHook(JSDContext* jsdc)
     return JS_TRUE;
 }
 
+/* The startup debugger tracks scripts without necessarily observing calls.
+ * Keep the engine hooks installed only while they have work to perform;
+ * otherwise their mere presence needlessly prevents ES2015 tail retirement.
+ * Callers hold JSD_LOCK when changing the hook/flag state. */
+void
+jsd_SyncCallHooks(JSDContext *jsdc)
+{
+    JSBool common = (jsdc->flags & JSD_COLLECT_PROFILE_DATA) ||
+                    !(jsdc->flags & JSD_DISABLE_OBJECT_TRACE);
+#ifdef JSD_TRACE
+    common = JS_TRUE;
+#endif
+    JS_SetCallHook(jsdc->jsrt,
+                   common || jsdc->functionHook ? jsd_FunctionCallHook : NULL,
+                   jsdc);
+    JS_SetExecuteHook(jsdc->jsrt,
+                      common || jsdc->toplevelHook ? jsd_TopLevelCallHook : NULL,
+                      jsdc);
+}
+
 JSBool
 jsd_SetFunctionHook(JSDContext*      jsdc,
                     JSD_CallHookProc hook,
@@ -323,6 +343,7 @@ jsd_SetFunctionHook(JSDContext*      jsdc,
     JSD_LOCK();
     jsdc->functionHookData  = callerdata;
     jsdc->functionHook      = hook;
+    jsd_SyncCallHooks(jsdc);
     JSD_UNLOCK();
 
     return JS_TRUE;
@@ -333,6 +354,7 @@ jsd_ClearFunctionHook(JSDContext* jsdc)
 {
     JSD_LOCK();
     jsdc->functionHook      = NULL;
+    jsd_SyncCallHooks(jsdc);
     JSD_UNLOCK();
 
     return JS_TRUE;
@@ -346,6 +368,7 @@ jsd_SetTopLevelHook(JSDContext*      jsdc,
     JSD_LOCK();
     jsdc->toplevelHookData  = callerdata;
     jsdc->toplevelHook      = hook;
+    jsd_SyncCallHooks(jsdc);
     JSD_UNLOCK();
 
     return JS_TRUE;
@@ -356,6 +379,7 @@ jsd_ClearTopLevelHook(JSDContext* jsdc)
 {
     JSD_LOCK();
     jsdc->toplevelHook      = NULL;
+    jsd_SyncCallHooks(jsdc);
     JSD_UNLOCK();
 
     return JS_TRUE;

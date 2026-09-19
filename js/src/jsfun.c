@@ -2138,6 +2138,9 @@ fun_call(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         argv++;
     }
 
+    if (cx->fp->flags & JSFRAME_TAIL_FORWARD)
+        return js_RequestTailCall(cx, fval, thisv, argc, argv, rval);
+
     /* Allocate stack space for fval, obj, and the args. */
     sp = js_AllocStack(cx, 2 + argc, &mark);
     if (!sp)
@@ -2249,8 +2252,14 @@ Apply(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSBool
         sp++;
     }
 
-    /* Lift current frame to include the args and do the call. */
+    /* The argument-list getters have completed before retiring this
+     * native forwarding activation. */
     fp = cx->fp;
+    if (fp->flags & JSFRAME_TAIL_FORWARD) {
+        ok = js_RequestTailCall(cx, fval, sp[-(intN)argc - 1], argc, sp - argc, rval);
+        goto out;
+    }
+    /* Lift current frame to include the args and do the call. */
     oldsp = fp->sp;
     fp->sp = sp;
     ok = js_Invoke(cx, argc, JSINVOKE_INTERNAL | JSINVOKE_SKIP_CALLER);

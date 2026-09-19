@@ -394,6 +394,11 @@ historical object receiver. Run `legacy-application.js`, the embedding/window
 checks, and `calendar/test/run-compatibility.py` against Calendar. Exercise
 Calendar startup and all four views as well as shell tests; compilation and
 Test262 alone do not establish application compatibility.
+Tail-call changes must preserve captured arguments/locals, direct eval,
+legacy editions and balanced debugger hooks. Run the `tail-call-*.js` fixtures
+and `TestTailCalls.c`, including branch cancellation, collection and script
+serialization. Use original ES2015 tail-call realm rules; later normative
+changes must be reviewed explicitly rather than imported from current tests.
 Run `editor/composer/tests/run-lifecycle.py` for editor/lifecycle changes and
 `js/tests/es5/debugger-lifecycle.js` for debugger changes. Do not dispatch editor
 commands into dying docshells or retain raw script iterators across callbacks;

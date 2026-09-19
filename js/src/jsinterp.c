@@ -612,6 +612,130 @@ PutBlockObjects(JSContext *cx, JSStackFrame *fp)
     return ok;
 }
 
+static JSBool
+TailPosition(JSScript *script, jsbytecode *callpc)
+{
+    JSTryNote *note;
+    ptrdiff_t offset, next;
+    uintN steps;
+    JSBool saved = JS_FALSE;
+    JSOp op;
+    offset = callpc - script->main;
+    for (note = script->trynotes; note && note->catchStart; ++note) {
+        if (offset >= note->start && offset - note->start < note->length)
+            return JS_FALSE;
+    }
+    next = callpc - script->code + JSOP_CALL_LENGTH;
+    for (steps = 0; steps < script->length; ++steps) {
+        if (next < 0 || (size_t)next >= script->length) return JS_FALSE;
+        callpc = script->code + next;
+        op = (JSOp)*callpc;
+        switch (op) {
+          case JSOP_RETURN:
+            return !saved;
+          case JSOP_RETRVAL:
+            return saved;
+          case JSOP_SETRVAL:
+            if (saved) return JS_FALSE;
+            saved = JS_TRUE;
+            ++next;
+            break;
+          case JSOP_LEAVEBLOCK:
+            if (!saved) return JS_FALSE;
+            next += JSOP_LEAVEBLOCK_LENGTH;
+            break;
+          case JSOP_NOP:
+          case JSOP_GROUP: /* Parentheses preserve the returned value. */
+            ++next;
+            break;
+          case JSOP_GOTO:
+            next += GET_JUMP_OFFSET(callpc);
+            break;
+          case JSOP_GOTOX:
+            next += GET_JUMPX_OFFSET(callpc);
+            break;
+          default:
+            return JS_FALSE;
+        }
+    }
+    return JS_FALSE;
+}
+
+/* Internal completion used only between the interpreter and invocation loop.
+ * The rooted array owns the next callee, raw receiver and evaluated arguments. */
+static JSClass TailRequestClass = {
+    "TailRequest", JSCLASS_HAS_RESERVED_SLOTS(3) | JSCLASS_IS_ANONYMOUS,
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+IsTailRequest(JSContext *cx, jsval value)
+{
+    return !JSVAL_IS_PRIMITIVE(value) &&
+           OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(value)) == &TailRequestClass;
+}
+
+static JSBool
+CanRequestTailCall(JSContext *cx, JSStackFrame *fp, JSScript *script,
+                   jsbytecode *pc, jsval callee)
+{
+    return fp->fun && FUN_INTERPRETED(fp->fun) &&
+           script == fp->fun->u.i.script && script->strictMode &&
+           (script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015 &&
+           !(fp->flags & (JSFRAME_GENERATOR | JSFRAME_SPECIAL)) &&
+           !fp->annotation && !fp->sharpDepth &&
+           !cx->runtime->callHook && !cx->runtime->executeHook &&
+           js_IsCallable(cx, callee) &&
+           TailPosition(script, pc);
+}
+
+static JSBool
+MakeTailRequest(JSContext *cx, uintN argc, jsval *argv, jsval *result)
+{
+    jsval values[2] = {JSVAL_NULL, JSVAL_NULL};
+    JSTempValueRooter root;
+    JSObject *array, *request;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    array = JS_NewArrayObject(cx, argc + 2, argv);
+    if (!array) goto out;
+    values[0] = OBJECT_TO_JSVAL(array);
+    request = js_NewObject(cx, &TailRequestClass, NULL, NULL);
+    if (!request) goto out;
+    values[1] = OBJECT_TO_JSVAL(request);
+    if (!JS_SetReservedSlot(cx, request, 0, values[0]) ||
+        !JS_SetReservedSlot(cx, request, 1, INT_TO_JSVAL(cx->version))) goto out;
+    *result = values[1];
+    ok = JS_TRUE;
+ out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_RequestTailCall(JSContext *cx, jsval callee, jsval receiver, uintN argc,
+                   jsval *argv, jsval *result)
+{
+    jsval *slots;
+    void *mark;
+    uintN i;
+    JSBool ok;
+    if (argc >= ARRAY_INIT_LIMIT) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS);
+        return JS_FALSE;
+    }
+    slots = js_AllocStack(cx, argc + 2, &mark);
+    if (!slots) return JS_FALSE;
+    slots[0] = callee;
+    slots[1] = receiver;
+    for (i = 0; i < argc; ++i) slots[i + 2] = argv[i];
+    ok = MakeTailRequest(cx, argc, slots, result);
+    js_FreeStack(cx, mark);
+    return ok;
+}
+
 JSObject *
 js_ComputeThis(JSContext *cx, JSObject *thisp, jsval *argv)
 {
@@ -1119,7 +1243,7 @@ LogCall(JSContext *cx, jsval callee, uintN argc, jsval *argv)
  * when done.  Then push the return value.
  */
 static JSBool
-InvokeWithNewTarget(JSContext *cx, uintN argc, uintN flags, JSObject *newTarget)
+InvokeOnce(JSContext *cx, uintN argc, uintN flags, JSObject *newTarget)
 {
     void *mark;
     JSStackFrame *fp, frame;
@@ -1185,7 +1309,9 @@ InvokeWithNewTarget(JSContext *cx, uintN argc, uintN flags, JSObject *newTarget)
             goto bad;
         ok = (flags & JSINVOKE_CONSTRUCT)
              ? js_ProxyConstruct(cx, funobj, argc, vp + 2, newTarget ? newTarget : funobj, &frame.rval)
-             : js_ProxyCall(cx, funobj, thisv, argc, vp + 2, &frame.rval);
+             : (flags & JSINVOKE_TAIL_FORWARD)
+               ? js_ProxyTailCall(cx, funobj, thisv, argc, vp + 2, &frame.rval)
+               : js_ProxyCall(cx, funobj, thisv, argc, vp + 2, &frame.rval);
         goto out2;
     }
     if (clasp == &js_RegExpClass &&
@@ -1536,6 +1662,13 @@ have_fun:
         }
         ok = js_Interpret(cx, script->code, &v);
         if (ok && FUN_IS_DERIVED(fun) && (flags & JSINVOKE_CONSTRUCT) &&
+            IsTailRequest(cx, frame.rval)) {
+            /* The detached lexical cell remains live until [[Construct]]
+             * validates the tail result. An escaping arrow may still bind it. */
+            ok = JS_GetReservedSlot(cx, frame.callobj, 0, &v) &&
+                 JS_SetReservedSlot(cx, JSVAL_TO_OBJECT(frame.rval), 2, v);
+        }
+        if (ok && FUN_IS_DERIVED(fun) && (flags & JSINVOKE_CONSTRUCT) &&
             JSVAL_IS_PRIMITIVE(frame.rval)) {
             if (!JSVAL_IS_VOID(frame.rval)) {
                 JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_DERIVED_RETURN);
@@ -1590,6 +1723,130 @@ bad:
     js_ReportIsNotFunction(cx, vp, flags & JSINVOKE_FUNFLAGS);
     ok = JS_FALSE;
     goto out2;
+}
+
+/* Each iteration fully releases the retired activation before invoking its
+ * successor. Argument segments are separately rooted and released every time. */
+static JSBool
+FinishTailRequest(JSContext *cx, jsval *result)
+{
+    JSTempValueRooter root;
+    JSStackFrame *caller = cx->fp, realmFrame;
+    JSVersion savedVersion, originVersion;
+    jsval roots[3] = {*result, OBJECT_TO_JSVAL(js_ProxyOperationGlobal(cx)), JSVAL_VOID};
+    JSObject *array;
+    jsval arguments, callee, state[3], *slots;
+    jsuint count, boundCount, i;
+    void *mark;
+    JSBool ok = JS_TRUE;
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &root);
+    *result = JSVAL_VOID;
+    while (IsTailRequest(cx, roots[0])) {
+        if (!JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(roots[0]), 0, &arguments)) {
+            ok = JS_FALSE;
+            break;
+        }
+        if (!JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(roots[0]), 1, &roots[2])) {
+            ok = JS_FALSE;
+            break;
+        }
+        array = JSVAL_TO_OBJECT(arguments);
+        if (!JS_GetArrayLength(cx, array, &count)) { ok = JS_FALSE; break; }
+        JS_ASSERT(count >= 2);
+        if (!JS_GetElement(cx, array, 0, &callee)) { ok = JS_FALSE; break; }
+        if (!cx->runtime->callHook && !cx->runtime->executeHook &&
+            VALUE_IS_FUNCTION(cx, callee) &&
+            (((JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(callee)))->flags & JSFUN_BOUND_FUNCTION)) {
+            for (i = 0; i < 3; ++i) {
+                if (!JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(callee), i + 2, &state[i])) {
+                    ok = JS_FALSE;
+                    break;
+                }
+            }
+            if (!ok || !js_GetLengthProperty(cx, JSVAL_TO_OBJECT(state[2]), &boundCount)) {
+                ok = JS_FALSE;
+                break;
+            }
+            if (boundCount >= ARRAY_INIT_LIMIT || count - 2 >= ARRAY_INIT_LIMIT - boundCount) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS);
+                ok = JS_FALSE;
+                break;
+            }
+            slots = js_AllocStack(cx, count + boundCount, &mark);
+            if (!slots) { ok = JS_FALSE; break; }
+            slots[0] = state[0];
+            slots[1] = state[1];
+            for (i = 0; i < boundCount; ++i) {
+                if (!JS_GetElement(cx, JSVAL_TO_OBJECT(state[2]), i, &slots[i + 2])) {
+                    ok = JS_FALSE;
+                    break;
+                }
+            }
+            for (i = 2; ok && i < count; ++i)
+                ok = JS_GetElement(cx, array, i, &slots[boundCount + i]);
+            if (ok) ok = MakeTailRequest(cx, count + boundCount - 2, slots, &roots[0]);
+            if (ok) ok = JS_SetReservedSlot(cx, JSVAL_TO_OBJECT(roots[0]), 1, roots[2]);
+            js_FreeStack(cx, mark);
+            if (!ok) break;
+            continue;
+        }
+        slots = js_AllocStack(cx, count, &mark);
+        if (!slots) { ok = JS_FALSE; break; }
+        for (i = 0; i < count; ++i) {
+            if (!JS_GetElement(cx, array, i, &slots[i])) { ok = JS_FALSE; break; }
+        }
+        if (ok) {
+            /* ES2015 removes the leaf execution context: pre-call errors
+             * and Proxy argument arrays use the resumed caller's realm.
+             * Preserve the explicit engine edition independently of it. */
+            memset(&realmFrame, 0, sizeof realmFrame);
+            realmFrame.down = caller;
+            realmFrame.scopeChain = realmFrame.varobj = JSVAL_TO_OBJECT(roots[1]);
+            realmFrame.flags = JSFRAME_INTERNAL | JSFRAME_TAIL_FORWARD;
+            realmFrame.sp = slots + count;
+            savedVersion = cx->version;
+            originVersion = (JSVersion)JSVAL_TO_INT(roots[2]);
+            if (savedVersion != originVersion) js_SetVersion(cx, originVersion);
+            cx->fp = &realmFrame;
+            ok = InvokeOnce(cx, count - 2, JSINVOKE_INTERNAL | JSINVOKE_TAIL_FORWARD, NULL);
+            cx->fp = caller;
+            if (cx->version == originVersion && savedVersion != originVersion)
+                js_SetVersion(cx, savedVersion);
+            roots[0] = slots[0];
+        }
+        js_FreeStack(cx, mark);
+        if (!ok) break;
+    }
+    *result = ok ? roots[0] : JSVAL_VOID;
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+InvokeWithNewTarget(JSContext *cx, uintN argc, uintN flags, JSObject *newTarget)
+{
+    JSBool ok = InvokeOnce(cx, argc, flags, newTarget);
+    jsval cell = JSVAL_VOID, value;
+    JSTempValueRooter root;
+    if (ok && IsTailRequest(cx, cx->fp->sp[-1])) {
+        JS_PUSH_TEMP_ROOT(cx, 1, &cell, &root);
+        ok = JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(cx->fp->sp[-1]), 2, &cell) &&
+             FinishTailRequest(cx, cx->fp->sp - 1);
+        if (ok && !JSVAL_IS_PRIMITIVE(cell) &&
+            JSVAL_IS_PRIMITIVE(cx->fp->sp[-1])) {
+            if (!JSVAL_IS_VOID(cx->fp->sp[-1])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_DERIVED_RETURN);
+                ok = JS_FALSE;
+            } else if (!JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(cell), 0, &value)) {
+                ok = JS_FALSE;
+            } else if (value == JSVAL_UNINITIALIZED) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_UNINITIALIZED_THIS);
+                ok = JS_FALSE;
+            } else cx->fp->sp[-1] = value;
+        }
+        JS_POP_TEMP_ROOT(cx, &root);
+    }
+    return ok;
 }
 
 JS_FRIEND_API(JSBool)
@@ -2541,9 +2798,16 @@ InvokeConstructorWithFlags(JSContext *cx, jsval *vp, uintN argc,
 
     /* Now we have an object with a constructor method; call it. */
     vp[1] = OBJECT_TO_JSVAL(obj);
-    if (!InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags, newTarget)) {
-        cx->weakRoots.newborn[GCX_OBJECT] = NULL;
-        return JS_FALSE;
+    {
+        JSTempValueRooter receiverRoot;
+        JSBool invoked;
+        JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &receiverRoot);
+        invoked = InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags, newTarget);
+        JS_POP_TEMP_ROOT(cx, &receiverRoot);
+        if (!invoked) {
+            cx->weakRoots.newborn[GCX_OBJECT] = NULL;
+            return JS_FALSE;
+        }
     }
 
     /* Check the return value and if it's primitive, force it to be obj. */
@@ -2579,7 +2843,7 @@ js_InternalInvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
 
 static JSBool
 InvokeSpread(JSContext *cx, jsval callee, jsval receiver, JSObject *array,
-             JSBool construct, jsval *result, JSObject *newTarget)
+             JSBool construct, jsval *result, JSObject *newTarget, JSBool tail)
 {
     JSStackFrame *frame = cx->fp;
     jsval *base, *oldsp;
@@ -2597,6 +2861,10 @@ InvokeSpread(JSContext *cx, jsval callee, jsval receiver, JSObject *array,
     base[0] = callee; base[1] = receiver;
     for (index = 0; index < count; ++index) {
         if (!JS_GetElement(cx, array, index, &base[index + 2])) goto out;
+    }
+    if (tail) {
+        ok = MakeTailRequest(cx, count, base, result);
+        goto out;
     }
     oldsp = frame->sp;
     frame->sp = base + count + 2;
@@ -2847,7 +3115,7 @@ InvokeSuperReference(JSContext *cx, JSObject *reference, JSObject *array, jsval 
         !JS_GetReservedSlot(cx, reference, 2, &roots[2])) return JS_FALSE;
     roots[3] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
-    ok = InvokeSpread(cx, roots[0], JSVAL_NULL, array, JS_TRUE, &roots[3], JSVAL_TO_OBJECT(roots[1]));
+    ok = InvokeSpread(cx, roots[0], JSVAL_NULL, array, JS_TRUE, &roots[3], JSVAL_TO_OBJECT(roots[1]), JS_FALSE);
     if (ok) ok = js_BindDerivedThis(cx, JSVAL_TO_OBJECT(roots[2]), JSVAL_TO_OBJECT(roots[3]));
     if (ok) *result = roots[3];
     JS_POP_TEMP_ROOT(cx, &root);
@@ -3352,6 +3620,12 @@ interrupt:
                 /* Store the generating pc for the return value. */
                 vp[-depth] = (jsval)pc;
 
+                if (ok && IsTailRequest(cx, *vp)) {
+                    ok = FinishTailRequest(cx, vp);
+                    RESTORE_SP(fp);
+                    LOAD_BRANCH_CALLBACK(cx);
+                    LOAD_INTERRUPT_HANDLER(rt);
+                }
                 /* Resume execution in the calling frame. */
                 inlineCallCount--;
                 if (JS_LIKELY(ok)) {
@@ -4929,12 +5203,20 @@ interrupt:
 
           BEGIN_CASE(JSOP_CALLSPREAD)
             SAVE_SP_AND_PC(fp);
+            flags = GET_UINT16(pc) != 1 &&
+                    (GET_UINT16(pc) != 2 || !js_IsBuiltinEval(cx, FETCH_OPND(-3))) &&
+                    CanRequestTailCall(cx, fp, script, pc, FETCH_OPND(-3));
+            if (flags) {
+                CHECK_BRANCH(-1);
+                if (rt->callHook || rt->executeHook) flags = 0;
+            }
             ok = InvokeSpread(cx, FETCH_OPND(-3), FETCH_OPND(-2),
                               JSVAL_TO_OBJECT(FETCH_OPND(-1)), GET_UINT16(pc) == 1,
-                              &rval, NULL);
+                              &rval, NULL, flags != 0);
             LOAD_BRANCH_CALLBACK(cx);
             LOAD_INTERRUPT_HANDLER(rt);
             if (!ok) goto out;
+            if (flags) { fp->rval = rval; goto out; }
             sp -= 2;
             STORE_OPND(-1, rval);
             obj = NULL;
@@ -4947,6 +5229,14 @@ interrupt:
             vp = sp - (argc + 2);
             lval = *vp;
             SAVE_SP_AND_PC(fp);
+            if ((op != JSOP_EVAL || !js_IsBuiltinEval(cx, lval)) &&
+                CanRequestTailCall(cx, fp, script, pc, lval)) {
+                CHECK_BRANCH(-1);
+                if (!rt->callHook && !rt->executeHook) {
+                    ok = MakeTailRequest(cx, argc, vp, &fp->rval);
+                    goto out;
+                }
+            }
             if (VALUE_IS_FUNCTION(cx, lval) &&
                 (obj = JSVAL_TO_OBJECT(lval),
                  fun = (JSFunction *) JS_GetPrivate(cx, obj),
@@ -5106,8 +5396,12 @@ interrupt:
                 hook = rt->callHook;
                 if (hook) {
                     newifp->frame.pc = NULL;
+                    /* Stack inspection and collection during entry callbacks
+                     * must see the callee, just as the out-of-line path does. */
+                    cx->fp = &newifp->frame;
                     newifp->hookData = hook(cx, &newifp->frame, JS_TRUE, 0,
                                             rt->callHookData);
+                    cx->fp = fp;
                     LOAD_INTERRUPT_HANDLER(rt);
                 } else {
                     newifp->hookData = NULL;

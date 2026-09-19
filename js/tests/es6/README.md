@@ -3249,3 +3249,64 @@ This is not an ES2015 conformance score: the selection includes many later
 features and normative changes, and edition review remains pending. Unknown
 host flags, unsupported module fixtures and newer harness syntax remain visible.
 No upstream assertions or required modes were changed.
+
+
+## Tail-call execution and generator shorthand
+
+Strict ES2015 function and arrow calls in tail position now transfer their
+callee, raw receiver and evaluated arguments to an internal invocation loop.
+The retired activation releases its stack storage after captured arguments,
+locals and lexical blocks have been detached. The loop supports mutual calls,
+changing argument counts, spread, bound functions, `call`, `apply`,
+`Reflect.apply`, Proxy targets and Proxy traps. Direct intrinsic eval retains
+its calling environment. Calls protected by catch/finally handlers, generators,
+non-tail expressions and legacy editions retain their existing execution path.
+Embedding call/execute hooks disable retirement so their entry/exit callbacks
+remain balanced, including when a branch callback installs a hook.
+
+Original ES2015 removes the tail caller's execution context before invocation;
+pre-call Proxy errors and argument arrays therefore use the resumed caller's
+realm. This differs from the [2021 normative change](https://github.com/tc39/ecma262/pull/2495).
+The explicit engine edition is preserved independently of that realm. This
+change adds no opcode or serialized-bytecode format; cache version remains 63.
+Native regressions cover branch cancellation, collection, hooks, decompilation
+and XDR execution. Object shorthand `yield` in generator bodies is now rejected,
+while ordinary property names and nested ordinary/arrow bodies preserve their
+respective grammar contexts.
+
+The isolated candidate passes **28,582/28,582 pinned ES6** and **11,540/11,540
+ES5**, all 89 existing focused shell fixtures, 60 new focused checks and 19
+native checks. Reports: `artifacts/es6/tail-candidate-*`. The later `tco`
+substring diagnostic passes 37 of 41 modes: all 33 original-ES2015 tail-call
+modes pass; two post-ES2015 coalescing modes and two unrelated BigInt sort modes
+remain diagnostic failures. These are retained, not excluded from that report.
+Application build/package/runtime validation is recorded separately below.
+The integrated follow-up also handles parenthesized/comma expressions and
+constructors. Base constructor receivers remain rooted across tail execution;
+derived constructors retain their lexical `this` cell for return validation,
+including a tail-invoked arrow that initializes it through `super()`. Expanded
+control-flow tests cover catch/finally, loops, switch, tagged templates, extended
+jumps and iterator cleanup.
+
+Idle JSD script tracking no longer installs call/execute hooks that have no
+work to do. Function/top-level callbacks, profiling and object tracing install
+them when needed and continue to disable frame retirement. Strict functions
+with null/undefined receivers are included in debugger stacks. Inline entry
+callbacks now see the callee as the current frame, matching the ordinary call
+path. The debugger fixture checks balanced calls, profiling, callback collection
+and restoration of tail calls after hooks are cleared. The native fixture also
+checks current-frame identity and collection inside entry hooks. These fixes
+were found during Suite package validation; the failed attempt remains recorded.
+The combined focused coverage is 101 shell checks and 20 native checks.
+
+Final macOS arm64 validation passes **28,582/28,582 pinned ES6** and
+**11,540/11,540 ES5**, with zero failures, unsupported cases, harness errors,
+crashes or timeouts. All four root builds, packages and relocated desktop checks
+pass, including Calendar's four views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. Reports: `artifacts/es6/tail-integration-final-*`.
+The four application engine libraries and frozen conformance runtime share
+SHA-256 `691e17ff66b622a8e90d771d846adcd07d901fab948656cd2152b16d92fe9634`.
+C89 checks pass for the engine, JSD changes and native fixture. Three later
+generator shorthand diagnostic modes also pass. This batch has not been
+revalidated on Windows or Linux. The reviewed later ES2015 inventory is still unfinished;
+this is not a full ES2015 completion claim.

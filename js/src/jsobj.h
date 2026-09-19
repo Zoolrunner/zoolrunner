@@ -53,6 +53,7 @@
 #include "jspubtd.h"
 
 JS_BEGIN_EXTERN_C
+extern JSBool js_IsBuiltinEval(JSContext *, jsval);
 
 extern JSBool js_FreezeObject(JSContext *cx, JSObject *obj);
 

@@ -681,9 +681,9 @@ ArgumentArray(JSContext *cx, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
-JSBool
-js_ProxyCall(JSContext *cx, JSObject *obj, jsval receiver,
-               uintN argc, jsval *argv, jsval *rval)
+static JSBool
+ProxyCall(JSContext *cx, JSObject *obj, jsval receiver,
+          uintN argc, jsval *argv, jsval *rval, JSBool tail)
 {
     ProxyRoots roots;
     JSBool ok = JS_FALSE;
@@ -691,14 +691,36 @@ js_ProxyCall(JSContext *cx, JSObject *obj, jsval receiver,
     roots.v[P_ARG1] = receiver;
     if (!GetTrap(cx, obj, "apply", &roots)) goto out;
     if (JSVAL_IS_VOID(roots.v[P_TRAP])) {
-        ok = js_InternalInvokeValue(cx, receiver, roots.v[P_TARGET], 0, argc, argv, rval);
+        ok = tail ? js_RequestTailCall(cx, roots.v[P_TARGET], receiver, argc, argv, rval)
+                  : js_InternalInvokeValue(cx, receiver, roots.v[P_TARGET], 0, argc, argv, rval);
         goto out;
     }
-    if (!ArgumentArray(cx, argc, argv, &roots.v[P_ARG2]) || !CallTrap(cx, &roots, 3)) goto out;
-    *rval = roots.v[P_RESULT]; ok = JS_TRUE;
+    if (!ArgumentArray(cx, argc, argv, &roots.v[P_ARG2])) goto out;
+    if (tail) {
+        roots.v[P_ARG0] = roots.v[P_TARGET];
+        ok = js_RequestTailCall(cx, roots.v[P_TRAP], roots.v[P_HANDLER],
+                                3, &roots.v[P_ARG0], rval);
+    } else {
+        if (!CallTrap(cx, &roots, 3)) goto out;
+        *rval = roots.v[P_RESULT]; ok = JS_TRUE;
+    }
   out:
     JS_POP_TEMP_ROOT(cx, &roots.root);
     return ok;
+}
+
+JSBool
+js_ProxyCall(JSContext *cx, JSObject *obj, jsval receiver,
+              uintN argc, jsval *argv, jsval *rval)
+{
+    return ProxyCall(cx, obj, receiver, argc, argv, rval, JS_FALSE);
+}
+
+JSBool
+js_ProxyTailCall(JSContext *cx, JSObject *obj, jsval receiver,
+                  uintN argc, jsval *argv, jsval *rval)
+{
+    return ProxyCall(cx, obj, receiver, argc, argv, rval, JS_TRUE);
 }
 
 JSBool

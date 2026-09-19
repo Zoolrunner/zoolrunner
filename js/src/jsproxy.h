@@ -3,6 +3,7 @@
 #define jsproxy_h___
 #include "jspubtd.h"
 JS_BEGIN_EXTERN_C
+extern JSBool js_ProxyTailCall(JSContext *, JSObject *, jsval, uintN, jsval *, jsval *);
 extern JSClass js_ProxyClass;
 extern JSObject *js_NewProxyObject(JSContext *, jsval, jsval, JSObject *);
 extern JSObject *js_ProxyOperationGlobal(JSContext *cx);

@@ -7494,7 +7494,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 const char *bytes = keyword == TOK_RESERVED ? JS_GetStringBytes(name) : "";
                 JSParseNode *key = pn3;
                 if (!bytes) return NULL;
-                if ((keyword != TOK_EOF && keyword != TOK_RESERVED &&
+                if ((keyword == TOK_YIELD && (ts->flags & TSF_GENERATOR)) ||
+                    (keyword != TOK_EOF && keyword != TOK_RESERVED &&
                      keyword != TOK_LET && keyword != TOK_YIELD) ||
                     !strcmp(bytes,"class") || !strcmp(bytes,"enum") ||
                     !strcmp(bytes,"extends") || !strcmp(bytes,"super")) {

@@ -123,7 +123,10 @@ JSD_PUBLIC_API(void)
 JSD_SetContextFlags(JSDContext *jsdc, uint32 flags)
 {
     JSD_ASSERT_VALID_CONTEXT(jsdc);
+    JSD_LOCK();
     jsdc->flags = flags;
+    jsd_SyncCallHooks(jsdc);
+    JSD_UNLOCK();
 }
 
 JSD_PUBLIC_API(uint32)

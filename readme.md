@@ -164,7 +164,7 @@ not yet ES6 compliant. The [ES6 testing guide](js/tests/es6/README.md) records
 the baseline corpus, runner limitations and remaining implementation work.
 The complete pinned historical ES6 corpus now passes **28,582 / 28,582 modes**,
 with zero failures or unsupported cases. Later coverage is still under review,
-and proper tail calls remain unfinished. This historical pass does not complete
+and further edge-case and platform validation remains unfinished. This historical pass does not complete
 the full ES2015 target.
 
 Implemented areas include lexical bindings and temporal dead zones, per-iteration
@@ -909,3 +909,14 @@ and all four macOS arm64 build/package/application gates, including Calendar
 views and Browser/ChatZilla integration. See the ES6 guide for exact reports,
 expanded diagnostic limitations and unfinished tail-call/coverage work.
 This is not a new Windows or Linux validation result.
+
+
+The tail-call follow-up adds strict ES2015 frame retirement across ordinary,
+arrow, bound, spread, Proxy and native forwarding calls, including constructor
+return handling. Direct eval and explicit legacy editions keep their existing
+behavior. It also rejects invalid generator `yield` shorthand and corrects
+idle-debugger hook handling and strict-function stack visibility. Final macOS arm64 validation passes **28,582/28,582 pinned ES6** and
+**11,540/11,540 ES5**, all four builds/packages/relocated desktop checks, Calendar
+views, Browser navigation/layout and Suite/XULRunner ChatZilla. Focused coverage
+adds 101 shell checks and 20 native checks; C89 checks pass. Other operating
+systems have not been revalidated for this batch. See [tail-call validation](js/tests/es6/README.md#tail-call-execution-and-generator-shorthand).
