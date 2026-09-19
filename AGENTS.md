@@ -1485,3 +1485,17 @@ packaged runtime checks; other platforms remain unvalidated for this batch.
 Warm relocated runtimes once before starting concurrent conformance processes,
 so XPCOM component-cache regeneration is serialized. Retain failed startup
 logs and report complete reruns honestly.
+
+
+For object-pattern and update-expression changes, run
+`js/tests/es6/object-patterns.js`, `update-targets.js`, and
+`TestObjectPatterns.c`, plus the existing computed-properties and new-target
+checks. Retain empty-object coercibility checks through decompilation and XDR;
+cache version 50 records the new source notes/emission. Preserve legacy
+selected-edition destructuring and update operands. Modern invalid non-simple
+update targets use original ES2015 early ReferenceError; test no side effects
+before the error. The macOS arm64 baseline passes 27,997 ES2015 modes and all
+11,540 ES5 modes, with 571 failures and 14 unsupported modules remaining.
+All four applications pass build/package/runtime checks. Computed pattern keys,
+defaults, rest and complete iterator-based array patterns still require work;
+other platforms remain unvalidated for this batch.

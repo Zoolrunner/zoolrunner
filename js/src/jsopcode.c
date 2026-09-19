@@ -1347,6 +1347,10 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
     *hole = JS_FALSE;
     cx = ss->sprinter.context;
     jp = ss->printer;
+    if (*pc == JSOP_CHECKPROP) {
+        pc += JSOP_CHECKPROP_LENGTH;
+        if (pc == endpc) return pc;
+    }
     LOAD_OP_DATA(pc);
 
     switch (op) {
@@ -1511,6 +1515,9 @@ DecompileDestructuring(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc)
 
         switch (op) {
           case JSOP_POP:
+            sn = js_GetSrcNote(jp->script, pc);
+            if (sn && SN_TYPE(sn) == SRC_INITPROP)
+                *OFF2STR(&ss->sprinter, head) = '{';
             pc += oplen;
             goto out;
 

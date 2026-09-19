@@ -10,6 +10,11 @@ function syntax(source) {
     try { (0, eval)(source); } catch (error) { failed = error instanceof SyntaxError; }
     check(failed, 'syntax ' + source);
 }
+function invalidUpdate(source) {
+    var failed = false;
+    try { (0, eval)(source); } catch (error) { failed = error instanceof ReferenceError; }
+    check(failed, 'early invalid update ' + source);
+}
 function Target() { gc(); return {target: new.target}; }
 check(Target().target === undefined, 'ordinary call');
 check(Target.call({}).target === undefined, 'explicit receiver');
@@ -61,8 +66,8 @@ syntax('eval("new.target")');
 syntax('function f(){new.other}');
 syntax('function f(){new.\\u0074arget}');
 syntax('function f(){new.target=1}');
-syntax('function f(){++new.target}');
-syntax('function f(){new.target++}');
+invalidUpdate('function f(){++new.target}');
+invalidUpdate('function f(){new.target++}');
 syntax('function f(){[new.target]=[]}');
 syntax('function f(){({x:new.target}={})}');
 syntax('function f(){for(new.target in {}){}}');

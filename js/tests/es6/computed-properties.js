@@ -38,7 +38,8 @@ o=({['k']:(function(){})});check(o.k.name==='k','parenthesized anonymous functio
 function commaKey(a,b){return {[(a,b)]:function(){return 4;}};}
 var restored=eval('('+make.toString()+')');check(restored('x').x.name==='x','decompile ordinary computed key');
 restored=eval('('+commaKey.toString()+')');check(restored('a','b').b()===4,'decompile comma key');
-check(caught(function(){eval('({["x"]:x}={x:1})');}) instanceof SyntaxError,'unsupported computed destructuring fails safely');
+var patternValue; ({["x"]:patternValue}={x:1});
+check(patternValue===1,'constant-key object pattern');
 o=({method(a){return a+1;},['computed'](){return this;},get(){return 8;},set(){return 9;},17(){return 10;}});
 check(o.method(2)===3&&o.computed()===o&&o.get()===8&&o.set()===9&&o[17]()===10,'concise method calls');
 check(o.method.name==='method'&&o.method.length===1&&o.computed.name==='computed'&&o[17].name==='17','method metadata');

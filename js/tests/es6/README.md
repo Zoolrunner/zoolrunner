@@ -2556,3 +2556,35 @@ store now exists before the hook can inspect or restrict it. No bytecode change
 is needed for this batch. Other platforms remain unvalidated for these changes.
 Classes, modules, Unicode regular expressions and broader parameter,
 destructuring and lexical-environment semantics remain unfinished.
+
+
+### Basic object patterns and update targets
+
+Modern object patterns now accept shorthand bindings, validate null/undefined
+sources even for empty or nested patterns, and reject invalid assignment targets
+at compilation. Their decompiled source retains the distinction between empty
+object and array patterns. Cache version 50 records this emission/source-note
+change. Legacy destructuring remains edition selected. Modern update expressions
+parse their complete unary operand and report early ReferenceError for invalid
+non-simple targets, following the original ES2015 rules.
+
+Focused object-pattern and update-target fixtures pass 27 and 19 checks. The
+native embedding probe passes 13 checks, including GC during property access,
+XDR into a legacy-version context and decompiled script evaluation. The final
+complete pinned run passes **27,997 modes**, with **571 failures**, 14 unsupported
+modules and no harness errors, crashes or timeouts: **57 gained, zero lost**
+against the typed-array baseline. All **11,540 ES5.1 cases** pass. All four macOS
+arm64 applications pass root builds, packaging and desktop checks, including
+Calendar's four views, 169 Browser navigation/layout checks and Suite/XULRunner
+ChatZilla. C89 checks pass. The frozen runtime remained unchanged through both
+suites and matches all four application engines; its SHA-256 is
+`e28cdb4f23395f9709f2c6e3572a68bba0c5ce8cbf2acdc2e794783a6ad45b61`.
+Other platforms remain unvalidated for this batch. Arbitrary
+computed pattern keys, defaults, rest and complete array iterator semantics
+remain unfinished. Reports use `object-patterns-stage-*`; the main-build checks
+use `object-patterns-final-*`.
+
+The older focused tests now verify successful constant-key patterns and the
+original ES2015 ReferenceError for invalid new.target updates. Their previous
+unsupported-feature/error-type expectations no longer matched the implemented
+behavior. The pinned upstream tests and runner policy remain unchanged.

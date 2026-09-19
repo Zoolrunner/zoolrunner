@@ -714,3 +714,12 @@ build/package/runtime checks pass. Native tests exercise GC, detachment and
 reflection during allocation callbacks. Full ES2015 compliance remains
 unfinished; other platforms have not been revalidated for this batch. See
 [the typed-array validation record](js/tests/es6/README.md#typed-arrays).
+
+
+Basic ES2015 object patterns now support shorthand bindings and consistent
+null/undefined checks, with preserved decompiled source. Invalid update targets
+report the original ES2015 early errors. The latest full macOS arm64 run passes
+**27,997 ES2015 modes**, with **571 failures** and **14 unsupported modules**
+(**57 gained, zero lost**), and all **11,540 ES5 cases**. All four application
+build/package/runtime checks pass. Full ES2015 compliance remains unfinished.
+See [the pattern validation record](js/tests/es6/README.md#basic-object-patterns-and-update-targets).

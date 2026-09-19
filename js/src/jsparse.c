@@ -2498,6 +2498,11 @@ BindDestructuringLHS(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
 
     switch (pn->pn_type) {
       case TOK_NAME:
+        if (JS_VERSION_IS_ES2015(cx) && (tc->flags & TCF_STRICT_MODE) &&
+            RestrictedBinding(cx, pn->pn_atom)) {
+            StrictSyntaxError(cx, pn->pn_ts);
+            return JS_FALSE;
+        }
         if (pn->pn_atom == cx->runtime->atomState.argumentsAtom)
             tc->flags |= TCF_FUN_HEAVYWEIGHT;
         /* FALL THROUGH */
@@ -2508,6 +2513,10 @@ BindDestructuringLHS(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
 
 #if JS_HAS_LVALUE_RETURN
       case TOK_LP:
+        if (JS_VERSION_IS_ES2015(cx)) {
+            StrictSyntaxError(cx, pn->pn_ts);
+            return JS_FALSE;
+        }
         JS_ASSERT(pn->pn_op == JSOP_CALL || pn->pn_op == JSOP_EVAL);
         pn->pn_op = JSOP_SETCALL;
         break;
@@ -2523,8 +2532,7 @@ BindDestructuringLHS(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
 #endif
 
       default:
-        if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_PRIMARY &&
-            pn->pn_op == JSOP_NEWTARGET) {
+        if (JS_VERSION_IS_ES2015(cx)) {
             js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
                                         JSMSG_SYNTAX_ERROR);
             return JS_FALSE;
@@ -2689,6 +2697,9 @@ CheckDestructuring(JSContext *cx, BindData *data,
     FindPropValData fpvd;
     JSParseNode *lhs, *rhs, *pn, *pn2;
 
+    /* Modern literal keys may be computed; static RHS shape matching assumes
+     * the historical constant-key grammar and cannot validate these patterns. */
+    if (JS_VERSION_IS_ES2015(cx)) right = NULL;
     if (left->pn_type == TOK_ARRAYCOMP) {
         js_ReportCompileErrorNumber(cx, left, JSREPORT_PN | JSREPORT_ERROR,
                                     JSMSG_ARRAY_COMP_LEFTSIDE);
@@ -2750,6 +2761,14 @@ CheckDestructuring(JSContext *cx, BindData *data,
 
         while (lhs) {
             JS_ASSERT(lhs->pn_type == TOK_COLON);
+            if (JS_VERSION_IS_ES2015(cx) &&
+                lhs->pn_left->pn_type == TOK_COMPUTED_NAME &&
+                lhs->pn_left->pn_kid->pn_type == TOK_STRING &&
+                lhs->pn_right->pn_type == TOK_NAME && lhs->pn_op == JSOP_INITCOMPUTED) {
+                /* Shorthand properties have a constant string key. Restore
+                 * that representation when the cover grammar becomes a pattern. */
+                lhs->pn_left = lhs->pn_left->pn_kid;
+            }
             if (lhs->pn_left->pn_type == TOK_COMPUTED_NAME) {
                 /* Computed destructuring needs separate binding emission. */
                 js_ReportCompileErrorNumber(cx, lhs, JSREPORT_PN | JSREPORT_ERROR,
@@ -4823,14 +4842,18 @@ SetLvalKid(JSContext *cx, JSTokenStream *ts, JSParseNode *pn, JSParseNode *kid,
     if (kid->pn_type != TOK_NAME &&
         kid->pn_type != TOK_DOT &&
 #if JS_HAS_LVALUE_RETURN
-        (kid->pn_type != TOK_LP || kid->pn_op != JSOP_CALL) &&
+        (JS_VERSION_IS_ES2015(cx) || kid->pn_type != TOK_LP || kid->pn_op != JSOP_CALL) &&
 #endif
 #if JS_HAS_XML_SUPPORT
         (kid->pn_type != TOK_UNARYOP || kid->pn_op != JSOP_XMLNAME) &&
 #endif
         kid->pn_type != TOK_LB) {
-        js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
-                                    JSMSG_BAD_OPERAND, name);
+        if (JS_VERSION_IS_ES2015(cx))
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_BAD_LEFTSIDE_OF_ASS);
+        else
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_BAD_OPERAND, name);
         return NULL;
     }
     pn->pn_kid = kid;
@@ -4925,7 +4948,8 @@ UnaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn = NewParseNode(cx, ts, PN_UNARY, tc);
         if (!pn)
             return NULL;
-        pn2 = MemberExpr(cx, ts, tc, JS_TRUE);
+        pn2 = JS_VERSION_IS_ES2015(cx) ? UnaryExpr(cx, ts, tc)
+                                      : MemberExpr(cx, ts, tc, JS_TRUE);
         if (!pn2)
             return NULL;
         if (!SetIncOpKid(cx, ts, tc, pn, pn2, tt, JS_TRUE))

@@ -156,6 +156,11 @@ function modernWindowEdition() {
                          var b=a.subarray(1);b[0]=7;
                          return a.join()==="1,7,3" && a.map(v=>v+1).join()==="2,8,4" &&
                                 ArrayBuffer.isView(a) && a.values().next().value===1; })() &&
+           (function() { var {nested:{value}}={nested:{value:7}}, caught=false;
+                         try { ({}=null); } catch(e) { caught=e instanceof TypeError; }
+                         return value===7 && caught; })() &&
+           (function() { try { eval('1++'); } catch(e) { return e instanceof ReferenceError; }
+                         return false; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

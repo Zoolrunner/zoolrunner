@@ -3365,6 +3365,8 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
      * ending with a JSOP_ENUMELEM or equivalent op.
      */
     if (pn->pn_type == TOK_RB || pn->pn_type == TOK_RC) {
+        if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RC &&
+            js_Emit1(cx, cg, JSOP_CHECKPROP) < 0) return JS_FALSE;
         if (!EmitDestructuringOpsHelper(cx, cg, pn, declOp))
             return JS_FALSE;
         if (wantpop && js_Emit1(cx, cg, JSOP_POP) < 0)
@@ -3478,9 +3480,11 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 #endif
 
     if (pn->pn_count == 0) {
-        /* Emit a DUP;POP sequence for the decompiler. */
-        return js_Emit1(cx, cg, JSOP_DUP) >= 0 &&
-               js_Emit1(cx, cg, JSOP_POP) >= 0;
+        /* Preserve the empty object's shape as well as its coercibility check. */
+        if (js_Emit1(cx, cg, JSOP_DUP) < 0) return JS_FALSE;
+        if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RC &&
+            js_NewSrcNote(cx, cg, SRC_INITPROP) < 0) return JS_FALSE;
+        return js_Emit1(cx, cg, JSOP_POP) >= 0;
     }
 
     index = 0;
@@ -3574,6 +3578,8 @@ static JSBool
 EmitDestructuringOps(JSContext *cx, JSCodeGenerator *cg, JSOp declOp,
                      JSParseNode *pn)
 {
+    if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RC &&
+        js_Emit1(cx, cg, JSOP_CHECKPROP) < 0) return JS_FALSE;
     /*
      * If we're called from a variable declaration, help the decompiler by
      * annotating the first JSOP_DUP that EmitDestructuringOpsHelper emits.
