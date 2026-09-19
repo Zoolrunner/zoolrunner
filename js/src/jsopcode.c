@@ -1482,6 +1482,88 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
     return pc;
 }
 
+static jsbytecode *
+DecompilePatternReference(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc, JSBool objectPattern)
+{
+    JSContext *cx = ss->sprinter.context;
+    JSPrinter *jp = ss->printer;
+    jssrcnote *sn = js_GetSrcNote(jp->script, pc);
+    jsbytecode *keyEnd = pc + 1 + js_GetSrcNoteOffset(sn, 0);
+    jsbytecode *refEnd = pc + 1 + js_GetSrcNoteOffset(sn, 1);
+    jsbytecode *store = pc + 1 + js_GetSrcNoteOffset(sn, 2);
+    jsbytecode *value = refEnd + JSOP_GETLOCAL_LENGTH +
+        (objectPattern ? JSOP_GETLOCAL_LENGTH + JSOP_GETELEM_LENGTH
+                       : JSOP_PATTERNSTEP_LENGTH + JSOP_SWAP_LENGTH + JSOP_POP_LENGTH);
+    ptrdiff_t savedOffset = ss->sprinter.offset, off;
+    uintN top = ss->top, i;
+    JSOp storeOp = (JSOp)*store;
+    JSAtom *atom;
+    jsatomid atomIndex;
+    char *key = NULL, *base = NULL, *name = NULL, *initializer = NULL;
+    const char *text;
+    JSBool named, ok = JS_FALSE;
+
+    if (keyEnd < pc + 1 || refEnd < keyEnd || store < refEnd ||
+        store >= endpc || store + js_CodeSpec[storeOp].length +
+        3 * JSOP_POP_LENGTH > endpc) goto out;
+    if (storeOp == JSOP_LITOPX) {
+        atomIndex = GET_LITERAL_INDEX(store);
+        storeOp = (JSOp)store[1 + LITERAL_INDEX_LEN];
+    } else atomIndex = storeOp == JSOP_SETREF ? GET_ATOM_INDEX(store) : 0;
+    named = storeOp == JSOP_SETREF;
+    ss->sprinter.offset += PAREN_SLOP;
+    if (!Decompile(ss, pc+1, (intN)(keyEnd-pc-1))) goto out;
+    key = JS_strdup(cx, PopStr(ss, JSOP_NOP));
+    if (!key) goto out;
+    off = SprintCString(&ss->sprinter, "");
+    if (off < 0 || !PushOff(ss, off, JSOP_NOP)) goto out;
+    if (!Decompile(ss, keyEnd, (intN)(refEnd-keyEnd))) goto out;
+    if (named) {
+        (void)PopStr(ss, JSOP_NOP); (void)PopStr(ss, JSOP_NOP);
+        atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
+        text = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
+        if (!text) goto out;
+        name = JS_strdup(cx, text);
+    } else {
+        name = JS_strdup(cx, PopStr(ss, JSOP_NOP));
+        base = JS_strdup(cx, PopStr(ss, JSOP_GETELEM));
+        if (!base) goto out;
+    }
+    if (!name) goto out;
+    /* Keep the captured reference's two slots while decompiling an initializer. */
+    for (i=0; i<2; i++) {
+        off = SprintCString(&ss->sprinter, "");
+        if (off < 0 || !PushOff(ss, off, JSOP_NOP)) goto out;
+    }
+    if (value < store) {
+        if (*value != JSOP_DUP) goto out;
+        value += JSOP_DUP_LENGTH + JSOP_PUSH_LENGTH + JSOP_NEW_EQ_LENGTH;
+        if (value >= store || (*value != JSOP_IFEQ && *value != JSOP_IFEQX))
+            goto out;
+        value += js_CodeSpec[*value].length + JSOP_POP_LENGTH;
+        if (value > store || !Decompile(ss, value, (intN)(store-value))) goto out;
+        initializer = JS_strdup(cx, PopStr(ss, JSOP_NOP));
+        if (!initializer) goto out;
+    }
+    ss->top = top;
+    ss->sprinter.offset = savedOffset;
+    off = 0;
+    if (objectPattern) off = Sprint(&ss->sprinter, "[(%s)]: ", key);
+    else if (GET_UINT16(refEnd + JSOP_GETLOCAL_LENGTH) == 2)
+        off = SprintCString(&ss->sprinter, "...");
+    if (off >= 0) off = named ? SprintCString(&ss->sprinter, name)
+                              : Sprint(&ss->sprinter, "%s[%s]", base, name);
+    if (off < 0 || (initializer &&
+        Sprint(&ss->sprinter, " = (%s)", initializer) < 0)) goto out;
+    pc = store + js_CodeSpec[*store].length;
+    if (pc[0] != JSOP_POP || pc[1] != JSOP_POP || pc[2] != JSOP_POP) goto out;
+    pc += 3 * JSOP_POP_LENGTH;
+    ok = JS_TRUE;
+  out:
+    JS_free(cx, key); JS_free(cx, base); JS_free(cx, name); JS_free(cx, initializer);
+    return ok ? pc : NULL;
+}
+
 /*
  * Starting with a SRC_DESTRUCT-annotated JSOP_DUP, decompile a destructuring
  * left-hand side object or array initialiser, including nested destructuring
@@ -1535,11 +1617,54 @@ DecompileDestructuring(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc)
         saveop = op;
 
         switch (op) {
+          case JSOP_PATTERNSTART:
+          {
+            JSBool first = JS_TRUE;
+            jsbytecode *finish;
+            sn = js_GetSrcNote(jp->script, pc);
+            LOCAL_ASSERT(sn && SN_TYPE(sn) == SRC_PATTERNARRAY);
+            finish = pc + js_GetSrcNoteOffset(sn, 0);
+            pc += JSOP_PATTERNSTART_LENGTH;
+            while (pc < finish && *pc != JSOP_ENDOF) {
+                if (!first && SprintPut(&ss->sprinter, ", ", 2) < 0) return NULL;
+                first = JS_FALSE;
+                if (*pc == JSOP_DUP) {
+                    pc += JSOP_DUP_LENGTH;
+                    LOCAL_ASSERT(*pc == JSOP_NOP);
+                    pc = DecompilePatternReference(ss, pc, endpc, JS_FALSE);
+                    if (!pc) return NULL;
+                } else {
+                    LOCAL_ASSERT(*pc == JSOP_PATTERNSTEP);
+                    hole = GET_UINT16(pc) == 0;
+                    if (GET_UINT16(pc) == 2 && SprintCString(&ss->sprinter, "...") < 0)
+                        return NULL;
+                    pc += JSOP_PATTERNSTEP_LENGTH;
+                    if (hole) {
+                        LOCAL_ASSERT(*pc == JSOP_POP);
+                        pc += JSOP_POP_LENGTH;
+                        if (*pc == JSOP_ENDOF && SprintPut(&ss->sprinter, ",", 1) < 0)
+                            return NULL;
+                    } else {
+                        pc = DecompileDestructuringLHS(ss, pc, endpc, &hole);
+                        if (!pc) return NULL;
+                    }
+                }
+            }
+            pc = finish;
+            goto out;
+          }
           case JSOP_NOP:
           {
             ptrdiff_t savedOffset;
             const char *key;
             sn = js_GetSrcNote(jp->script, pc);
+            if (sn && SN_TYPE(sn) == SRC_PATTERNREF) {
+                *OFF2STR(&ss->sprinter, head) = '{';
+                pc = DecompilePatternReference(ss, pc, endpc, JS_TRUE);
+                if (!pc) return NULL;
+                hole = JS_FALSE;
+                goto after_pattern_lhs;
+            }
             LOCAL_ASSERT(sn && SN_TYPE(sn) == SRC_PATTERNKEY);
             pc2 = pc + js_GetSrcNoteOffset(sn, 0);
             LOCAL_ASSERT(pc2 < endpc && *pc2 == JSOP_GETELEM);
@@ -1643,6 +1768,7 @@ DecompileDestructuring(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc)
         pc = DecompileDestructuringLHS(ss, pc, endpc, &hole);
         if (!pc)
             return NULL;
+      after_pattern_lhs:
         if (pc == endpc || *pc != JSOP_DUP)
             break;
 

@@ -548,6 +548,7 @@ typedef enum JSSrcNoteType {
     SRC_PARENLEFT   = 1,        /* parenthesized identifier assignment target */
     SRC_IF_ELSE     = 2,        /* JSOP_IFEQ bytecode is from an if-then-else */
     SRC_WHILE       = 3,        /* JSOP_IFEQ is from a while loop */
+    SRC_PATTERNREF  = 4,        /* NOP: key end, reference end, final store */
     SRC_FOR         = 4,        /* JSOP_NOP or JSOP_POP in for loop head */
     SRC_CONTINUE    = 5,        /* JSOP_GOTO is a continue, not a break;
                                    also used on JSOP_ENDINIT if extra comma
@@ -559,6 +560,7 @@ typedef enum JSSrcNoteType {
                                    next POP, or from CONDSWITCH to first CASE
                                    opcode, etc. -- always a forward delta */
     SRC_GROUPASSIGN = 7,        /* SRC_DESTRUCT variant for [a, b] = [c, d] */
+    SRC_PATTERNARRAY = 7,      /* ITERSTART: distance past cleanup handler */
     SRC_PATTERNDEFAULT = 7,    /* JSOP_DUP; distance to default target */
     SRC_PATTERNKEY  = 7,        /* JSOP_NOP before a computed pattern key;
                                    forward distance to its JSOP_GETELEM */

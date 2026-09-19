@@ -2637,3 +2637,40 @@ revalidated for this batch. Parameter initializers on the whole parameter,
 complete parameter-environment semantics, rest elements, assignment-reference
 ordering and iterator-based array patterns remain unfinished. This is not full
 ES2015 compliance.
+
+
+### Iterator-based patterns and captured assignment targets
+
+ES2015 array patterns use iterators, retain exhaustion, skip elision values,
+collect rest elements into arrays and close unfinished iterators. Destination
+references are captured before source access or defaults for both object and
+array assignments. Legacy selected-edition patterns retain indexed behavior.
+Cache version 54 records the iterator opcodes and source notes; source and XDR
+round trips include nested/rest patterns, reference capture and wide branches.
+The focused reference, array, rest and wide fixtures pass 60 checks, and the
+native pattern probe passes 13 checks. The upstream destructuring subset passes
+291 of 299 cases; its remaining cases require classes or whole-parameter
+defaults. This diagnostic result is not a complete conformance result.
+The complete pinned ES2015 run passes **28,147 modes**, with **421 failures**,
+14 unsupported modules and no harness errors, crashes or timeouts: **62 gained,
+zero lost**. All **11,540 ES5 cases** pass on the same frozen macOS arm64 runtime.
+All four applications pass root build, package and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout checks and
+ChatZilla in Suite and XULRunner. Reports use `artifacts/es6/array-patterns-final-*`;
+all four engine hashes match the conformance runtime:
+`8a0abdef0880abc202bb7e139fba773d59d11d66764096c265a2815c3bb2dbb4`.
+C89 diagnostics and focused legacy-application checks pass. Array-literal
+spread, function-call spread, whole-parameter defaults, complete parameter
+environments, classes and modules remain unfinished. This is not full ES2015
+compliance; other platforms have not been revalidated for this batch.
+
+The wide immutable-write fixture now supplies `Array.prototype[Symbol.iterator]`
+on its array-like ES2015 input, so execution reaches the intended constant-write
+error. Its 24 assertions remain unchanged. The ES5 diagnostic likewise retains
+54 exception assertions with an iterable modern input and original legacy
+inputs. Initial package-check logs are retained under
+`array-patterns-final-*.initial*.log`; upstream Test262 files are unchanged.
+
+The initial orchestration watchers stopped while a failed package log was being
+rotated. Their diagnostics are retained; complete restarted conformance and
+desktop runs above passed their required checks against the unchanged engine.

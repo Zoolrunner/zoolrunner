@@ -1523,3 +1523,19 @@ including Calendar views and Suite/XULRunner ChatZilla. Whole-parameter
 defaults, parameter environments, rest patterns, assignment-reference ordering
 and iterator-based array patterns remain unfinished. Other platforms have not
 been revalidated for this batch.
+
+
+Modern iterator patterns and captured assignment references use cache version
+54. Run `array-patterns.js`, `array-rest.js`, `array-patterns-wide.js`,
+`pattern-references.js`, `pattern-references-wide.js` and the native pattern/XDR
+probe. Preserve source-key/target/getter/default ordering, one-time reference
+resolution, elision behavior, exhaustion, iterator closing, generator return,
+wide branches, rest arrays and selected-legacy indexed patterns. Local modern
+error fixtures must use iterables when testing a later getter/constant-write
+error; retain their legacy inputs and exception assertions. The validated
+macOS arm64 baseline passes 28,147 ES2015 modes and all 11,540 ES5 modes, with
+421 failures and 14 unsupported modules remaining and no harness errors,
+crashes or timeouts. All four applications pass build/package/runtime checks,
+including Calendar views and Suite/XULRunner ChatZilla. Other platforms remain
+unvalidated for this batch. Spread expressions, whole-parameter defaults,
+parameter environments, classes and modules remain unfinished.

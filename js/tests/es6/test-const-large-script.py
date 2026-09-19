@@ -25,7 +25,7 @@ function verify(fn, label) {
     checks++;
 }
 var writes=['fixed=2', 'fixed+=2', '[fixed]=[2]',
-            '[fixed]=({0:2,length:1})', '({value:fixed}={value:2})', '(fixed)=2', '(fixed)+=2'];
+            '[fixed]=({0:2,length:1,[Symbol.iterator]:Array.prototype[Symbol.iterator]})', '({value:fixed}={value:2})', '(fixed)=2', '(fixed)+=2'];
 for (var i=0;i<writes.length;i++) {
     var fn=evaluate(source.replace('WRITE',writes[i]),'extended-const-operand');
     verify(fn, 'compiled '+writes[i]);

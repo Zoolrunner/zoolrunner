@@ -6777,6 +6777,22 @@ interrupt:
 
 #undef FAST_LOCAL_INCREMENT_OP
 
+          BEGIN_CASE(JSOP_PATTERNSTART)
+            SAVE_SP_AND_PC(fp);
+            obj = js_PatternStart(cx, sp[-1]);
+            if (!obj) { ok = JS_FALSE; goto out; }
+            sp[-1] = OBJECT_TO_JSVAL(obj);
+          END_CASE(JSOP_PATTERNSTART)
+
+          BEGIN_CASE(JSOP_PATTERNSTEP)
+            SAVE_SP_AND_PC(fp);
+            ok = GET_UINT16(pc) == 2
+                 ? js_PatternRest(cx, JSVAL_TO_OBJECT(sp[-1]), &rval)
+                 : js_PatternStep(cx, JSVAL_TO_OBJECT(sp[-1]), GET_UINT16(pc) != 0, &rval);
+            if (!ok) goto out;
+            PUSH_OPND(rval);
+          END_CASE(JSOP_PATTERNSTEP)
+
           BEGIN_CASE(JSOP_FOROF)
             SAVE_SP_AND_PC(fp);
             obj = js_ForOfStart(cx, sp[-1]);

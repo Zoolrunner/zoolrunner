@@ -741,3 +741,13 @@ and **14 unsupported modules**, with no harness errors, crashes or timeouts
 build/package/runtime checks pass. Full ES2015 compliance remains unfinished;
 other platforms remain unvalidated for this batch. See
 [the defaults validation record](js/tests/es6/README.md#destructuring-defaults).
+
+ES2015 array patterns now consume iterators, support rest elements, retain
+exhaustion and close unfinished iterators. Object and array assignments capture
+the destination before source getters or defaults. Legacy selected-edition
+patterns retain indexed access. The latest full macOS arm64 result is
+**28,147 ES2015 passes**, **421 failures**, **14 unsupported modules**, and no
+harness errors, crashes or timeouts (**62 gained, zero lost**). All **11,540 ES5
+cases** and all four application build/package/runtime checks pass. Full ES2015
+compliance remains unfinished; other platforms remain unvalidated for this
+batch. See [the iterator-pattern validation record](js/tests/es6/README.md#iterator-based-patterns-and-captured-assignment-targets).

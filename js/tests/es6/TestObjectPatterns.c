@@ -39,6 +39,9 @@ int main(void)
         "key[Symbol.toPrimitive]=function(){gc();return symbol};"
         "pattern({get nested(){gc();return {x:9}},blank:3})===9 && hits===2 && "
         "computed(values,null,key)===21 && "
+        "(function(v){var [a,...r]=v;gc();return r.join()})([1,2,3])==='2,3' && "
+        "(function(o,d){({x:d.y=(gc(),7)}=o);return d.y})({},{})===7 && "
+        "(function(v){var [a,,b=(gc(),4)]=v;return a+b})([2])===6 && "
         "(function({x=(gc(),5)}){return x})({})===5 && "
         "(function(o){let {x=(gc(),3),y=x+1}=o;return y})({})===4";
     const char *legacy = "function old(v){var [a,b]=v;return a+b}old([3,4])===7";

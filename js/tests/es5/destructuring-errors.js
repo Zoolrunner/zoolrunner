@@ -38,9 +38,14 @@ for (var e=0; e<editions.length; ++e) {
         try { copy(); } catch(error) { caught = error instanceof TypeError; }
         check(caught, 'decompilation round trip '+editions[e]+'/'+i);
     }
+    /* Modern array patterns require an iterable. Keep the historical indexed
+     * object in legacy editions and the same throwing element getter in ES2015. */
+    var inner = editions[e] === 2015
+        ? 'Object.defineProperty([],"0",{get:function(){order+="g";throw new RangeError("original");}})'
+        : '{get 0(){order+="g";throw new RangeError("original");}}';
     check(compileIn(editions[e],
         'var order=""; function diagnosticGetter(){var x;' +
-        '[[x]]=[{get 0(){order+="g";throw new RangeError("original");}}];}' +
+        '[[x]]=['+inner+'];}' +
         'var caught=false;try{diagnosticGetter();}catch(e){caught=e instanceof RangeError && e.message==="original";}' +
         'caught && order==="g"'), 'preserve getter exception '+editions[e]);
     check(compileIn(editions[e],

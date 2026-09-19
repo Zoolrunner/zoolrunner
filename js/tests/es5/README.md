@@ -479,3 +479,8 @@ chain: `SPROP_IS_DUPLICATE` is mutable on shared property-tree nodes and can
 reflect an unrelated function. The regression compiles valid strict functions
 after both successful duplicate-parameter functions and failed compilations,
 and checks Function construction, decompilation and garbage collection.
+
+The destructuring-error diagnostic keeps its indexed object in legacy editions.
+ES2015 now uses an array with the same throwing element getter, because modern
+array patterns require an iterable. Both paths must preserve the original
+RangeError and message; all 54 checks remain required.

@@ -453,7 +453,7 @@ js_IteratorCloseThrow(JSContext *cx, JSObject *iterator)
 /* Private for-of state: underlying iterator, retained value, close eligibility.
  * Reserved slots trace values across callbacks without exposing mutable state. */
 static JSClass forOfClass = {
-    "For Of State", JSCLASS_HAS_RESERVED_SLOTS(3),
+    "For Of State", JSCLASS_HAS_RESERVED_SLOTS(4),
     JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
     JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
@@ -534,6 +534,95 @@ js_ForOfNext(JSContext *cx, JSObject *state, JSBool *more)
     }
     ok = JS_TRUE;
   out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* Array patterns retain exhaustion independently of whether closing is due.
+ * Failures from next/done/value finish the record without calling return. */
+JSObject *
+js_PatternStart(JSContext *cx, jsval input)
+{
+    JSObject *state = js_ForOfStart(cx, input);
+    if (state) {
+        JS_SetReservedSlot(cx, state, 2, JSVAL_TRUE);
+        JS_SetReservedSlot(cx, state, 3, JSVAL_FALSE);
+    }
+    return state;
+}
+
+JSBool
+js_PatternStep(JSContext *cx, JSObject *state, JSBool readValue, jsval *value)
+{
+    jsval roots[4], exhausted;
+    JSTempValueRooter root;
+    JSObject *iterator, *result;
+    JSBool done, ok = JS_FALSE;
+    uintN i;
+    *value = JSVAL_VOID;
+    JS_GetReservedSlot(cx, state, 3, &exhausted);
+    if (exhausted == JSVAL_TRUE) return JS_TRUE;
+    for (i=0; i<4; i++) roots[i] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    JS_GetReservedSlot(cx, state, 0, &roots[0]);
+    iterator = JSVAL_TO_OBJECT(roots[0]);
+    JS_SetReservedSlot(cx, state, 2, JSVAL_FALSE);
+    JS_SetReservedSlot(cx, state, 3, JSVAL_TRUE);
+    if (!JS_GetProperty(cx, iterator, "next", &roots[1])) goto out;
+    if (!js_IsCallable(cx, roots[1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "iterator next");
+        goto out;
+    }
+    if (!js_InternalCall(cx, iterator, roots[1], 0, NULL, &roots[2])) goto out;
+    if (JSVAL_IS_PRIMITIVE(roots[2])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_BAD_ITERATOR_RETURN, "iterator", "next");
+        goto out;
+    }
+    result = JSVAL_TO_OBJECT(roots[2]);
+    if (!JS_GetProperty(cx, result, "done", &roots[3]) ||
+        !JS_ValueToBoolean(cx, roots[3], &done)) goto out;
+    if (!done) {
+        if (readValue && !JS_GetProperty(cx, result, "value", &roots[3])) goto out;
+        if (readValue) *value = roots[3];
+        JS_SetReservedSlot(cx, state, 2, JSVAL_TRUE);
+        JS_SetReservedSlot(cx, state, 3, JSVAL_FALSE);
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_PatternRest(JSContext *cx, JSObject *state, jsval *value)
+{
+    jsval roots[2], exhausted;
+    JSTempValueRooter root;
+    IteratorIdRoot indexRoot;
+    JSObject *array;
+    jsdouble index = 0;
+    JSBool ok = JS_FALSE;
+    roots[0] = roots[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    indexRoot.id = INT_TO_JSID(0);
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIteratorId, &indexRoot.root);
+    array = js_NewArrayObject(cx, 0, NULL);
+    if (!array) goto out;
+    roots[0] = OBJECT_TO_JSVAL(array);
+    for (;;) {
+        if (!js_PatternStep(cx, state, JS_TRUE, &roots[1])) goto out;
+        JS_GetReservedSlot(cx, state, 3, &exhausted);
+        if (exhausted == JSVAL_TRUE) break;
+        if (!js_ArrayLikeIndex(cx, index, &indexRoot.id) ||
+            !js_CreateDataPropertyOrThrow(cx, array, indexRoot.id, roots[1])) goto out;
+        ++index;
+    }
+    *value = roots[0];
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &indexRoot.root);
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
 }

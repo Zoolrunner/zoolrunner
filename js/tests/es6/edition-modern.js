@@ -167,6 +167,11 @@ function modernWindowEdition() {
                          function parameter({value=5}) { return value; }
                          var restored=eval('('+parameter.toString()+')');
                          return x===3 && y===4 && restored({})===5; })() &&
+           (function() { var [first,...rest]=[1,2,3], target={}, events=[];
+                         function destination() { events.push('target'); return target; }
+                         ({x:destination().value}={get x(){events.push('get');return 7}});
+                         return first===1 && rest.join()==='2,3' && target.value===7 &&
+                                events.join()==='target,get'; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

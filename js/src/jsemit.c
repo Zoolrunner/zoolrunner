@@ -3320,8 +3320,8 @@ EmitDestructuringDecls(JSContext *cx, JSCodeGenerator *cg, JSOp prologOp,
     JSParseNode *pn2, *pn3;
     DestructuringDeclEmitter emitter;
 
-    if (pn->pn_type == TOK_ASSIGN) {
-        pn = pn->pn_left;
+    if (pn->pn_type == TOK_ASSIGN || pn->pn_type == TOK_ELLIPSIS) {
+        pn = pn->pn_type == TOK_ELLIPSIS ? pn->pn_kid : pn->pn_left;
         emitter = pn->pn_type == TOK_NAME ? EmitDestructuringDecl
                                           : EmitDestructuringDecls;
         return emitter(cx, cg, prologOp, pn);
@@ -3478,6 +3478,141 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
     return JS_TRUE;
 }
 
+/* Capture a simple destination before reading its source property.  The
+ * source and key stay rooted below the reference until the final store. */
+static JSBool
+EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
+                     JSParseNode *target, JSParseNode *initializer, JSBool rest)
+{
+    JSParseNode key;
+    JSAtomListElement *ale;
+    jsatomid atomIndex = 0;
+    jsuint sourceSlot = cg->stackDepth - 1;
+    ptrdiff_t start, note, keyEnd, refEnd, store, branch, defStart, defNote;
+
+    if (sourceSlot >= JS_BIT(16) - 1) {
+        ReportStatementTooLarge(cx, cg);
+        return JS_FALSE;
+    }
+    start = CG_OFFSET(cg);
+    note = js_NewSrcNote(cx, cg, SRC_PATTERNREF);
+    if (note < 0 || js_Emit1(cx, cg, JSOP_NOP) < 0) return JS_FALSE;
+    if (property) key = *property;
+    if (!property) {
+        if (js_Emit1(cx, cg, JSOP_PUSH) < 0) return JS_FALSE;
+    } else if (key.pn_type == TOK_COMPUTED_NAME) {
+        if (!js_EmitTree(cx, cg, key.pn_kid) ||
+            js_Emit1(cx, cg, JSOP_PROPERTYKEY) < 0) return JS_FALSE;
+    } else if (key.pn_type == TOK_NUMBER) {
+        if (!EmitNumberOp(cx, key.pn_dval, cg)) return JS_FALSE;
+    } else {
+        if (!EmitAtomOp(cx, &key, JSOP_STRING, cg)) return JS_FALSE;
+    }
+    keyEnd = CG_OFFSET(cg);
+    if (target->pn_type == TOK_NAME) {
+        ale = js_IndexAtom(cx, target->pn_atom, &cg->atomList);
+        if (!ale) return JS_FALSE;
+        atomIndex = ALE_INDEX(ale);
+        EMIT_ATOM_INDEX_OP(JSOP_BINDREF, atomIndex);
+    } else {
+        if (target->pn_type == TOK_DOT) {
+            if (!js_EmitTree(cx, cg, target->pn_expr) ||
+                !EmitAtomOp(cx, target, JSOP_STRING, cg)) return JS_FALSE;
+        } else {
+            if (!js_EmitTree(cx, cg, target->pn_left) ||
+                !js_EmitTree(cx, cg, target->pn_right)) return JS_FALSE;
+        }
+        if (js_Emit1(cx, cg, JSOP_CHECKELEMENT) < 0) return JS_FALSE;
+    }
+    refEnd = CG_OFFSET(cg);
+    EMIT_UINT16_IMM_OP(JSOP_GETLOCAL, sourceSlot);
+    if (property) {
+        EMIT_UINT16_IMM_OP(JSOP_GETLOCAL, sourceSlot + 1);
+        if (js_Emit1(cx, cg, JSOP_GETELEM) < 0) return JS_FALSE;
+    } else {
+        EMIT_UINT16_IMM_OP(JSOP_PATTERNSTEP, rest ? 2 : 1);
+        if (js_Emit1(cx, cg, JSOP_SWAP) < 0 ||
+            js_Emit1(cx, cg, JSOP_POP) < 0) return JS_FALSE;
+    }
+    if (initializer) {
+        defStart = CG_OFFSET(cg);
+        defNote = js_NewSrcNote(cx, cg, SRC_PATTERNDEFAULT);
+        if (defNote < 0 || js_Emit1(cx, cg, JSOP_DUP) < 0 ||
+            js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, cg, JSOP_NEW_EQ) < 0) return JS_FALSE;
+        branch = EmitJump(cx, cg, JSOP_IFEQ, 0);
+        if (branch < 0 || js_Emit1(cx, cg, JSOP_POP) < 0 ||
+            !js_EmitTree(cx, cg, initializer) ||
+            !js_SetJumpOffset(cx, cg, CG_CODE(cg, branch), CG_OFFSET(cg)-branch) ||
+            !js_SetSrcNoteOffset(cx, cg, (uintN)defNote, 0, CG_OFFSET(cg)-defStart))
+            return JS_FALSE;
+    }
+    store = CG_OFFSET(cg);
+    if (target->pn_type == TOK_NAME) {
+        EMIT_ATOM_INDEX_OP(JSOP_SETREF, atomIndex);
+    } else if (js_Emit1(cx, cg, JSOP_SETELEM) < 0) return JS_FALSE;
+    if (js_Emit1(cx, cg, JSOP_POP) < 0 || js_Emit1(cx, cg, JSOP_POP) < 0 ||
+        js_Emit1(cx, cg, JSOP_POP) < 0) return JS_FALSE;
+    return js_SetSrcNoteOffset(cx, cg, (uintN)note, 0, keyEnd-start-1) &&
+           js_SetSrcNoteOffset(cx, cg, (uintN)note, 1, refEnd-start-1) &&
+           js_SetSrcNoteOffset(cx, cg, (uintN)note, 2, store-start-1);
+}
+
+static JSBool
+EmitArrayPattern(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn, JSOp declOp)
+{
+    JSParseNode *item, *target, *initializer;
+    jsuint depth = cg->stackDepth;
+    ptrdiff_t start, note, begin, end, handler, skip;
+    JSBool hole, rest;
+    if (depth >= JS_BIT(16)-1) {
+        ReportStatementTooLarge(cx, cg);
+        return JS_FALSE;
+    }
+    if (js_Emit1(cx, cg, JSOP_DUP) < 0) return JS_FALSE;
+    start = CG_OFFSET(cg);
+    note = js_NewSrcNote(cx, cg, SRC_PATTERNARRAY);
+    if (note < 0 || js_Emit1(cx, cg, JSOP_PATTERNSTART) < 0) return JS_FALSE;
+    begin = CG_OFFSET(cg);
+    for (item=pn->pn_head; item; item=item->pn_next) {
+        rest = item->pn_type == TOK_ELLIPSIS;
+        target = rest ? item->pn_kid : item;
+        initializer = NULL;
+        if (target->pn_type == TOK_ASSIGN) {
+            initializer = target->pn_right;
+            target = target->pn_left;
+        }
+        while (target->pn_type == TOK_RP) target = target->pn_kid;
+        if (target->pn_type == TOK_NAME &&
+            !BindNameToSlot(cx, &cg->treeContext, target, JS_FALSE)) return JS_FALSE;
+        if ((target->pn_type == TOK_NAME && target->pn_slot < 0) ||
+            target->pn_type == TOK_DOT || target->pn_type == TOK_LB) {
+            if (js_Emit1(cx, cg, JSOP_DUP) < 0 ||
+                !EmitPatternReference(cx, cg, NULL, target, initializer, rest)) return JS_FALSE;
+        } else {
+            hole = target->pn_type == TOK_COMMA && target->pn_arity == PN_NULLARY;
+            EMIT_UINT16_IMM_OP(JSOP_PATTERNSTEP, rest ? 2 : !hole);
+            if (hole) {
+                if (js_Emit1(cx, cg, JSOP_POP) < 0) return JS_FALSE;
+            } else if (!EmitDestructuringLHS(cx, cg, rest ? item->pn_kid : item, JS_TRUE, declOp))
+                return JS_FALSE;
+        }
+    }
+    end = CG_OFFSET(cg);
+    if (js_Emit1(cx, cg, JSOP_ENDOF) < 0) return JS_FALSE;
+    skip = EmitJump(cx, cg, JSOP_GOTO, 0);
+    if (skip < 0) return JS_FALSE;
+    handler = CG_OFFSET(cg);
+    EMIT_UINT16_IMM_OP(JSOP_SETSP, depth + 1);
+    cg->stackDepth = depth + 1;
+    if (js_Emit1(cx, cg, JSOP_THROWOF) < 0) return JS_FALSE;
+    CHECK_AND_SET_JUMP_OFFSET_AT(cx, cg, skip);
+    ++cg->treeContext.tryCount;
+    if (!js_AllocTryNotes(cx, cg) ||
+        !js_NewTryNote(cx, cg, begin, end, handler)) return JS_FALSE;
+    return js_SetSrcNoteOffset(cx, cg, (uintN)note, 0, CG_OFFSET(cg)-start);
+}
+
 /*
  * Recursive helper for EmitDestructuringOps.
  *
@@ -3490,7 +3625,7 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                            JSOp declOp)
 {
     jsuint index;
-    JSParseNode *pn2, *pn3;
+    JSParseNode *pn2, *pn3, *target, *initializer;
     JSBool doElemOp;
     ptrdiff_t keyStart, keyNote;
 
@@ -3501,6 +3636,8 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
     JS_ASSERT(pn->pn_type == TOK_RB || pn->pn_type == TOK_RC);
 #endif
 
+    if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RB)
+        return EmitArrayPattern(cx, cg, pn, declOp);
     if (pn->pn_count == 0) {
         /* Preserve the empty object's shape as well as its coercibility check. */
         if (js_Emit1(cx, cg, JSOP_DUP) < 0) return JS_FALSE;
@@ -3523,6 +3660,25 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
          * "label" on the left of a colon in the object initialiser.  Set pn3
          * to the lvalue node, which is in the value-initializing position.
          */
+        if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_RC) {
+            target = pn2->pn_right;
+            initializer = NULL;
+            if (target->pn_type == TOK_ASSIGN) {
+                initializer = target->pn_right;
+                target = target->pn_left;
+            }
+            while (target->pn_type == TOK_RP) target = target->pn_kid;
+            if (target->pn_type == TOK_NAME &&
+                !BindNameToSlot(cx, &cg->treeContext, target, JS_FALSE))
+                return JS_FALSE;
+            if ((target->pn_type == TOK_NAME && target->pn_slot < 0) ||
+                target->pn_type == TOK_DOT || target->pn_type == TOK_LB) {
+                if (!EmitPatternReference(cx, cg, pn2->pn_left, target, initializer, JS_FALSE))
+                    return JS_FALSE;
+                ++index;
+                continue;
+            }
+        }
         doElemOp = JS_TRUE;
         if (pn->pn_type == TOK_RB) {
             if (!EmitNumberOp(cx, index, cg))
@@ -3695,7 +3851,8 @@ MaybeEmitGroupAssignment(JSContext *cx, JSCodeGenerator *cg, JSOp declOp,
     JS_ASSERT(*pop == JSOP_POP || *pop == JSOP_POPV);
     lhs = pn->pn_left;
     rhs = pn->pn_right;
-    if (lhs->pn_type == TOK_RB && rhs->pn_type == TOK_RB &&
+    if (!JS_VERSION_IS_ES2015(cx) &&
+        lhs->pn_type == TOK_RB && rhs->pn_type == TOK_RB &&
         lhs->pn_count <= rhs->pn_count &&
         (rhs->pn_count == 0 ||
          rhs->pn_head->pn_type != TOK_DEFSHARP)) {

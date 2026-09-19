@@ -2701,7 +2701,7 @@ CheckDestructuring(JSContext *cx, BindData *data,
      * the historical constant-key grammar and cannot validate these patterns. */
     if (JS_VERSION_IS_ES2015(cx)) {
         right = NULL;
-        left->pn_extra &= ~PNX_COVERINIT;
+        left->pn_extra &= ~(PNX_COVERINIT | PNX_COVERREST);
     }
     if (left->pn_type == TOK_ARRAYCOMP) {
         js_ReportCompileErrorNumber(cx, left, JSREPORT_PN | JSREPORT_ERROR,
@@ -2734,6 +2734,17 @@ CheckDestructuring(JSContext *cx, BindData *data,
                 }
             }
 
+            if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_ELLIPSIS) {
+                if (lhs->pn_next || (left->pn_extra & PNX_ENDCOMMA) ||
+                    pn->pn_kid->pn_type == TOK_ASSIGN ||
+                    (data && pn->pn_kid->pn_type != TOK_NAME)) {
+                    js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
+                                                JSMSG_STRICT_SYNTAX);
+                    ok = JS_FALSE;
+                    goto out;
+                }
+                pn = pn->pn_kid;
+            }
             if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_ASSIGN &&
                 pn->pn_op == JSOP_NOP) pn = pn->pn_left;
             /* Nullary comma is an elision; binary comma is an expression.*/
@@ -6173,6 +6184,14 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     /* So CURRENT_TOKEN gets TOK_COMMA and not TOK_LB. */
                     js_MatchToken(cx, ts, TOK_COMMA);
                     pn2 = NewParseNode(cx, ts, PN_NULLARY, tc);
+                } else if (tt == TOK_ELLIPSIS && JS_VERSION_IS_ES2015(cx)) {
+                    js_GetToken(cx, ts);
+                    pn2 = NewParseNode(cx, ts, PN_UNARY, tc);
+                    if (!pn2) return NULL;
+                    pn2->pn_type = TOK_ELLIPSIS;
+                    pn2->pn_kid = AssignExpr(cx, ts, tc);
+                    if (!pn2->pn_kid) return NULL;
+                    pn->pn_extra |= PNX_COVERREST;
                 } else {
                     pn2 = AssignExpr(cx, ts, tc);
                 }
@@ -7307,8 +7326,9 @@ js_FoldConstants(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
         return JS_FALSE;
     }
 
-    if (pn->pn_type == TOK_RC && pn->pn_arity == PN_LIST &&
-        (pn->pn_extra & PNX_COVERINIT)) {
+    if (pn->pn_arity == PN_LIST &&
+        ((pn->pn_type == TOK_RC && (pn->pn_extra & PNX_COVERINIT)) ||
+         (pn->pn_type == TOK_RB && (pn->pn_extra & PNX_COVERREST)))) {
         js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
                                     JSMSG_STRICT_SYNTAX);
         return JS_FALSE;
