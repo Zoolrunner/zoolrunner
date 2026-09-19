@@ -52,6 +52,16 @@ JS_BEGIN_EXTERN_C
 /*
  * JS operation bytecodes.
  */
+/* Integer selectors for the atom-directed extended opcode. */
+#define JS_EXT_SUPER_REF 1
+#define JS_EXT_SUPER_GET 2
+#define JS_EXT_SUPER_SET 3
+#define JS_EXT_SUPER_PREINC 4
+#define JS_EXT_SUPER_POSTINC 5
+#define JS_EXT_SUPER_PREDEC 6
+#define JS_EXT_SUPER_POSTDEC 7
+#define JS_EXT_SUPER_DELETE 8
+
 typedef enum JSOp {
 #define OPDEF(op,val,name,token,length,nuses,ndefs,prec,format) \
     op = val,

@@ -17,6 +17,7 @@ REFLECT_NATIVE(js_ReflectIsExtensible);
 REFLECT_NATIVE(js_ReflectPreventExtensions);
 REFLECT_NATIVE(js_ReflectSetPrototypeOf);
 REFLECT_NATIVE(js_ReflectSet);
+REFLECT_NATIVE(js_ReflectGet);
 #undef REFLECT_NATIVE
 JS_END_EXTERN_C
 #endif

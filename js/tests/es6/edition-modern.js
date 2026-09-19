@@ -193,6 +193,11 @@ function modernWindowEdition() {
                          return a.length===5 && !(3 in a) &&
                                 a.slice(...[1,3]).join()==='1,2' &&
                                 c.total===7 && c.target===C && eval(...['local'])===9; })() &&
+           (function() { var base={get value(){return this.saved},set value(v){this.saved=v}},
+                             o={saved:7,m(){super.value+=2;return ()=>super.value},
+                                e(){return eval('super.value')}};
+                         Object.setPrototypeOf(o,base);
+                         return o.m()()===9 && o.e()===9; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

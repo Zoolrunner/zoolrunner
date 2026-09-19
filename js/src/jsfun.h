@@ -74,6 +74,18 @@ struct JSFunction {
 #define JSFUN_KIND_ARROW    1
 #define JSFUN_KIND_REST     2
 #define JSFUN_KIND_GENERATOR 4
+#define JSFUN_KIND_HOME_OBJECT 8
+#define FUN_HAS_HOME_OBJECT(fun) (((fun)->kind & JSFUN_KIND_HOME_OBJECT) != 0)
+#define JSFUN_HOME_SLOT(fun) (2 + (fun)->u.i.nregexps + \
+    (((fun)->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0) + (FUN_IS_ARROW(fun) ? 1 : 0))
+extern JSBool js_SetFunctionHomeObject(JSContext *, JSObject *, JSObject *);
+extern JSBool js_GetFunctionHomeObject(JSContext *, JSObject *, JSObject **);
+extern JSBool js_GetFunctionSuperBase(JSContext *, JSObject *, JSObject **);
+extern JSBool js_IsSuperReference(JSContext *, JSObject *);
+extern JSObject *js_NewSuperReference(JSContext *, JSObject *, jsval, jsval, JSBool);
+extern JSBool js_GetSuperReference(JSContext *, JSObject *, jsval *);
+extern JSBool js_SetSuperReference(JSContext *, JSObject *, jsval);
+extern JSBool js_UpdateSuperReference(JSContext *, JSObject *, JSBool, JSBool, jsval *);
 #define FUN_IS_GENERATOR(fun) (((fun)->kind & JSFUN_KIND_GENERATOR) != 0)
 #define FUN_IS_ARROW(fun) (((fun)->kind & JSFUN_KIND_ARROW) != 0)
 #define FUN_HAS_REST(fun) (((fun)->kind & JSFUN_KIND_REST) != 0)

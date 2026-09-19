@@ -58,6 +58,7 @@
 #include "jsinterp.h"
 #include "jsiteres6.h"
 #include "jsproxy.h"
+#include "jsreflect.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
@@ -1497,7 +1498,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         goto bad;
     }
 
-    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR) ||
+    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR | JSFUN_KIND_HOME_OBJECT) ||
         (FUN_IS_ARROW(fun) && FUN_IS_GENERATOR(fun))) {
         JS_ReportError(cx, "invalid serialized function kind");
         goto bad;
@@ -1832,7 +1833,7 @@ fun_reserveSlots(JSContext *cx, JSObject *obj)
     if (fun && FUN_INTERPRETED(fun)) {
         /* Function.prototype owns the realm's shared ThrowTypeError. */
         return fun->u.i.nregexps + ((fun->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0) +
-               (FUN_IS_ARROW(fun) ? 1 : 0);
+               (FUN_IS_ARROW(fun) ? 1 : 0) + (FUN_HAS_HOME_OBJECT(fun) ? 1 : 0);
     }
     return fun->u.n.spare;
 }
@@ -2810,6 +2811,155 @@ static JSClass arrowBindingClass = {
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
+/* Home objects belong to function instances, not shared compiler templates.
+ * Traced reserved slots keep them alive without exposing a JS property. */
+JSBool
+js_SetFunctionHomeObject(JSContext *cx, JSObject *function, JSObject *home)
+{
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, function);
+    JS_ASSERT(fun && FUN_INTERPRETED(fun) && FUN_HAS_HOME_OBJECT(fun));
+    return JS_SetReservedSlot(cx, function, JSFUN_HOME_SLOT(fun), OBJECT_TO_JSVAL(home));
+}
+
+JSBool
+js_GetFunctionHomeObject(JSContext *cx, JSObject *function, JSObject **home)
+{
+    JSFunction *fun = (JSFunction *)JS_GetPrivate(cx, function);
+    jsval value;
+    *home = NULL;
+    if (!fun || !FUN_HAS_HOME_OBJECT(fun)) return JS_TRUE;
+    if (!JS_GetReservedSlot(cx, function, JSFUN_HOME_SLOT(fun), &value))
+        return JS_FALSE;
+    if (JSVAL_IS_OBJECT(value)) *home = JSVAL_TO_OBJECT(value);
+    return JS_TRUE;
+}
+
+JSBool
+js_GetFunctionSuperBase(JSContext *cx, JSObject *function, JSObject **base)
+{
+    JSObject *home;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!js_GetFunctionHomeObject(cx, function, &home)) return JS_FALSE;
+    *base = NULL;
+    if (!home) return JS_TRUE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, home, &root);
+    if (js_IsProxy(cx, home)) {
+        ok = js_ProxyGetPrototype(cx, home, base);
+    } else {
+        *base = OBJ_GET_PROTO(cx, home);
+        ok = JS_TRUE;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* A captured super reference retains its base and actual receiver across RHS
+ * callbacks. It is an interpreter value, never an application-visible object. */
+static JSClass superReferenceClass = {
+    "Super Reference", JSCLASS_HAS_RESERVED_SLOTS(4) | JSCLASS_IS_ANONYMOUS |
+    JSCLASS_HAS_CACHED_PROTO(JSProto_Object),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+JSBool
+js_IsSuperReference(JSContext *cx, JSObject *object)
+{
+    return object && OBJ_GET_CLASS(cx, object) == &superReferenceClass;
+}
+
+JSObject *
+js_NewSuperReference(JSContext *cx, JSObject *function, jsval receiver,
+                     jsval key, JSBool strict)
+{
+    jsval roots[4];
+    JSTempValueRooter root;
+    JSObject *base, *reference = NULL;
+    JSBool ok;
+    roots[0] = OBJECT_TO_JSVAL(function);
+    roots[1] = receiver;
+    roots[2] = key;
+    roots[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
+    if (!js_GetFunctionSuperBase(cx, function, &base)) goto out;
+    roots[3] = OBJECT_TO_JSVAL(base);
+    reference = js_NewObject(cx, &superReferenceClass, NULL, cx->globalObject);
+    if (!reference) goto out;
+    roots[0] = OBJECT_TO_JSVAL(reference);
+    ok = JS_SetPrototype(cx, reference, NULL) &&
+         JS_SetReservedSlot(cx, reference, 0, roots[3]) &&
+         JS_SetReservedSlot(cx, reference, 1, receiver) &&
+         JS_SetReservedSlot(cx, reference, 2, key) &&
+         JS_SetReservedSlot(cx, reference, 3, BOOLEAN_TO_JSVAL(strict));
+    if (!ok) reference = NULL;
+out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return reference;
+}
+
+JSBool
+js_GetSuperReference(JSContext *cx, JSObject *reference, jsval *result)
+{
+    jsval args[3];
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_ASSERT(OBJ_GET_CLASS(cx, reference) == &superReferenceClass);
+    if (!JS_GetReservedSlot(cx, reference, 0, &args[0]) ||
+        !JS_GetReservedSlot(cx, reference, 2, &args[1]) ||
+        !JS_GetReservedSlot(cx, reference, 1, &args[2])) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 3, args, &root);
+    ok = js_ReflectGet(cx, NULL, 3, args, result);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_SetSuperReference(JSContext *cx, JSObject *reference, jsval value)
+{
+    jsval args[4], strict, accepted;
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_ASSERT(OBJ_GET_CLASS(cx, reference) == &superReferenceClass);
+    if (!JS_GetReservedSlot(cx, reference, 0, &args[0]) ||
+        !JS_GetReservedSlot(cx, reference, 2, &args[1]) ||
+        !JS_GetReservedSlot(cx, reference, 1, &args[3]) ||
+        !JS_GetReservedSlot(cx, reference, 3, &strict)) return JS_FALSE;
+    args[2] = value;
+    JS_PUSH_TEMP_ROOT(cx, 4, args, &root);
+    ok = js_ReflectSet(cx, NULL, 4, args, &accepted);
+    if (ok && strict == JSVAL_TRUE && accepted == JSVAL_FALSE) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+        ok = JS_FALSE;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_UpdateSuperReference(JSContext *cx, JSObject *reference, JSBool increment,
+                        JSBool prefix, jsval *result)
+{
+    jsval roots[2];
+    jsdouble previous, next;
+    JSTempValueRooter root;
+    JSBool ok;
+    roots[0] = OBJECT_TO_JSVAL(reference);
+    roots[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    ok = js_GetSuperReference(cx, reference, &roots[1]) &&
+         JS_ValueToNumber(cx, roots[1], &previous);
+    if (ok) {
+        next = previous + (increment ? 1 : -1);
+        ok = JS_NewNumberValue(cx, next, &roots[1]) &&
+             js_SetSuperReference(cx, reference, roots[1]) &&
+             JS_NewNumberValue(cx, prefix ? next : previous, result);
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 JSBool
 js_GetArrowBindings(JSContext *cx, JSObject *function, jsval *thisValue,
                     JSObject **newTarget)
@@ -2907,6 +3057,11 @@ js_CaptureArrowBindings(JSContext *cx, JSObject *function, JSStackFrame *fp)
         }
     }
     ok = JS_SetReservedSlot(cx, function, JSFUN_ARROW_SLOT(fun), roots[2]);
+    if (ok && FUN_HAS_HOME_OBJECT(fun)) {
+        JSObject *home;
+        ok = fp->callee && js_GetFunctionHomeObject(cx, fp->callee, &home) &&
+             js_SetFunctionHomeObject(cx, function, home);
+    }
 out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
@@ -3027,6 +3182,11 @@ js_CloneFunctionObject(JSContext *cx, JSObject *funobj, JSObject *parent)
         jsval cell;
         metadataOK = JS_GetReservedSlot(cx, funobj, JSFUN_ARROW_SLOT(fun), &cell) &&
                      JS_SetReservedSlot(cx, newfunobj, JSFUN_ARROW_SLOT(fun), cell);
+    }
+    if (metadataOK && FUN_HAS_HOME_OBJECT(fun)) {
+        jsval home;
+        metadataOK = JS_GetReservedSlot(cx, funobj, JSFUN_HOME_SLOT(fun), &home) &&
+                     JS_SetReservedSlot(cx, newfunobj, JSFUN_HOME_SLOT(fun), home);
     }
     if (metadataOK) metadataOK = js_InitFunctionProperties(cx, newfunobj);
     JS_POP_TEMP_ROOT(cx, &metadataRoot);

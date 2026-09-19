@@ -1521,6 +1521,7 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     compilation.scopeChain = scope;
     compilation.varobj = inheritedStrict ? scope : direct ? caller->varobj : global;
     compilation.fun = direct && !inheritedStrict ? caller->fun : NULL;
+    compilation.callee = direct ? caller->callee : NULL;
     compilation.vars = direct ? caller->vars : NULL;
     compilation.nvars = direct ? caller->nvars : 0;
     compilation.flags = JSFRAME_EVAL | JSFRAME_EVAL_COMPILER |

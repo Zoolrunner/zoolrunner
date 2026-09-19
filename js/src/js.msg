@@ -318,3 +318,4 @@ MSG_DEF(JSMSG_SYMBOL_XDR,           235, 0, JSEXN_TYPEERR, "cannot serialize a S
 MSG_DEF(JSMSG_ARGUMENT_LIST_LIMIT,  236, 0, JSEXN_RANGEERR, "argument list exceeds the implementation limit")
 MSG_DEF(JSMSG_PROMISE_OPERATION,    237, 0, JSEXN_TYPEERR, "incompatible Promise receiver or callback")
 MSG_DEF(JSMSG_UNINITIALIZED_LEXICAL, 238, 0, JSEXN_REFERENCEERR, "cannot access an uninitialized lexical binding")
+MSG_DEF(JSMSG_DELETE_SUPER, 239, 0, JSEXN_REFERENCEERR, "cannot delete a super property")

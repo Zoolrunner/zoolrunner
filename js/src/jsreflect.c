@@ -37,8 +37,8 @@ RequireTarget(JSContext *cx, uintN argc, jsval *argv)
     }
     return JSVAL_TO_OBJECT(argv[0]);
 }
-static JSBool
-ReflectGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+JSBool
+js_ReflectGet(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     JSObject *target = RequireTarget(cx, argc, argv);
     ReflectIdRoot id;
@@ -133,7 +133,7 @@ static const ReflectMethod methods[] = {
     {"defineProperty", js_ReflectDefineProperty, 3},
     {"deleteProperty", js_ReflectDeleteProperty, 2},
     {"enumerate", js_ReflectEnumerate, 1},
-    {"get", ReflectGet, 2}, {"getOwnPropertyDescriptor", js_ReflectGetOwnPropertyDescriptor, 2},
+    {"get", js_ReflectGet, 2}, {"getOwnPropertyDescriptor", js_ReflectGetOwnPropertyDescriptor, 2},
     {"getPrototypeOf", js_ReflectGetPrototypeOf, 1}, {"has", ReflectHas, 2},
     {"isExtensible", js_ReflectIsExtensible, 1}, {"ownKeys", js_ReflectOwnKeys, 1},
     {"preventExtensions", js_ReflectPreventExtensions, 1}, {"set", js_ReflectSet, 3},

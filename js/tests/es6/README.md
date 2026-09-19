@@ -2842,3 +2842,41 @@ match the frozen conformance runtime:
 `28ca09fd4b1a86436944ece57598ac3cdb316c25c7b7bc00ad2bb0fa90b6ac21`.
 C89 checks pass. Full ES2015 compliance remains unfinished; this batch's
 validation is macOS arm64 only.
+
+
+## Method home objects and super properties
+
+Object methods and accessors retain their own traced home object; cloning,
+computed methods, generators and nested arrows preserve it. Modern `super.x`
+and `super[key]` support reads, calls, tagged/spread calls, assignment, compound
+assignment, updates, destructuring targets and for-in/for-of targets. Direct
+eval inherits method context; ordinary nested functions and indirect eval do
+not. A private reference captures the base, receiver, key and strictness before
+RHS callbacks. Base lookup follows the home object's current prototype, while
+getter/setter calls retain the original receiver. Deleting a super property
+throws ReferenceError. Class declarations and `super()` remain unfinished.
+
+Cache version 60 stores the function kind needed to reconstruct home objects;
+integer selectors extend the existing atom-directed instruction. The new tests
+are `super-properties.js` (33 assertions), `TestMethodHome.c` (75),
+`TestSuperReference.c` (36) and `TestSuperWide.c` (16). The wide probe exercises
+66,000 distinct atoms, XDR, source reconstruction and collection in accessors.
+It exposed a decompiler buffer relocation bug: copying an expression already
+inside the growing buffer must relocate its source pointer as well. Thirty
+repeated wide runs pass with allocation scribbling enabled. Real chrome/content
+fixtures also execute super accessors, an escaped arrow and direct eval.
+
+The initial complete isolated macOS arm64 run gains 16 cases with zero lost:
+**28,229 pass, 339 fail, 14 unsupported**, with zero harness errors, crashes or
+timeouts. All **11,540 ES5 cases** pass. The 1,020-case comparison against Node
+agrees after fixing a recursive Proxy trap and comparing global identity rather
+than host-specific global tags in the diagnostic fixture. Reports use
+`artifacts/es6/super-property-first-*`. Final integrated reports under
+`artifacts/es6/super-property-final-*` retain these totals and the 16 gained/zero
+lost result. All four applications pass root builds, packaging and relocated
+desktop checks, including Calendar's four views, 169 Browser navigation/layout
+checks and ChatZilla in Suite and XULRunner. All four engine hashes match the
+unchanged frozen conformance runtime:
+`284ae2f98e5d99b54a3407afa01e520861ced00348641700dc23d96d50445149`.
+C89 checks pass. Full ES2015 compliance remains unfinished; this batch's
+validation is macOS arm64 only.

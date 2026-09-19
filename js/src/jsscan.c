@@ -1555,6 +1555,12 @@ retry:
             TOKENBUF_OK() &&
             (kw = FindKeyword(TOKENBUF_BASE(), TOKENBUF_LENGTH()))) {
             if (kw->tokentype == TOK_RESERVED) {
+                if (JS_VERSION_IS_ES2015(cx) && !hadUnicodeEscape &&
+                    !strcmp(kw->chars, "super")) {
+                    tt = TOK_SUPER;
+                    tp->t_op = JSOP_NOP;
+                    goto out;
+                }
                 if (!strcmp(kw->chars, "class") || !strcmp(kw->chars, "enum") ||
                     !strcmp(kw->chars, "extends") || !strcmp(kw->chars, "super")) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,

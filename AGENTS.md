@@ -1550,3 +1550,13 @@ including cross-script window fixtures, GC, source/XDR round trips and split
 prolog/body execution. Internal lexical records must remain hidden from the
 historical `__parent__` accessor. Report the complete conformance and four-app
 results separately from focused probe totals.
+
+
+Preserve method home objects on each function instance, including clones,
+computed/accessor/generator methods and nested arrows. Direct eval inherits
+super-property context; indirect eval and ordinary nested functions do not.
+Captured super references must retain base, receiver and key across callbacks.
+Run `super-properties.js`, `TestMethodHome.c`, `TestSuperReference.c` and
+`TestSuperWide.c`, including XDR/source reconstruction, wide operands and GC.
+When the decompiler copies text from its own buffer, preserve source offsets
+across arena growth. Real chrome/content fixtures must also exercise super.

@@ -148,6 +148,7 @@ typedef enum JSTokenType {
     TOK_TEMPLATE_OBJECT,                /* tagged-template record */
     TOK_TEMPLATE_SEGMENT,               /* cooked/raw AST atom pair */
     TOK_FOROFVALUE,                     /* internal for-of binding RHS */
+    TOK_SUPER,                         /* ES2015 method super reference */
     TOK_LIMIT                           /* domain size */
 } JSTokenType;
 
@@ -270,6 +271,8 @@ struct JSTokenStream {
 #define TOKF_PAREN  0x04 /* parenthesized literal is not a directive */
 #define TOKF_ESCAPE 0x02 /* raw string contains an escape or continuation */
 #define TOKF_GENERATOR_METHOD 0x08
+#define TOKF_METHOD 0x10
+#define TSF_SUPER_ALLOWED 0x20000
 #define TSF_GENERATOR 0x10000
 #define TSF_STRICT_MODE 0x8000          /* ES5 strict lexical grammar */
 

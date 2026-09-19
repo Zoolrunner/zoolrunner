@@ -497,6 +497,9 @@ js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
     fp = cx->fp;
     MaybeSetupFrame(cx, chain, fp, &frame);
     flags = cx->fp->flags;
+    if ((flags & JSFRAME_EVAL_COMPILER) && cx->fp->callee &&
+        FUN_HAS_HOME_OBJECT((JSFunction *)JS_GetPrivate(cx, cx->fp->callee)))
+        ts->flags |= TSF_SUPER_ALLOWED;
     cx->fp->flags = flags |
                     (JS_HAS_COMPILE_N_GO_OPTION(cx)
                      ? JSFRAME_COMPILING | JSFRAME_COMPILE_N_GO
@@ -1345,6 +1348,9 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
     JSBool generator;
     uintN outerGenerator = ts->flags & TSF_GENERATOR;
+    uintN outerSuper = ts->flags & TSF_SUPER_ALLOWED;
+    JSBool method = JS_VERSION_IS_ES2015(cx) && (CURRENT_TOKEN(ts).flags & TOKF_METHOD);
+    ts->flags = (ts->flags & ~TSF_SUPER_ALLOWED) | (method ? TSF_SUPER_ALLOWED : 0);
     generator = JS_VERSION_IS_ES2015(cx) &&
                 (CURRENT_TOKEN(ts).flags & TOKF_GENERATOR_METHOD);
     /* Make a TOK_FUNCTION node. */
@@ -1752,7 +1758,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     pn->pn_tryCount = funtc.tryCount;
     pn->pn_restSlot = funtc.restSlot;
     TREE_CONTEXT_FINISH(&funtc);
-    ts->flags = (ts->flags & ~TSF_GENERATOR) | outerGenerator;
+    ts->flags = (ts->flags & ~(TSF_GENERATOR | TSF_SUPER_ALLOWED)) | outerGenerator | outerSuper;
     return result;
 }
 
@@ -1801,7 +1807,7 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                          cx->fp->varobj, NULL);
     if (!fun)
         return NULL;
-    fun->kind = JSFUN_KIND_ARROW;
+    fun->kind = JSFUN_KIND_ARROW | ((ts->flags & TSF_SUPER_ALLOWED) ? JSFUN_KIND_HOME_OBJECT : 0);
     atom = js_AtomizeObject(cx, fun->object, 0);
     if (!atom)
         return NULL;
@@ -6148,6 +6154,15 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif
 
     switch (tt) {
+      case TOK_SUPER:
+        if (!(ts->flags & TSF_SUPER_ALLOWED) ||
+            (js_PeekToken(cx, ts) != TOK_DOT && js_PeekToken(cx, ts) != TOK_LB)) {
+            LexicalSyntaxError(cx, ts);
+            return NULL;
+        }
+        pn = NewParseNode(cx, ts, PN_NULLARY, tc);
+        if (!pn) return NULL;
+        break;
       case TOK_FUNCTION:
 #if JS_HAS_XML_SUPPORT
         ts->flags |= TSF_KEYWORD_IS_NAME;
@@ -6528,12 +6543,15 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                             /* We have to fake a 'function' token here. */
                             CURRENT_TOKEN(ts).t_op = JSOP_NOP;
                             CURRENT_TOKEN(ts).type = TOK_FUNCTION;
+                            if (JS_VERSION_IS_ES2015(cx)) CURRENT_TOKEN(ts).flags |= TOKF_METHOD;
                             pn2 = FunctionExpr(cx, ts, tc);
                             if (pn2) {
                                 JSFunction *accessor = (JSFunction *) JS_GetPrivate(
                                     cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
-                                if (JS_VERSION_IS_ES2015(cx))
+                                if (JS_VERSION_IS_ES2015(cx)) {
                                     accessor->flags |= JSFUN_NO_CONSTRUCT;
+                                    accessor->kind |= JSFUN_KIND_HOME_OBJECT;
+                                }
                                 /* Historical language versions allow accessor argument
                                  * lists used by unchanged XUL/XPCOM applications.
                                  * Keep standard arity for default and ES2015
@@ -6637,11 +6655,13 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 js_UngetToken(ts);
                 CURRENT_TOKEN(ts).t_op = JSOP_NOP;
                 CURRENT_TOKEN(ts).type = TOK_FUNCTION;
+                CURRENT_TOKEN(ts).flags |= TOKF_METHOD;
                 if (generatorMethod) CURRENT_TOKEN(ts).flags |= TOKF_GENERATOR_METHOD;
                 pn2 = FunctionExpr(cx, ts, tc);
                 if (!pn2) return NULL;
                 method = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn2->pn_funAtom));
                 if (!generatorMethod) method->flags |= JSFUN_NO_CONSTRUCT;
+                method->kind |= JSFUN_KIND_HOME_OBJECT;
                 ATOM_LIST_INIT(&formals);
                 for (parameter = SCOPE_LAST_PROP(OBJ_SCOPE(method->object)); parameter;
                      parameter = parameter->parent) {

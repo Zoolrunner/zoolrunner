@@ -3487,6 +3487,10 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
 
 /* Capture a simple destination before reading its source property.  The
  * source and key stay rooted below the reference until the final store. */
+static JSBool IsSuperProperty(JSParseNode *pn);
+static JSBool EmitSuperReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn);
+static JSBool EmitExtended(JSContext *cx, JSCodeGenerator *cg, jsint selector);
+
 static JSBool
 EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
                      JSParseNode *target, JSParseNode *initializer, JSBool rest)
@@ -3521,6 +3525,9 @@ EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
         if (!ale) return JS_FALSE;
         atomIndex = ALE_INDEX(ale);
         EMIT_ATOM_INDEX_OP(JSOP_BINDREF, atomIndex);
+    } else if (IsSuperProperty(target)) {
+        if (!EmitSuperReference(cx, cg, target) || js_Emit1(cx, cg, JSOP_PUSH) < 0)
+            return JS_FALSE;
     } else {
         if (target->pn_type == TOK_DOT) {
             if (!js_EmitTree(cx, cg, target->pn_expr) ||
@@ -3557,6 +3564,8 @@ EmitPatternReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *property,
     store = CG_OFFSET(cg);
     if (target->pn_type == TOK_NAME) {
         EMIT_ATOM_INDEX_OP((target->pn_attrs & PN_GLOBAL_LEXICAL) ? JSOP_EXTENDED : JSOP_SETREF, atomIndex);
+    } else if (IsSuperProperty(target)) {
+        if (!EmitExtended(cx, cg, JS_EXT_SUPER_SET)) return JS_FALSE;
     } else if (js_Emit1(cx, cg, JSOP_SETELEM) < 0) return JS_FALSE;
     if (js_Emit1(cx, cg, JSOP_POP) < 0 || js_Emit1(cx, cg, JSOP_POP) < 0 ||
         js_Emit1(cx, cg, JSOP_POP) < 0) return JS_FALSE;
@@ -4305,6 +4314,43 @@ EmitForOf(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
            js_SetSrcNoteOffset(cx, cg, (uintN)note, 2, CG_OFFSET(cg) - base - 1);
 }
 
+static JSBool
+IsSuperProperty(JSParseNode *pn)
+{
+    while (pn->pn_type == TOK_RP) pn = pn->pn_kid;
+    return (pn->pn_type == TOK_DOT && pn->pn_expr->pn_type == TOK_SUPER) ||
+           (pn->pn_type == TOK_LB && pn->pn_left->pn_type == TOK_SUPER);
+}
+
+static JSBool
+EmitExtended(JSContext *cx, JSCodeGenerator *cg, jsint selector)
+{
+    JSAtom *atom = js_AtomizeInt(cx, selector, 0);
+    JSAtomListElement *entry;
+    if (!atom || !(entry = js_IndexAtom(cx, atom, &cg->atomList))) return JS_FALSE;
+    EMIT_ATOM_INDEX_OP(JSOP_EXTENDED, ALE_INDEX(entry));
+    return JS_TRUE;
+}
+
+static JSBool
+EmitSuperReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
+{
+    while (pn->pn_type == TOK_RP) pn = pn->pn_kid;
+    if (js_Emit1(cx, cg, JSOP_THIS) < 0) return JS_FALSE;
+    if (pn->pn_type == TOK_DOT) {
+        if (!EmitAtomOp(cx, pn, JSOP_STRING, cg)) return JS_FALSE;
+    } else if (!js_EmitTree(cx, cg, pn->pn_right) ||
+               js_Emit1(cx, cg, JSOP_PROPERTYKEY) < 0) return JS_FALSE;
+    return js_Emit1(cx, cg, JSOP_PUSH) >= 0 && EmitExtended(cx, cg, JS_EXT_SUPER_REF);
+}
+
+static JSBool
+EmitSuperGet(JSContext *cx, JSCodeGenerator *cg)
+{
+    return js_Emit1(cx, cg, JSOP_PUSH) >= 0 && js_Emit1(cx, cg, JSOP_PUSH) >= 0 &&
+           EmitExtended(cx, cg, JS_EXT_SUPER_GET);
+}
+
 JSBool
 js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 {
@@ -4846,8 +4892,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 break;
 
               case TOK_DOT:
-                useful = JS_FALSE;
-                if (!CheckSideEffects(cx, &cg->treeContext, pn3->pn_expr,
+                useful = IsSuperProperty(pn3);
+                if (!useful && !CheckSideEffects(cx, &cg->treeContext, pn3->pn_expr,
                                       &useful)) {
                     return JS_FALSE;
                 }
@@ -4928,6 +4974,12 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 #endif
 
                 /* Now that we're safely past the IFEQ, commit side effects. */
+                if (IsSuperProperty(pn3)) {
+                    if (!EmitSuperReference(cx, cg, pn3) ||
+                        js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+                        js_Emit1(cx, cg, JSOP_ENUMELEM) < 0) return JS_FALSE;
+                    break;
+                }
                 if (!EmitElemOp(cx, pn3, JSOP_ENUMELEM, cg))
                     return JS_FALSE;
                 break;
@@ -5754,6 +5806,26 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         pn2 = pn->pn_left;
         while (pn2->pn_type == TOK_RP)
             pn2 = pn2->pn_kid;
+        if (IsSuperProperty(pn2)) {
+            uintN referenceSlot = cg->stackDepth;
+            if (referenceSlot >= JS_BIT(16)) {
+                ReportStatementTooLarge(cx, cg);
+                return JS_FALSE;
+            }
+            if (!EmitSuperReference(cx, cg, pn2) || js_Emit1(cx, cg, JSOP_PUSH) < 0)
+                return JS_FALSE;
+            op = pn->pn_op;
+            if (op != JSOP_NOP) {
+                EMIT_UINT16_IMM_OP(JSOP_GETLOCAL, referenceSlot);
+                if (!EmitSuperGet(cx, cg)) return JS_FALSE;
+            }
+            if (!js_EmitTree(cx, cg, pn->pn_right)) return JS_FALSE;
+            if (op != JSOP_NOP &&
+                (js_NewSrcNote(cx, cg, SRC_ASSIGNOP) < 0 || js_Emit1(cx, cg, op) < 0))
+                return JS_FALSE;
+            ok = EmitExtended(cx, cg, JS_EXT_SUPER_SET);
+            break;
+        }
         atomIndex = (jsatomid) -1;
         switch (pn2->pn_type) {
           case TOK_NAME:
@@ -6174,6 +6246,14 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         JS_ASSERT(pn2->pn_type != TOK_RP);
         op = pn->pn_op;
         depth = cg->stackDepth;
+        if (IsSuperProperty(pn2)) {
+            jsint selector = (pn->pn_type == TOK_INC ? JS_EXT_SUPER_PREINC : JS_EXT_SUPER_PREDEC) +
+                             ((js_CodeSpec[op].format & JOF_POST) ? 1 : 0);
+            ok = EmitSuperReference(cx, cg, pn2) &&
+                 js_Emit1(cx, cg, JSOP_PUSH) >= 0 && js_Emit1(cx, cg, JSOP_PUSH) >= 0 &&
+                 EmitExtended(cx, cg, selector);
+            break;
+        }
         switch (pn2->pn_type) {
           case TOK_NAME:
             pn2->pn_op = op;
@@ -6268,6 +6348,12 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * must evaluate the operand if it appears it might have side effects.
          */
         pn2 = pn->pn_kid;
+        if (IsSuperProperty(pn2)) {
+            ok = EmitSuperReference(cx, cg, pn2) &&
+                 js_Emit1(cx, cg, JSOP_PUSH) >= 0 && js_Emit1(cx, cg, JSOP_PUSH) >= 0 &&
+                 EmitExtended(cx, cg, JS_EXT_SUPER_DELETE);
+            break;
+        }
         switch (pn2->pn_type) {
           case TOK_NAME:
             pn2->pn_op = JSOP_DELNAME;
@@ -6341,6 +6427,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 #endif
 
       case TOK_DOT:
+        if (IsSuperProperty(pn)) {
+            ok = EmitSuperReference(cx, cg, pn) && EmitSuperGet(cx, cg);
+            break;
+        }
         /*
          * Pop a stack operand, convert it to object, get a property named by
          * this bytecode's immediate-indexed atom operand, and push its value
@@ -6361,7 +6451,9 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * push its value.  Set the "obj" register to the result of ToObject
          * on the left operand.
          */
-        ok = EmitElemOp(cx, pn, pn->pn_op, cg);
+        ok = IsSuperProperty(pn)
+             ? EmitSuperReference(cx, cg, pn) && EmitSuperGet(cx, cg)
+             : EmitElemOp(cx, pn, pn->pn_op, cg);
         break;
 
       case TOK_NEW:
@@ -6394,7 +6486,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          * Push the virtual machine's "obj" register, which was set by a
          * name, property, or element get (or set) bytecode.
          */
-        if (js_Emit1(cx, cg, JSOP_PUSHOBJ) < 0)
+        if (js_Emit1(cx, cg, IsSuperProperty(pn2) ? JSOP_THIS : JSOP_PUSHOBJ) < 0)
             return JS_FALSE;
 
         /* Remember start of callable-object bytecode for decompilation hint. */

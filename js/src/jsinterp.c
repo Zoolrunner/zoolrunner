@@ -3734,6 +3734,43 @@ interrupt:
 
           BEGIN_LITOPX_CASE(JSOP_EXTENDED, 0)
             SAVE_SP_AND_PC(fp);
+            if (ATOM_IS_INT(atom)) {
+                switch (ATOM_TO_INT(atom)) {
+                  case JS_EXT_SUPER_REF:
+                    obj = js_NewSuperReference(cx, fp->callee, FETCH_OPND(-3),
+                                                FETCH_OPND(-2), script->strictMode);
+                    ok = obj != NULL;
+                    rval = OBJECT_TO_JSVAL(obj);
+                    break;
+                  case JS_EXT_SUPER_GET:
+                    ok = js_GetSuperReference(cx, JSVAL_TO_OBJECT(FETCH_OPND(-3)), &rval);
+                    break;
+                  case JS_EXT_SUPER_SET:
+                    rval = FETCH_OPND(-1);
+                    ok = js_SetSuperReference(cx, JSVAL_TO_OBJECT(FETCH_OPND(-3)), rval);
+                    break;
+                  case JS_EXT_SUPER_PREINC:
+                  case JS_EXT_SUPER_POSTINC:
+                  case JS_EXT_SUPER_PREDEC:
+                  case JS_EXT_SUPER_POSTDEC:
+                    i = ATOM_TO_INT(atom);
+                    ok = js_UpdateSuperReference(cx, JSVAL_TO_OBJECT(FETCH_OPND(-3)),
+                              i < JS_EXT_SUPER_PREDEC, !(i & 1), &rval);
+                    break;
+                  case JS_EXT_SUPER_DELETE:
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_DELETE_SUPER);
+                    ok = JS_FALSE;
+                    break;
+                  default:
+                    ok = JS_FALSE;
+                    break;
+                }
+                if (!ok) goto out;
+                sp -= 2;
+                STORE_OPND(-1, rval);
+                obj = NULL;
+                DO_NEXT_OP(JSOP_EXTENDED_LENGTH);
+            }
             obj = JSVAL_TO_OBJECT(FETCH_OPND(-3));
             rval = FETCH_OPND(-1);
             ok = js_InitializeLexicalBinding(cx, obj, ATOM_TO_JSID(atom), rval);
@@ -4609,6 +4646,15 @@ interrupt:
           END_CASE(JSOP_SETELEM)
 
           BEGIN_CASE(JSOP_ENUMELEM)
+            if (!JSVAL_IS_PRIMITIVE(FETCH_OPND(-2)) &&
+                js_IsSuperReference(cx, JSVAL_TO_OBJECT(FETCH_OPND(-2)))) {
+                SAVE_SP_AND_PC(fp);
+                ok = js_SetSuperReference(cx, JSVAL_TO_OBJECT(FETCH_OPND(-2)), FETCH_OPND(-3));
+                if (!ok) goto out;
+                sp -= 3;
+                obj = NULL;
+                DO_NEXT_OP(JSOP_ENUMELEM_LENGTH);
+            }
             /* Funky: the value to set is under the [obj, id] pair. */
             FETCH_ELEMENT_ID(-1, id);
             FETCH_OBJECT(cx, -2, lval, obj);
@@ -5978,7 +6024,8 @@ interrupt:
                 goto out;
             }
             if (OBJ_GET_PARENT(cx, obj) != parent ||
-                FUN_IS_ARROW((JSFunction *)JS_GetPrivate(cx, obj))) {
+                FUN_IS_ARROW((JSFunction *)JS_GetPrivate(cx, obj)) ||
+                FUN_HAS_HOME_OBJECT((JSFunction *)JS_GetPrivate(cx, obj))) {
                 obj = js_CloneFunctionObject(cx, obj, parent);
                 if (!obj) {
                     ok = JS_FALSE;
@@ -6228,6 +6275,11 @@ interrupt:
                 goto out;
             }
 
+            if (JS_VERSION_IS_ES2015(cx) && VALUE_IS_FUNCTION(cx, rval) &&
+                FUN_HAS_HOME_OBJECT((JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(rval)))) {
+                ok = js_SetFunctionHomeObject(cx, JSVAL_TO_OBJECT(rval), obj);
+                if (!ok) goto out;
+            }
             /*
              * Getters and setters are just like watchpoints from an access
              * control point of view.
@@ -6339,6 +6391,12 @@ interrupt:
                                           FETCH_OPND(-2), op)) {
                 ok = JS_FALSE;
                 goto out;
+            }
+            if (op == JSOP_INITMETHODCOMPUTED || op == JSOP_INITGETTERCOMPUTED ||
+                op == JSOP_INITSETTERCOMPUTED) {
+                ok = js_SetFunctionHomeObject(cx, JSVAL_TO_OBJECT(FETCH_OPND(-1)),
+                                              JSVAL_TO_OBJECT(FETCH_OPND(-3)));
+                if (!ok) goto out;
             }
             if (op == JSOP_INITGETTERCOMPUTED || op == JSOP_INITSETTERCOMPUTED) {
                 ok = DefineComputedAccessor(cx, JSVAL_TO_OBJECT(FETCH_OPND(-3)),

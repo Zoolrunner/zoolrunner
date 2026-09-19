@@ -787,3 +787,14 @@ timeouts. All **11,540 ES5 cases** and all four application build/package/deskto
 checks pass. Full ES2015 compliance remains unfinished; other platforms have not
 been revalidated for this batch. See the
 [lexical binding notes](js/tests/es6/README.md#persistent-global-and-eval-lexical-bindings).
+
+
+Object-method `super` properties now use traced home objects,
+receiver-preserving calls and setters, arrows, direct eval and reconstructed
+source/cache support. The complete integrated macOS arm64 run records 28,229 ES2015
+passes, 339 failures and 14 unsupported modules (16 gained, zero lost), with all
+11,540 ES5 cases passing. All four applications pass build, package and relocated
+desktop checks, including Calendar views, Browser navigation/layout and Suite /
+XULRunner ChatZilla; see `js/tests/es6/README.md`. Classes, full parameter
+environments and modules remain unfinished. Other platforms have not been
+revalidated for this batch.

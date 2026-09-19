@@ -418,11 +418,19 @@ SprintPut(Sprinter *sp, const char *s, size_t len)
 {
     ptrdiff_t nb, offset;
     char *bp;
+    size_t sourceOffset = 0;
+    JSBool internal = sp->base && (jsuword)s >= (jsuword)sp->base &&
+                      (jsuword)s - (jsuword)sp->base < sp->size;
+
+    /* Stack expressions may already live in this buffer. Arena growth can
+     * relocate it, so preserve an offset rather than the old source pointer. */
+    if (internal) sourceOffset = (size_t)(s - sp->base);
 
     /* Allocate space for s, including the '\0' at the end. */
     nb = (sp->offset + len + 1) - sp->size;
     if (nb > 0 && !SprintAlloc(sp, nb))
         return -1;
+    if (internal) s = sp->base + sourceOffset;
 
     /* Advance offset and copy s into sp's buffer. */
     offset = sp->offset;
@@ -1501,7 +1509,7 @@ DecompilePatternReference(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc, JS
     jsatomid atomIndex;
     char *key = NULL, *base = NULL, *name = NULL, *initializer = NULL;
     const char *text;
-    JSBool named, ok = JS_FALSE;
+    JSBool named, superTarget = JS_FALSE, ok = JS_FALSE;
 
     if (keyEnd < pc + 1 || refEnd < keyEnd || store < refEnd ||
         store >= endpc || store + js_CodeSpec[storeOp].length +
@@ -1511,6 +1519,10 @@ DecompilePatternReference(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc, JS
         storeOp = (JSOp)store[1 + LITERAL_INDEX_LEN];
     } else atomIndex = (storeOp == JSOP_SETREF || storeOp == JSOP_EXTENDED) ? GET_ATOM_INDEX(store) : 0;
     named = storeOp == JSOP_SETREF || storeOp == JSOP_EXTENDED;
+    if (storeOp == JSOP_EXTENDED) {
+        atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
+        superTarget = ATOM_IS_INT(atom) && ATOM_TO_INT(atom) == JS_EXT_SUPER_SET;
+    }
     ss->sprinter.offset += PAREN_SLOP;
     if (!Decompile(ss, pc+1, (intN)(keyEnd-pc-1))) goto out;
     key = JS_strdup(cx, PopStr(ss, JSOP_NOP));
@@ -1518,7 +1530,10 @@ DecompilePatternReference(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc, JS
     off = SprintCString(&ss->sprinter, "");
     if (off < 0 || !PushOff(ss, off, JSOP_NOP)) goto out;
     if (!Decompile(ss, keyEnd, (intN)(refEnd-keyEnd))) goto out;
-    if (named) {
+    if (superTarget) {
+        (void)PopStr(ss, JSOP_NOP);
+        name = JS_strdup(cx, PopStr(ss, JSOP_NOP));
+    } else if (named) {
         (void)PopStr(ss, JSOP_NOP); (void)PopStr(ss, JSOP_NOP);
         atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
         text = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
@@ -3450,6 +3465,25 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 atom = js_GetAtom(cx, &jp->script->atomMap, atomIndex);
 
               do_setname:
+                if (op == JSOP_EXTENDED && ATOM_IS_INT(atom)) {
+                    i = ATOM_TO_INT(atom);
+                    rval = POP_STR();
+                    xval = POP_STR();
+                    lval = POP_STR();
+                    if (i == JS_EXT_SUPER_REF)
+                        todo = Sprint(&ss->sprinter, "super[%s]", xval);
+                    else if (i == JS_EXT_SUPER_GET)
+                        todo = SprintCString(&ss->sprinter, lval);
+                    else if (i == JS_EXT_SUPER_SET)
+                        goto do_setlval;
+                    else if (i == JS_EXT_SUPER_DELETE)
+                        todo = Sprint(&ss->sprinter, "delete %s", lval);
+                    else if (i == JS_EXT_SUPER_PREINC || i == JS_EXT_SUPER_PREDEC)
+                        todo = Sprint(&ss->sprinter, "%s%s", i == JS_EXT_SUPER_PREINC ? "++" : "--", lval);
+                    else
+                        todo = Sprint(&ss->sprinter, "%s%s", lval, i == JS_EXT_SUPER_POSTINC ? "++" : "--");
+                    break;
+                }
                 lval = QuoteString(&ss->sprinter, ATOM_TO_STRING(atom), IDENTIFIER_ESCAPE);
                 if (!lval)
                     return NULL;
