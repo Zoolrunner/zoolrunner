@@ -13,6 +13,7 @@ import sys
 import tarfile
 from legacy_tar import LegacyTarInfo
 import tempfile
+import time
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("arch", choices=("arm64", "x86_64", "i386", "powerpc"))
@@ -174,7 +175,29 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             str(obj / "parser/expat/lib/libexpat_s.a"),
             "-o", str(blocking)], check=True)
         subprocess.run([str(blocking)], env=environment, check=True, timeout=60)
+        # Cold registration loads every native component. Under Rosetta this
+        # can exceed a short fixture's budget before JavaScript even starts.
+        # Require initialization separately; individual test limits stay fixed.
+        started = time.monotonic()
+        print("Initializing packaged runtime", flush=True)
+        try:
+            startup = subprocess.run(
+                [str(runtime / "xpcshell"), "-e", 'print("PACKAGED-RUNTIME READY")'],
+                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=180)
+        except subprocess.TimeoutExpired as error:
+            if error.stdout:
+                print(error.stdout.decode("utf-8", "replace")
+                      if isinstance(error.stdout, bytes) else error.stdout, flush=True)
+            raise
+        print(startup.stdout, flush=True)
+        if startup.returncode or "PACKAGED-RUNTIME READY" not in startup.stdout:
+            raise RuntimeError("Packaged runtime failed initialization")
+        print("Package initialization passed in %.2f seconds" %
+              (time.monotonic() - started), flush=True)
         for test, marker in (
+                ("../es6/discarded-operations.js", "DISCARDED-OPERATIONS checks=63 failures=0"),
+                ("../es6/arguments-exit.js", "ARGUMENTS-EXIT checks=25 failures=0"),
                 ("../es6/setter-result.js", "SETTER-RESULT PASS checks=16"),
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
                 ("arguments-lifetime.js", "ARGUMENTS-LIFETIME checks=12 failures=0"),
@@ -401,6 +424,9 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("super-properties.js", "SUPER-PROPERTIES PASS checks=33"),
                 ("classes.js", "CLASS PASS checks=53"),
                 ("contextual-escapes.js", "CONTEXTUAL-ESCAPES checks=88 failures=0"),
+                ("discarded-operations.js", "DISCARDED-OPERATIONS checks=63 failures=0"),
+                ("arguments-exit.js", "ARGUMENTS-EXIT checks=25 failures=0"),
+                ("arguments-exit-prototype.js", "ARGUMENTS-EXIT-PROTOTYPE checks=5 failures=0"),
                 ("derived-this-effects.js", "DERIVED-THIS-EFFECTS checks=43 failures=0"),
                 ("catch-declarations.js", "CATCH-DECLARATIONS PASS checks=18"),
                 ("default-parameters.js", "DEFAULT-PARAMETERS checks=60 failures=0"),
@@ -509,6 +535,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestSuperWide.c", "SUPER-WIDE PASS checks=16"),
                 ("es6/TestClassRuntime.c", "CLASS-RUNTIME PASS checks=47"),
                 ("es6/TestContextualEscapes.c", "ES6-CONTEXTUAL-ESCAPES checks=25 failures=0"),
+                ("es6/TestDiscardedEffects.c", "ES6-DISCARDED-EFFECTS checks=13 failures=0"),
                 ("es6/TestDerivedThisEffects.c", "ES6-DERIVED-THIS-EFFECTS checks=13 failures=0"),
                 ("es6/TestClassWide.c", "CLASS-WIDE PASS checks=16"),
                 ("es6/TestBlockFunctionWide.c", "BLOCK-FUNCTION-WIDE PASS checks=17"),

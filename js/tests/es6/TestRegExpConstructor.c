@@ -37,7 +37,7 @@ int main(void)
     JS_BeginRequest(cx);JS_SetVersion(cx,JSVERSION_ECMA_2015);
     global=JS_NewObject(cx,&globalClass,NULL,NULL);CHECK(global);
     JS_SetGlobalObject(cx,global);CHECK(JS_InitStandardClasses(cx,global));
-    CHECK(JSXDR_BYTECODE_VERSION==(0xb973c0de - 66));
+    CHECK(JSXDR_BYTECODE_VERSION==(0xb973c0de - 67));
     pattern=JS_NewRegExpObject(cx,"a",1,JSREG_STICKY);CHECK(pattern);
     CHECK(JS_DefineProperty(cx,global,"nativePattern",OBJECT_TO_JSVAL(pattern),NULL,NULL,0));
     CHECK(Evaluate(cx,global,"nativePattern.sticky && nativePattern.exec('ba')===null && "

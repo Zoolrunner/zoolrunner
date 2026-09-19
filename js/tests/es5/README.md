@@ -484,3 +484,12 @@ The destructuring-error diagnostic keeps its indexed object in legacy editions.
 ES2015 now uses an array with the same throwing element getter, because modern
 array patterns require an iterable. Both paths must preserve the original
 RangeError and message; all 54 checks remain required.
+
+The shared `../es6/discarded-operations.js` and `../es6/arguments-exit.js`
+fixtures also run in the default ES5 shell. They cover unused expressions whose
+conversions/getters still have effects, and arguments-object detachment that
+must not invoke user accessors on function return. Explicit non-strict legacy
+editions retain their historical optimizer/detachment behavior. The initial
+isolated correction passes the complete pinned ES5.1 gate; integrated platform
+and application results are tracked in the
+[ES6 work log](../es6/README.md#discarded-conversions-and-arguments-detachment).

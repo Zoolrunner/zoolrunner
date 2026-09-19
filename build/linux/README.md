@@ -218,3 +218,12 @@ gate. Its supplemental run passed 116 focused fixtures and 63 packaged native
 probes, but five private-probe links failed and the external harness encountered
 a Git worktree-path error. Those failures remain recorded; they motivated
 running internal probes while production build objects are still available.
+
+For the subsequent discarded-operation/arguments-detachment correction, native
+aarch64 Suite and Browser GTK2 each pass the expanded local `act` workflow:
+build, ABI, package, runtime, 11,540 ES5.1 cases, 28,582 ES2015 modes, 122 focused
+fixtures, 70 native probes and artifact uploads. The unchanged packaged engine
+hash is `df4c535ffecd820f568f445fc097825e7927f0a6c9e9450401d6b16260cee42e`.
+The frozen source and reports are under `artifacts/es6/linux-discarded-effects-*`.
+The other six aarch64 entries are still running; this is not a complete new
+matrix result and does not establish Linux x86 or GitHub-hosted validation.

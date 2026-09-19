@@ -2183,7 +2183,7 @@ static JSBool
 CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
                  JSBool *answer)
 {
-    JSBool ok;
+    JSBool ok, standard;
     JSFunction *fun;
     JSParseNode *pn2;
 
@@ -2193,6 +2193,42 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
     if (pn->pn_type == TOK_SUPER_CALL || pn->pn_type == TOK_CLASS) {
         *answer = JS_TRUE;
         return JS_TRUE;
+    }
+
+    standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+               JS_VERSION_IS_ES2015(cx) || (tc->flags & TCF_STRICT_MODE);
+    if (standard) {
+        /* Coercion and protocol operations can call user code or throw even
+         * when the result is discarded. Keep the historical optimization only
+         * in explicitly selected, non-strict legacy language versions. */
+        switch (pn->pn_type) {
+          case TOK_EQOP:
+            if (pn->pn_op == JSOP_NEW_EQ || pn->pn_op == JSOP_NEW_NE)
+                break;
+            /* FALL THROUGH */
+          case TOK_RELOP:
+          case TOK_IN:
+          case TOK_INSTANCEOF:
+          case TOK_BITOR:
+          case TOK_BITXOR:
+          case TOK_BITAND:
+          case TOK_SHOP:
+          case TOK_PLUS:
+          case TOK_MINUS:
+          case TOK_STAR:
+          case TOK_DIVOP:
+            *answer = JS_TRUE;
+            return JS_TRUE;
+          case TOK_UNARYOP:
+            if (pn->pn_op == JSOP_POS || pn->pn_op == JSOP_NEG ||
+                pn->pn_op == JSOP_BITNOT) {
+                *answer = JS_TRUE;
+                return JS_TRUE;
+            }
+            break;
+          default:
+            break;
+        }
     }
 
     switch (pn->pn_arity) {
@@ -2277,7 +2313,7 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
                     !BindNameToSlot(cx, tc, pn2, JS_FALSE)) {
                     return JS_FALSE;
                 }
-                if (pn2->pn_op != JSOP_ARGUMENTS) {
+                if (standard || pn2->pn_op != JSOP_ARGUMENTS) {
                     /*
                      * Any indexed property reference could call a getter with
                      * side effects, except for arguments[i] where arguments is
@@ -2348,8 +2384,8 @@ CheckSideEffects(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
                 !BindNameToSlot(cx, tc, pn2, JS_FALSE)) {
                 return JS_FALSE;
             }
-            if (!(pn2->pn_op == JSOP_ARGUMENTS &&
-                  pn->pn_atom == cx->runtime->atomState.lengthAtom)) {
+            if (standard || !(pn2->pn_op == JSOP_ARGUMENTS &&
+                              pn->pn_atom == cx->runtime->atomState.lengthAtom)) {
                 /*
                  * Any dotted property reference could call a getter, except
                  * for arguments.length where arguments is unambiguous.

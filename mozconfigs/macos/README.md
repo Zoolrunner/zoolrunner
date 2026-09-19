@@ -229,3 +229,11 @@ allow initial Rosetta startup; actual cases retained the ten-second timeout.
 This is a result for the pinned suite, not proof of complete specification
 conformance. Local reports, logs and archive hashes are preserved under
 `artifacts/macos-modern-validation/`, with the summary in `results.json`.
+
+Package validation initializes the freshly copied runtime in a separate process
+before running JavaScript fixtures. Cold Suite component registration was
+measured at 100.6 seconds under Rosetta during concurrent validation, before
+JavaScript execution. Initialization has a 180-second limit and must print its
+readiness marker; every fixture keeps its existing timeout and assertions.
+The original 60-second first-fixture failures and loader samples remain under
+`artifacts/es6/discarded-suite-*` and `discarded-effects-x86-*`.

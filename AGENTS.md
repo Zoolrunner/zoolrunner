@@ -1705,3 +1705,12 @@ reports separate from focused/native results. Private engine unit probes link
 the production Makefile's objects in standalone executables; do not export
 private interfaces merely to link tests against a package. Preserve the
 object hashes, packaged-library identity check and generated target headers.
+
+Discarded operations must retain required coercions, protocol calls and property
+reads in default ES5, strict and ES2015 code. Keep explicit non-strict legacy
+optimization and saved-edition behavior. Standard arguments detachment must not
+invoke overridden length/callee accessors or consult prototype traps on return;
+preserve mapped values and deleted/detached properties. Run
+`discarded-operations.js` and `arguments-exit.js` in default and modern modes,
+`arguments-exit-prototype.js`, and `TestDiscardedEffects.c`, including source/XDR
+round trips. This emitter correction advances the embedding cache to 67.

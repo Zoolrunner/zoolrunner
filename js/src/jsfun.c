@@ -350,19 +350,21 @@ js_PutArgsObject(JSContext *cx, JSStackFrame *fp)
             JS_free(cx, JSVAL_TO_PRIVATE(bmapval));
     }
 
-    /*
-     * Now get the prototype properties so we snapshot fp->fun and fp->argc
-     * before fp goes away.
-     */
-    rt = cx->runtime;
-    ok &= js_GetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.calleeAtom),
-                         &rval);
-    ok &= js_SetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.calleeAtom),
-                         &rval);
-    ok &= js_GetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.lengthAtom),
-                         &rval);
-    ok &= js_SetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.lengthAtom),
-                         &rval);
+    /* Standard arguments objects are already snapshotted by args_enumerate.
+     * Calling public getters or setters here would execute user code merely
+     * because the owning function returns. Keep explicit legacy behavior. */
+    if (fp->fun->edition != JSVERSION_DEFAULT &&
+        fp->fun->edition < JSVERSION_ECMA_2015) {
+        rt = cx->runtime;
+        ok &= js_GetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.calleeAtom),
+                             &rval);
+        ok &= js_SetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.calleeAtom),
+                             &rval);
+        ok &= js_GetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.lengthAtom),
+                             &rval);
+        ok &= js_SetProperty(cx, argsobj, ATOM_TO_JSID(rt->atomState.lengthAtom),
+                             &rval);
+    }
 
     /*
      * Clear the private pointer to fp, which is about to go away (js_Invoke).
@@ -567,31 +569,37 @@ args_enumerate(JSContext *cx, JSObject *obj)
     JSProperty *prop;
     JSScopeProperty *sprop;
     uintN slot, argc;
+    JSLookupPropOp lookup;
 
     fp = (JSStackFrame *)
          JS_GetInstancePrivate(cx, obj, &js_ArgumentsClass, NULL);
     if (!fp)
         return JS_TRUE;
     JS_ASSERT(fp->argsobj);
+    lookup = (fp->fun->edition == JSVERSION_DEFAULT ||
+              fp->fun->edition >= JSVERSION_ECMA_2015 ||
+              (fp->fun->flags & JSFUN_STRICT))
+             ? js_LookupOwnProperty : js_LookupProperty;
 
     /*
      * Trigger reflection with value snapshot in args_resolve using a series
-     * of js_LookupProperty calls.  We handle length, callee, and the indexed
+     * of own-property lookups in standard editions (legacy lookup otherwise).
+     * We handle length, callee, and the indexed
      * argument properties.  We know that args_resolve covers all these cases
      * and creates direct properties of obj, but that it may fail to resolve
      * length or callee if overridden.
      */
-    if (!js_LookupProperty(cx, obj,
-                           ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
-                           &pobj, &prop)) {
+    if (!lookup(cx, obj,
+                ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                &pobj, &prop)) {
         return JS_FALSE;
     }
     if (prop)
         OBJ_DROP_PROPERTY(cx, pobj, prop);
 
-    if (!js_LookupProperty(cx, obj,
-                           ATOM_TO_JSID(cx->runtime->atomState.calleeAtom),
-                           &pobj, &prop)) {
+    if (!lookup(cx, obj,
+                ATOM_TO_JSID(cx->runtime->atomState.calleeAtom),
+                &pobj, &prop)) {
         return JS_FALSE;
     }
     if (prop)
@@ -599,7 +607,7 @@ args_enumerate(JSContext *cx, JSObject *obj)
 
     argc = fp->argc;
     for (slot = 0; slot < argc; slot++) {
-        if (!js_LookupProperty(cx, obj, INT_TO_JSID((jsint)slot), &pobj, &prop))
+        if (!lookup(cx, obj, INT_TO_JSID((jsint)slot), &pobj, &prop))
             return JS_FALSE;
         if (prop) {
             /* An earlier read can already have materialized this index.

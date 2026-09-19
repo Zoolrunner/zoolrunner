@@ -3863,3 +3863,76 @@ ArrayBuffer length behavior and anonymous-class own-name requirements. Original
 ES2015 class-expression evaluation adds the name here only for a present
 BindingIdentifier. These source-hashed reviews neither change the diagnostic
 results nor establish a complete edition inventory.
+
+### Discarded conversions and arguments detachment
+
+A follow-up effect-analysis audit found discarded arithmetic, comparison,
+`in`/`instanceof`, and arguments-property reads could lose conversions,
+getters or exceptions. Default ES5, strict code and ES2015 now retain those
+operations; explicitly selected non-strict legacy editions keep their existing
+optimization. Emitted semantics change, so the embedding cache advances to 67.
+
+The added arguments getter checks also exposed calls to overridden `length`
+and `callee` accessors when the owning function returned. Standard arguments
+objects now detach using own-property snapshots without invoking those public
+getters/setters or walking a replaced prototype. Parameter mappings, assigned
+fields and deleted/detached properties remain intact. Policy follows the
+function's saved edition; explicit legacy detachment remains unchanged.
+
+The isolated candidate passes 63 discarded-operation checks and 25 arguments
+exit checks in each standard mode, five ES2015 Proxy/protocol checks, 13 native
+source/XDR/cross-edition checks, all 117 existing focused fixtures and 69 native
+fixtures, and C89 diagnostics. The integrated fixture table contains 122
+focused fixtures and 70 native probes. Fixtures are `discarded-operations.js`,
+`arguments-exit.js`, `arguments-exit-prototype.js`, and `TestDiscardedEffects.c`.
+
+The integrated arm64 and x86_64 engines each pass all 28,582 pinned ES2015
+modes and all 11,540 pinned ES5.1 cases with zero failures, timeouts, crashes or
+harness errors. Engine hashes match across all four applications within each
+architecture. The first Intel
+Suite package attempt and its unchanged retry timed out before the first fixture
+ran. A native stack sample places the delay in XPCOM component loading; a clean
+startup-only run then completed in 100.6 seconds, and the fixture passed in
+0.26 seconds after initialization. Packaging now requires a separate 180-second
+initialization step before the unchanged per-fixture limits. Original failures,
+loader logs and samples remain recorded. All eight packages pass the fresh gate,
+and all four applications on both architectures pass their relocated desktop
+checks, Calendar four-view checks, Browser navigation (169 checks), and
+Suite/XULRunner ChatZilla coverage. The successful driver log is
+`discarded-effects-startup-coordinator.log`; the initial coordinator and first
+unchanged package retry remain failed records. A separate local wait-file error
+was corrected without changing tests or rerunning the successful builds.
+Archives are preserved under `artifacts/es6/discarded-effects-package-archives`,
+with full hashes in `discarded-effects-both-architectures-hashes.json`.
+
+Native Linux aarch64 Suite and Browser GTK2 each pass actual local `act`
+build/ABI/package/runtime/upload validation, both complete pinned suites, all
+122 focused fixtures and all 70 native probes. Their packaged engine hash is
+`df4c535ffecd820f568f445fc097825e7927f0a6c9e9450401d6b16260cee42e`.
+The frozen source, patch, original reports and artifacts are retained under
+`linux-discarded-effects-snapshot` and `linux-discarded-effects-act-*`.
+The other six aarch64 matrix entries are running; Linux x86 and Windows remain
+unvalidated for this batch. These are local results, not GitHub-hosted runs.
+
+A fresh later ES6-ID diagnostic on the isolated candidate retains 5,835 passes
+and 17 failures (10 files), with no host errors. All 17 failures correspond to
+source-hashed later-requirement records already in the ledger. This is a bounded
+diagnostic, not a complete edition inventory or a zero-failure conformance run.
+All 33 diagnostic runner controls pass.
+
+Package copies have different full-file engine hashes because packaging renews
+Mach-O metadata. A byte comparison after removing that metadata in temporary
+copies confirms identical code/data on both architectures; the only remaining
+changes are LINKEDIT virtual/file sizes and verified zero alignment padding.
+Both the initial whole-file comparison and the precise payload comparison are
+retained (`discarded-effects-package-checkpoint.json`,
+`discarded-effects-signature-normalized-comparison.json`, and
+`discarded-effects-package-payload-comparison.json`). Conformance uses the frozen
+build runtimes; focused/native and desktop checks use the actual relocated
+packages. Do not conflate their full-file hashes.
+
+Further arguments review identified an unfinished original-ES2015 ordering
+edge: resolving `arguments.callee` before `length`, or adding a user field first,
+can change the initial string-key order of mapped arguments. A separate isolated
+correction passes initial focused/native checks but is not part of this batch.
+The full later-edition diagnostic and edition inventory also remain unfinished.

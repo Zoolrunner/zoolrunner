@@ -1002,3 +1002,10 @@ and all four applications pass on both macOS architectures. Native Linux
 aarch64 Suite GTK2 passes the expanded local `act` gate, including complete
 ES5/ES6 runs and focused/native probes. Other Linux entries and Windows remain
 unvalidated for this batch; see [derived-this validation](js/tests/es6/README.md#discarded-derived-this-reads).
+
+A subsequent correction preserves discarded conversions/property reads and
+avoids invoking arguments accessors during function exit. Both complete pinned
+suites and all four applications pass on macOS arm64 and x86_64. Native Linux
+aarch64 Suite and Browser GTK2 pass their full local `act` gates; the remaining
+Linux entries and broader edition review are still in progress. See
+[discarded operations](js/tests/es6/README.md#discarded-conversions-and-arguments-detachment).
