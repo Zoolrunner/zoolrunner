@@ -297,7 +297,8 @@ third-party license files for applicable terms and credits.
 On the ES6 development branch, modern array/object literal construction now
 uses private per-global intrinsic constructors, including classic embedding
 globals without reserved slots. Legacy scripts retain their historical binding
-lookup. The current bytecode cache version is 37; older caches are invalidated. All four macOS arm64 applications pass the packaged compatibility checks;
+lookup. This milestone used bytecode cache version 37; see the latest entry
+for the current version. All four macOS arm64 applications passed the packaged compatibility checks;
 the full ES5 run passes 11,540 cases, and ES2015 remains at 23,528 passes with
 5,038 failures, 14 unsupported cases and two harness errors. Other platforms
 have not been revalidated for this change. See `js/tests/es6/README.md`.
@@ -977,3 +978,10 @@ lengths, while legacy methods retain their historical length conversion.
 Inspector startup also handles browser loads arriving before viewer readiness.
 Both full pinned suites and all four macOS arm64 application gates pass; see
 [JSON realm and length validation](js/tests/es6/README.md#json-method-realms-and-array-lengths).
+
+Canonical String comparison and incomplete non-Unicode RegExp escapes now
+pass both complete pinned suites and all four macOS arm64 application gates,
+with legacy method behavior and grammar retained. The ES6 result required a
+complete retry after one shell-bootstrap error; both reports are retained.
+RegExp cache records now preserve their compilation edition (cache version 65).
+See [String/RegExp edge validation](js/tests/es6/README.md#canonical-comparison-and-incomplete-regexp-escapes).

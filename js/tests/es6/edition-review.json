@@ -255,6 +255,13 @@
       "reason": "This revised test includes a BigInt literal (4n), outside the original ES2015 grammar. Its source is retained unchanged in the diagnostic; focused original primitive-receiver checks remain separate."
     },
     {
+      "test": "built-ins/String/prototype/localeCompare/15.5.4.9_CE.js",
+      "sha256": "b61ba4f457ad63e4c0f8facf6bba1d7fc25b16851a7cd4d5c676abda55cb46c1",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.localecompare",
+      "reason": "Original ES2015 requires canonical Unicode equivalents to compare equal even without host collation. Modern localeCompare now normalizes canonically before comparison and preserves legacy host callback behavior."
+    },
+    {
       "test": "built-ins/String/prototype/match/cstm-matcher-on-boolean-primitive.js",
       "sha256": "a5ad19dc8ea1c07a94a155432320a3c83d6d25f73aa17b2ef100fecc121f0885",
       "decision": "later-requirement",
@@ -337,6 +344,13 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.split",
       "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/split/separator-regexp.js",
+      "sha256": "8835e363f5baf77034f1efde6dacc892da19ba3e950c5fec413455506dc8c444",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-regular-expressions-patterns",
+      "reason": "Original ES2015 Annex B uses IdentityEscape when a complete hexadecimal escape does not match. Incomplete non-Unicode escapes now retain their literal x/u and following characters, including lazy character classes; Unicode patterns retain their syntax checks."
     },
     {
       "test": "built-ins/TypedArray/prototype/indexOf/fromIndex-minus-zero.js",

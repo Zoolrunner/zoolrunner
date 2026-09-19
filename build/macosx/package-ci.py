@@ -428,6 +428,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("with-binding-value.js", "WITH-BINDING-VALUE checks=13 failures=0"),
                 ("json-reviver.js", "JSON-REVIVER checks=93 failures=0"),
                 ("json-realms-length.js", "JSON-REALMS-LENGTH checks=91 failures=0"),
+                ("locale-compare.js", "LOCALE-COMPARE checks=33 failures=0"),
+                ("regexp-incomplete-hex.js", "REGEXP-INCOMPLETE-HEX checks=62 failures=0"),
                 ("typedarray-zero-indices.js", "TYPEDARRAY-ZERO-INDICES checks=207 failures=0"),
                 ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
                 ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),
@@ -488,6 +490,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         for source, marker in (
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
                 ("es6/TestJSONRealms.c", "ES6-JSON-REALMS checks=28 failures=0"),
+                ("es6/TestLocaleCompare.c", "ES6-LOCALE-COMPARE checks=20 failures=0"),
+                ("es6/TestRegExpHex.c", "ES6-REGEXP-HEX checks=15 failures=0"),
                 ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=14 failures=0"),
                 ("es6/TestReferenceEmbedding.c", "ES6-REFERENCE-EMBEDDING checks=38 failures=0"),
                 ("es6/TestGeneratorEmbedding.c", "ES6-GENERATOR-EMBEDDING PASS checks=14"),

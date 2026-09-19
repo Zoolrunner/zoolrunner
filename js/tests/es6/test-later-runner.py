@@ -18,9 +18,9 @@ def main():
     args = parser.parse_args()
     shell = args.shell.resolve()
     checks = 0
-    def control(source, expected, negative=None, harness='', mode='non-strict', flags=(), fixtures=None):
+    def control(source, expected, negative=None, harness='', mode='non-strict', flags=(), fixtures=None, features=()):
         nonlocal checks
-        record = dict(flags=list(flags))
+        record = dict(flags=list(flags), features=list(features))
         if negative:
             record['negative'] = dict(phase=negative[0], type=negative[1])
         case = dict(source=source, mode=mode, test='control.js', record=record)
@@ -37,6 +37,9 @@ def main():
     control('throw new SyntaxError("runtime")', 'fail', ('parse', 'SyntaxError'))
     control('throw new SyntaxError("runtime")', 'pass', ('runtime', 'SyntaxError'))
     control('throw new Error("\\u0108\\u0122\\u0323\\ud83d\\ude00")', 'pass', ('runtime', 'Error'))
+    control('var x=1', 'harness-error', features=('IsHTMLDDA',))
+    control('throw new TypeError("missing host")', 'harness-error',
+            ('runtime', 'TypeError'), features=('IsHTMLDDA',))
     control('var =', 'fail', ('runtime', 'SyntaxError'))
     control('throw new TypeError("wrong type")', 'fail', ('runtime', 'SyntaxError'))
     control('throw new SyntaxError("body")', 'harness-error', ('runtime', 'SyntaxError'), harness='var =')

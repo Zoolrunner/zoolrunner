@@ -445,6 +445,23 @@ isASCIIHexDigit(jschar c, uintN *digit)
 }
 
 
+/* Leave the cursor unchanged when Annex B must use IdentityEscape. */
+static JSBool
+CompleteHexEscape(const jschar **position, const jschar *end, uintN digits,
+                  uintN *value)
+{
+    const jschar *cp = *position;
+    uintN i, digit, n = 0;
+    for (i = 0; i < digits; ++i) {
+        if (cp == end || !isASCIIHexDigit(*cp++, &digit)) return JS_FALSE;
+        n = (n << 4) | digit;
+    }
+    *position = cp;
+    *value = n;
+    return JS_TRUE;
+}
+
+
 typedef struct {
     REOp op;
     const jschar *errPos;
@@ -918,8 +935,8 @@ GetDecimalValue(jschar c, uintN max, uintN (*findMax)(CompilerState *state),
 
 #include "jsregexp-casefold.h"
 
-static uint32
-UnicodeRegExpFold(uint32 point)
+uint32
+js_UnicodeSimpleFold(uint32 point)
 {
     size_t low = 0, high = sizeof(regexpCaseFolds) / sizeof(regexpCaseFolds[0]), mid;
     while (low < high) {
@@ -1042,7 +1059,7 @@ UnicodeClassAtom(CompilerState *state, const jschar **position, const jschar *en
 static JSBool
 UnicodeWord(uint32 point, JSBool fold)
 {
-    if (fold) point = UnicodeRegExpFold(point);
+    if (fold) point = js_UnicodeSimpleFold(point);
     return point < 128 && JS_ISWORD(point);
 }
 
@@ -1076,7 +1093,7 @@ UnicodeClass(CompilerState *state, const jschar *src, const jschar *end,
             }
             if (kind == 'D' || kind == 'W' || kind == 'S') include = !include;
             if (!include) continue;
-            mapped = fold ? UnicodeRegExpFold(point) : point;
+            mapped = fold ? js_UnicodeSimpleFold(point) : point;
             if (mapped > *maximum) *maximum = mapped;
             if (bits) bits[mapped >> 3] |= 1 << (mapped & 7);
         }
@@ -1156,6 +1173,12 @@ CalculateBitmapSize(CompilerState *state, RENode *target, const jschar *src,
             case 'u':
                 nDigits = 4;
 lexHex:
+                if (state->modern) {
+                    if (!CompleteHexEscape(&src, end, nDigits, &n))
+                        n = c;
+                    localMax = n;
+                    break;
+                }
                 n = 0;
                 for (i = 0; (i < nDigits) && (src < end); i++) {
                     c = *src++;
@@ -1514,6 +1537,12 @@ lexHex:
                 if (!UnicodeRegExpEscape(state, &state->cp, state->cpend,
                                           nDigits == 4 ? 'u' : 'x', &c))
                     return JS_FALSE;
+                goto doFlat;
+            }
+            if (state->modern) {
+                if (!CompleteHexEscape(&state->cp, state->cpend, nDigits, &n))
+                    n = nDigits == 4 ? 'u' : 'x';
+                c = (jschar)n;
                 goto doFlat;
             }
             n = 0;
@@ -2241,8 +2270,10 @@ NewRegExpWithEdition(JSContext *cx, JSTokenStream *ts,
             re = NULL;
             goto out;
         }
-        for (i = 0; i < re->classCount; i++)
+        for (i = 0; i < re->classCount; i++) {
             re->classList[i].converted = JS_FALSE;
+            re->classList[i].modern = modern;
+        }
     } else {
         re->classList = NULL;
     }
@@ -2268,6 +2299,7 @@ NewRegExpWithEdition(JSContext *cx, JSTokenStream *ts,
     }
 
     re->flags = flags;
+    re->modern = modern;
     re->cloneIndex = 0;
     re->parenCount = state.parenCount;
     re->source = str;
@@ -2459,7 +2491,7 @@ UnicodeSequenceMatcher(REGlobalData *gData, REMatchState *x,
         a = RegExpPoint(left, end, JS_TRUE, &aw);
         b = RegExpPoint(right, gData->cpend, JS_TRUE, &bw);
         if (gData->regexp->flags & JSREG_FOLD) {
-            a = UnicodeRegExpFold(a); b = UnicodeRegExpFold(b);
+            a = js_UnicodeSimpleFold(a); b = js_UnicodeSimpleFold(b);
         }
         if (a != b) return NULL;
         left += aw; right += bw;
@@ -2661,6 +2693,12 @@ ProcessCharSet(REGlobalData *gData, RECharSet *charSet)
             case 'u':
                 nDigits = 4;
             lexHex:
+                if (charSet->modern) {
+                    if (!CompleteHexEscape(&src, end, nDigits, &n))
+                        n = c;
+                    thisCh = (jschar)n;
+                    break;
+                }
                 n = 0;
                 for (i = 0; (i < nDigits) && (src < end); i++) {
                     uintN digit;
@@ -3002,7 +3040,7 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         pc += 2*ARG_LEN;
         if (x->cp != gData->cpend &&
             ((gData->regexp->flags & JSREG_FOLD)
-             ? UnicodeRegExpFold(point) == UnicodeRegExpFold(matchCh)
+             ? js_UnicodeSimpleFold(point) == js_UnicodeSimpleFold(matchCh)
              : point == matchCh)) {
             result = x;
             result->cp += width;
@@ -3015,7 +3053,7 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
             charSet = &gData->regexp->classList[index];
             JS_ASSERT(charSet->converted);
             ch = unicode && (gData->regexp->flags & JSREG_FOLD)
-                 ? UnicodeRegExpFold(point) : point;
+                 ? js_UnicodeSimpleFold(point) : point;
             index = ch >> 3;
             if (charSet->length != 0 &&
                 ch <= charSet->length &&
@@ -3032,7 +3070,7 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
             charSet = &gData->regexp->classList[index];
             JS_ASSERT(charSet->converted);
             ch = unicode && (gData->regexp->flags & JSREG_FOLD)
-                 ? UnicodeRegExpFold(point) : point;
+                 ? js_UnicodeSimpleFold(point) : point;
             index = ch >> 3;
             if (charSet->length == 0 ||
                 ch > charSet->length ||
@@ -4386,7 +4424,7 @@ regexp_xdrObject(JSXDRState *xdr, JSObject **objp)
 {
     JSRegExp *re;
     JSString *source;
-    uint32 flagsword;
+    uint32 flagsword, modernword;
     JSObject *obj;
     jsval roots[2];
     JSTempValueRooter tvr;
@@ -4398,12 +4436,18 @@ regexp_xdrObject(JSXDRState *xdr, JSObject **objp)
             return JS_FALSE;
         source = re->source;
         flagsword = ((uint32)re->cloneIndex << 16) | re->flags;
+        modernword = re->modern;
     }
     if (!JS_XDRString(xdr, &source) ||
-        !JS_XDRUint32(xdr, &flagsword)) {
+        !JS_XDRUint32(xdr, &flagsword) ||
+        !JS_XDRUint32(xdr, &modernword)) {
         return JS_FALSE;
     }
     if (xdr->mode == JSXDR_DECODE) {
+        if (modernword > 1) {
+            JS_ReportErrorNumber(xdr->cx, js_GetErrorMessage, NULL, JSMSG_BAD_SCRIPT_MAGIC);
+            return JS_FALSE;
+        }
         /* Compilation can invoke the embedding's branch callback. Keep both
          * the decoded source and the new instance live across that callback. */
         roots[0] = STRING_TO_JSVAL(source);
@@ -4414,7 +4458,8 @@ regexp_xdrObject(JSXDRState *xdr, JSObject **objp)
         if (!obj)
             goto done;
         roots[1] = OBJECT_TO_JSVAL(obj);
-        re = js_NewRegExp(xdr->cx, NULL, source, (uint16)flagsword, JS_FALSE);
+        re = NewRegExpWithEdition(xdr->cx, NULL, source, (uint16)flagsword,
+                                  JS_FALSE, modernword != 0);
         if (!re)
             goto done;
         if (!JS_SetPrivate(xdr->cx, obj, re)) {

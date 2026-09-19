@@ -78,6 +78,7 @@ js_RegExpStatics_clear(JSContext *cx, JSRegExpStatics *res);
 typedef struct RECharSet {
     JSPackedBool    converted;
     JSPackedBool    sense;
+    JSPackedBool    modern; /* grammar policy for lazy bitmap compilation */
     uint32          length;
     union {
         uint8       *bits;
@@ -110,8 +111,12 @@ struct JSRegExp {
     size_t       classCount;    /* count [...] bitmaps */
     RECharSet    *classList;    /* list of [...] bitmaps */
     JSString     *source;       /* locked source string, sans // */
+    JSPackedBool modern;       /* grammar edition, including serialized patterns */
     jsbytecode   program[1];    /* regular expression bytecode */
 };
+
+extern uint32
+js_UnicodeSimpleFold(uint32 point);
 
 extern JSRegExp *
 js_NewRegExp(JSContext *cx, JSTokenStream *ts,

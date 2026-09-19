@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnose es6id-tagged cases in the pinned later Test262 coverage inventory.
+"""Diagnose cases in the pinned later Test262 coverage inventory.
 
 This is an explicitly bounded diagnostic, not a full ES2015 conformance run.
 An es6id can survive later syntax and normative changes. Keep every selected
@@ -21,6 +21,7 @@ import tempfile
 import yaml
 
 REVISION = '35d566604512cba908054eec49f85e64a59f3091'
+RUNNER_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 ROOTS = ('annexB', 'built-ins', 'language')
 # Positive diagnostic selection only: mixed newer features are retained and
 # all selected failures remain visible. These tags do not decide edition scope.
@@ -54,7 +55,8 @@ def phase_driver(case, harness, marker, fixtures=None):
     negative=case['record'].get('negative') or {}
     values=dict(source=source,harness=harness,marker=marker,filename=case['test'],
                 module=case['mode']=='module',async_='async' in case['record'].get('flags',[]),
-                expected=negative.get('type'),fixtures=fixtures or {})
+                expected=negative.get('type'),fixtures=fixtures or {},
+                needsHTMLDDA='IsHTMLDDA' in case['record'].get('features', []))
     return '(function(p){\n'+r'''
 var realm=createTest262Realm(), emit=print, encode=JSON.stringify, stringify=String;
 var expected=p.expected ? realm.global[p.expected] : null;
@@ -73,6 +75,9 @@ function finish(kind, phase, error) {
   }));
 }
 if(p.async_) realm.global.$DONE=function(error){done++;if(error!==undefined)doneError=error;};
+if(p.needsHTMLDDA && !('IsHTMLDDA' in realm.global.$262)){
+  finish('harness-error','harness','Host lacks the required $262.IsHTMLDDA fixture');return;
+}
 try{realm.evalScript(p.harness)}catch(e){finish('harness-error','harness',e);return;}
 try{unit=p.module?cm(p.source,p.filename):compile(p.source)}
 catch(e){finish('throw','parse',e);return;}
@@ -239,7 +244,8 @@ def main():
                 print(len(results), 'complete', flush=True)
     counts = dict(collections.Counter(row['status'] for row in results))
     report = dict(purpose='Unreviewed later diagnostic only; not full ES2015 conformance.',
-                  revision=revision, selection=args.selection, filter=args.filter,
+                  revision=revision, runner_sha256=RUNNER_SHA256,
+                  selection=args.selection, filter=args.filter,
                   timezone='America/Los_Angeles', files=len({case['test'] for case in cases}),
                   counts=counts, results=results, runtime_sha256=before,
                   runtime_unchanged=before == historical.runtime_hashes(args.shell))

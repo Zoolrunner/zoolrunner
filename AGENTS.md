@@ -1657,3 +1657,16 @@ Inspector browser pageshow can precede asynchronous viewer-registry readiness.
 Queue that load until the document panel exists, and discard pending work and
 listeners during teardown. Keep the controller load-order test alongside the
 real Suite lifecycle check; do not hide script errors by delaying the test.
+
+Modern localeCompare must compare canonical Unicode equivalents as equal even
+without a host collator, with consistent ordering against other strings. Keep
+legacy callback input unchanged. Run `locale-compare.js` and
+`TestLocaleCompare.c`, including callback GC, exceptions and JSAPI clones.
+
+For non-Unicode RegExp hexadecimal escapes, consume digits only for a complete
+escape before applying the original ES2015 Annex B identity fallback. Preserve
+explicit legacy parsing and strict Unicode patterns. Lazy class bitmaps retain
+the compilation edition, and XDR stores it independently of the decoding
+context. Cache version 65 invalidates the older regexp record format. Run
+`regexp-incomplete-hex.js` and `TestRegExpHex.c`, including standalone-object
+and script cache roundtrips in both edition directions, source and GC checks.

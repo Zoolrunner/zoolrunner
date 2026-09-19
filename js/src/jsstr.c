@@ -869,28 +869,82 @@ str_toLocaleUpperCase(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     return str_toUpperCase(cx, obj, 0, argv, rval);
 }
 
+/* A deterministic Unicode case-folded order when no host collator exists.
+ * Canonical strings break primary-weight ties, so distinct spellings retain
+ * a total order without assigning locale-option semantics to extra arguments. */
 static JSBool
-str_localeCompare(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
-                  jsval *rval)
+FallbackLocaleCompare(JSContext *cx, JSString *left, JSString *right, jsval *rval)
+{
+    const jschar *a = JSSTRING_CHARS(left), *b = JSSTRING_CHARS(right);
+    size_t alen = JSSTRING_LENGTH(left), blen = JSSTRING_LENGTH(right);
+    size_t i = 0, j = 0, work = 0;
+    uint32 x, y;
+    while (i < alen && j < blen) {
+        if (!(work++ & 1023) && cx->branchCallback &&
+            !cx->branchCallback(cx, NULL)) return JS_FALSE;
+        x = a[i++]; y = b[j++];
+        if (x >= 0xD800 && x <= 0xDBFF && i < alen &&
+            a[i] >= 0xDC00 && a[i] <= 0xDFFF)
+            x = 0x10000 + ((x - 0xD800) << 10) + a[i++] - 0xDC00;
+        if (y >= 0xD800 && y <= 0xDBFF && j < blen &&
+            b[j] >= 0xDC00 && b[j] <= 0xDFFF)
+            y = 0x10000 + ((y - 0xD800) << 10) + b[j++] - 0xDC00;
+        x = js_UnicodeSimpleFold(x); y = js_UnicodeSimpleFold(y);
+        if (x != y) {
+            *rval = INT_TO_JSVAL(x < y ? -1 : 1);
+            return JS_TRUE;
+        }
+    }
+    *rval = INT_TO_JSVAL(i < alen ? 1 : j < blen ? -1 : js_CompareStrings(left, right));
+    return JS_TRUE;
+}
+
+static JSBool
+StringLocaleCompare(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                    jsval *rval, JSBool modern)
 {
     JSString *str, *thatStr;
 
     str = js_ValueToString(cx, OBJECT_TO_JSVAL(obj));
-    if (!str)
-        return JS_FALSE;
+    if (!str) return JS_FALSE;
     argv[-1] = STRING_TO_JSVAL(str);
-
-    {
-        thatStr = js_ValueToString(cx, argv[0]);
-        if (!thatStr)
-            return JS_FALSE;
-        if (cx->localeCallbacks && cx->localeCallbacks->localeCompare) {
-            argv[0] = STRING_TO_JSVAL(thatStr);
-            return cx->localeCallbacks->localeCompare(cx, str, thatStr, rval);
+    thatStr = js_ValueToString(cx, argv[0]);
+    if (!thatStr) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(thatStr);
+    if (modern) {
+        /* Canonical equivalents compare equal even without a host collator.
+         * Normalize all inputs so comparisons with a third string are also
+         * consistent. Compatibility equivalences remain distinct. */
+        str = js_NormalizeString(cx, str, 1);
+        if (!str) return JS_FALSE;
+        argv[-1] = STRING_TO_JSVAL(str);
+        thatStr = js_NormalizeString(cx, thatStr, 1);
+        if (!thatStr) return JS_FALSE;
+        argv[0] = STRING_TO_JSVAL(thatStr);
+        if (!js_CompareStrings(str, thatStr)) {
+            *rval = INT_TO_JSVAL(0);
+            return JS_TRUE;
         }
-        *rval = INT_TO_JSVAL(js_CompareStrings(str, thatStr));
     }
+    if (cx->localeCallbacks && cx->localeCallbacks->localeCompare)
+        return cx->localeCallbacks->localeCompare(cx, str, thatStr, rval);
+    if (modern) return FallbackLocaleCompare(cx, str, thatStr, rval);
+    *rval = INT_TO_JSVAL(js_CompareStrings(str, thatStr));
     return JS_TRUE;
+}
+
+static JSBool
+str_localeCompare(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                  jsval *rval)
+{
+    return StringLocaleCompare(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+str_localeCompare_modern(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                         jsval *rval)
+{
+    return StringLocaleCompare(cx, obj, argc, argv, rval, JS_TRUE);
 }
 
 static JSBool
@@ -3044,6 +3098,9 @@ js_InitStringClass(JSContext *cx, JSObject *obj)
         return NULL;
     if (js_IsModernGlobal(cx, obj)) {
         if (!js_InitModernCasing(cx, proto)) return NULL;
+        if (!JS_GetProperty(cx, proto, "localeCompare", &v)) return NULL;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(v));
+        fun->u.n.native = str_localeCompare_modern;
         for (i = 0; i < sizeof(protocols) / sizeof(protocols[0]); ++i) {
             if (!JS_GetProperty(cx, proto, protocols[i], &v)) return NULL;
             fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(v));

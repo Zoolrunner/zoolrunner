@@ -30,7 +30,7 @@ Harness setup is a separate script in the tested realm; bookkeeping stays in
 the shell realm, so a test can make its global nonextensible. Negative tests
 must throw the expected realm's constructor in their specified parse, resolution
 or runtime phase. Harness failures cannot satisfy a negative expectation.
-The runner has 26 executable phase, isolation, Unicode, module-graph, async and metadata controls:
+The runner has 33 executable phase, isolation, Unicode, module-graph, async, metadata and host-fixture controls:
 
 ```sh
 python3 js/tests/es6/test-later-runner.py --shell /path/to/frozen/xpcshell
@@ -50,9 +50,11 @@ additive native `JS_DetachArrayBuffer` API and reports errors in the host method
 own realm. Agent and other modern host capabilities are not implied. The
 informational `generated` flag does not change execution; unknown flags remain
 explicit harness failures. Missing hosts and later syntax must
-be investigated, not counted as ES2015 passes. Broader ES6-tagged coverage
-already confirms that proper tail-call execution remains unfinished; the
-historical corpus's complete pass does not cover it.
+be investigated, not counted as ES2015 passes. Later diagnostics exposed
+proper tail-call gaps that are now implemented and covered by the
+[tail-call regressions](#tail-call-execution-and-generator-shorthand). The
+broader edition review remains unfinished; the historical corpus alone does
+not establish complete coverage.
 
 ## Reproducible initial baseline
 
@@ -3651,3 +3653,50 @@ probe passes against each application engine. All four and the frozen
 conformance runtime share SHA-256
 `5170c6b9d7e76e8085ac1252e8ae5b46d63b39450c6ec0dc15d4634f6896427d`. C89 checks pass. Other platforms and the broader edition inventory
 remain unvalidated for this batch.
+
+### Canonical comparison and incomplete RegExp escapes
+
+Modern localeCompare now applies canonical normalization before comparing,
+including when a host collator is absent. Legacy methods retain their callback
+inputs and behavior. Without a host collator, normalized Unicode scalar values
+use simple case folding for primary order and their original normalized spelling
+for ties. Focused coverage adds 33 shell and 20 native checks for
+canonical/supplementary sequences, conversion order, callbacks, GC, exceptions,
+legacy globals and cloned methods. The later localeCompare directory passes
+all 26 diagnostic modes.
+
+Non-Unicode RegExp escapes now consume hex digits only for complete escapes;
+otherwise original ES2015 Annex B treats x/u as identity escapes. This fixes
+end-of-pattern and character-class cases while preserving legacy parsing and
+strict Unicode patterns. Lazy class bitmaps carry their grammar policy. XDR
+also serializes that policy independently of the decoder's context, requiring
+bytecode cache version 65. There are 62 shell and 15 native checks, including
+script/source and standalone-object cache roundtrips across editions and GC.
+The complete split-directory diagnostic retry records 228 passes, 12 failures
+and two missing-host errors. The failures include later primitive-separator
+rules and later syntax; the unavailable IsHTMLDDA fixture remains explicit.
+See `string-collation-final-later-split-retry.json`.
+Final macOS arm64 validation passes both complete pinned suites: 28,582 ES6
+modes and 11,540 ES5 modes, with zero failures, unsupported cases, timeouts,
+crashes or harness errors. All four builds, packages and relocated desktop
+checks pass, including Calendar's four views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. There are 114 focused fixtures and 66 native fixtures.
+All four engines and the frozen runtime share SHA-256
+`7949dc49110b0f094a15f39dc1e086e89349e44255bee25e396a4613ba04fadd`.
+C89 checks and all 149 edition-ledger source hashes/anchors pass.
+
+Reports use `artifacts/es6/string-collation-final-*`; the complete ES6 success
+is `string-collation-final-es6-retry.json`. Its first complete attempt had
+28,581 passes and one shell-bootstrap harness error. The unchanged complete
+corpus was rerun with eight workers and passed; the original error remains
+recorded and its cause is not established. A separate split diagnostic also
+encountered one bootstrap error. Earlier `string-grammar-final-*` reports
+retain the two pinned collation failures and the stopped application pipeline
+before the general case-folded fallback correction. These are not clean passes.
+Other platforms and the broader edition review remain unfinished.
+
+The later diagnostic host now records its own runner SHA-256 and explicitly
+reports a harness error when a test requires `$262.IsHTMLDDA`, which this shell
+host does not supply. This prevents an absent fixture from being mistaken for
+an ordinary undefined value or satisfying an expected TypeError. All selected
+rows remain in the report. The expanded host controls pass all 33 checks.
