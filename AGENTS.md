@@ -1721,3 +1721,13 @@ earlier-edition behavior. Run `arguments-property-order.js` and
 `TestArgumentsPropertyOrder.c`, including descriptors, GC, delete/re-addition,
 freezing and source/XDR execution across editions. Resolver callbacks receive
 jsval property values, not internal jsid encodings.
+
+URI decoding must reject non-shortest UTF-8 and encoded surrogate values in
+default ES5/ES2015 calls while preserving explicit legacy decoding. Do not alter
+the shared byte decoder to implement URI-only validation. Run `uri-decoding.js`
+in default and modern modes and `TestURIDecoding.c`, including conversion, GC,
+raw UTF-16 input and saved-edition source/XDR execution.
+Eager Math initialization must select the target realm Object prototype without
+recursively resolving Math as its own class prototype. Run
+`math-realm-prototype.js` and `TestMathRealmPrototype.c`, preserving explicit
+legacy initialization and testing independent globals and collection.

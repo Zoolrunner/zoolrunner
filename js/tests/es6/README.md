@@ -3969,7 +3969,8 @@ The eight archives are preserved in `arguments-order-package-archives`, with
 build hashes separately. Code/data payloads match after removing only signing
 metadata in temporary comparison copies. The broader diagnostic and currently
 running Linux matrix use the preceding frozen source and do not validate this
-correction; its separate eight-entry Linux matrix remains queued.
+correction. Its queued matrix was superseded before any job started by the
+URI/Math matrix, which also includes and tests this arguments-order change.
 
 ### Complete later-corpus diagnostic
 
@@ -3985,8 +3986,59 @@ source-hashed review ledger does not cover this entire inventory.
 
 Review found an original Decode requirement missing from the engine: URI
 functions accept encoded surrogate values and some overlong UTF-8 sequences.
-An isolated follow-up rejects those in default ES5/ES2015 calls while retaining
-explicit legacy behavior; integration and full application validation are
-unfinished. A separate Math prototype failure reproduces during eager
-initialization of a new realm, although the shell's initial global passes.
-These findings remain open rather than being hidden by the pinned-suite result.
+The follow-up below corrects those in default ES5/ES2015 calls while retaining
+explicit legacy behavior. It also corrects the Math prototype during eager
+initialization of a new realm, which the shell's initial global did not expose.
+
+### URI decoding and eager Math initialization
+
+The integrated follow-up enforces the original Decode requirement for encoded
+surrogates, overlong UTF-8 and out-of-range scalar values in default ES5/ES2015
+calls. Explicit legacy editions retain their prior behavior. The shared byte
+decoder is unchanged, and raw UTF-16 input still passes through as required.
+The isolated URI candidate passes 4,166 checks in each standard mode, 15 native
+saved-edition/source/XDR checks, all 123 prior focused fixtures, all 71 native
+probes and a C89 declaration check. The exact later URI case passes both modes.
+The isolated URI candidate also passes the complete 11,540-case ES5.1 and
+28,582-mode ES2015 suites with zero failures. Its first new native test had a
+truncated source-length argument; that fixture
+error and corrected `strlen` call are recorded separately.
+
+Eager initialization now supplies Math's Object prototype explicitly and caches
+the resulting intrinsic, avoiding recursive Math initialization. Default and
+ES2015 native globals receive the required prototype; explicit legacy behavior
+is retained. The combined isolated candidate passes 19 new realm checks,
+29 native initialization/GC checks, all 123 previous focused fixtures and all
+71 previous native probes. Both exact later Math-prototype files pass both
+modes. The edition ledger now records 232 exact-hash reviews; it is still
+incomplete and never changes a diagnostic result into a pass.
+
+The integrated revision passes all 28,582 pinned ES2015 modes and all 11,540
+required ES5.1 cases on macOS arm64 and x86_64, with zero failures and unchanged
+frozen runtimes. All eight application builds, packages and relocated desktop
+runs pass, including Calendar's four views, Browser navigation/reflection checks
+and Suite/XULRunner ChatZilla. Each package passes 126 focused fixtures and
+73 native probes. Runtime-only changes retain cache 67.
+
+Evidence is in `artifacts/es6/uri-math-final-coordinator.log`, the matching
+`uri-math[-x86]-final` reports, `uri-math-both-architectures-hashes.json` and
+`uri-math-package-payload-comparison.json`. All eight package archives are
+preserved independently. Signed package hashes differ from build hashes; the
+normalized engine code/data comparison passes. The newer Linux aarch64 matrix
+has not started: its waiting coordinator was canceled before any jobs so the
+next combined revision can be validated. Windows remains unvalidated for this
+revision. These results do not establish complete ES2015 compliance.
+
+The later diagnostic now accepts upstream runtime negatives using the
+harness-defined `Test262Error`, capturing that constructor after harness setup.
+Native error constructors remain captured before setup, and an exception from
+harness setup cannot satisfy a negative test. All 38 phase/isolation controls
+pass. A supplemental recheck of every one of the original full diagnostic's
+26 metadata rejections yields 24 passes and two actual parser failures in
+`annexB/language/comments/multi-line-html-close.js`. The original full report is
+unchanged. Those failures concern original Annex B HTML close comments after
+multiline comments containing a line terminator; a separate isolated parser
+correction passes all 26 affected modes, 79 new focused checks, 15 native
+source/XDR checks, all 126 existing focused fixtures and all 73 existing native
+probes. It is not part of this URI/Math matrix and still needs complete
+conformance/application validation.

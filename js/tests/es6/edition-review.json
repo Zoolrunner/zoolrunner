@@ -290,6 +290,13 @@
       "reason": "Original ES2015 requires CreateDataProperty, including atomic descriptor validation, while ignoring a false result. JSON reviver writes now use the complete descriptor path rather than bypassing validation through the native definition hook."
     },
     {
+      "test": "built-ins/Math/proto.js",
+      "sha256": "5a9a70968e07b007f2e9cfbc6705ec0d2223726222ad09ee20136c0c63a04309",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-math-object",
+      "reason": "Original ES2015 requires Math to inherit from its own realm Object.prototype. Eager initialization recursively resolved a second Math object as the prototype, unlike the initial shell global. Explicit Object prototype selection and intrinsic caching correct the original requirement; both exact later-test modes pass on the isolated runtime."
+    },
+    {
       "test": "built-ins/Object/getOwnPropertyNames/proxy-invariant-duplicate-symbol-entry.js",
       "sha256": "8ddef6ea9958a8cdcf2a3137b441393ca943ba4c3c46ed10545c8a48e13e1a00",
       "decision": "later-requirement",
@@ -302,6 +309,13 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys",
       "reason": "Original ES2015 [[OwnPropertyKeys]] has no duplicate-entry rejection and returns the trap result for an extensible target without non-configurable keys. These tests require the later duplicate-entry invariant."
+    },
+    {
+      "test": "built-ins/Object/getPrototypeOf/15.2.3.2-2-8.js",
+      "sha256": "c91dcc85345ef1a4375e0ec05aed162b44f1fb6fe6ba3b26ce8d6cbd636b4ad7",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-math-object",
+      "reason": "The Math prototype requirement predates ES2015 and applies to eagerly initialized realms as well as lazy shell globals. The isolated correction passes both modes of this exact later test; the pinned historical case only exercised the initial global."
     },
     {
       "test": "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values-__proto__.js",
@@ -666,6 +680,13 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
       "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/decodeURIComponent/throw-URIError.js",
+      "sha256": "f8fd88920ccbe9d45e319cdec2764e9bbd909847f9e3e0ca4eedaeef2a451e2f",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-decode",
+      "reason": "Original ES2015 Decode requires valid shortest-form UTF-8 and excludes encoded surrogate values. The correction rejects these sequences in default ES5 and ES2015 calls while retaining explicit legacy behavior. The exact later test passes both modes on the isolated corrected runtime."
     },
     {
       "test": "language/expressions/arrow-function/eval-var-scope-syntax-err.js",

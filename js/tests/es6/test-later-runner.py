@@ -37,6 +37,12 @@ def main():
     control('throw new SyntaxError("runtime")', 'fail', ('parse', 'SyntaxError'))
     control('throw new SyntaxError("runtime")', 'pass', ('runtime', 'SyntaxError'))
     control('throw new Error("\\u0108\\u0122\\u0323\\ud83d\\ude00")', 'pass', ('runtime', 'Error'))
+    custom_error = 'function Test262Error(){}'
+    control('throw new Test262Error()', 'pass', ('runtime', 'Test262Error'), harness=custom_error)
+    control('throw new Error()', 'fail', ('runtime', 'Test262Error'), harness=custom_error)
+    control('throw new Test262Error()', 'fail', ('parse', 'Test262Error'), harness=custom_error)
+    control('throw new Test262Error()', 'harness-error', ('runtime', 'Test262Error'),
+            harness=custom_error+';throw new Test262Error();')
     control('var x=1', 'harness-error', features=('IsHTMLDDA',))
     control('throw new TypeError("missing host")', 'harness-error',
             ('runtime', 'TypeError'), features=('IsHTMLDDA',))
@@ -82,6 +88,16 @@ def main():
         checks += 1
         case['record']['flags'].append('unknownControlFlag')
         assert later.run_case(case, suite, shell, 15)['status'] == 'diagnostic-harness-error'
+        checks += 1
+    with tempfile.TemporaryDirectory(prefix='zool-later-negative-') as temporary:
+        suite = Path(temporary)
+        (suite / 'harness').mkdir()
+        (suite / 'harness/assert.js').write_text('')
+        (suite / 'harness/sta.js').write_text(custom_error)
+        case = dict(source='throw new Test262Error();', mode='non-strict',
+                    test='custom-negative.js', sha256='control',
+                    record=dict(negative=dict(phase='runtime', type='Test262Error')))
+        assert later.run_case(case, suite, shell, 15)['status'] == 'diagnostic-pass'
         checks += 1
     # Untagged tests need a diagnostic path too. Helper fixtures remain
     # dependencies, while upstream mode flags and source hashes stay intact.

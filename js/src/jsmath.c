@@ -717,16 +717,25 @@ static JSFunctionSpec math_static_methods[] = {
 JSObject *
 js_InitMathClass(JSContext *cx, JSObject *obj)
 {
-    JSObject *Math;
+    JSObject *Math, *proto = NULL;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
-    Math = JS_DefineObject(cx, obj, js_Math_str, &js_MathClass, NULL, 0);
+    /* A non-constructor intrinsic must not resolve its own class as its
+     * prototype. Eager initialization otherwise recursively creates Math. */
+    if (standard &&
+        (!js_GetClassPrototype(cx, obj, INT_TO_JSID(JSProto_Object), &proto) ||
+         !proto))
+        return NULL;
+    Math = JS_DefineObject(cx, obj, js_Math_str, &js_MathClass, proto, 0);
     if (!Math)
         return NULL;
     if (!JS_DefineFunctions(cx, Math, math_static_methods) ||
         !js_SetBuiltinMethodFlags(cx, Math, math_static_methods, JSFUN_NO_CONSTRUCT))
         return NULL;
     if (!JS_DefineConstDoubles(cx, Math, math_constants) ||
-        !js_DefineBuiltinTag(cx, Math, "Math"))
+        !js_DefineBuiltinTag(cx, Math, "Math") ||
+        (standard && !js_SetClassObject(cx, obj, JSProto_Math, Math)))
         return NULL;
     return Math;
 }

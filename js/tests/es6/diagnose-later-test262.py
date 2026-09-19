@@ -79,6 +79,8 @@ if(p.needsHTMLDDA && !('IsHTMLDDA' in realm.global.$262)){
   finish('harness-error','harness','Host lacks the required $262.IsHTMLDDA fixture');return;
 }
 try{realm.evalScript(p.harness)}catch(e){finish('harness-error','harness',e);return;}
+// Test262Error is supplied by the harness, unlike the realm's native errors.
+if(p.expected==='Test262Error') expected=realm.global.Test262Error;
 try{unit=p.module?cm(p.source,p.filename):compile(p.source)}
 catch(e){finish('throw','parse',e);return;}
 if(p.module){
@@ -190,7 +192,7 @@ def run_case(case, suite, shell, timeout):
         negative = case['record'].get('negative')
         if negative and (not isinstance(negative, dict) or
                          negative.get('phase') not in ('parse', 'resolution', 'runtime') or
-                         negative.get('type') not in ('SyntaxError', 'ReferenceError', 'TypeError', 'RangeError', 'EvalError', 'URIError', 'Error')):
+                         negative.get('type') not in ('SyntaxError', 'ReferenceError', 'TypeError', 'RangeError', 'EvalError', 'URIError', 'Error', 'Test262Error')):
             raise ValueError('Unrecognized negative metadata: ' + repr(negative))
         harness = ''
         if case['mode'] != 'raw':

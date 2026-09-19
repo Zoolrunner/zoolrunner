@@ -1017,3 +1017,10 @@ The preceding revision passes all four native Linux aarch64 GTK2 workflows,
 including both complete suites, while Xlib jobs continue. The broader diagnostic
 has identified further URI-decoding and realm-initialization work. See
 [arguments creation order](js/tests/es6/README.md#mapped-arguments-property-creation-order).
+
+URI decoding and eager Math realm initialization corrections pass both complete
+pinned suites and all four application builds, packages and desktop checks on
+macOS arm64 and x86_64. Their Linux validation is deferred to the next combined
+revision; Windows remains unvalidated for these changes. The complete later diagnostic remains mixed-edition and nonzero; its
+unreviewed failures are not a completed ES2015 inventory. See
+[URI and Math validation](js/tests/es6/README.md#uri-decoding-and-eager-math-initialization).

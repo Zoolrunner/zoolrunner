@@ -5349,6 +5349,21 @@ Decode(JSContext *cx, JSString *str, const jschar *reservedSet, jsval *rval)
                     k += 2;
                     octets[j] = (char)B;
                 }
+                /* URI decoding requires shortest-form UTF-8 scalar values.
+                 * Keep the shared byte decoder and explicit legacy editions'
+                 * historical replacement/surrogate behavior unchanged. */
+                if ((JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                     JS_VERSION_IS_ES2015(cx)) &&
+                    (n > 4 ||
+                     (n == 2 && octets[0] < 0xC2) ||
+                     (n == 3 &&
+                      ((octets[0] == 0xE0 && octets[1] < 0xA0) ||
+                       (octets[0] == 0xED && octets[1] >= 0xA0))) ||
+                     (n == 4 &&
+                      ((octets[0] == 0xF0 && octets[1] < 0x90) ||
+                       octets[0] > 0xF4 ||
+                       (octets[0] == 0xF4 && octets[1] > 0x8F)))))
+                    goto bad;
                 v = Utf8ToOneUcs4Char(octets, n);
                 if (v >= 0x10000) {
                     v -= 0x10000;
