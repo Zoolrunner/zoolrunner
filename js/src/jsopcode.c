@@ -1360,6 +1360,26 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
         break;
 
       case JSOP_DUP:
+      {
+        jssrcnote *sn = js_GetSrcNote(jp->script, pc);
+        if (sn && SN_TYPE(sn) == SRC_PATTERNDEFAULT) {
+            jsbytecode *target = pc + js_GetSrcNoteOffset(sn, 0);
+            jsbytecode *expression = pc + JSOP_DUP_LENGTH + JSOP_PUSH_LENGTH +
+                                     JSOP_NEW_EQ_LENGTH;
+            ptrdiff_t savedOffset = ss->sprinter.offset;
+            char *initializer;
+            LOCAL_ASSERT(*expression == JSOP_IFEQ || *expression == JSOP_IFEQX);
+            expression += js_CodeSpec[*expression].length + JSOP_POP_LENGTH;
+            ss->sprinter.offset += PAREN_SLOP;
+            if (!Decompile(ss, expression, (intN)(target-expression))) return NULL;
+            initializer = JS_strdup(cx, PopStr(ss, JSOP_NOP));
+            if (!initializer) return NULL;
+            ss->sprinter.offset = savedOffset;
+            pc = DecompileDestructuringLHS(ss, target, endpc, hole);
+            if (pc && Sprint(&ss->sprinter, " = (%s)", initializer) < 0) pc = NULL;
+            JS_free(cx, initializer);
+            return pc;
+        }
         pc = DecompileDestructuring(ss, pc, endpc);
         if (!pc)
             return NULL;
@@ -1372,6 +1392,7 @@ DecompileDestructuringLHS(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc,
             return pc;
         LOCAL_ASSERT(*pc == JSOP_POP);
         break;
+      }
 
       case JSOP_LITOPX:
         LOCAL_ASSERT(pc[1 + LITERAL_INDEX_LEN] == JSOP_CONSTASSIGN);
@@ -4802,6 +4823,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
 
                 LOCAL_ASSERT(*pc == JSOP_GETARG);
                 pc += JSOP_GETARG_LENGTH;
+                if (*pc == JSOP_CHECKPROP) pc += JSOP_CHECKPROP_LENGTH;
                 LOCAL_ASSERT(*pc == JSOP_DUP);
                 if (!ss.printer) {
                     ok = InitSprintStack(cx, &ss, jp, fun->u.i.script->depth);

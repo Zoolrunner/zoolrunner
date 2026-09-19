@@ -559,6 +559,7 @@ typedef enum JSSrcNoteType {
                                    next POP, or from CONDSWITCH to first CASE
                                    opcode, etc. -- always a forward delta */
     SRC_GROUPASSIGN = 7,        /* SRC_DESTRUCT variant for [a, b] = [c, d] */
+    SRC_PATTERNDEFAULT = 7,    /* JSOP_DUP; distance to default target */
     SRC_PATTERNKEY  = 7,        /* JSOP_NOP before a computed pattern key;
                                    forward distance to its JSOP_GETELEM */
     SRC_ASSIGNOP    = 8,        /* += or another assign-op follows */

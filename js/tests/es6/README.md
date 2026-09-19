@@ -2610,3 +2610,30 @@ builds and the conformance runtime:
 C89 diagnostics pass. These results cover macOS arm64 only. Defaults, rest,
 assignment-reference ordering and complete array iterator behavior remain
 unfinished; this is not full ES2015 compliance.
+
+
+### Destructuring defaults
+
+Modern object and array patterns accept initializers, evaluating them only for
+undefined values. Object shorthand defaults remain cover grammar and are
+rejected when used as ordinary object literals, including dead branches.
+Source notes preserve initializers and cache version 52 records their emission.
+Object-pattern formal decompilation also skips the coercibility opcode.
+The focused fixture passes 28 checks, including GC, inferred names, lexical
+initialization, generator suspension, parameter/source round trips and wide
+branches. The native 13-check pattern probe includes defaults through XDR and
+script decompilation; real-window coverage includes lexical and formal defaults.
+The complete pinned ES2015 run passes **28,085 modes**, with **483 failures**,
+14 unsupported modules and no harness errors, crashes or timeouts: **83 gained,
+zero lost**. All **11,540 ES5 cases** pass on the same frozen macOS arm64 runtime.
+All four applications pass root build, package and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout checks and
+ChatZilla in Suite and XULRunner. Reports use
+`artifacts/es6/pattern-defaults-final-*`; all four application engine hashes
+match the conformance runtime: `885a599b9536dee8b5290abb0e885f5d45901bdc3d1b68f2f704137ee90f887b`.
+C89 diagnostics and the existing focused lexical, generator, for-of, arrow,
+reference and legacy-application fixtures pass. Other platforms have not been
+revalidated for this batch. Parameter initializers on the whole parameter,
+complete parameter-environment semantics, rest elements, assignment-reference
+ordering and iterator-based array patterns remain unfinished. This is not full
+ES2015 compliance.

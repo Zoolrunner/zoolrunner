@@ -38,7 +38,9 @@ int main(void)
         "var symbol=Symbol('key'),values={},key={};values[symbol]=21;"
         "key[Symbol.toPrimitive]=function(){gc();return symbol};"
         "pattern({get nested(){gc();return {x:9}},blank:3})===9 && hits===2 && "
-        "computed(values,null,key)===21";
+        "computed(values,null,key)===21 && "
+        "(function({x=(gc(),5)}){return x})({})===5 && "
+        "(function(o){let {x=(gc(),3),y=x+1}=o;return y})({})===4";
     const char *legacy = "function old(v){var [a,b]=v;return a+b}old([3,4])===7";
     if (!rt) return 1;
     cx = JS_NewContext(rt,8192);

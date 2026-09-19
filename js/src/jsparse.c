@@ -2699,7 +2699,10 @@ CheckDestructuring(JSContext *cx, BindData *data,
 
     /* Modern literal keys may be computed; static RHS shape matching assumes
      * the historical constant-key grammar and cannot validate these patterns. */
-    if (JS_VERSION_IS_ES2015(cx)) right = NULL;
+    if (JS_VERSION_IS_ES2015(cx)) {
+        right = NULL;
+        left->pn_extra &= ~PNX_COVERINIT;
+    }
     if (left->pn_type == TOK_ARRAYCOMP) {
         js_ReportCompileErrorNumber(cx, left, JSREPORT_PN | JSREPORT_ERROR,
                                     JSMSG_ARRAY_COMP_LEFTSIDE);
@@ -2731,6 +2734,8 @@ CheckDestructuring(JSContext *cx, BindData *data,
                 }
             }
 
+            if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_ASSIGN &&
+                pn->pn_op == JSOP_NOP) pn = pn->pn_left;
             /* Nullary comma is an elision; binary comma is an expression.*/
             if (pn->pn_type != TOK_COMMA || pn->pn_arity != PN_NULLARY) {
                 if (pn->pn_type == TOK_RB || pn->pn_type == TOK_RC) {
@@ -2784,6 +2789,8 @@ CheckDestructuring(JSContext *cx, BindData *data,
                     pn = pn->pn_kid;
             }
 
+            if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_ASSIGN &&
+                pn->pn_op == JSOP_NOP) pn = pn->pn_left;
             if (pn->pn_type == TOK_RB || pn->pn_type == TOK_RC) {
                 if (right) {
                     rhs = FindPropertyValue(right, lhs->pn_left, &fpvd);
@@ -6536,7 +6543,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     return NULL;
             }
 #endif
-            if (!generatorMethod && (tt == TOK_COMMA || tt == TOK_RC) &&
+            if (!generatorMethod && (tt == TOK_COMMA || tt == TOK_RC ||
+                (tt == TOK_ASSIGN && CURRENT_TOKEN(ts).t_op == JSOP_NOP)) &&
                 pn3->pn_type == TOK_NAME && JS_VERSION_IS_ES2015(cx)) {
                 JSString *name = ATOM_TO_STRING(pn3->pn_atom);
                 JSTokenType keyword = js_CheckKeyword(JSSTRING_CHARS(name), JSSTRING_LENGTH(name));
@@ -6554,6 +6562,17 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 CURRENT_TOKEN(ts).t_op = JSOP_NAME;
                 pn2 = PrimaryExpr(cx, ts, tc, TOK_NAME, JS_FALSE);
                 if (!pn2) return NULL;
+                if (tt == TOK_ASSIGN) {
+                    JSParseNode *initializer;
+                    js_GetToken(cx, ts);
+                    initializer = AssignExpr(cx, ts, tc);
+                    if (!initializer || !InferFunctionName(cx, initializer,
+                                                           key->pn_atom, JSOP_NOP))
+                        return NULL;
+                    pn2 = NewBinary(cx, TOK_ASSIGN, JSOP_NOP, pn2, initializer, tc);
+                    if (!pn2) return NULL;
+                    pn->pn_extra |= PNX_COVERINIT;
+                }
                 key->pn_type = TOK_STRING;
                 key->pn_op = JSOP_STRING;
                 pn3 = NewParseNode(cx, ts, PN_UNARY, tc);
@@ -7288,6 +7307,12 @@ js_FoldConstants(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
         return JS_FALSE;
     }
 
+    if (pn->pn_type == TOK_RC && pn->pn_arity == PN_LIST &&
+        (pn->pn_extra & PNX_COVERINIT)) {
+        js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
+                                    JSMSG_STRICT_SYNTAX);
+        return JS_FALSE;
+    }
     switch (pn->pn_arity) {
       case PN_FUNC:
       {

@@ -732,3 +732,12 @@ crashes or timeouts, and all **11,540 ES5 cases**. All four application
 build/package/runtime checks pass. Full ES2015 compliance remains unfinished;
 other platforms have not been revalidated for this batch. See
 [the computed-pattern validation record](js/tests/es6/README.md#computed-object-pattern-keys).
+
+Destructuring defaults now run only for undefined values and preserve source,
+lexical initialization, generator suspension and bytecode-cache round trips.
+The latest full macOS arm64 result is **28,085 ES2015 passes**, **483 failures**
+and **14 unsupported modules**, with no harness errors, crashes or timeouts
+(**83 gained, zero lost**). All **11,540 ES5 cases** and all four application
+build/package/runtime checks pass. Full ES2015 compliance remains unfinished;
+other platforms remain unvalidated for this batch. See
+[the defaults validation record](js/tests/es6/README.md#destructuring-defaults).

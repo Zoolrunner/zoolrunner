@@ -163,6 +163,10 @@ function modernWindowEdition() {
                          return false; })() &&
            (function() { var key=Symbol('pattern'), source={};source[key]=11;
                          var {[key]:value}=source;return value===11; })() &&
+           (function() { let {x=3,y=x+1}={};
+                         function parameter({value=5}) { return value; }
+                         var restored=eval('('+parameter.toString()+')');
+                         return x===3 && y===4 && restored({})===5; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

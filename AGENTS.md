@@ -1510,3 +1510,16 @@ crashes or timeouts. All four applications pass build/package/runtime checks,
 including Calendar views and Suite/XULRunner ChatZilla. Defaults, rest,
 assignment-reference ordering and complete array iterator semantics still
 require work; other platforms remain unvalidated for this batch.
+
+
+Destructuring defaults use cache version 52. Run `pattern-defaults.js` and the
+native pattern/XDR test. Preserve rejected object-literal cover initializers,
+undefined-only evaluation, inferred names, lexical initialization, generator
+suspension, wide branches and formal-pattern source round trips. The validated
+macOS arm64 baseline passes 28,085 ES2015 modes and all 11,540 ES5 modes, with
+483 failures and 14 unsupported modules remaining and no harness errors,
+crashes or timeouts. All four applications pass build/package/runtime checks,
+including Calendar views and Suite/XULRunner ChatZilla. Whole-parameter
+defaults, parameter environments, rest patterns, assignment-reference ordering
+and iterator-based array patterns remain unfinished. Other platforms have not
+been revalidated for this batch.

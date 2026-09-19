@@ -3320,6 +3320,12 @@ EmitDestructuringDecls(JSContext *cx, JSCodeGenerator *cg, JSOp prologOp,
     JSParseNode *pn2, *pn3;
     DestructuringDeclEmitter emitter;
 
+    if (pn->pn_type == TOK_ASSIGN) {
+        pn = pn->pn_left;
+        emitter = pn->pn_type == TOK_NAME ? EmitDestructuringDecl
+                                          : EmitDestructuringDecls;
+        return emitter(cx, cg, prologOp, pn);
+    }
     if (pn->pn_type == TOK_RB) {
         for (pn2 = pn->pn_head; pn2; pn2 = pn2->pn_next) {
             if (pn2->pn_type == TOK_COMMA)
@@ -3353,11 +3359,26 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                      JSBool wantpop, JSOp declOp)
 {
     jsuint slot;
+    ptrdiff_t start, note, branch;
 
     /* Skip any parenthesization. */
     while (pn->pn_type == TOK_RP)
         pn = pn->pn_kid;
 
+    if (pn->pn_type == TOK_ASSIGN) {
+        start = CG_OFFSET(cg);
+        note = js_NewSrcNote(cx, cg, SRC_PATTERNDEFAULT);
+        if (note < 0 || js_Emit1(cx, cg, JSOP_DUP) < 0 ||
+            js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, cg, JSOP_NEW_EQ) < 0) return JS_FALSE;
+        branch = EmitJump(cx, cg, JSOP_IFEQ, 0);
+        if (branch < 0 || js_Emit1(cx, cg, JSOP_POP) < 0 ||
+            !js_EmitTree(cx, cg, pn->pn_right) ||
+            !js_SetJumpOffset(cx, cg, CG_CODE(cg, branch), CG_OFFSET(cg)-branch) ||
+            !js_SetSrcNoteOffset(cx, cg, (uintN)note, 0, CG_OFFSET(cg)-start))
+            return JS_FALSE;
+        pn = pn->pn_left;
+    }
     /*
      * Now emit the lvalue opcode sequence.  If the lvalue is a nested
      * destructuring initialiser-form, call ourselves to handle it, then
