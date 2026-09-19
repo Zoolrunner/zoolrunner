@@ -1714,3 +1714,10 @@ preserve mapped values and deleted/detached properties. Run
 `discarded-operations.js` and `arguments-exit.js` in default and modern modes,
 `arguments-exit-prototype.js`, and `TestDiscardedEffects.c`, including source/XDR
 round trips. This emitter correction advances the embedding cache to 67.
+
+Modern mapped arguments must establish initial length/callee string-key order
+before user reads or mutations. Preserve lazy numeric parameter mappings and
+earlier-edition behavior. Run `arguments-property-order.js` and
+`TestArgumentsPropertyOrder.c`, including descriptors, GC, delete/re-addition,
+freezing and source/XDR execution across editions. Resolver callbacks receive
+jsval property values, not internal jsid encodings.

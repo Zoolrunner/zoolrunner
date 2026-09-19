@@ -253,10 +253,14 @@ js_GetArgsProperty(JSContext *cx, JSStackFrame *fp, jsid id,
     return JS_TRUE;
 }
 
+static JSBool
+args_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
+             JSObject **objp);
+
 JSObject *
 js_GetArgsObject(JSContext *cx, JSStackFrame *fp)
 {
-    JSObject *argsobj, *global, *parent;
+    JSObject *argsobj, *global, *parent, *resolved;
     uintN i;
     JSBool strict;
 
@@ -311,6 +315,18 @@ js_GetArgsObject(JSContext *cx, JSStackFrame *fp)
             if (!JS_DefineElement(cx, argsobj, i, fp->argv[i], NULL, NULL,
                                   JSPROP_ENUMERATE)) return NULL;
         }
+    }
+    if (!strict && fp->fun->edition >= JSVERSION_ECMA_2015) {
+        /* These own string properties exist from creation. Lazy resolution
+         * must not let an earlier callee read or user property change their
+         * ES2015 creation order. Numeric indices can remain lazily mapped. */
+        if (!args_resolve(cx, argsobj,
+                          ATOM_KEY(cx->runtime->atomState.lengthAtom),
+                          0, &resolved) ||
+            !args_resolve(cx, argsobj,
+                          ATOM_KEY(cx->runtime->atomState.calleeAtom),
+                          0, &resolved))
+            return NULL;
     }
     if (fp->script && (fp->script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015 &&
         !js_InitArgumentsIterator(cx, global, argsobj))

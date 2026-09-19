@@ -1009,3 +1009,11 @@ suites and all four applications pass on macOS arm64 and x86_64. Native Linux
 aarch64 Suite and Browser GTK2 pass their full local `act` gates; the remaining
 Linux entries and broader edition review are still in progress. See
 [discarded operations](js/tests/es6/README.md#discarded-conversions-and-arguments-detachment).
+
+A further mapped-arguments correction preserves initial string-key order when
+`callee` is read before other fields. Both complete pinned suites and all four
+applications pass on macOS arm64 and x86_64; its Linux matrix remains queued.
+The preceding revision passes all four native Linux aarch64 GTK2 workflows,
+including both complete suites, while Xlib jobs continue. The broader diagnostic
+has identified further URI-decoding and realm-initialization work. See
+[arguments creation order](js/tests/es6/README.md#mapped-arguments-property-creation-order).

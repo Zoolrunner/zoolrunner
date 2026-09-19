@@ -212,7 +212,7 @@ def main():
                   language_edition=args.edition, global_initialization=args.edition,
                   source_transport='unicode-global-script', harness_layout='separate-global-script',
                   shell=str(shell), shell_sha256=hashlib.sha256(shell.read_bytes()).hexdigest(),
-                  runtime_sha256=binaries,
+                  runtime_sha256=binaries, timeout_seconds=args.timeout, jobs=args.jobs,
                   runtime_unchanged=runtime_hashes(shell) == binaries,
                   seconds=round(time.monotonic() - started, 2), counts=counts, results=results)
     args.report.parent.mkdir(parents=True, exist_ok=True)

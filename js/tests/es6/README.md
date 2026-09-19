@@ -3936,3 +3936,57 @@ edge: resolving `arguments.callee` before `length`, or adding a user field first
 can change the initial string-key order of mapped arguments. A separate isolated
 correction passes initial focused/native checks but is not part of this batch.
 The full later-edition diagnostic and edition inventory also remain unfinished.
+
+### Mapped arguments property creation order
+
+Modern mapped arguments now create their `length` and `callee` fields in the
+required order before exposing the object. Previously, reading `callee` first,
+asking for its descriptor, or adding a custom field before enumeration could
+reorder the initial own string keys. Numeric argument mappings remain lazy,
+and default ES5/explicit legacy ordering remains unchanged. This changes runtime
+object creation rather than emitted bytecode, so cache version 67 is retained.
+The original requirement is [CreateMappedArgumentsObject](https://262.ecma-international.org/6.0/#sec-createmappedargumentsobject).
+
+The isolated correction passes 28 focused checks, 13 native source/XDR/GC and
+cross-edition checks, all 122 existing focused fixtures, all 70 existing native
+probes, and C89 checks. Coverage includes live/detached objects, descriptor and
+accessor reads, custom fields, symbol grouping, deletion/re-addition, freezing,
+parameter mapping and zero actual arguments. The first isolated implementation
+passed an internal jsid to the resolver callback, which expects a jsval; its
+failed regression is preserved and the corrected call uses the atom value.
+The integrated correction passes all 28,582 pinned ES2015 modes and all 11,540
+required ES5.1 cases on both macOS arm64 and x86_64, with zero failures, timeouts,
+crashes or harness errors. All eight application build/package checks pass,
+including 123 focused fixtures and 71 native probes per package. All four apps
+pass desktop validation on both architectures, plus Calendar's four views,
+Browser navigation and Suite/XULRunner ChatZilla. The complete driver is
+`artifacts/es6/arguments-order-final-coordinator.log`; no failed attempt was
+replaced to obtain this matrix result.
+
+The eight archives are preserved in `arguments-order-package-archives`, with
+`arguments-order-both-architectures-hashes.json` and
+`arguments-order-package-payload-comparison.json` recording signed package and
+build hashes separately. Code/data payloads match after removing only signing
+metadata in temporary comparison copies. The broader diagnostic and currently
+running Linux matrix use the preceding frozen source and do not validate this
+correction; its separate eight-entry Linux matrix remains queued.
+
+### Complete later-corpus diagnostic
+
+The unfiltered later diagnostic at `35d566604512cba908054eec49f85e64a59f3091`
+completed all 93,197 modes on the frozen discarded-effects arm64 runtime:
+52,417 diagnostic passes, 37,446 diagnostic failures and 3,334 harness errors;
+its runtime hashes remained unchanged. The full report is
+`artifacts/es6/discarded-effects-later-all.json`. This mixed-edition corpus
+includes post-ES2015 features and is not an ES2015 conformance result. Every
+failure and host error remains visible. Feature tags and directory names can
+prioritize review but cannot establish an edition exemption. The existing
+source-hashed review ledger does not cover this entire inventory.
+
+Review found an original Decode requirement missing from the engine: URI
+functions accept encoded surrogate values and some overlong UTF-8 sequences.
+An isolated follow-up rejects those in default ES5/ES2015 calls while retaining
+explicit legacy behavior; integration and full application validation are
+unfinished. A separate Math prototype failure reproduces during eager
+initialization of a new realm, although the shell's initial global passes.
+These findings remain open rather than being hidden by the pinned-suite result.

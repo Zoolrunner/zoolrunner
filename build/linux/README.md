@@ -220,10 +220,22 @@ a Git worktree-path error. Those failures remain recorded; they motivated
 running internal probes while production build objects are still available.
 
 For the subsequent discarded-operation/arguments-detachment correction, native
-aarch64 Suite and Browser GTK2 each pass the expanded local `act` workflow:
+aarch64 Suite, Browser and Calendar GTK2 each pass the expanded local `act` workflow:
 build, ABI, package, runtime, 11,540 ES5.1 cases, 28,582 ES2015 modes, 122 focused
 fixtures, 70 native probes and artifact uploads. The unchanged packaged engine
 hash is `df4c535ffecd820f568f445fc097825e7927f0a6c9e9450401d6b16260cee42e`.
 The frozen source and reports are under `artifacts/es6/linux-discarded-effects-*`.
-The other six aarch64 entries are still running; this is not a complete new
+XULRunner GTK2 also passes after the retry documented below; the four Xlib
+entries are still running; this is not a complete new
 matrix result and does not establish Linux x86 or GitHub-hosted validation.
+
+The XULRunner GTK2 continuation recorded 11,538 ES5.1 passes and two exhaustive
+URI-decoding timeouts at the original 10-second per-case limit. The exact
+packaged engine matches the first three applications' hash. Both unchanged cases
+pass alone in about nine seconds (`linux-es5-uri-timeout-investigation`); these
+subset diagnostics do not replace the failed full report. The Linux ES5 gate
+now uses the same uniform 60-second per-case limit as ES6, retaining every case,
+mode and assertion. The full XULRunner retry passes all 11,540 ES5 cases with
+zero failures or timeouts, followed by all 28,582 ES6 cases, all 122 focused
+fixtures, 70 native probes, runtime checks and both uploads. Its complete workflow
+passes; the remaining Xlib entries are still pending. Runner reports now include the per-case limit and worker count.

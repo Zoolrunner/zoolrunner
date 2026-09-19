@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         run(['git', '-C', suite, 'checkout', '--detach', revision], 'test262-checkout')
         report = logs / 'test262.json'
         run(['python3', root / 'js/tests/es5/run-test262.py', '--suite', suite,
-             '--shell', shell, '--report', report, '--jobs', '4',
+             '--shell', shell, '--report', report, '--jobs', '4', '--timeout', '60',
              '--timezone', 'America/Los_Angeles'], 'test262', timeout=1800)
         counts = json.loads(report.read_text())['counts']
         if counts != {'pass': 11540, 'fail': 0, 'timeout': 0, 'crash': 0, 'harness-error': 0}:

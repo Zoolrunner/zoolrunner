@@ -493,3 +493,10 @@ editions retain their historical optimizer/detachment behavior. The initial
 isolated correction passes the complete pinned ES5.1 gate; integrated platform
 and application results are tracked in the
 [ES6 work log](../es6/README.md#discarded-conversions-and-arguments-detachment).
+
+Linux aarch64's workflow supplies `--timeout 60` for every required-mode case.
+The exhaustive four-byte URI decoding tests each took about nine seconds alone
+and timed out at ten seconds during a concurrent XULRunner run. Both original
+failures and full retry results remain recorded; filtered diagnostic passes are
+not a replacement for the complete 11,540-case gate. JSON reports include
+`timeout_seconds` and `jobs`; the standalone runner's default remains ten seconds.
