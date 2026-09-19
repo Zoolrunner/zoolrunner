@@ -174,6 +174,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             "-o", str(blocking)], check=True)
         subprocess.run([str(blocking)], env=environment, check=True, timeout=60)
         for test, marker in (
+                ("../es6/setter-result.js", "SETTER-RESULT PASS checks=16"),
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
                 ("arguments-lifetime.js", "ARGUMENTS-LIFETIME checks=12 failures=0"),
                 ("legacy-application.js", "LEGACY-APPLICATION checks=58 failures=0"),
@@ -394,6 +395,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("regexp-unicode.js", "REGEXP-UNICODE PASS checks=48"),
                 ("global-declarations.js", "GLOBAL-DECLARATIONS-EXTENDED PASS checks=22"),
                 ("completion.js", "COMPLETION PASS checks=27"),
+                ("setter-result.js", "SETTER-RESULT PASS checks=16"),
                 ("super-properties.js", "SUPER-PROPERTIES PASS checks=33"),
                 ("global-lexical.js", "GLOBAL-LEXICAL-COMPILER PASS checks=17"),
                 ("array-spread.js", "ARRAY-SPREAD PASS checks=21"),
@@ -438,6 +440,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestRegExpUnicode.c", "ES6-REGEXP-UNICODE-EMBEDDING PASS checks=22"),
                 ("es6/TestGlobalDeclarations.c", "GLOBAL-DECLARATIONS-EMBEDDING PASS checks=13"),
                 ("es6/TestCompletion.c", "COMPLETION-EMBEDDING PASS checks=17"),
+                ("es6/TestSetterResult.c", "SETTER-RESULT-NATIVE PASS checks=66"),
                 ("es6/TestMethodHome.c", "METHOD-HOME PASS checks=75"),
                 ("es6/TestSuperReference.c", "SUPER-REFERENCE PASS checks=36"),
                 ("es6/TestSuperWide.c", "SUPER-WIDE PASS checks=16"),

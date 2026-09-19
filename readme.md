@@ -798,3 +798,13 @@ desktop checks, including Calendar views, Browser navigation/layout and Suite /
 XULRunner ChatZilla; see `js/tests/es6/README.md`. Classes, full parameter
 environments and modules remain unfinished. Other platforms have not been
 revalidated for this batch.
+
+
+Scripted setter assignment results now follow standard-edition behavior while
+preserving explicitly selected legacy behavior. The complete macOS arm64 run
+passes **28,231 ES2015 cases**, with **337 failures**, **14 unsupported modules**,
+and no harness errors, crashes or timeouts (two gained, zero lost). All **11,540
+ES5 cases** and all four applications' build/package/desktop checks pass,
+including Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Full ES2015 compliance remains unfinished; other platforms are not revalidated
+for this batch.

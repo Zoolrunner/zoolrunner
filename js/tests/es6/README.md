@@ -2880,3 +2880,27 @@ unchanged frozen conformance runtime:
 `284ae2f98e5d99b54a3407afa01e520861ced00348641700dc23d96d50445149`.
 C89 checks pass. Full ES2015 compliance remains unfinished; this batch's
 validation is macOS arm64 only.
+
+
+## Scripted setter assignment results
+
+Standard-edition assignment retains the assigned value when a scripted setter
+returns another value or returns implicitly. Explicit historical editions keep
+their old result behavior unless the caller opts into strict mode. Native setter
+hooks retain their embedding contract. The assigned value is rooted across
+callbacks; the setter's exception still propagates.
+
+`setter-result.js` passes 16 checks in default ES5 and ES2015 modes, covering
+computed/inherited/primitive receivers, compound assignment, updates, descriptor
+replacement and reentrancy. `TestSetterResult.c` passes 66 checks with collection
+and mixed setter/caller editions. The 20-case object-literal diagnostic subset
+passes completely. Final integrated reports under
+`artifacts/es6/setter-result-final-*` record **28,231 ES2015 passes**, **337
+failures**, **14 unsupported modules** and zero harness errors, crashes or
+timeouts: **two gained, zero lost**. All **11,540 ES5 cases** pass. All four
+applications pass build, package and relocated desktop checks, including
+Calendar's four views, 169 Browser navigation/layout checks and Suite/XULRunner
+ChatZilla. The frozen conformance runtime remains unchanged, and all four
+engine hashes match: `fca775a9ee16720547e1373307306ccddd6dd85899649a6a6e73668d25577515`.
+C89 checks pass. This batch is validated on macOS arm64 only; full ES2015
+compliance remains unfinished.

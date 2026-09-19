@@ -1674,6 +1674,20 @@ js_InternalGetOrSetValue(JSContext *cx, JSObject *obj, jsval thisv,
         return JS_FALSE;
     }
 
+    /* Scripted setter return values do not become assignment results in
+     * standard editions. Keep the explicitly selected historical behavior. */
+    if (mode == JSACC_WRITE && argc == 1 &&
+        (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT || JS_VERSION_IS_ES2015(cx) ||
+         (cx->fp && cx->fp->script && cx->fp->script->strictMode))) {
+        jsval assigned = argv[0], ignored;
+        JSTempValueRooter root;
+        JSBool ok;
+        JS_PUSH_TEMP_ROOT(cx, 1, &assigned, &root);
+        ok = js_InternalInvokeValue(cx, thisv, fval, 0, argc, argv, &ignored);
+        if (ok) *rval = assigned;
+        JS_POP_TEMP_ROOT(cx, &root);
+        return ok;
+    }
     return js_InternalInvokeValue(cx, thisv, fval, 0, argc, argv, rval);
 }
 

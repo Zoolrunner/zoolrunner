@@ -1560,3 +1560,9 @@ Run `super-properties.js`, `TestMethodHome.c`, `TestSuperReference.c` and
 `TestSuperWide.c`, including XDR/source reconstruction, wide operands and GC.
 When the decompiler copies text from its own buffer, preserve source offsets
 across arena growth. Real chrome/content fixtures must also exercise super.
+
+
+Scripted setters must preserve assignment results in standard editions while
+retaining explicit legacy result behavior and native property-hook contracts.
+Run `setter-result.js` in default ES5 and ES2015 modes and `TestSetterResult.c`
+for mixed caller/setter editions, strict callers, callbacks and GC.

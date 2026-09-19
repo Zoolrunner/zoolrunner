@@ -197,7 +197,8 @@ function modernWindowEdition() {
                              o={saved:7,m(){super.value+=2;return ()=>super.value},
                                 e(){return eval('super.value')}};
                          Object.setPrototypeOf(o,base);
-                         return o.m()()===9 && o.e()===9; })() &&
+                         return o.m()()===9 && o.e()===9 &&
+                                (o.value=12)===12 && o.e()===12; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();
