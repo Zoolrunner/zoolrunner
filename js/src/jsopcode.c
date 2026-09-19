@@ -5000,7 +5000,15 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     }
     js_puts(jp, "(");
 
-    if (FUN_INTERPRETED(fun) && fun->object) {
+    if (FUN_INTERPRETED(fun) && fun->object &&
+        fun->u.i.script->parameterSourceIndex != (uint32)-1) {
+        JSScript *bodyScript = fun->u.i.script;
+        JSString *formalSource = ATOM_TO_STRING(
+            bodyScript->atomMap.vector[bodyScript->parameterSourceIndex]);
+        if (SprintSourceString(&jp->sprinter, formalSource) < 0) return JS_FALSE;
+        scope = OBJ_SCOPE(fun->object);
+        pc = bodyScript->main;
+    } else if (FUN_INTERPRETED(fun) && fun->object) {
         size_t paramsize;
 #ifdef JS_HAS_DESTRUCTURING
         SprintStack ss;
@@ -5144,7 +5152,7 @@ js_DecompileFunction(JSPrinter *jp, JSFunction *fun)
     if (FUN_INTERPRETED(fun) && fun->object) {
         /* A non-simple formal list cannot contain an explicit strict
          * directive. Its strictness comes from the enclosing source. */
-        if ((fun->flags & JSFUN_STRICT) && !FUN_HAS_REST(fun) &&
+        if ((fun->flags & JSFUN_STRICT) && !FUN_HAS_REST(fun) && !FUN_HAS_NON_SIMPLE(fun) &&
             js_printf(jp, "\t\"use strict\";\n") < 0) {
             jp->indent = indent;
             return JS_FALSE;

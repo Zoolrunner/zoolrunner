@@ -190,6 +190,7 @@ NewOrRecycledNode(JSContext *cx, JSTreeContext *tc)
         switch (pn->pn_arity) {
           case PN_FUNC:
             RecycleTree(pn->pn_body, tc);
+            RecycleTree(pn->pn_parameters, tc);
             break;
           case PN_LIST:
             if (pn->pn_head) {
@@ -249,7 +250,11 @@ NewParseNode(JSContext *cx, JSTokenStream *ts, JSParseNodeArity arity,
     pn->pn_pos = tp->pos;
     pn->pn_op = JSOP_NOP;
     pn->pn_arity = arity;
-    if (arity == PN_FUNC) pn->pn_restSlot = -1;
+    if (arity == PN_FUNC) {
+        pn->pn_restSlot = -1;
+        pn->pn_parameters = NULL;
+        pn->pn_parameterLocalCount = pn->pn_expectedArgs = 0;
+    }
     pn->pn_next = NULL;
     pn->pn_ts = ts;
     pn->pn_source = NULL;
@@ -898,7 +903,7 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     } else if (parametersOK) {
         pn = Statements(cx, ts, tc);
     }
-    if ((tc->flags & TCF_STRICT_MODE) || FUN_IS_GENERATOR(fun)) {
+    if ((tc->flags & TCF_STRICT_MODE) || FUN_IS_GENERATOR(fun) || FUN_IS_ARROW(fun) || FUN_HAS_NON_SIMPLE(fun)) {
         JSAtomList formals;
         JSAtomListElement *formal;
 
@@ -913,7 +918,8 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
              sprop = sprop->parent) {
             if (sprop->getter == js_GetArgument ||
                 (sprop->getter == js_GetLocalVariable &&
-                 tc->restSlot == (intN)(uint16)sprop->shortid)) {
+                 (tc->restSlot == (intN)(uint16)sprop->shortid ||
+                  (FUN_HAS_NON_SIMPLE(fun) && (uint16)sprop->shortid < tc->parameterLocalCount)))) {
                 JSAtom *name = JSID_TO_ATOM(sprop->id);
 
                 /* SPROP_IS_DUPLICATE is mutable on shared property-tree
@@ -966,14 +972,19 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
  * Compile a JS function body, which might appear as the value of an event
  * handler attribute in an HTML <INPUT> tag.
  */
+static JSBool ModernFunctionParameters(JSContext *, JSTokenStream *, JSFunction *,
+                                       JSTreeContext *, JSAtom **, JSBool);
+
 JSBool
-js_CompileFunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun)
+js_CompileFunctionWithParameters(JSContext *cx, JSTokenStream *ts,
+                                 JSTokenStream *parameterTS, JSFunction *fun)
 {
     JSArenaPool codePool, notePool;
     JSCodeGenerator funcg;
     JSStackFrame *fp, frame;
     JSObject *funobj;
-    JSParseNode *pn;
+    JSParseNode *pn = NULL;
+    JSTempValueRooter parameterRoot;
 
     JS_InitArenaPool(&codePool, "code", 1024, sizeof(jsbytecode));
     JS_InitArenaPool(&notePool, "note", 1024, sizeof(jssrcnote));
@@ -1015,10 +1026,18 @@ js_CompileFunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun)
      * Therefore we must fold constants, allocate try notes, and generate code
      * for this function, including a stop opcode at the end.
      */
-    CURRENT_TOKEN(ts).type = TOK_LC;
-    pn = FunctionBody(cx, ts, fun, &funcg.treeContext, JS_FALSE);
-    if (pn && !js_NewScriptFromCG(cx, &funcg, fun))
-        pn = NULL;
+    if (!parameterTS || ModernFunctionParameters(cx, parameterTS, fun,
+            &funcg.treeContext, &funcg.treeContext.parameterSource, JS_TRUE)) {
+        CURRENT_TOKEN(ts).type = TOK_LC;
+        pn = FunctionBody(cx, ts, fun, &funcg.treeContext, JS_FALSE);
+        if (pn) {
+            JSBool hasParameters = funcg.treeContext.parameterScript != NULL;
+            if (hasParameters)
+                JS_PUSH_TEMP_ROOT_SCRIPT(cx, funcg.treeContext.parameterScript, &parameterRoot);
+            if (!js_NewScriptFromCG(cx, &funcg, fun)) pn = NULL;
+            if (hasParameters) JS_POP_TEMP_ROOT(cx, &parameterRoot);
+        }
+    }
 
     /* Restore saved state and release code generation arenas. */
     cx->fp = fp;
@@ -1027,6 +1046,12 @@ js_CompileFunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun)
     JS_FinishArenaPool(&codePool);
     JS_FinishArenaPool(&notePool);
     return pn != NULL;
+}
+
+JSBool
+js_CompileFunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun)
+{
+    return js_CompileFunctionWithParameters(cx, ts, NULL, fun);
 }
 
 /*
@@ -1160,7 +1185,7 @@ BindLocalVariable(JSContext *cx, BindData *data, JSAtom *atom)
      * a variable must be handled specially.
      */
     if (atom == cx->runtime->atomState.argumentsAtom &&
-        !FUN_IS_ARROW(data->u.var.fun))
+        !FUN_IS_ARROW(data->u.var.fun) && !FUN_HAS_NON_SIMPLE(data->u.var.fun))
         return JS_TRUE;
 
     fun = data->u.var.fun;
@@ -1213,6 +1238,10 @@ BindDestructuringArg(JSContext *cx, BindData *data, JSAtom *atom,
 
     if (prop) {
         JS_ASSERT(pobj == obj && OBJ_IS_NATIVE(pobj));
+        if (JS_VERSION_IS_ES2015(cx)) {
+            OBJ_DROP_PROPERTY(cx, pobj, prop);
+            return StrictSyntaxError(cx, data->ts);
+        }
         name = js_AtomToPrintableString(cx, atom);
         if (!name ||
             !js_ReportCompileErrorNumber(cx,
@@ -1329,6 +1358,135 @@ ModernParenthesizedExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     }
     tc->flags = oldflags | (tc->flags & TCF_FUN_FLAGS);
     return pn;
+}
+
+static JSBool
+InferFunctionName(JSContext *cx, JSParseNode *pn, JSAtom *name, JSOp prefix);
+
+static JSParseNode *
+FormalNameNode(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+               JSAtom *name, JSOp op, jsint slot)
+{
+    JSParseNode *pn = NewParseNode(cx, ts, PN_NAME, tc);
+    if (!pn) return NULL;
+    pn->pn_type = TOK_NAME;
+    pn->pn_op = op;
+    pn->pn_atom = name;
+    pn->pn_expr = NULL;
+    pn->pn_slot = slot;
+    pn->pn_attrs = 0;
+    return pn;
+}
+
+/* Parse the modern formal grammar once; the caller retains the initializer
+ * list only when a binding pattern or whole-parameter default needs it. */
+static JSBool
+ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
+                          JSTreeContext *tc, JSAtom **source, JSBool bare)
+{
+    JSStackFrame frame, *outer = cx->fp;
+    JSParseNode *list, *left, *right, *entry, *initial;
+    BindData data;
+    JSAtom *name;
+    JSTokenType tt;
+    jsint slot;
+    size_t begin;
+    uintN generatorFlags = ts->flags & TSF_GENERATOR;
+    JSBool ok = JS_FALSE, rest, stopsLength = JS_FALSE;
+    if (!bare && js_GetToken(cx, ts) != TOK_LP) return LexicalSyntaxError(cx, ts);
+    begin = bare ? 0 : CURRENT_TOKEN(ts).sourceEnd;
+    list = NewParseNode(cx, ts, PN_LIST, tc);
+    if (!list) return JS_FALSE;
+    list->pn_type = TOK_COMMA;
+    PN_INIT_LIST(list);
+    memset(&frame, 0, sizeof frame);
+    frame.fun = fun;
+    frame.varobj = frame.scopeChain = fun->object;
+    frame.down = outer;
+    frame.flags = outer ? (outer->flags & JSFRAME_COMPILE_N_GO) : 0;
+    cx->fp = &frame;
+    fun->flags |= JSFUN_INTERPRETED;
+    tc->flags |= TCF_IN_FUNCTION;
+    tc->initializingParameters = JS_TRUE;
+    ts->flags = (ts->flags & ~TSF_GENERATOR) |
+                (FUN_IS_GENERATOR(fun) ? TSF_GENERATOR : 0);
+    if (!js_MatchToken(cx, ts, bare ? TOK_EOF : TOK_RP)) {
+        for (;;) {
+            memset(&data, 0, sizeof data);
+            data.ts = ts;
+            data.obj = fun->object;
+            data.binder = BindArg;
+            data.u.arg.fun = fun;
+            ts->flags |= TSF_OPERAND;
+            tt = js_GetToken(cx, ts);
+            ts->flags &= ~TSF_OPERAND;
+            rest = tt == TOK_ELLIPSIS;
+            if (rest) {
+                if (fun->flags & (JSPROP_GETTER | JSPROP_SETTER)) goto syntax;
+                tt = js_GetToken(cx, ts);
+                name = tt == TOK_NAME ? CURRENT_TOKEN(ts).t_atom
+                                      : cx->runtime->atomState.emptyAtom;
+                if (!js_BindRestParameter(cx, ts, fun, name, tc)) goto out;
+                slot = tc->restSlot;
+                stopsLength = JS_TRUE;
+            } else slot = fun->nargs;
+            if (tt == TOK_NAME) {
+                name = CURRENT_TOKEN(ts).t_atom;
+                if (!rest && !BindArg(cx, &data, name, tc)) goto out;
+                left = FormalNameNode(cx, ts, tc, name, JSOP_SETNAME, -1);
+            } else if (tt == TOK_LB || tt == TOK_LC) {
+                fun->kind |= JSFUN_KIND_NON_SIMPLE;
+                data.op = JSOP_DEFVAR;
+                data.binder = BindDestructuringArg;
+                data.u.var.fun = fun;
+                data.u.var.clasp = &js_FunctionClass;
+                data.u.var.getter = js_GetLocalVariable;
+                data.u.var.setter = js_SetLocalVariable;
+                data.u.var.attrs = JSPROP_PERMANENT;
+                left = DestructuringExpr(cx, &data, tc, tt);
+                if (!left || (!rest && !BumpFormalCount(cx, fun))) goto out;
+            } else goto syntax;
+            if (!left) goto out;
+            right = FormalNameNode(cx, ts, tc, cx->runtime->atomState.emptyAtom,
+                                    rest ? JSOP_GETVAR : JSOP_GETARG, slot);
+            if (!right) goto out;
+            if (js_MatchToken(cx, ts, TOK_ASSIGN)) {
+                if (rest || CURRENT_TOKEN(ts).t_op != JSOP_NOP) goto syntax;
+                stopsLength = JS_TRUE;
+                fun->kind |= JSFUN_KIND_NON_SIMPLE;
+                initial = AssignExpr(cx, ts, tc);
+                if (!initial) goto out;
+                if (left->pn_type == TOK_NAME &&
+                    !InferFunctionName(cx, initial, left->pn_atom, JSOP_NOP)) goto out;
+                left = NewBinary(cx, TOK_ASSIGN, JSOP_NOP, left, initial, tc);
+                if (!left) goto out;
+            }
+            if (!stopsLength) ++tc->expectedArgs;
+            entry = NewBinary(cx, TOK_ASSIGN, JSOP_NOP, left, right, tc);
+            if (!entry) goto out;
+            PN_APPEND(list, entry);
+            if (rest || !js_MatchToken(cx, ts, TOK_COMMA)) break;
+        }
+        if (js_GetToken(cx, ts) != (bare ? TOK_EOF : TOK_RP)) goto syntax;
+    }
+    if (FUN_HAS_NON_SIMPLE(fun)) {
+        tc->parameters = list;
+        tc->parameterLocalCount = fun->u.i.nvars;
+        tc->flags |= TCF_FUN_HEAVYWEIGHT;
+        fun->flags |= JSFUN_HEAVYWEIGHT;
+        *source = js_AtomizeChars(cx, ts->sourcebuf.base + begin,
+                                   (bare ? ts->sourceCursor : CURRENT_TOKEN(ts).sourceBegin) - begin, 0);
+        if (!*source) goto out;
+    }
+    ok = JS_TRUE;
+    goto out;
+ syntax:
+    LexicalSyntaxError(cx, ts);
+ out:
+    tc->initializingParameters = JS_FALSE;
+    ts->flags = (ts->flags & ~TSF_GENERATOR) | generatorFlags;
+    cx->fp = outer;
+    return ok;
 }
 
 static JSParseNode *
@@ -1461,14 +1619,15 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             if (!prop ||
                 pobj != varobj ||
                 (sprop = (JSScopeProperty *)prop,
-                 sprop->getter != js_GetLocalVariable)) {
+                 sprop->getter != js_GetLocalVariable ||
+                 (FUN_HAS_NON_SIMPLE(fp->fun) && (uint16)sprop->shortid < tc->parameterLocalCount))) {
                 uintN sflags;
 
                 /*
                  * Use SPROP_IS_DUPLICATE if there is a formal argument of the
                  * same name, so the decompiler can find the parameter name.
                  */
-                sflags = (sprop && sprop->getter == js_GetArgument)
+                sflags = (sprop && (sprop->getter == js_GetArgument || FUN_HAS_NON_SIMPLE(fp->fun)))
                          ? SPROP_IS_DUPLICATE | SPROP_HAS_SHORTID
                          : SPROP_HAS_SHORTID;
                 if (!js_AddHiddenProperty(cx, varobj, ATOM_TO_JSID(funAtom),
@@ -1518,6 +1677,10 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     funtc.flags |= tc->flags & TCF_STRICT_MODE;
 
     /* Now parse formal argument list and compute fun->nargs. */
+    if (JS_VERSION_IS_ES2015(cx)) {
+        if (!ModernFunctionParameters(cx, ts, fun, &funtc, &pn->pn_source, JS_FALSE))
+            return NULL;
+    } else {
     MUST_MATCH_TOKEN(TOK_LP, JSMSG_PAREN_BEFORE_FORMAL);
     if (!js_MatchToken(cx, ts, TOK_RP)) {
         BindData data;
@@ -1637,6 +1800,8 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         } while (js_MatchToken(cx, ts, TOK_COMMA));
 
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_AFTER_FORMAL);
+    }
+
     }
 
     MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_BODY);
@@ -1763,6 +1928,9 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                    ((fun->flags & JSFUN_STRICT) ? TCF_STRICT_MODE : 0);
     pn->pn_tryCount = funtc.tryCount;
     pn->pn_restSlot = funtc.restSlot;
+    pn->pn_parameters = funtc.parameters;
+    pn->pn_parameterLocalCount = funtc.parameterLocalCount;
+    pn->pn_expectedArgs = funtc.expectedArgs;
     TREE_CONTEXT_FINISH(&funtc);
     ts->flags = (ts->flags & ~(TSF_GENERATOR | TSF_SUPER_ALLOWED | TSF_SUPER_CALL_ALLOWED)) |
                 outerGenerator | outerSuper | outerSuperCall;
@@ -1796,7 +1964,7 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     names = parameters;
     if (parameters->pn_type == TOK_RP && parameters->pn_parens == 1)
         names = parameters->pn_kid;
-    if (names->pn_type != TOK_NAME &&
+    if (!parameters->pn_source && names->pn_type != TOK_NAME &&
         !(names->pn_type == TOK_ELLIPSIS && parameters->pn_parens == 1) &&
         !(parameters->pn_parens == 1 &&
           (names->pn_type == TOK_COMMA ||
@@ -1826,6 +1994,19 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     data.obj = fun->object;
     data.binder = BindArg;
     data.u.arg.fun = fun;
+    if (parameters->pn_source) {
+        JSString *formalText = ATOM_TO_STRING(parameters->pn_source);
+        JSTokenStream *formalTS = js_NewTokenStream(cx, JSSTRING_CHARS(formalText),
+            JSSTRING_LENGTH(formalText), ts->filename, position.begin.lineno, ts->principals);
+        JSBool parsed;
+        if (!formalTS) goto bad;
+        formalTS->flags |= ts->flags & (TSF_STRICT_MODE | TSF_SUPER_ALLOWED | TSF_SUPER_CALL_ALLOWED);
+        parsed = ModernFunctionParameters(cx, formalTS, fun, &funtc, &pn->pn_source, JS_FALSE);
+        if (parsed && js_GetToken(cx, formalTS) != TOK_EOF)
+            parsed = LexicalSyntaxError(cx, formalTS);
+        if (!js_CloseTokenStream(cx, formalTS)) parsed = JS_FALSE;
+        if (!parsed) goto bad;
+    } else {
     ATOM_LIST_INIT(&seen);
     name = names->pn_arity == PN_NAME ? names : names->pn_head;
     for (; name; name = names->pn_arity == PN_NAME ? NULL : name->pn_next) {
@@ -1847,6 +2028,7 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         } else if (!BindArg(cx, &data, name->pn_atom, &funtc)) {
             goto bad;
         }
+    }
     }
     ts->flags |= TSF_OPERAND;
     expressionBody = !js_MatchToken(cx, ts, TOK_LC);
@@ -1875,6 +2057,9 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                    ((fun->flags & JSFUN_STRICT) ? TCF_STRICT_MODE : 0);
     pn->pn_tryCount = funtc.tryCount;
     pn->pn_restSlot = funtc.restSlot;
+    pn->pn_parameters = funtc.parameters;
+    pn->pn_parameterLocalCount = funtc.parameterLocalCount;
+    pn->pn_expectedArgs = funtc.expectedArgs;
     TREE_CONTEXT_FINISH(&funtc);
     return pn;
 bad:
@@ -1990,7 +2175,7 @@ Statements(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
                        JSSTRING_LENGTH(ATOM_TO_STRING(literal->pn_atom)) == 10 &&
                        !memcmp(JSSTRING_CHARS(ATOM_TO_STRING(literal->pn_atom)),
                                strictDirective, sizeof(strictDirective))) {
-                    if (cx->fp->fun && FUN_HAS_REST(cx->fp->fun) &&
+                    if (cx->fp->fun && (FUN_HAS_REST(cx->fp->fun) || FUN_HAS_NON_SIMPLE(cx->fp->fun)) &&
                         !(cx->fp->flags & JSFRAME_EVAL_COMPILER)) {
                         StrictSyntaxError(cx, ts);
                         return NULL;
@@ -2366,6 +2551,26 @@ BindVarOrConst(JSContext *cx, BindData *data, JSAtom *atom, JSTreeContext *tc)
                                      &pobj, &prop)) {
             return JS_FALSE;
         }
+    }
+
+    if (prop && pobj == obj && data->u.var.clasp == &js_FunctionClass &&
+        FUN_HAS_NON_SIMPLE(fun) &&
+        (((JSScopeProperty *)prop)->getter == js_GetArgument ||
+         (((JSScopeProperty *)prop)->getter == js_GetLocalVariable &&
+          (uint16)((JSScopeProperty *)prop)->shortid < tc->parameterLocalCount))) {
+        OBJ_DROP_PROPERTY(cx, pobj, prop);
+        if (op == JSOP_DEFCONST) return StrictSyntaxError(cx, data->ts);
+        if (fun->u.i.nvars == JS_BITMASK(16)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_VARS);
+            return JS_FALSE;
+        }
+        if (!js_AddHiddenProperty(cx, obj, ATOM_TO_JSID(atom),
+                                  js_GetLocalVariable, js_SetLocalVariable,
+                                  SPROP_INVALID_SLOT, data->u.var.attrs | JSPROP_SHARED,
+                                  SPROP_HAS_SHORTID | SPROP_IS_DUPLICATE,
+                                  fun->u.i.nvars)) return JS_FALSE;
+        ++fun->u.i.nvars;
+        return JS_TRUE;
     }
 
     ok = JS_TRUE;
@@ -2760,7 +2965,9 @@ CheckDestructuring(JSContext *cx, BindData *data,
             if (JS_VERSION_IS_ES2015(cx) && pn->pn_type == TOK_ELLIPSIS) {
                 if (lhs->pn_next || (left->pn_extra & PNX_ENDCOMMA) ||
                     pn->pn_kid->pn_type == TOK_ASSIGN ||
-                    (data && pn->pn_kid->pn_type != TOK_NAME)) {
+                    (data && pn->pn_kid->pn_type != TOK_NAME &&
+                     !(data->binder == BindDestructuringArg &&
+                       (pn->pn_kid->pn_type == TOK_RB || pn->pn_kid->pn_type == TOK_RC)))) {
                     js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
                                                 JSMSG_STRICT_SYNTAX);
                     ok = JS_FALSE;
@@ -2935,6 +3142,10 @@ ReturnOrYield(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     JSParseNode *pn, *pn2;
 
     tt = CURRENT_TOKEN(ts).type;
+    if (tc->initializingParameters && tt == TOK_YIELD) {
+        LexicalSyntaxError(cx, ts);
+        return NULL;
+    }
     if (!(tc->flags & TCF_IN_FUNCTION)) {
         js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                     JSMSG_BAD_RETURN_OR_YIELD,
@@ -7065,6 +7276,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
       case TOK_LP:
       {
         JSBool hasRest = JS_FALSE;
+        size_t formalBegin = CURRENT_TOKEN(ts).sourceBegin, formalEnd;
         pn = NewParseNode(cx, ts, PN_UNARY, tc);
         if (!pn)
             return NULL;
@@ -7093,6 +7305,7 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             return NULL;
 
         MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_IN_PAREN);
+        formalEnd = CURRENT_TOKEN(ts).sourceEnd;
         if (hasRest && js_PeekTokenSameLine(cx, ts) != TOK_ARROW) {
             LexicalSyntaxError(cx, ts);
             return NULL;
@@ -7127,6 +7340,11 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         if (JS_VERSION_IS_ES2015(cx)) {
             pn->pn_parens = pn->pn_parens ? 2 : 1;
             pn->pn_pos.end = CURRENT_TOKEN(ts).pos.end;
+            if (js_PeekTokenSameLine(cx, ts) == TOK_ARROW) {
+                pn->pn_source = js_AtomizeChars(cx, ts->sourcebuf.base + formalBegin,
+                                                formalEnd - formalBegin, 0);
+                if (!pn->pn_source) return NULL;
+            }
         }
 
         break;

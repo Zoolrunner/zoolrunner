@@ -76,6 +76,8 @@ struct JSFunction {
 #define JSFUN_KIND_REST     2
 #define JSFUN_KIND_GENERATOR 4
 #define JSFUN_KIND_HOME_OBJECT 8
+#define JSFUN_KIND_NON_SIMPLE 128
+#define FUN_HAS_NON_SIMPLE(fun) (((fun)->kind & JSFUN_KIND_NON_SIMPLE) != 0)
 #define JSFUN_KIND_CLASS 16
 #define JSFUN_KIND_DERIVED 32
 #define JSFUN_KIND_SUPER_CALL 64
@@ -245,6 +247,12 @@ js_PutArgsObject(JSContext *cx, JSStackFrame *fp);
 
 extern JSBool
 js_XDRFunction(JSXDRState *xdr, JSObject **objp);
+
+extern JSBool js_BeginParameterBindings(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_EnterParameterInitializer(JSContext *cx, JSStackFrame *fp);
+extern void js_LeaveParameterInitializer(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_FinishParameterBindings(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_IsParameterProperty(JSFunction *fun, JSScopeProperty *property);
 
 JS_END_EXTERN_C
 

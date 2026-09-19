@@ -102,6 +102,8 @@ js_InitCodeGenerator(JSContext *cx, JSCodeGenerator *cg,
 JS_FRIEND_API(void)
 js_FinishCodeGenerator(JSContext *cx, JSCodeGenerator *cg)
 {
+    if (cg->treeContext.parameterScript)
+        js_DestroyScript(cx, cg->treeContext.parameterScript);
     TREE_CONTEXT_FINISH(&cg->treeContext);
     JS_ARENA_RELEASE(cg->codePool, cg->codeMark);
     JS_ARENA_RELEASE(cg->notePool, cg->noteMark);
@@ -1933,6 +1935,9 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
     JS_ASSERT(pn->pn_type == TOK_NAME);
     if (pn->pn_attrs & PN_GLOBAL_LEXICAL)
         return JS_TRUE;
+    if (pn->pn_op == JSOP_ARGUMENTS && cx->fp->fun &&
+        FUN_HAS_NON_SIMPLE(cx->fp->fun))
+        pn->pn_op = JSOP_NAME;
     if (pn->pn_slot >= 0 || pn->pn_op == JSOP_ARGUMENTS)
         return JS_TRUE;
 
@@ -1986,6 +1991,8 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
      * lookups will succeed.
      */
     fp = cx->fp;
+    if (tc->initializingParameters)
+        return JS_TRUE;
     if (fp->flags & JSFRAME_SCRIPT_OBJECT)
         return JS_TRUE;
 
@@ -2075,6 +2082,13 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
         sprop = (JSScopeProperty *) prop;
         if (sprop) {
             if (pobj == obj) {
+                if (fp->fun && FUN_HAS_NON_SIMPLE(fp->fun) &&
+                    (sprop->getter == js_GetArgument ||
+                     (sprop->getter == js_GetLocalVariable &&
+                      (uint16)sprop->shortid < tc->parameterLocalCount))) {
+                    OBJ_DROP_PROPERTY(cx, pobj, prop);
+                    return JS_TRUE;
+                }
                 getter = sprop->getter;
                 attrs = sprop->attrs;
                 slot = (sprop->flags & SPROP_HAS_SHORTID) ? sprop->shortid : -1;
@@ -2143,7 +2157,7 @@ BindNameToSlot(JSContext *cx, JSTreeContext *tc, JSParseNode *pn,
          */
         if ((pn->pn_op == JSOP_NAME || pn->pn_op == JSOP_DELNAME) &&
             atom == cx->runtime->atomState.argumentsAtom &&
-            (!fp->fun || !FUN_IS_ARROW(fp->fun))) {
+            (!fp->fun || (!FUN_IS_ARROW(fp->fun) && !FUN_HAS_NON_SIMPLE(fp->fun)))) {
             pn->pn_op = pn->pn_op == JSOP_DELNAME ? JSOP_FALSE : JSOP_ARGUMENTS;
             return JS_TRUE;
         }
@@ -3177,8 +3191,10 @@ bad:
     goto out;
 }
 
-JSBool
-js_EmitFunctionBytecode(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body)
+static JSBool EmitParameterScript(JSContext *, JSCodeGenerator *);
+
+static JSBool
+EmitBodyBytecode(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body)
 {
     if (!js_AllocTryNotes(cx, cg))
         return JS_FALSE;
@@ -3192,7 +3208,7 @@ js_EmitFunctionBytecode(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body)
         CG_SWITCH_TO_MAIN(cg);
     }
 
-    if (cg->treeContext.restSlot >= 0) {
+    if (cg->treeContext.restSlot >= 0 && !cg->treeContext.parameters) {
         uintN slot = (uintN)cg->treeContext.restSlot;
         CG_SWITCH_TO_PROLOG(cg);
         if (js_Emit3(cx, cg, JSOP_RESTARG, UINT16_HI(slot), UINT16_LO(slot)) < 0)
@@ -3204,12 +3220,29 @@ js_EmitFunctionBytecode(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body)
 }
 
 JSBool
+js_EmitFunctionBytecode(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body)
+{
+    JSBool ok;
+    JSTempValueRooter parameterRoot;
+    if (cg->treeContext.parameters &&
+        (!js_FoldConstants(cx, cg->treeContext.parameters, &cg->treeContext) ||
+         !EmitParameterScript(cx, cg))) return JS_FALSE;
+    if (cg->treeContext.parameterScript)
+        JS_PUSH_TEMP_ROOT_SCRIPT(cx, cg->treeContext.parameterScript, &parameterRoot);
+    ok = EmitBodyBytecode(cx, cg, body);
+    if (cg->treeContext.parameterScript)
+        JS_POP_TEMP_ROOT(cx, &parameterRoot);
+    return ok;
+}
+
+JSBool
 js_EmitFunctionBody(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body,
                     JSFunction *fun)
 {
     JSStackFrame *fp, frame;
     JSObject *funobj;
     JSBool ok;
+    JSTempValueRooter parameterRoot;
 
     fp = cx->fp;
     funobj = fun->object;
@@ -3228,8 +3261,12 @@ js_EmitFunctionBody(JSContext *cx, JSCodeGenerator *cg, JSParseNode *body,
     if (!ok)
         return JS_FALSE;
 
-    if (!js_NewScriptFromCG(cx, cg, fun))
-        return JS_FALSE;
+    if (cg->treeContext.parameterScript)
+        JS_PUSH_TEMP_ROOT_SCRIPT(cx, cg->treeContext.parameterScript, &parameterRoot);
+    ok = js_NewScriptFromCG(cx, cg, fun) != NULL;
+    if (cg->treeContext.parameters)
+        JS_POP_TEMP_ROOT(cx, &parameterRoot);
+    if (!ok) return JS_FALSE;
 
     JS_ASSERT(FUN_INTERPRETED(fun));
     return JS_TRUE;
@@ -3380,6 +3417,8 @@ static JSBool
 EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                            JSOp declOp);
 
+static JSBool EmitExtended(JSContext *cx, JSCodeGenerator *cg, jsint selector);
+
 static JSBool
 EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
                      JSBool wantpop, JSOp declOp)
@@ -3404,6 +3443,12 @@ EmitDestructuringLHS(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             !js_SetSrcNoteOffset(cx, cg, (uintN)note, 0, CG_OFFSET(cg)-start))
             return JS_FALSE;
         pn = pn->pn_left;
+    }
+    if (cg->treeContext.initializingParameters && pn->pn_type == TOK_NAME) {
+        if (!EmitAtomOp(cx, pn, JSOP_STRING, cg) ||
+            js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+            !EmitExtended(cx, cg, JS_EXT_PARAMETER_BIND)) return JS_FALSE;
+        return !wantpop || js_Emit1(cx, cg, JSOP_POP) >= 0;
     }
     /*
      * Now emit the lvalue opcode sequence.  If the lvalue is a nested
@@ -3620,7 +3665,8 @@ EmitArrayPattern(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn, JSOp declO
         while (target->pn_type == TOK_RP) target = target->pn_kid;
         if (target->pn_type == TOK_NAME &&
             !BindNameToSlot(cx, &cg->treeContext, target, JS_FALSE)) return JS_FALSE;
-        if ((target->pn_type == TOK_NAME && target->pn_slot < 0) ||
+        if ((target->pn_type == TOK_NAME && target->pn_slot < 0 &&
+             !cg->treeContext.initializingParameters) ||
             target->pn_type == TOK_DOT || target->pn_type == TOK_LB) {
             if (js_Emit1(cx, cg, JSOP_DUP) < 0 ||
                 !EmitPatternReference(cx, cg, NULL, target, initializer, rest)) return JS_FALSE;
@@ -3706,7 +3752,8 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             if (target->pn_type == TOK_NAME &&
                 !BindNameToSlot(cx, &cg->treeContext, target, JS_FALSE))
                 return JS_FALSE;
-            if ((target->pn_type == TOK_NAME && target->pn_slot < 0) ||
+            if ((target->pn_type == TOK_NAME && target->pn_slot < 0 &&
+             !cg->treeContext.initializingParameters) ||
                 target->pn_type == TOK_DOT || target->pn_type == TOK_LB) {
                 if (!EmitPatternReference(cx, cg, pn2->pn_left, target, initializer, JS_FALSE))
                     return JS_FALSE;
@@ -4352,6 +4399,49 @@ EmitExtended(JSContext *cx, JSCodeGenerator *cg, jsint selector)
 }
 
 static JSBool
+EmitParameterScript(JSContext *cx, JSCodeGenerator *cg)
+{
+    JSCodeGenerator parameterCG;
+    JSParseNode *entry;
+    JSScript *script = NULL;
+    uintN slot;
+    JSBool ok = JS_FALSE;
+    if (!js_InitCodeGenerator(cx, &parameterCG, cg->codePool, cg->notePool,
+                              cg->filename, cg->firstLine, cg->principals))
+        return JS_FALSE;
+    parameterCG.parent = cg;
+    parameterCG.treeContext.flags = cg->treeContext.flags & ~TCF_FUN_IS_GENERATOR;
+    parameterCG.treeContext.initializingParameters = JS_TRUE;
+    parameterCG.treeContext.parameterLocalCount = cg->treeContext.parameterLocalCount;
+    for (entry = cg->treeContext.parameters->pn_head; entry; entry = entry->pn_next) {
+        if (js_Emit1(cx, &parameterCG, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, &parameterCG, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, &parameterCG, JSOP_PUSH) < 0 ||
+            !EmitExtended(cx, &parameterCG, JS_EXT_PARAMETER_ENTER) ||
+            js_Emit1(cx, &parameterCG, JSOP_POP) < 0) goto out;
+        if (entry->pn_right->pn_op == JSOP_GETVAR) {
+            slot = (uintN)entry->pn_right->pn_slot;
+            if (js_Emit3(cx, &parameterCG, JSOP_RESTARG,
+                         UINT16_HI(slot), UINT16_LO(slot)) < 0) goto out;
+        }
+        if (!js_EmitTree(cx, &parameterCG, entry->pn_right) ||
+            !EmitDestructuringLHS(cx, &parameterCG, entry->pn_left, JS_TRUE, JSOP_DEFVAR) ||
+            js_Emit1(cx, &parameterCG, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, &parameterCG, JSOP_PUSH) < 0 ||
+            js_Emit1(cx, &parameterCG, JSOP_PUSH) < 0 ||
+            !EmitExtended(cx, &parameterCG, JS_EXT_PARAMETER_LEAVE) ||
+            js_Emit1(cx, &parameterCG, JSOP_POP) < 0) goto out;
+    }
+    if (js_Emit1(cx, &parameterCG, JSOP_STOP) < 0) goto out;
+    script = js_NewScriptFromCG(cx, &parameterCG, NULL);
+    ok = script != NULL;
+ out:
+    js_FinishCodeGenerator(cx, &parameterCG);
+    cg->treeContext.parameterScript = script;
+    return ok;
+}
+
+static JSBool
 EmitSuperReference(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 {
     while (pn->pn_type == TOK_RP) pn = pn->pn_kid;
@@ -4501,6 +4591,10 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
         cg2->treeContext.flags = (uint16) (pn->pn_flags | TCF_IN_FUNCTION);
         cg2->treeContext.tryCount = pn->pn_tryCount;
         cg2->treeContext.restSlot = pn->pn_restSlot;
+        cg2->treeContext.parameters = pn->pn_parameters;
+        cg2->treeContext.parameterLocalCount = pn->pn_parameterLocalCount;
+        cg2->treeContext.expectedArgs = pn->pn_expectedArgs;
+        cg2->treeContext.parameterSource = pn->pn_source;
         cg2->parent = cg;
         fun = (JSFunction *) JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
         if (!js_EmitFunctionBody(cx, cg2, pn->pn_body, fun))

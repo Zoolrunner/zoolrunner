@@ -71,6 +71,8 @@ struct JSScript {
     uint16       version;       /* JS version under which script was compiled */
     uint16       numGlobalVars; /* declared global var/const/function count */
     JSBool       strictMode;    /* ES5 strict execution semantics */
+    uint16       parameterLocalCount; /* locals bound by non-simple parameters */
+    uint16       expectedArgs; /* length before first default/rest parameter */
     JSBool       needsArguments; /* body refers to arguments (or direct eval) */
     JSAtomMap    atomMap;       /* maps immediate index to literal struct */
     const char   *filename;     /* source filename or null */
@@ -79,6 +81,8 @@ struct JSScript {
     JSTryNote    *trynotes;     /* exception table for this script */
     JSPrincipals *principals;   /* principals for this script */
     JSObject     *object;       /* optional Script-class object wrapper */
+    JSScript     *parameterScript; /* owned initializer bytecode, before body */
+    uint32       parameterSourceIndex; /* atom-map source string, or UINT32_MAX */
     uint32       globalLexicalIndex; /* atom-map template index, or UINT32_MAX */
 };
 

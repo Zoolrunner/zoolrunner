@@ -54,6 +54,7 @@
 #include "jsconfig.h"
 #include "jsdbgapi.h"
 #include "jsfun.h"
+#include "jsrealm.h"
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jsiteres6.h"
@@ -212,7 +213,7 @@ js_GetArgsProperty(JSContext *cx, JSStackFrame *fp, jsid id,
         return OBJ_GET_PROPERTY(cx, obj, id, vp);
     }
 
-    if ((fp->fun->flags & JSFUN_STRICT) || FUN_HAS_REST(fp->fun)) {
+    if ((fp->fun->flags & JSFUN_STRICT) || (FUN_HAS_REST(fp->fun) || FUN_HAS_NON_SIMPLE(fp->fun))) {
         obj = js_GetArgsObject(cx, fp);
         if (!obj) return JS_FALSE;
         *objp = obj;
@@ -269,7 +270,7 @@ js_GetArgsObject(JSContext *cx, JSStackFrame *fp)
     while (fp->flags & JSFRAME_SPECIAL)
         fp = fp->down;
 
-    strict = (fp->fun->flags & JSFUN_STRICT) != 0 || FUN_HAS_REST(fp->fun);
+    strict = (fp->fun->flags & JSFUN_STRICT) != 0 || (FUN_HAS_REST(fp->fun) || FUN_HAS_NON_SIMPLE(fp->fun));
 
     /* Create an arguments object for fp only if it lacks one. */
     argsobj = fp->argsobj;
@@ -334,7 +335,7 @@ js_PutArgsObject(JSContext *cx, JSStackFrame *fp)
      * deleted argument slot bitmap, because args_enumerate depends on that.
      */
     argsobj = fp->argsobj;
-    if ((fp->fun->flags & JSFUN_STRICT) || FUN_HAS_REST(fp->fun))
+    if ((fp->fun->flags & JSFUN_STRICT) || (FUN_HAS_REST(fp->fun) || FUN_HAS_NON_SIMPLE(fp->fun)))
         return JS_TRUE; /* Already an independent, fully materialized object. */
     ok = args_enumerate(cx, argsobj);
 
@@ -661,6 +662,105 @@ JSClass js_ArgumentsClass = {
     args_or_call_mark,  NULL
 };
 
+/* Non-simple parameter bindings precede and are distinct from body vars. */
+JSBool
+js_IsParameterProperty(JSFunction *fun, JSScopeProperty *property)
+{
+    return FUN_HAS_NON_SIMPLE(fun) && FUN_INTERPRETED(fun) && fun->u.i.script &&
+           (property->getter == js_GetArgument ||
+            (property->getter == js_GetLocalVariable &&
+             (uint16)property->shortid < fun->u.i.script->parameterLocalCount));
+}
+
+JSBool
+js_BeginParameterBindings(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *env, *args;
+    JSScopeProperty *property;
+    JSAtom *atom;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE, bindsArguments = JS_FALSE;
+    JS_ASSERT(fp->fun && FUN_HAS_NON_SIMPLE(fp->fun) && fp->callobj);
+    env = js_NewLexicalEnvironment(cx, OBJ_GET_PARENT(cx, fp->callobj));
+    if (!env) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, env, &root);
+    for (property = SCOPE_LAST_PROP(OBJ_SCOPE(fp->fun->object)); property;
+         property = property->parent) {
+        if (!js_IsParameterProperty(fp->fun, property)) continue;
+        atom = JSID_TO_ATOM(property->id);
+        if (atom->flags & ATOM_HIDDEN) atom = atom->entry.value;
+        if (!JSSTRING_LENGTH(ATOM_TO_STRING(atom))) continue;
+        if (atom == cx->runtime->atomState.argumentsAtom) bindsArguments = JS_TRUE;
+        if (!js_DefineLexicalBinding(cx, env, ATOM_TO_JSID(atom), JS_FALSE)) goto out;
+    }
+    if (!FUN_IS_ARROW(fp->fun) && !bindsArguments) {
+        args = js_GetArgsObject(cx, fp);
+        if (!args ||
+            !js_DefineLexicalBinding(cx, env,
+                ATOM_TO_JSID(cx->runtime->atomState.argumentsAtom), JS_FALSE) ||
+            !js_InitializeLexicalBinding(cx, env,
+                ATOM_TO_JSID(cx->runtime->atomState.argumentsAtom), OBJECT_TO_JSVAL(args)))
+            goto out;
+    }
+    if (!JS_SetParent(cx, fp->callobj, env)) goto out;
+    fp->scopeChain = fp->varobj = env;
+    fp->flags |= JSFRAME_PARAMETER_INIT;
+    ok = JS_TRUE;
+ out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* Each initializer gets its own eval declaration environment; parameter
+ * assignments still initialize the shared parameter record underneath it. */
+JSBool
+js_EnterParameterInitializer(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *scope;
+    JS_ASSERT(fp->flags & JSFRAME_PARAMETER_INIT);
+    scope = js_NewLexicalEnvironment(cx, OBJ_GET_PARENT(cx, fp->callobj));
+    if (!scope) return JS_FALSE;
+    fp->scopeChain = fp->varobj = scope;
+    return JS_TRUE;
+}
+
+void
+js_LeaveParameterInitializer(JSContext *cx, JSStackFrame *fp)
+{
+    JS_ASSERT(fp->flags & JSFRAME_PARAMETER_INIT);
+    fp->scopeChain = fp->varobj = OBJ_GET_PARENT(cx, fp->callobj);
+}
+
+JSBool
+js_FinishParameterBindings(JSContext *cx, JSStackFrame *fp)
+{
+    JSObject *env, *owner;
+    JSScopeProperty *property;
+    JSProperty *binding;
+    JSAtom *atom;
+    jsval value;
+    JS_ASSERT(fp->callobj && (fp->flags & JSFRAME_PARAMETER_INIT));
+    env = OBJ_GET_PARENT(cx, fp->callobj);
+    JS_ASSERT(js_IsLexicalEnvironment(cx, env));
+    for (property = SCOPE_LAST_PROP(OBJ_SCOPE(fp->fun->object)); property;
+         property = property->parent) {
+        if (property->getter != js_GetLocalVariable ||
+            js_IsParameterProperty(fp->fun, property)) continue;
+        atom = JSID_TO_ATOM(property->id);
+        if (atom->flags & ATOM_HIDDEN) atom = atom->entry.value;
+        if (!js_LookupOwnProperty(cx, env, ATOM_TO_JSID(atom), &owner, &binding))
+            return JS_FALSE;
+        if (binding) OBJ_DROP_PROPERTY(cx, owner, binding);
+        if (!binding || owner != env) continue;
+        if (!OBJ_GET_PROPERTY(cx, env, ATOM_TO_JSID(atom), &value)) return JS_FALSE;
+        GC_POKE(cx, fp->vars[(uint16)property->shortid]);
+        fp->vars[(uint16)property->shortid] = value;
+    }
+    fp->scopeChain = fp->varobj = fp->callobj;
+    fp->flags &= ~JSFRAME_PARAMETER_INIT;
+    return JS_TRUE;
+}
+
 JSObject *
 js_GetCallObject(JSContext *cx, JSStackFrame *fp, JSObject *parent)
 {
@@ -687,7 +787,7 @@ js_GetCallObject(JSContext *cx, JSStackFrame *fp, JSObject *parent)
         return NULL;
     }
     fp->callobj = callobj;
-    if (FUN_IS_ARROW(fp->fun))
+    if (FUN_IS_ARROW(fp->fun) || FUN_HAS_NON_SIMPLE(fp->fun))
         OBJ_SET_PROTO(cx, callobj, NULL);
 
     /* Make callobj be the scope chain and the variables object. */
@@ -720,7 +820,7 @@ js_PutCallObject(JSContext *cx, JSStackFrame *fp)
     /*
      * Get the arguments object to snapshot fp's actual argument values.
      */
-    if (fp->argsobj && !FUN_IS_ARROW(fp->fun)) {
+    if (fp->argsobj && !FUN_IS_ARROW(fp->fun) && !FUN_HAS_NON_SIMPLE(fp->fun)) {
         argsid = ATOM_TO_JSID(cx->runtime->atomState.argumentsAtom);
         ok &= js_GetProperty(cx, callobj, argsid, &aval);
         ok &= js_SetProperty(cx, callobj, argsid, &aval);
@@ -880,6 +980,7 @@ call_enumerate(JSContext *cx, JSObject *obj)
      */
     scope = OBJ_SCOPE(funobj);
     for (sprop = SCOPE_LAST_PROP(scope); sprop; sprop = sprop->parent) {
+        if (js_IsParameterProperty(fp->fun, sprop)) continue;
         getter = sprop->getter;
         if (getter == js_GetArgument)
             vec = fp->argv;
@@ -962,6 +1063,10 @@ call_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
         }
 
         sprop = (JSScopeProperty *) prop;
+        if (js_IsParameterProperty(fp->fun, sprop)) {
+            OBJ_DROP_PROPERTY(cx, obj2, prop);
+            return JS_TRUE;
+        }
         getter = sprop->getter;
         attrs = sprop->attrs & ~JSPROP_SHARED;
         slot = (uintN) sprop->shortid;
@@ -1104,7 +1209,8 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
         return JS_FALSE;
     if (!js_DefineNativeProperty(cx, obj,
                                 ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
-                                INT_TO_JSVAL(fun->nargs), NULL, NULL,
+                                INT_TO_JSVAL(FUN_HAS_NON_SIMPLE(fun) && FUN_INTERPRETED(fun)
+                                             ? fun->u.i.script->expectedArgs : fun->nargs), NULL, NULL,
                                 JSPROP_READONLY, 0, 0, NULL))
         return JS_FALSE;
     if (FUN_IS_CLASS(fun))
@@ -1432,7 +1538,8 @@ fun_finalize(JSContext *cx, JSObject *obj)
 enum {
     JSXDR_FUNARG = 1,
     JSXDR_FUNVAR = 2,
-    JSXDR_FUNCONST = 3
+    JSXDR_FUNCONST = 3,
+    JSXDR_FUNARG_PATTERN = 4
 };
 
 /* XXX store parent and proto, if defined */
@@ -1505,7 +1612,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
         goto bad;
     }
 
-    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR | JSFUN_KIND_HOME_OBJECT | JSFUN_KIND_CLASS | JSFUN_KIND_DERIVED | JSFUN_KIND_SUPER_CALL) ||
+    if (fun->kind > (JSFUN_KIND_ARROW | JSFUN_KIND_REST | JSFUN_KIND_GENERATOR | JSFUN_KIND_HOME_OBJECT | JSFUN_KIND_CLASS | JSFUN_KIND_DERIVED | JSFUN_KIND_SUPER_CALL | JSFUN_KIND_NON_SIMPLE) ||
         (FUN_IS_ARROW(fun) && FUN_IS_GENERATOR(fun)) ||
         (FUN_IS_CLASS(fun) &&
          (FUN_IS_ARROW(fun) || FUN_IS_GENERATOR(fun) || !FUN_HAS_HOME_OBJECT(fun) ||
@@ -1538,6 +1645,7 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
                     goto bad;
                 }
             }
+            memset(spvec, 0, n * sizeof(JSScopeProperty *));
             scope = OBJ_SCOPE(fun->object);
             for (sprop = SCOPE_LAST_PROP(scope); sprop;
                  sprop = sprop->parent) {
@@ -1551,17 +1659,30 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
             }
             for (i = 0; i < n; i++) {
                 sprop = spvec[i];
-                JS_ASSERT(sprop->flags & SPROP_HAS_SHORTID);
-                type = (i < fun->nargs)
-                       ? JSXDR_FUNARG
-                       : (sprop->attrs & JSPROP_READONLY)
-                       ? JSXDR_FUNCONST
-                       : JSXDR_FUNVAR;
-                userid = INT_TO_JSVAL(sprop->shortid);
-                propAtom = JSID_TO_ATOM(sprop->id);
+                if (!sprop) {
+                    /* A destructuring formal has a positional argument but
+                     * no named GetArgument property. Preserve that hole. */
+                    if (i >= fun->nargs) {
+                        JS_ReportError(cx, "missing serialized local binding");
+                        if (mark) JS_ARENA_RELEASE(&cx->tempPool, mark);
+                        goto bad;
+                    }
+                    type = JSXDR_FUNARG_PATTERN;
+                    userid = INT_TO_JSVAL(i);
+                    propAtom = cx->runtime->atomState.emptyAtom;
+                } else {
+                    JS_ASSERT(sprop->flags & SPROP_HAS_SHORTID);
+                    type = (i < fun->nargs)
+                           ? JSXDR_FUNARG
+                           : (sprop->attrs & JSPROP_READONLY)
+                           ? JSXDR_FUNCONST
+                           : JSXDR_FUNVAR;
+                    userid = INT_TO_JSVAL(sprop->shortid);
+                    propAtom = JSID_TO_ATOM(sprop->id);
+                }
                 if (!JS_XDRUint32(xdr, &type) ||
                     !JS_XDRUint32(xdr, &userid) ||
-                    !js_XDRCStringAtom(xdr, &propAtom)) {
+                    !js_XDRStringAtom(xdr, &propAtom)) {
                     if (mark)
                         JS_ARENA_RELEASE(&cx->tempPool, mark);
                     goto bad;
@@ -1577,8 +1698,13 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
 
                 if (!JS_XDRUint32(xdr, &type) ||
                     !JS_XDRUint32(xdr, &userid) ||
-                    !js_XDRCStringAtom(xdr, &propAtom)) {
+                    !js_XDRStringAtom(xdr, &propAtom)) {
                     goto bad;
+                }
+                if (type == JSXDR_FUNARG_PATTERN) {
+                    if (!JSVAL_IS_INT(userid) || JSVAL_TO_INT(userid) < 0 ||
+                        (uintN)JSVAL_TO_INT(userid) >= fun->nargs) goto bad;
+                    continue;
                 }
                 JS_ASSERT(type == JSXDR_FUNARG || type == JSXDR_FUNVAR ||
                           type == JSXDR_FUNCONST);
@@ -1598,10 +1724,15 @@ fun_xdrObject(JSXDRState *xdr, JSObject **objp)
                 }
 
                 /* Flag duplicate argument if atom is bound in fun->object. */
-                dupflag = SCOPE_GET_PROPERTY(OBJ_SCOPE(fun->object),
-                                             ATOM_TO_JSID(propAtom))
-                          ? SPROP_IS_DUPLICATE
-                          : 0;
+                {
+                    JSObject *owner;
+                    JSProperty *previous;
+                    if (!js_LookupHiddenProperty(cx, fun->object,
+                                                ATOM_TO_JSID(propAtom), &owner, &previous))
+                        goto bad;
+                    dupflag = previous && owner == fun->object ? SPROP_IS_DUPLICATE : 0;
+                    if (previous) OBJ_DROP_PROPERTY(cx, owner, previous);
+                }
 
                 if (!js_AddHiddenProperty(cx, fun->object,
                                           ATOM_TO_JSID(propAtom),
@@ -2448,6 +2579,55 @@ js_IsIdentifier(JSString *str)
 }
 
 static JSBool
+CompileDynamicModern(JSContext *cx, JSFunction *fun, uintN argc, jsval *argv,
+                     const char *filename, uintN lineno, JSPrincipals *principals)
+{
+    jsval roots[3];
+    JSTempValueRooter rooter;
+    JSString *text;
+    JSTokenStream *formalTS = NULL, *bodyTS = NULL;
+    uintN i;
+    JSBool ok = JS_FALSE;
+    void *mark;
+    roots[0] = roots[1] = roots[2] = STRING_TO_JSVAL(cx->runtime->emptyString);
+    JS_PUSH_TEMP_ROOT(cx, 3, roots, &rooter);
+    for (i = 0; i + 1 < argc; ++i) {
+        text = js_ValueToString(cx, argv[i]);
+        if (!text) goto out;
+        roots[1] = STRING_TO_JSVAL(text);
+        if (i) {
+            text = JS_NewStringCopyZ(cx, ",");
+            if (!text) goto out;
+            roots[2] = STRING_TO_JSVAL(text);
+            text = js_ConcatStrings(cx, JSVAL_TO_STRING(roots[0]), text);
+            if (!text) goto out;
+            roots[0] = STRING_TO_JSVAL(text);
+        }
+        text = js_ConcatStrings(cx, JSVAL_TO_STRING(roots[0]), JSVAL_TO_STRING(roots[1]));
+        if (!text) goto out;
+        roots[0] = STRING_TO_JSVAL(text);
+    }
+    text = argc ? js_ValueToString(cx, argv[argc - 1]) : cx->runtime->emptyString;
+    if (!text) goto out;
+    roots[1] = STRING_TO_JSVAL(text);
+    mark = JS_ARENA_MARK(&cx->tempPool);
+    text = JSVAL_TO_STRING(roots[0]);
+    formalTS = js_NewTokenStream(cx, JSSTRING_CHARS(text), JSSTRING_LENGTH(text),
+                                  filename, lineno, principals);
+    text = JSVAL_TO_STRING(roots[1]);
+    bodyTS = js_NewTokenStream(cx, JSSTRING_CHARS(text), JSSTRING_LENGTH(text),
+                                filename, lineno, principals);
+    if (formalTS && bodyTS)
+        ok = js_CompileFunctionWithParameters(cx, bodyTS, formalTS, fun);
+    if (bodyTS && !js_CloseTokenStream(cx, bodyTS)) ok = JS_FALSE;
+    if (formalTS && !js_CloseTokenStream(cx, formalTS)) ok = JS_FALSE;
+    JS_ARENA_RELEASE(&cx->tempPool, mark);
+ out:
+    JS_POP_TEMP_ROOT(cx, &rooter);
+    return ok;
+}
+
+static JSBool
 DynamicFunction(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
                 JSBool generator)
 {
@@ -2522,6 +2702,9 @@ DynamicFunction(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rv
                                   CLASS_ATOM(cx, Function))) {
         return JS_FALSE;
     }
+
+    if (JS_VERSION_IS_ES2015(cx))
+        return CompileDynamicModern(cx, fun, argc, argv, filename, lineno, principals);
 
     n = argc ? argc - 1 : 0;
     if (n > 0) {

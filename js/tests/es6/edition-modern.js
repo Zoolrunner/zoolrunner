@@ -208,6 +208,9 @@ function modernWindowEdition() {
                          try { Function('{function repeated(){} function repeated(){}}'); }
                          catch(e) { caught=e instanceof SyntaxError; }
                          return caught && eval('"use strict"; catchOuter=1; try{throw 2}catch(catchOuter){var catchOuter=3} catchOuter')===1; })() &&
+           (function() { function f(a=3,b=()=>a){var a=7;return a===7&&b()===3}
+                         var g=({x=4}={})=>x;
+                         return f() && g()===4 && Function('a=5','return a')()===5; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

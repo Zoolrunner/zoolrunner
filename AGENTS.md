@@ -1579,3 +1579,12 @@ instantiating `var` in the enclosing variable environment. Follow the original
 ES2015 duplicate block-function early error; explicit legacy/default editions
 retain their existing grammar. Run `catch-declarations.js` and
 `TestCatchDeclarations.c`, including wide prolog operands and XDR/source checks.
+
+
+For non-simple ES2015 formals, preserve the separate parameter and body records,
+per-initializer eval scope, unmapped arguments, and generator call-time defaults.
+Keep dynamic Function formals separate from its body token stream. Parameter
+initializer scripts are owned by their body scripts: trace, serialize, destroy
+and notify debugger hooks consistently. Run `default-parameters.js` and
+`TestParameterWide.c`, including wide operands, callback-triggered GC and
+cache/source round trips. Preserve legacy formal parsing and embedding APIs.

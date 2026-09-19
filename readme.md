@@ -828,3 +828,12 @@ and all four applications' build/package/desktop checks pass, including Calendar
 views, Browser navigation/layout and Suite/XULRunner ChatZilla. Full ES2015
 compliance remains unfinished. Other platforms were not revalidated for this
 batch; see `js/tests/es6/README.md`.
+
+
+ES2015 default parameters and parameter environments pass integrated macOS arm64
+validation: **28,568 ES6 passes, zero failures, 14 unsupported module cases**,
+with 46 gained and zero lost. ES5 remains **11,540/11,540**. All four applications
+pass build/package/desktop checks, including Calendar views, Browser
+navigation/layout, and Suite/XULRunner ChatZilla. Module support is still required
+for completion. Other platforms were not revalidated for this batch; see
+`js/tests/es6/README.md`.

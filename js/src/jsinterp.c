@@ -1520,6 +1520,20 @@ have_fun:
             ok = JS_FALSE;
             goto out;
         }
+        if (script->parameterScript) {
+            if (!js_BeginParameterBindings(cx, &frame)) {
+                ok = JS_FALSE;
+                goto out;
+            }
+            frame.script = script->parameterScript;
+            ok = js_Interpret(cx, frame.script->code, &v);
+            frame.script = script;
+            frame.pc = NULL;
+            if (!ok || !js_FinishParameterBindings(cx, &frame)) {
+                ok = JS_FALSE;
+                goto out;
+            }
+        }
         ok = js_Interpret(cx, script->code, &v);
         if (ok && FUN_IS_DERIVED(fun) && (flags & JSINVOKE_CONSTRUCT) &&
             JSVAL_IS_PRIMITIVE(frame.rval)) {
@@ -3906,6 +3920,21 @@ interrupt:
             SAVE_SP_AND_PC(fp);
             if (ATOM_IS_INT(atom)) {
                 switch (ATOM_TO_INT(atom)) {
+                  case JS_EXT_PARAMETER_ENTER:
+                    ok = js_EnterParameterInitializer(cx, fp);
+                    rval = JSVAL_VOID;
+                    break;
+                  case JS_EXT_PARAMETER_LEAVE:
+                    js_LeaveParameterInitializer(cx, fp);
+                    rval = JSVAL_VOID;
+                    ok = JS_TRUE;
+                    break;
+                  case JS_EXT_PARAMETER_BIND:
+                    rval = FETCH_OPND(-3);
+                    ok = JS_ValueToId(cx, FETCH_OPND(-2), &id) &&
+                         js_InitializeLexicalBinding(cx,
+                             OBJ_GET_PARENT(cx, fp->callobj), id, rval);
+                    break;
                   case JS_EXT_SUPER_CALL_REF:
                     obj = NewSuperCallReference(cx, fp);
                     rval = OBJECT_TO_JSVAL(obj);
@@ -4915,7 +4944,7 @@ interrupt:
             if (VALUE_IS_FUNCTION(cx, lval) &&
                 (obj = JSVAL_TO_OBJECT(lval),
                  fun = (JSFunction *) JS_GetPrivate(cx, obj),
-                 FUN_INTERPRETED(fun)))
+                 FUN_INTERPRETED(fun) && !FUN_HAS_NON_SIMPLE(fun)))
           /* inline_call: */
             {
                 uintN nframeslots, nvars, nslots, missing;

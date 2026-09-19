@@ -2970,3 +2970,38 @@ The four application libraries and frozen conformance runtime share SHA-256
 C89 declaration/implicit-function checks pass. Cache version remains 61.
 Reports use `artifacts/es6/catch-declarations-final-*`. Other operating systems
 and architectures have not been revalidated for this batch.
+
+
+### Parameter environments (integrated macOS arm64 validation)
+
+ES2015 defaults and binding patterns now share a formal parser across ordinary
+functions, methods, generators, arrows and dynamic Function constructors.
+Parameters initialize left to right with TDZ checks, unmapped arguments,
+initializer eval scopes, and separate body bindings when necessary. Defaults
+run before a generator first suspends. The body owns a separately traced and
+serialized initializer script so destructuring exception tables and IteratorClose
+retain their normal offsets. The dynamic constructor parses formals and body
+as separate streams. Legacy editions retain their existing parser path.
+
+The isolated full run in `artifacts/es6/parameter-reviewed-*` records **28,568
+passes, zero failures, 14 unsupported module cases**, and zero harness errors,
+crashes or timeouts. All **11,540 ES5 cases** pass. This is not completion:
+module compilation/linking/evaluation remains unsupported. Additional native
+checks subsequently fixed destructured argument holes and duplicate binding
+metadata in XDR, Unicode binding serialization, and raw parameter source output.
+The wide initializer test covers 66,000 atoms, GC during script callbacks,
+balanced script notifications, and cache/source round trips. Cache version is 62.
+`default-parameters.js` passes 60 focused checks and `TestParameterWide.c`
+passes 17 checks with 12 balanced script lifecycles. All four applications pass
+root builds, packaging and relocated desktop checks, including Calendar's four
+views, Browser navigation/layout (169 checks), and Suite/XULRunner ChatZilla.
+The final packaged-runtime full run confirms **28,568 passes, zero failures,
+14 unsupported modules**, zero other errors, **46 gained and zero lost**;
+ES5 remains **11,540/11,540**. Reports use `artifacts/es6/parameters-final-*`.
+All four libraries and the frozen runtime share SHA-256
+`85ea999d5c43a23af1ffda28c7369bd6ba2db8d1ccbbfed569c61a8e9ec9a85d`.
+C89 checks pass. Other platforms are not revalidated for this batch.
+
+The pinned corpus also includes later rest binding-pattern cases. Those formals
+are accepted without widening ordinary variable-declaration rest grammar; the
+unchanged `array-rest.js` negative cases and all 56 rest-parameter checks pass.
