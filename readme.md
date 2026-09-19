@@ -955,3 +955,12 @@ pinned suites and all four macOS arm64 build/package/runtime checks pass;
 see [generator and caller validation](js/tests/es6/README.md#generator-method-grammar-and-caller-reflection).
 Broader later-Test262 edition review and validation on other operating systems
 remain unfinished.
+
+The current environment edge-case batch fixes switch discriminant closure
+scope, default-only switch decompilation and ES2015 `with` binding reads after
+observable lookup. It retains explicit legacy scope behavior and extends the
+native cache/source round-trip checks; bytecode cache version is 64. Both
+complete pinned suites pass with zero failures, along with all four macOS arm64
+build/package/runtime checks and the expanded native collection/cache probe.
+The broader edition review and other-platform validation remain unfinished; see
+[environment validation](js/tests/es6/README.md#switch-discriminant-environments).

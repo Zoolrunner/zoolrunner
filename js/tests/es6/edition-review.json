@@ -108,6 +108,13 @@
       "reason": "Original clause 17 excludes anonymous built-ins from the name requirement. The unchanged pinned ES2015 test requires no own name; the later test requires an own empty name."
     },
     {
+      "test": "built-ins/Proxy/setPrototypeOf/toboolean-trap-result-false.js",
+      "sha256": "beacc1f395ded13359bd5baa6ade10ad69afaa41410fcb9cb0a08186e854e4e2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxy-object-internal-methods-and-internal-slots-setprototypeof-v",
+      "reason": "Original ES2015 checks target extensibility after the trap even when its result is false. This later test requires an early false return before the observable extensibility check."
+    },
+    {
       "test": "built-ins/Reflect/ownKeys/return-on-corresponding-order-large-index.js",
       "sha256": "098bc8f84e522ed348c9722b2a1cf66cddee9e46cb376196367f64342521f78e",
       "decision": "later-requirement",
@@ -239,6 +246,111 @@
       "decision": "original-es2015-regression",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-%typedarray%.prototype.lastindexof",
       "reason": "Search algorithms address element zero after ToString of either signed zero. Normalizing the algorithmic index fixes negative-zero searches while the distinct canonical property string -0 remains invalid. Both unchanged later modes pass in the staged lexical/index candidate."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/buffer-arg/custom-proto-access-throws.js",
+      "sha256": "5c2afa7b7579b9e3ad86bc4393e77e660001717959b70a4c34c26fe5d0d0947c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/buffer-arg/use-custom-proto-if-object.js",
+      "sha256": "8b69d6e9a9c5b672192f13298c1b77c91dcbc391ac3630227e4661441d18f5fa",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/buffer-arg/use-default-proto-if-custom-proto-is-not-object.js",
+      "sha256": "85bc28d8f316039a900d3cc3ac0379ec239f06d08f084acf85fd905c1aca7189",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/length-arg/custom-proto-access-throws.js",
+      "sha256": "3f9c3fd4f3ff68d5061e8d16ad7e1b3e6b81d84767acad33fdfb48258cb57531",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/length-arg/use-custom-proto-if-object.js",
+      "sha256": "55722a64ecdd430b75f5e3e5325133348f5dea35c5a81b6a8b8dafe30b71c000",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/length-arg/use-default-proto-if-custom-proto-is-not-object.js",
+      "sha256": "50dd75f589201ada8c3433abc687cc36b9971f9e57e9ba6e2a1d0050ac07abdd",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/no-args/custom-proto-access-throws.js",
+      "sha256": "afa67ef362f97b36e4068ac753ef8cd704e56a755ea741d2ae464fd179b1d6fc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/no-args/use-custom-proto-if-object.js",
+      "sha256": "9c98c3f9c9f26b71d59ae11702e545528e75459048028807f08d6a27f32f7742",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/no-args/use-default-proto-if-custom-proto-is-not-object.js",
+      "sha256": "d400fe52c2d9a697f5ce2bb27b8aee8ee2b5a093e721d5a8d137d13ba9b7f280",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/object-arg/custom-proto-access-throws.js",
+      "sha256": "a54196626913dd200b3b4ae0ef1c48659632fedb7c0d7e2177248ccd3da88c3b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/object-arg/use-custom-proto-if-object.js",
+      "sha256": "09d50bb5e9ef85d327c8c65a355a1821fdb9cb75f90ae0763b75d9c53168be5e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/object-arg/use-default-proto-if-custom-proto-is-not-object.js",
+      "sha256": "d25ddd2106257645dd5f275a4189d89babbe39be4127fd95a1c005e145b96ea5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/typedarray-arg/custom-proto-access-throws.js",
+      "sha256": "56ba21f24f1ca930a829fea0d2926063568c344fe6d197bfc0e546cbbce72e3a",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/typedarray-arg/use-custom-proto-if-object.js",
+      "sha256": "cad836eb6c6bc1f1cddc2f7619fcb6476dd72e2f63e64af537ec17aff3c907d5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+    },
+    {
+      "test": "built-ins/TypedArrayConstructors/ctors/typedarray-arg/use-default-proto-if-custom-proto-is-not-object.js",
+      "sha256": "8db6e9175095a3103a3bba2f2971e4c453d409c5ee7832cf309f175d67fe7078",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "language/expressions/arrow-function/eval-var-scope-syntax-err.js",
@@ -675,6 +787,20 @@
       "reason": "yield is a BindingIdentifier grammar candidate, then prohibited by generator early errors. The newline does not allow ASI between let and its binding. Both later diagnostic modes pass unchanged in the staged lexical candidate."
     },
     {
+      "test": "language/statements/switch/scope-lex-open-case.js",
+      "sha256": "6fd3a3b591b9e7460904c1c3d4deca2181c8653ef432ead76fd680e8321a714b",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-switch-statement-runtime-semantics-evaluation",
+      "reason": "Original ES2015 evaluates the discriminant in the enclosing lexical environment, then enters the case-body environment. The unchanged test exposes incorrect closure capture when block entry precedes discriminant evaluation."
+    },
+    {
+      "test": "language/statements/switch/scope-lex-open-dflt.js",
+      "sha256": "f8907fb43727ef2796d891d274b4637e874cfbced74c1065bd131289c8cbb214",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-switch-statement-runtime-semantics-evaluation",
+      "reason": "Original ES2015 evaluates the discriminant in the enclosing lexical environment, then enters the case-body environment. The unchanged test exposes incorrect closure capture when block entry precedes discriminant evaluation."
+    },
+    {
       "test": "language/statements/try/dstr/ary-ptrn-rest-ary-elem.js",
       "sha256": "4314aaca5c3b8beea845e5aa3da82801c4aa8a24837042c33e28753ead620994",
       "decision": "later-requirement",
@@ -743,6 +869,62 @@
       "decision": "original-es2015-regression",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-runtime-semantics-catchclauseevaluation",
       "reason": "Parameter initialization precedes Block evaluation and its distinct lexical environment. Fixed in the staged catch environment candidate; later diagnostic passes unchanged."
+    },
+    {
+      "test": "language/statements/with/get-binding-value-call-with-proxy-env.js",
+      "sha256": "fa512d709219d5ed2fb04a5408bc1881b105ebce64db9ef2a8feff28ade8d121",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-getbindingvalue-n-s",
+      "reason": "Original ES2015 GetBindingValue performs HasProperty after HasBinding and its unscopables lookup. The test exposes a missing second check, including the required ReferenceError when a resolved binding disappears before a strict read."
+    },
+    {
+      "test": "language/statements/with/get-binding-value-idref-with-proxy-env.js",
+      "sha256": "0b86dbfe9b71049b15a3acfd97e2b7679ed4b6e197178417cf61270cdfe931ef",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-getbindingvalue-n-s",
+      "reason": "Original ES2015 GetBindingValue performs HasProperty after HasBinding and its unscopables lookup. The test exposes a missing second check, including the required ReferenceError when a resolved binding disappears before a strict read."
+    },
+    {
+      "test": "language/statements/with/get-mutable-binding-binding-deleted-in-get-unscopables-strict-mode.js",
+      "sha256": "ed75d3637447c2d3204c195a19db320609c63d3d53a0636394090814a8f965fc",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-getbindingvalue-n-s",
+      "reason": "Original ES2015 GetBindingValue performs HasProperty after HasBinding and its unscopables lookup. The test exposes a missing second check, including the required ReferenceError when a resolved binding disappears before a strict read."
+    },
+    {
+      "test": "language/statements/with/set-mutable-binding-binding-deleted-in-get-unscopables-strict-mode.js",
+      "sha256": "59166ec5b3e051262a435c43eff5849a655f0cac9d3dd29c6836f6d5b61458ec",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s",
+      "reason": "Original ES2015 object-environment SetMutableBinding delegates directly to Set without a new HasProperty check or a separate missing-binding ReferenceError. This test requires the later added existence check."
+    },
+    {
+      "test": "language/statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain-strict-mode.js",
+      "sha256": "9d130255780c1b557606655d834e33acd1e8b39f2a67f27665f172f6ba75dd4d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s",
+      "reason": "Original ES2015 object-environment SetMutableBinding delegates directly to Set without a new HasProperty check or a separate missing-binding ReferenceError. This test requires the later added existence check."
+    },
+    {
+      "test": "language/statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain.js",
+      "sha256": "ee45a6317ace1932a3a0d965c6831f517b4d4b1960a449481a90e3a60a892d27",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-integer-indexed-exotic-objects-set-p-v-receiver",
+      "reason": "Original ES2015 integer-indexed Set uses the ordinary object path when the receiver differs from the typed array. This test requires later handling of an invalid canonical numeric key on a different receiver, which suppresses its ordinary own-property creation."
+    },
+    {
+      "test": "language/statements/with/set-mutable-binding-idref-compound-assign-with-proxy-env.js",
+      "sha256": "9124381fbc149b74ea343af7089150d41896425db5d82ca7b8af70102a0ff003",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s",
+      "reason": "Original ES2015 object-environment SetMutableBinding delegates directly to Set without a new HasProperty check or a separate missing-binding ReferenceError. This test requires the later added existence check."
+    },
+    {
+      "test": "language/statements/with/set-mutable-binding-idref-with-proxy-env.js",
+      "sha256": "00e6243422e9515735417ebd02f79c48eac900e386fe168d47a9039145e16a70",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s",
+      "reason": "Original ES2015 object-environment SetMutableBinding delegates directly to Set without a new HasProperty check or a separate missing-binding ReferenceError. This test requires the later added existence check."
     }
   ]
 }

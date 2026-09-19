@@ -2264,7 +2264,7 @@ Object(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
  */
 /* A binding can survive deletion during @@unscopables lookup. Return an
  * opaque with-binding marker rather than retaining a property/lock across
- * user callbacks or performing a second HasProperty lookup. */
+ * user callbacks. GetBindingValue performs its own existence check. */
 static jsval withBindingMarker;
 
 static void
@@ -2328,10 +2328,34 @@ with_LookupProperty(JSContext *cx, JSObject *obj, jsid id, JSObject **objp,
 static JSBool
 with_GetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp)
 {
-    JSObject *proto = OBJ_GET_PROTO(cx, obj);
+    JSObject *proto = OBJ_GET_PROTO(cx, obj), *owner;
+    JSProperty *property;
+    WithBindingRoot root;
+    JSBool ok;
+    const char *printable;
     if (!proto)
         return js_GetProperty(cx, obj, id, vp);
-    return OBJ_GET_PROPERTY(cx, proto, id, vp);
+    if (!JS_VERSION_IS_ES2015(cx) || OBJ_BLOCK_DEPTH(cx, obj) < 0)
+        return OBJ_GET_PROPERTY(cx, proto, id, vp);
+    /* GetBindingValue rechecks existence after HasBinding's observable
+     * unscopables lookup. It does not repeat the unscopables lookup itself. */
+    root.id = id;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkWithBindingId, &root.root);
+    ok = OBJ_LOOKUP_PROPERTY(cx, proto, id, &owner, &property);
+    if (ok && !property) {
+        *vp = JSVAL_VOID;
+        if (cx->fp && cx->fp->script && cx->fp->script->strictMode) {
+            printable = js_ValueToPrintableString(cx, ID_TO_VALUE(id));
+            if (printable)
+                js_ReportIsNotDefined(cx, printable);
+            ok = JS_FALSE;
+        }
+    } else if (ok) {
+        OBJ_DROP_PROPERTY(cx, owner, property);
+        ok = OBJ_GET_PROPERTY(cx, proto, id, vp);
+    }
+    JS_POP_TEMP_ROOT(cx, &root.root);
+    return ok;
 }
 
 static JSBool

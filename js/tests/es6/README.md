@@ -3418,7 +3418,7 @@ The unchanged later diagnostics record 177/195 catch modes, 178/258 accessor
 modes, 2/2 generator-let modes and 4/12 signed-zero search modes passing. The
 remaining failures in those bounded groups require later rest-binding/object
 rest syntax, private class accessors or `includes`; they remain in the reports.
-[The edition review ledger](edition-review.json) records 106 manually reviewed
+[The edition review ledger](edition-review.json) records 132 manually reviewed
 paths with exact source hashes and original specification sections, including
 other normative differences. It is incomplete and is not a test selector or
 conformance score. The broader ES2015 inventory and other operating systems
@@ -3476,3 +3476,78 @@ score: later syntax, changed normative requirements and later harness needs
 remain visible. The narrower metadata-only triage still contains 699 failing
 modes across 370 paths and requires edition review. It confirmed four original
 switch-environment failures, now being fixed and validated separately.
+
+### Switch discriminant environments
+
+Modern switch discriminants now execute before entering the case-body lexical
+environment. Their closures retain the enclosing bindings, while case selectors
+and bodies share the new case environment. Explicit legacy versions retain
+the historical scope ordering. ENTERBLOCK preserves the evaluated discriminant
+above the new lexical slots, including its producer information; decompilation
+preserves that stack order without overwriting lexical-name strings. The
+bytecode cache version advances to 64.
+
+The corrected isolated candidate passes four unchanged later-Test262 original
+ES2015 modes, 108 existing focused fixtures, 63 native fixtures, 15 new shell
+checks and C89 checks. The final combined conformance and all four macOS arm64 application checks
+pass as recorded below. Reports use `switch-scope-source-fixed-*` and
+`environment-final-*` under `artifacts/es6`. An expanded native XDR and source
+round-trip check also exposed an older default-only switch decompilation bug;
+the decompiler now retains that body. The expanded shell fixture passes 18
+checks, and the native allocation-callback/cache/source fixture passes all 19
+checks with the added switch coverage. The intermediate `switch-scope-final-*`
+application run stopped after XULRunner/Suite checks to incorporate this fix;
+it does not establish complete final application validation. The initial `switch-scope-stage-*`
+full runs were stopped incomplete after an expanded multi-binding source
+round-trip regression failed; they are not passing full-suite results.
+The corrected source regression passes. Other operating systems and the
+broader edition review remain unvalidated for this batch.
+
+The switch and default-source changes are now validated together with the
+with-binding read correction below under `environment-final-*`. The short
+`switch-source-final-*` attempt stopped during its first build before any
+complete package or conformance results; its logs remain diagnostic only.
+
+### With-binding reads after observable lookup
+
+ES2015 syntactic `with` reads now perform GetBindingValue's property-existence
+check after HasBinding and its `Symbol.unscopables` lookup. A removed binding
+returns `undefined` in non-strict code and throws `ReferenceError` in strict
+code, including `typeof` on a previously resolved binding. A compound read
+performs the check once, and methods retain the binding object's receiver.
+Explicit legacy language versions and embedding object scopes keep their
+historical behavior. Original ES2015 writes do not perform the extra existence
+check required by later specifications.
+
+The isolated candidate passes 109 existing focused fixtures, 63 native
+fixtures, 13 new shell checks and C89 checks. The unchanged later with-scope
+diagnostic passes 16 of 21 modes, fixing three original-ES2015 failures; the
+remaining five involve later write requirements and remain diagnostic failures.
+Full suites and combined four-application validation pass under
+`artifacts/es6/environment-final-*`; intermediate reports use
+`with-binding-stage-*`. Its intermediate full runs stopped incomplete when
+the changes were consolidated; only `environment-final-*` can establish the
+combined full-suite result. Other operating systems and architectures have
+not been revalidated for this batch.
+
+The combined packaged runtime passes all 41 selected unchanged later switch
+modes and 16/21 with modes (`environment-final-later-switch.json` and
+`environment-final-later-with.json`). The five remaining with failures are
+recorded in the edition ledger as later write requirements. These bounded
+diagnostics are additional evidence, not substitutes for the full pinned runs.
+
+Final integrated validation records all **28,582 ES6 modes** and **11,540 ES5
+modes** passing, with zero failures, unsupported cases, timeouts, crashes or
+harness errors. All four macOS arm64 applications build, package and pass their
+relocated desktop checks, including Calendar's four views, Browser
+navigation/layout and Suite/XULRunner ChatZilla. The package checks include
+110 focused fixtures, 63 native fixtures and the new 18 switch/13 with checks.
+The native lexical fixture additionally observes temporary discriminant
+liveness during allocation-callback collection, then exercises XDR and source
+round trips; the expanded probe passes against all four application engines
+(`environment-final-*-xdr-liveness.log`). C89 checks pass. All four engines
+and the unchanged frozen conformance runtime share SHA-256
+`3c76e27af3d8b9f6a2895318c04d8e17e30b7e855cd3b37647311f8f7b6ec830`.
+The broader later-Test262 edition inventory remains incomplete; these results
+are not a claim of complete specification correctness or other-platform runtime
+validation.

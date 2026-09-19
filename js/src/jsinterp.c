@@ -4177,6 +4177,18 @@ interrupt:
                 goto atom_not_defined;
             obj = JSVAL_TO_OBJECT(FETCH_OPND(-2));
             id = ATOM_TO_JSID(atom);
+            /* Syntactic with objects implement GetBindingValue themselves.
+             * Do not perform their observable HasProperty check twice. */
+            if (JS_VERSION_IS_ES2015(cx) &&
+                OBJ_GET_CLASS(cx, obj) == &js_WithClass &&
+                OBJ_BLOCK_DEPTH(cx, obj) >= 0) {
+                ok = OBJ_GET_PROPERTY(cx, obj, id, &rval);
+                if (!ok)
+                    goto out;
+                PUSH_OPND(rval);
+                obj = NULL;
+                DO_NEXT_OP(JSOP_GETREF_LENGTH);
+            }
             /* GetBindingValue checks existence without repeating HasBinding's
              * unscopables lookup. A callback may have removed the property. */
             ok = OBJ_LOOKUP_PROPERTY(cx, obj, id, &obj2, &prop);
@@ -7635,7 +7647,17 @@ interrupt:
 #endif /* JS_HAS_XML_SUPPORT */
 
           BEGIN_LITOPX_CASE(JSOP_ENTERBLOCK, 0)
+          {
+            JSBool preserveValue;
+            jsval value, producer;
             obj = ATOM_TO_OBJECT(atom);
+            preserveValue = fp->spbase + OBJ_BLOCK_DEPTH(cx, obj) + 1 == sp;
+            value = producer = JSVAL_VOID;
+            if (preserveValue) {
+                --sp;
+                value = *sp;
+                producer = sp[-depth];
+            }
             JS_ASSERT(fp->spbase + OBJ_BLOCK_DEPTH(cx, obj) == sp);
             vp = sp + OBJ_BLOCK_COUNT(cx, obj);
             JS_ASSERT(vp <= fp->spbase + depth);
@@ -7644,6 +7666,13 @@ interrupt:
                 /* Preserve producer PCs for value decompilation. */
                 sp[-depth] = (jsval)CURRENT_PC;
                 sp++;
+            }
+
+            if (preserveValue) {
+                *sp = value;
+                sp[-depth] = producer;
+                ++sp;
+                SAVE_SP_AND_PC(fp);
             }
 
             /*
@@ -7679,6 +7708,7 @@ interrupt:
                           OBJ_GET_PARENT(cx, obj) == fp->blockChain);
                 fp->blockChain = obj;
             }
+          }
           END_LITOPX_CASE(JSOP_ENTERBLOCK)
 
           BEGIN_CASE(JSOP_LEAVEBLOCKEXPR)

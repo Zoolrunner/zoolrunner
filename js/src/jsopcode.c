@@ -1212,6 +1212,14 @@ DecompileSwitch(SprintStack *ss, TableEntry *table, uintN tableLength,
         }
     }
 
+    if (!tableLength && defaultOffset < switchLength) {
+        jp->indent += 2;
+        js_printf(jp, "\t%s:\n", js_default_str);
+        jp->indent += 2;
+        if (!Decompile(ss, pc + defaultOffset, switchLength - defaultOffset))
+            return JS_FALSE;
+        jp->indent -= 4;
+    }
     if (defaultOffset == switchLength) {
         jp->indent += 2;
         js_printf(jp, "\t%s:;\n", js_default_str);
@@ -2749,15 +2757,31 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               {
                 JSAtom **atomv, *smallv[5];
                 JSScopeProperty *sprop;
+                JSBool preserveValue;
+                ptrdiff_t valueOffset;
+                char *valueText;
+                jsbytecode valueOp;
 
                 obj = ATOM_TO_OBJECT(atom);
+                preserveValue = ss->top == (uintN)OBJ_BLOCK_DEPTH(cx, obj) + 1;
+                valueText = NULL;
+                valueOp = JSOP_NOP;
+                if (preserveValue) {
+                    valueText = JS_strdup(cx, GetStr(ss, ss->top - 1));
+                    if (!valueText)
+                        return NULL;
+                    --ss->top;
+                    valueOp = ss->opcodes[ss->top];
+                }
                 argc = OBJ_BLOCK_COUNT(cx, obj);
                 if ((size_t)argc <= sizeof smallv / sizeof smallv[0]) {
                     atomv = smallv;
                 } else {
                     atomv = (JSAtom **) JS_malloc(cx, argc * sizeof(JSAtom *));
-                    if (!atomv)
+                    if (!atomv) {
+                        JS_free(cx, valueText);
                         return NULL;
+                    }
                 }
 
                 /* From here on, control must flow through enterblock_out. */
@@ -2779,6 +2803,15 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     }
                 }
 
+                if (preserveValue) {
+                    /* Keep stack string offsets in allocation order: popping
+                     * the discriminant must not overwrite lexical names. */
+                    valueOffset = SprintCString(&ss->sprinter, valueText);
+                    if (valueOffset < 0 || !PushOff(ss, valueOffset, valueOp)) {
+                        ok = JS_FALSE;
+                        goto enterblock_out;
+                    }
+                }
                 sn = js_GetSrcNote(jp->script, pc);
                 switch (sn ? SN_TYPE(sn) : SRC_NULL) {
 #if JS_HAS_BLOCK_SCOPE
@@ -2863,6 +2896,7 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 todo = -2;
 
               enterblock_out:
+                JS_free(cx, valueText);
                 if (atomv != smallv)
                     JS_free(cx, atomv);
                 if (!ok)
@@ -5539,7 +5573,8 @@ js_DecompileValueGenerator(JSContext *cx, intN spindex, jsval v,
             atomIndex = pc2 ? GET_LITERAL_INDEX(pc) : GET_ATOM_INDEX(pc);
             atom = js_GetAtom(cx, &script->atomMap, atomIndex);
             obj = ATOM_TO_OBJECT(atom);
-            JS_ASSERT(OBJ_BLOCK_DEPTH(cx, obj) == pcdepth);
+            JS_ASSERT(OBJ_BLOCK_DEPTH(cx, obj) == pcdepth ||
+                      OBJ_BLOCK_DEPTH(cx, obj) + 1 == pcdepth);
             ndefs = OBJ_BLOCK_COUNT(cx, obj);
         }
         pcdepth += ndefs;

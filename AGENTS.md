@@ -405,6 +405,14 @@ pattern bindings must retain their temporal dead zone. Run `catch-environments.j
 distinct from the canonical property string `"-0"`. Record later-edition
 Test262 reviews with exact source hashes; never treat a review ledger as a
 passing conformance run or a complete edition inventory.
+Switch discriminants must execute outside their case-body lexical environment.
+Run `switch-environments.js` and `TestLexicalEmbedding.c` for block-entry changes,
+including allocation-callback collection, default-only bodies and multi-binding
+cache/source round trips. Keep explicit legacy scope ordering. Syntactic modern
+with environments perform GetBindingValue's existence check after unscopables;
+do not repeat the unscopables lookup or add later-edition write checks. Run
+`with-binding-value.js`, `unscopables.js` and `TestUnscopables.c`, preserving
+embedding object receivers and explicit legacy lookup behavior.
 Property replacement must preserve ES2015 creation order and keep compiler
 metadata private. Run `property-order.js` and `function-key-order.js`, including
 watchpoints, duplicate parameters, collection and deletion/re-addition. Keep

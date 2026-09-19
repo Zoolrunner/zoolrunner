@@ -12,6 +12,45 @@ static JSClass globalClass = {
     JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
+/* Observe liveness without rooting the temporary switch discriminant. */
+static JSObject *watchedSwitchValue;
+static JSBool switchValueFinalized;
+static void
+FinalizeSwitchValue(JSContext *cx, JSObject *obj)
+{
+    if (obj == watchedSwitchValue)
+        switchValueFinalized = JS_TRUE;
+}
+static JSClass switchValueClass = {
+    "SwitchValue", 0,
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, FinalizeSwitchValue,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+static JSBool
+MakeSwitchValue(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *value = JS_NewObject(cx, &switchValueClass, NULL, NULL);
+    if (!value)
+        return JS_FALSE;
+    watchedSwitchValue = value;
+    switchValueFinalized = JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(value);
+    return JS_TRUE;
+}
+static JSBool
+CheckSwitchValue(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JS_ClearNewbornRoots(cx);
+    JS_GC(cx);
+    if (switchValueFinalized) {
+        JS_ReportError(cx, "switch discriminant collected before case evaluation");
+        return JS_FALSE;
+    }
+    *rval = JSVAL_ZERO;
+    return JS_TRUE;
+}
+
 static unsigned checks, allocationCalls, reentries, constReentries, iterationReentries;
 static unsigned forOfReentries;
 static JSBool inAllocation, hookFailed;
@@ -127,6 +166,11 @@ int main(void)
         "forOfProbe();"
         "function headPending(){try{headCaptures[0]();return false}"
         "catch(e){return e instanceof ReferenceError}}"
+        "function switchProbe(){let x=3;var f;switch((f=()=>x,makeSwitchValue())){"
+        "case checkSwitchValue():return -100;default:let x=4,y=5;return f()+x+y;}}"
+        "function defaultProbe(){switch(0){default:let x=1,y=2;return x+y;}}"
+        "defaultProbe()===3 && "
+        "switchProbe()===12 && "
         "caught() && caughtConst() && immutable() && live()===11 && "
         "values(forOfValues)==='3,4' && "
         "values(loopValues)==='0,1,2' && values(keys)==='a,b'";
@@ -146,7 +190,9 @@ int main(void)
     global = JS_NewObject(cx, &globalClass, NULL, NULL);
     CHECK(global != NULL);
     JS_SetGlobalObject(cx, global);
-    CHECK(JS_InitStandardClasses(cx, global));
+    CHECK(JS_InitStandardClasses(cx, global) &&
+          JS_DefineFunction(cx, global, "makeSwitchValue", MakeSwitchValue, 0, 0) &&
+          JS_DefineFunction(cx, global, "checkSwitchValue", CheckSwitchValue, 0, 0));
     script = JS_CompileScript(cx, global, program, strlen(program), "lexicals", 1);
     CHECK(script && (scriptObject = JS_NewScriptObject(cx, script)) != NULL);
     JS_SetObjectHook(rt, Allocation, NULL);

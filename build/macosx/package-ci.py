@@ -423,6 +423,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("generator-let-newline.js", "GENERATOR-LET-NEWLINE checks=7 failures=0"),
                 ("generator-method-grammar.js", "GENERATOR-METHOD-GRAMMAR checks=16 failures=0"),
                 ("caller-reflection.js", "CALLER-REFLECTION checks=14 failures=0"),
+                ("switch-environments.js", "SWITCH-SCOPE checks=18 failures=0"),
+                ("with-binding-value.js", "WITH-BINDING-VALUE checks=13 failures=0"),
                 ("typedarray-zero-indices.js", "TYPEDARRAY-ZERO-INDICES checks=207 failures=0"),
                 ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
                 ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),

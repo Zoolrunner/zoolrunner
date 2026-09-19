@@ -2664,7 +2664,7 @@ EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
            JSStmtInfo *stmtInfo)
 {
     JSOp switchOp;
-    JSBool ok, hasDefault, constPropagated;
+    JSBool ok, hasDefault, constPropagated, discriminantEmitted;
     ptrdiff_t top, off, defaultOffset;
     JSParseNode *pn2, *pn3, *pn4;
     uint32 caseCount, tableLength;
@@ -2685,28 +2685,34 @@ EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
     /* Try for most optimal, fall back if not dense ints, and per ECMAv2. */
     switchOp = JSOP_TABLESWITCH;
     ok = JS_TRUE;
-    hasDefault = constPropagated = JS_FALSE;
+    hasDefault = constPropagated = discriminantEmitted = JS_FALSE;
     defaultOffset = -1;
 
     /*
-     * If the switch contains let variables scoped by its body, model the
-     * resulting block on the stack first, before emitting the discriminant's
-     * bytecode (in case the discriminant contains a stack-model dependency
-     * such as a let expression).
+     * Modern switch bodies enter their lexical environment after evaluating
+     * the discriminant. Legacy let expressions retain the historical ordering
+     * and static block parenting. In either case the body's slots lie below
+     * the discriminant when the dispatch bytecode runs.
      */
     pn2 = pn->pn_right;
 #if JS_HAS_BLOCK_SCOPE
     if (pn2->pn_type == TOK_LEXICALSCOPE) {
         atom = pn2->pn_atom;
         obj = ATOM_TO_OBJECT(atom);
-        OBJ_SET_BLOCK_DEPTH(cx, obj, cg->stackDepth);
+        /* ES2015 evaluates the discriminant in the enclosing environment.
+         * ENTERBLOCK preserves that value above the new lexical slots. */
+        if (JS_VERSION_IS_ES2015(cx)) {
+            if (!js_EmitTree(cx, cg, pn->pn_left))
+                return JS_FALSE;
+            discriminantEmitted = JS_TRUE;
+        }
+        OBJ_SET_BLOCK_DEPTH(cx, obj,
+                            cg->stackDepth - (discriminantEmitted ? 1 : 0));
 
         /*
-         * Push the body's block scope before discriminant code-gen for proper
-         * static block scope linkage in case the discriminant contains a let
-         * expression.  The block's locals must lie under the discriminant on
-         * the stack so that case-dispatch bytecodes can find the discriminant
-         * on top of stack.
+         * Legacy code pushes the body's scope before discriminant code-gen
+         * for proper static parenting of let expressions. Modern code has
+         * already emitted the discriminant in the enclosing environment.
          */
         js_PushBlockScope(&cg->treeContext, stmtInfo, atom, -1);
         stmtInfo->type = STMT_SWITCH;
@@ -2716,7 +2722,7 @@ EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
         if ((uintN)cg->stackDepth > cg->maxStackDepth)
             cg->maxStackDepth = cg->stackDepth;
 
-        /* Emit JSOP_ENTERBLOCK before code to evaluate the discriminant. */
+        /* Enter the scope, preserving an already evaluated discriminant. */
         ale = js_IndexAtom(cx, atom, &cg->atomList);
         if (!ale)
             return JS_FALSE;
@@ -2743,7 +2749,7 @@ EmitSwitch(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
      * Emit code for the discriminant first (or nearly first, in the case of a
      * switch whose body is a block scope).
      */
-    if (!js_EmitTree(cx, cg, pn->pn_left))
+    if (!discriminantEmitted && !js_EmitTree(cx, cg, pn->pn_left))
         return JS_FALSE;
 
     /* Switch bytecodes run from here till end of final case. */
