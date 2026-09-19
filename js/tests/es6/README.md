@@ -2944,3 +2944,29 @@ frozen conformance runtime:
 `b0a096716f708d35d39719f0426b603c9f657f75ba311be3da6c30af6e0bdfa5`.
 Other platforms are not revalidated for this batch. Full parameter environments,
 module execution and full ES2015 conformance remain unfinished.
+
+
+## Catch variables and block function declarations (validation in progress)
+
+A catch-local slot used by an initializer no longer suppresses its separate
+outer `var` declaration in ES2015 scripts/eval. ES2015 also rejects duplicate
+block function declarations according to its original
+[13.2.1 early errors](https://262.ecma-international.org/6.0/#sec-block-static-semantics-early-errors);
+explicit legacy and default editions retain their existing behavior. The
+[catch-variable extension](https://262.ecma-international.org/6.0/#sec-variablestatements-in-catch-blocks)
+applies to strict as well as non-strict cases. These three pinned failures were
+implementation issues, not contradictory test metadata.
+
+The final integrated macOS arm64 run passes **28,522 cases**, with **46 failures**,
+**14 unsupported modules**, zero harness errors/crashes/timeouts, **three gained
+and zero lost**. `catch-declarations.js` passes 18 checks, and the native wide
+probe passes 16. The latter also exposed missing decompiler handling for wide
+prolog declarations; they now retain the same source-note behavior as narrow
+instructions. All **11,540 ES5 cases** pass. All four applications pass root
+builds, packaging and relocated desktop checks, including Calendar's four
+views, Browser navigation/layout (169 checks), and Suite/XULRunner ChatZilla.
+The four application libraries and frozen conformance runtime share SHA-256
+`4faae023331deddd2dcee1e37f1bdd3b56962b7d57211935dbd1eb03865b1330`.
+C89 declaration/implicit-function checks pass. Cache version remains 61.
+Reports use `artifacts/es6/catch-declarations-final-*`. Other operating systems
+and architectures have not been revalidated for this batch.

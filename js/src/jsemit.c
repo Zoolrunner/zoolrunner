@@ -3289,6 +3289,21 @@ MaybeEmitVarDecl(JSContext *cx, JSCodeGenerator *cg, JSOp prologOp,
         atomIndex = ALE_INDEX(ale);
     }
 
+    /* A catch binding is the initializer's target, not the declaration's
+     * variable environment. Slot optimization must not erase the hoisted var. */
+    if (JS_VERSION_IS_ES2015(cx) && prologOp == JSOP_DEFVAR &&
+        !(cg->treeContext.flags & TCF_IN_FUNCTION) && pn->pn_slot >= 0 &&
+        (js_CodeSpec[pn->pn_op].format & JOF_TYPEMASK) == JOF_LOCAL) {
+        jsatomid declarationIndex;
+        ale = js_IndexAtom(cx, pn->pn_atom, &cg->atomList);
+        if (!ale) return JS_FALSE;
+        declarationIndex = ALE_INDEX(ale);
+        CG_SWITCH_TO_PROLOG(cg);
+        if (!UpdateLineNumberNotes(cx, cg, pn)) return JS_FALSE;
+        EMIT_ATOM_INDEX_OP(JSOP_DEFVAR, declarationIndex);
+        CG_SWITCH_TO_MAIN(cg);
+    }
+
     if (!(pn->pn_attrs & PN_GLOBAL_LEXICAL) &&
         (js_CodeSpec[pn->pn_op].format & JOF_TYPEMASK) == JOF_CONST &&
         (!(cg->treeContext.flags & TCF_IN_FUNCTION) ||

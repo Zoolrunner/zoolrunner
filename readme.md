@@ -819,3 +819,12 @@ including Calendar views, Browser navigation/layout and Suite/XULRunner ChatZill
 See `js/tests/es6/README.md`. Full parameter environments, module execution and
 full ES2015 compliance remain unfinished; other platforms are not revalidated
 for this batch.
+
+
+ES2015 catch-variable instantiation and duplicate block-function errors now
+pass integrated macOS arm64 validation: **28,522 ES6 passes, 46 failures and
+14 unsupported modules**, with three gained and zero lost. All 11,540 ES5 cases
+and all four applications' build/package/desktop checks pass, including Calendar
+views, Browser navigation/layout and Suite/XULRunner ChatZilla. Full ES2015
+compliance remains unfinished. Other platforms were not revalidated for this
+batch; see `js/tests/es6/README.md`.

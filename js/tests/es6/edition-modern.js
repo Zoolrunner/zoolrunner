@@ -204,6 +204,10 @@ function modernWindowEdition() {
                              m(){return super.m()+1}}
                          var restored=eval('('+Child.toString()+')');
                          return new Child(4).m()===5 && new restored(6).m()===7; })() &&
+           (function() { var caught=false;
+                         try { Function('{function repeated(){} function repeated(){}}'); }
+                         catch(e) { caught=e instanceof SyntaxError; }
+                         return caught && eval('"use strict"; catchOuter=1; try{throw 2}catch(catchOuter){var catchOuter=3} catchOuter')===1; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

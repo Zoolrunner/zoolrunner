@@ -1573,3 +1573,9 @@ mutable declaration bindings and immutable inner class names. Retain complete
 class source across collection and XDR, including file-backed compilation.
 Run `classes.js`, `class-source.js`, `TestClassRuntime.c` and `TestClassWide.c`,
 plus the chrome/content edition fixture. Keep explicit legacy parsing unchanged.
+
+For ES2015 declaration rules, preserve catch-local initializer targets while
+instantiating `var` in the enclosing variable environment. Follow the original
+ES2015 duplicate block-function early error; explicit legacy/default editions
+retain their existing grammar. Run `catch-declarations.js` and
+`TestCatchDeclarations.c`, including wide prolog operands and XDR/source checks.

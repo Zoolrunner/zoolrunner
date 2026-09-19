@@ -4024,6 +4024,14 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 atomIndex = GET_LITERAL_INDEX(pc);
                 pc2 = pc + 1 + LITERAL_INDEX_LEN;
                 op = saveop = *pc2;
+                /* Prolog declarations have no expression result. Their
+                 * source statements are reconstructed from main-code notes,
+                 * just as for narrow declaration instructions. */
+                if (op == JSOP_DEFFUN || op == JSOP_DEFVAR ||
+                    op == JSOP_DEFCONST || op == JSOP_DEFLOCALFUN) {
+                    todo = -2;
+                    break;
+                }
                 /* For-in decompilation measures its branch from the prefix,
                  * and must retain that complete instruction's length. */
                 if (op == JSOP_FORNAME || op == JSOP_FORPROP) {

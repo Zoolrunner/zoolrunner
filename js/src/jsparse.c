@@ -768,9 +768,9 @@ RecordDeclaration(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         lexicals = stmt ? &stmt->lexicalDecls : &tc->lexicalDecls;
         vars = stmt ? &stmt->varDecls : &tc->varDecls;
         ATOM_LIST_SEARCH(ale, lexicals, atom);
-        if (ale && !(lexical && kind == JSOP_CLOSURE &&
-                     ALE_JSOP(ale) == JSOP_CLOSURE &&
-                     !(tc->flags & TCF_STRICT_MODE)))
+        /* ES2015 13.2.1 rejects duplicate lexical names, including two
+         * block functions. Later-edition Annex B relaxations are not ES2015. */
+        if (ale)
             return LexicalSyntaxError(cx, ts);
         if (lexical) {
             ATOM_LIST_SEARCH(ale, vars, atom);
