@@ -73,11 +73,46 @@
       "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
     },
     {
+      "test": "built-ins/Promise/all/invoke-resolve-get-error.js",
+      "sha256": "b287a20c3148f362d5e0fc8ee1821a4b5ed8f97d7e4473dc35366b8b25076318",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-promise.all",
+      "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
+    },
+    {
+      "test": "built-ins/Promise/all/resolve-non-callable.js",
+      "sha256": "155b8850155c0ab3f4efe0693d4bfb038b5273bea7389d39d3369e6433422455",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-promise.all",
+      "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
+    },
+    {
+      "test": "built-ins/Promise/race/invoke-resolve-get-error.js",
+      "sha256": "f81166f088ba98a374c61c3b001a3f3918967e4f0940e70e2c52fe989cf74810",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-promise.race",
+      "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
+    },
+    {
+      "test": "built-ins/Promise/race/resolve-non-callable.js",
+      "sha256": "f050a943f14406e280d55c837fdae97eaf27a137eca2bd79a4e6f99f2f0c4331",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-promise.race",
+      "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
+    },
+    {
       "test": "built-ins/Proxy/revocable/revocation-function-name.js",
       "sha256": "6e8001ca68067ddf513ee7c113136080b13c1843ee0f27fbb1bc918d884f7ae6",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-standard-built-in-objects",
       "reason": "Original clause 17 excludes anonymous built-ins from the name requirement. The unchanged pinned ES2015 test requires no own name; the later test requires an own empty name."
+    },
+    {
+      "test": "built-ins/Reflect/ownKeys/return-on-corresponding-order-large-index.js",
+      "sha256": "098bc8f84e522ed348c9722b2a1cf66cddee9e46cb376196367f64342521f78e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys",
+      "reason": "Original ES2015 sorts integer indices numerically, including indices beyond the array-index range. This later test requires only array indices to be sorted and larger integer keys to remain in creation order."
     },
     {
       "test": "built-ins/RegExp/prototype/Symbol.search/lastindex-no-restore.js",
@@ -204,6 +239,13 @@
       "decision": "original-es2015-regression",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-%typedarray%.prototype.lastindexof",
       "reason": "Search algorithms address element zero after ToString of either signed zero. Normalizing the algorithmic index fixes negative-zero searches while the distinct canonical property string -0 remains invalid. Both unchanged later modes pass in the staged lexical/index candidate."
+    },
+    {
+      "test": "language/expressions/arrow-function/eval-var-scope-syntax-err.js",
+      "sha256": "40e934786842de3b50e12eb0d0e9c82e07127836a3842497c081eed7d54e533e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
     },
     {
       "test": "language/expressions/class/accessor-name-inst/literal-string-default-escaped-ext.js",
@@ -372,6 +414,48 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
       "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/function/eval-var-scope-syntax-err.js",
+      "sha256": "cf5fa31bc3a7bd1b42e8451aa97dace02aad66843df66cc747211a19b959cdd0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/generators/eval-var-scope-syntax-err.js",
+      "sha256": "55f96bc7485c947506b3aa75f8218dec5f1782cbaa8e6e641d3506319cd7c69c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/object/method-definition/gen-meth-eval-var-scope-syntax-err.js",
+      "sha256": "fd7493592238c30ff4ae6a84740d92d2b38f9ff8f5c3392e76756a88b0580810",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/object/method-definition/meth-eval-var-scope-syntax-err.js",
+      "sha256": "8d046a9be38d444405bcfb4daee7eb7d39eabab3b275a991c16646b2a46edd6a",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/object/scope-gen-meth-param-elem-var-close.js",
+      "sha256": "2fa36410e06b927e53df4a818abc16c1a22447c627548c14e678a5193c14eaa6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/object/scope-gen-meth-param-elem-var-open.js",
+      "sha256": "a0364f515060589835fd453e43280077e2a5d9c61036b3407a84cf3fefd6c4b3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
     },
     {
       "test": "language/module-code/namespace/Symbol.toStringTag.js",
@@ -568,6 +652,20 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-iteratornext",
       "reason": "Original IteratorNext invokes the next property on each step. The later iterator-record algorithm caches the method."
+    },
+    {
+      "test": "language/statements/function/eval-var-scope-syntax-err.js",
+      "sha256": "794cb526b9757815d020a52fa99e711b9e62aae573caaf40dcbf8d84f3ce3581",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/statements/generators/eval-var-scope-syntax-err.js",
+      "sha256": "68635098aab3060cec3a28b0409542a0360393a2b0aba6aedd7478f3a3897a07",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
+      "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
     },
     {
       "test": "language/statements/let/syntax/let-newline-yield-in-generator-function.js",

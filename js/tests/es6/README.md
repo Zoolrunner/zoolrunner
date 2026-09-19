@@ -3418,7 +3418,7 @@ The unchanged later diagnostics record 177/195 catch modes, 178/258 accessor
 modes, 2/2 generator-let modes and 4/12 signed-zero search modes passing. The
 remaining failures in those bounded groups require later rest-binding/object
 rest syntax, private class accessors or `includes`; they remain in the reports.
-[The edition review ledger](edition-review.json) records 92 manually reviewed
+[The edition review ledger](edition-review.json) records 106 manually reviewed
 paths with exact source hashes and original specification sections, including
 other normative differences. It is incomplete and is not a test selector or
 conformance score. The broader ES2015 inventory and other operating systems
@@ -3438,3 +3438,41 @@ original-language cases previously blocked by missing external fixtures now
 pass unchanged. The fourth requires later arbitrary module export names and
 now reports its actual dependency syntax failure. This bounded diagnostic
 retains its later-language and normative-difference failures.
+
+### Generator method grammar and caller reflection
+
+Object generator methods now reject incomplete stars and accessor-prefix forms
+such as `({*get x(){}})`, while retaining valid generator methods named `get`
+and `set`. Decompilation places the generator star before a computed property
+name, so the resulting function source compiles and runs again.
+
+For modern non-strict functions, the optional historical `caller` extension
+returns `null` when called from a strict function, including class methods.
+This also permits inspecting its property descriptor. Explicit earlier-edition
+functions retain their throwing getter; strict functions and bound functions
+retain their throwing caller accessors. No bytecode or embedding API changes
+are required.
+
+The isolated candidate passes 106 existing focused fixtures, 63 native fixtures,
+30 new shell checks, C89 checks, all 28,582 pinned ES6 modes and all 11,540
+pinned ES5 modes with zero failures. The integrated packaged-engine runs also
+pass all 28,582 ES6 modes and 11,540 ES5 modes, with zero failures, unsupported
+cases, timeouts, crashes or harness errors. All four macOS arm64 applications
+build, package and pass relocated desktop checks, including Calendar's four
+views, Browser navigation/layout and Suite/XULRunner ChatZilla. The four
+application engines and unchanged frozen conformance runtime share SHA-256
+`922f649567bdb41e95fb50f7ab376fb2484ed0124643b8f12cef5dd76e44e7d2`.
+Reports use `artifacts/es6/generator-caller-stage-*` and
+`generator-caller-final-*`. The bounded unchanged later class-method and
+generator-method diagnostics both pass all six modes. The broader later-suite
+review remains unfinished; these results do not establish complete ES6
+conformance or validation on other operating systems.
+
+The refreshed 37,972-mode later-feature diagnostic records 19,098 passes,
+18,574 failures and 300 harness errors (`later-expanded-generator-caller.json`).
+Compared with the earlier same-source diagnostic, 127 modes now pass and no
+passing modes were lost. These mixed-edition results are not an ES6 conformance
+score: later syntax, changed normative requirements and later harness needs
+remain visible. The narrower metadata-only triage still contains 699 failing
+modes across 370 paths and requires edition review. It confirmed four original
+switch-environment failures, now being fixed and validated separately.

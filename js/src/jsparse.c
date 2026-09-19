@@ -7425,8 +7425,9 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
                     atom = CURRENT_TOKEN(ts).t_atom;
                     rt = cx->runtime;
-                    if (atom == rt->atomState.getAtom ||
-                        atom == rt->atomState.setAtom) {
+                    if (!generatorMethod &&
+                        (atom == rt->atomState.getAtom ||
+                         atom == rt->atomState.setAtom)) {
                         op = (atom == rt->atomState.getAtom)
                             ? JSOP_GETTER
                             : JSOP_SETTER;
@@ -7489,6 +7490,10 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     pn3->pn_atom = CURRENT_TOKEN(ts).t_atom;
                 break;
               case TOK_RC:
+                if (generatorMethod) {
+                    LexicalSyntaxError(cx, ts);
+                    return NULL;
+                }
                 if (afterComma &&
                     !js_ReportCompileErrorNumber(cx, ts,
                                                  JSREPORT_TS |

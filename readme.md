@@ -947,3 +947,11 @@ and native checks, all four macOS arm64 builds/packages and relocated applicatio
 checks, including Calendar’s four views. Other operating systems have not been
 revalidated for this batch. See
 [parser and index validation](js/tests/es6/README.md#catch-environments-unicode-strings-and-signed-zero-indices).
+
+Generator-method parsing and decompilation now preserve valid `get`/`set` names
+and reject invalid accessor forms. Modern caller reflection handles strict
+callers while retaining explicitly selected legacy behavior. Both complete
+pinned suites and all four macOS arm64 build/package/runtime checks pass;
+see [generator and caller validation](js/tests/es6/README.md#generator-method-grammar-and-caller-reflection).
+Broader later-Test262 edition review and validation on other operating systems
+remain unfinished.

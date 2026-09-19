@@ -421,6 +421,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("catch-environments.js", "CATCH-ENVIRONMENTS checks=14 failures=0"),
                 ("string-codepoint-escapes.js", "STRING-CODEPOINT-ESCAPES checks=27 failures=0"),
                 ("generator-let-newline.js", "GENERATOR-LET-NEWLINE checks=7 failures=0"),
+                ("generator-method-grammar.js", "GENERATOR-METHOD-GRAMMAR checks=16 failures=0"),
+                ("caller-reflection.js", "CALLER-REFLECTION checks=14 failures=0"),
                 ("typedarray-zero-indices.js", "TYPEDARRAY-ZERO-INDICES checks=207 failures=0"),
                 ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
                 ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),

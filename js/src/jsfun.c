@@ -1332,8 +1332,15 @@ fun_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
             *vp = JSVAL_NULL;
         if (VALUE_IS_FUNCTION(cx, *vp) &&
             (((JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(*vp)))->flags & JSFUN_STRICT)) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
-            return JS_FALSE;
+            /* ES2015's optional caller extension must not expose a strict
+             * caller. Use null so reflection can inspect the descriptor;
+             * functions from earlier editions keep their throwing getter. */
+            if (fun->edition >= JSVERSION_ECMA_2015) {
+                *vp = JSVAL_NULL;
+            } else {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+                return JS_FALSE;
+            }
         }
         if (!JSVAL_IS_PRIMITIVE(*vp) && cx->runtime->checkObjectAccess) {
             id = ATOM_KEY(cx->runtime->atomState.callerAtom);

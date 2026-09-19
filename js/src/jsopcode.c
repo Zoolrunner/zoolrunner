@@ -4573,17 +4573,24 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
               case JSOP_INITMETHODCOMPUTED:
               case JSOP_INITGETTERCOMPUTED:
               case JSOP_INITSETTERCOMPUTED:
+              {
+                JSBool generator;
+                const char *args;
                 rval = POP_STR();
                 xval = POP_STR();
                 lval = POP_STR();
                 LOCAL_ASSERT(strncmp(rval, js_function_str, 8) == 0);
-                rval += 8;
-                while (*rval == ' ') ++rval;
+                generator = !strncmp(rval, "function*", 9);
+                args = strchr(rval, '(');
+                LOCAL_ASSERT(args);
+                /* GeneratorMethod places its star before PropertyName. */
                 todo = Sprint(&ss->sprinter, "%s%s%s[(%s)]%s", lval,
                               (lval[1] != '\0') ? ", " : "",
                               op == JSOP_INITGETTERCOMPUTED ? "get " :
-                              op == JSOP_INITSETTERCOMPUTED ? "set " : "", xval, rval);
+                              op == JSOP_INITSETTERCOMPUTED ? "set " :
+                              generator ? "*" : "", xval, args);
                 break;
+              }
 
               case JSOP_INITCOMPUTED:
               case JSOP_INITNAMEDCOMPUTED:
