@@ -2666,7 +2666,7 @@ EmitNumberOp(JSContext *cx, jsdouble dval, JSCodeGenerator *cg)
     return EmitAtomIndexOp(cx, JSOP_NUMBER, ALE_INDEX(ale), cg);
 }
 
-/* Initialize strict block functions on scope entry, including declarations in
+/* Initialize modern block functions on scope entry, including declarations in
  * switch cases which execution may never reach. Keep source declarations at
  * their original positions for decompilation. */
 static JSBool
@@ -4665,6 +4665,28 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             if (!ale || js_NewSrcNote2(cx, cg, SRC_FUNCDEF, ALE_INDEX(ale)) < 0 ||
                 js_Emit1(cx, cg, JSOP_NOP) < 0)
                 return JS_FALSE;
+            if (pn->pn_flags & PNF_ANNEX_FUNCTION) {
+                JSAtomListElement *nameEntry;
+                JSObject *block = cg->treeContext.blockChain;
+                JSScopeProperty *property;
+                jsuint slot;
+                fun = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
+                property = SCOPE_GET_PROPERTY(OBJ_SCOPE(block), ATOM_TO_JSID(fun->atom));
+                JS_ASSERT(property && (property->flags & SPROP_HAS_SHORTID));
+                slot = OBJ_BLOCK_DEPTH(cx, block) + (uint16)property->shortid;
+                if (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0) return JS_FALSE;
+                EMIT_UINT16_IMM_OP(JSOP_GETLOCAL, slot);
+                nameEntry = js_IndexAtom(cx, fun->atom, &cg->atomList);
+                if (!nameEntry || js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                    !EmitAtomIndexOp(cx, JSOP_STRING, ALE_INDEX(nameEntry), cg) ||
+                    js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                    js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+                    js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                    !EmitExtended(cx, cg, JS_EXT_ANNEX_BIND) ||
+                    js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                    js_Emit1(cx, cg, JSOP_POP) < 0)
+                    return JS_FALSE;
+            }
             break;
         }
 

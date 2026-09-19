@@ -3515,7 +3515,10 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                     rval = POP_STR();
                     xval = POP_STR();
                     lval = POP_STR();
-                    if (i == JS_EXT_SUPER_CALL_REF) {
+                    if (i == JS_EXT_ANNEX_BIND) {
+                        /* Its following hidden POP has no source-stack effect. */
+                        todo = -2;
+                    } else if (i == JS_EXT_SUPER_CALL_REF) {
                         todo = SprintCString(&ss->sprinter, "super");
                     } else if (i == JS_EXT_SUPER_CALL) {
                         size_t argsLength = strlen(xval);

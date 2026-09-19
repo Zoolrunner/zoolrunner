@@ -4221,6 +4221,13 @@ interrupt:
                     rval = JSVAL_VOID;
                     ok = JS_TRUE;
                     break;
+                  case JS_EXT_ANNEX_BIND:
+                    rval = FETCH_OPND(-3);
+                    obj = fp->callobj;
+                    JS_ASSERT(obj);
+                    ok = JS_ValueToId(cx, FETCH_OPND(-2), &id) &&
+                         OBJ_SET_PROPERTY(cx, obj, id, &rval);
+                    break;
                   case JS_EXT_PARAMETER_BIND:
                     rval = FETCH_OPND(-3);
                     ok = JS_ValueToId(cx, FETCH_OPND(-2), &id) &&
@@ -7043,8 +7050,24 @@ interrupt:
             } else if (id == ATOM_TO_JSID(rt->atomState.protoAtom) &&
                        op != JSOP_INITCOMPUTED && op != JSOP_INITNAMEDCOMPUTED &&
                        op != JSOP_INITMETHODCOMPUTED) {
-                /* Preserve the historical explicit prototype initializer. */
-                ok = OBJ_SET_PROPERTY(cx, obj, id, &rval);
+                if (JS_VERSION_IS_ES2015(cx)) {
+                    /* Annex B literal syntax invokes [[SetPrototypeOf]], not
+                     * an inherited property setter. Primitive values do not
+                     * create a property or change the prototype. */
+                    ok = JS_TRUE;
+                    if (JSVAL_IS_OBJECT(rval)) {
+                        jsval values[2], accepted;
+                        JSTempValueRooter root;
+                        values[0] = lval;
+                        values[1] = rval;
+                        JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+                        ok = js_ReflectSetPrototypeOf(cx, NULL, 2, values, &accepted);
+                        JS_POP_TEMP_ROOT(cx, &root);
+                    }
+                } else {
+                    /* Preserve the historical explicit prototype initializer. */
+                    ok = OBJ_SET_PROPERTY(cx, obj, id, &rval);
+                }
             } else {
                 /* Literal members are own properties, not assignments. */
                 ok = OBJ_DEFINE_PROPERTY(cx, obj, id, rval, NULL, NULL,

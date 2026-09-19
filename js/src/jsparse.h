@@ -323,7 +323,8 @@ struct JSParseNode {
     JSAtom              *pn_source;     /* saved source for decompilation */
 };
 
-#define PNF_BLOCK_FUNCTION 0x10000U /* strict block lexical declaration */
+#define PNF_BLOCK_FUNCTION 0x10000U /* modern block lexical declaration */
+#define PNF_ANNEX_FUNCTION 0x40000U /* original B.3.3 variable bridge */
 #define PNF_BLOCK_EMITTED  0x20000U /* initialization emitted at scope entry */
 
 #define pn_funAtom      pn_u.func.funAtom

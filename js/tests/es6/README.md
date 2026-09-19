@@ -4107,3 +4107,61 @@ URI/Math or current HTML/Number/native-property engine revisions. Their combined
 Linux matrix was deferred before any jobs started; the unused frozen source
 manifest remains at `linux-html-number-snapshot/source.json`. Its waiting
 coordinator cancellation is recorded in `linux-html-number-matrix-deferred.json`.
+
+### Non-strict block functions and prototype initializer syntax
+
+The next integrated revision initializes every modern block function at block
+entry. For eligible non-strict function bodies, a separate variable binding is
+instantiated before execution and receives the current lexical value at the
+declaration's source position. Eligibility is checked against the completed
+outer lexical scopes and formal bound names. Simple catch parameters follow
+original Annex B.3.5; destructured catch bindings retain their conflict checks.
+Implicit arguments bindings are reused, if arms receive lexical blocks, and
+labelled declarations retain their hoisting and single-statement early errors.
+Default and explicit legacy script behavior remains unchanged.
+
+The bridge writes directly to the variable environment and cannot be redirected
+by a with object. Its private bytecode selector advances the cache version to
+68. The initial wide-script source round trip exposed an extra decompiler stack
+value; the corrected bridge consumes its source operands without leaving one
+for the hidden POP. The initial failure and successful rerun are retained.
+
+ES2015 literal `__proto__` initializer syntax now uses the existing rooted
+internal prototype operation. Replaced public setters are bypassed; primitive
+values create no property, and computed/shorthand/method/accessor members keep
+their ordinary behavior. Explicit legacy literal assignment remains unchanged.
+
+The isolated block-function candidate passes 49 fresh-realm assertions, 15
+native saved-edition/cache/source checks, 17 wide-atom/capture/collection checks,
+all 131 previous focused fixtures, all 76 previous native probes, C89 declaration
+checks, all 28,582 pinned ES2015 modes and all 11,540 pinned ES5.1 cases.
+The combined prototype candidate additionally passes 46 focused and 17 native
+checks, all prior 131/76 probes and both modes of the original upstream
+prototype-setter failure and all 28,582 pinned ES2015 modes. All eight integrated
+macOS builds and packages pass their 133 focused fixtures and 79 native probes.
+Both architecture runtimes pass all 28,582 pinned ES2015 modes and all 11,540
+pinned ES5.1 cases with zero failures, timeouts, crashes or harness errors. All
+eight relocated-package desktop checks pass, along with Calendar's four views,
+Browser navigation/reflection and Suite/XULRunner ChatZilla coverage. The eight
+archives and engine payload comparisons are preserved under
+`artifacts/es6/block-prototype-*`; the frozen conformance runtime hashes remain
+unchanged. This validates the local macOS matrix, not GitHub-hosted runs, the
+latest Linux source revision or Windows.
+
+The later function-code diagnostic reports 156 passes and three failures. The
+three failures require later duplicate-declaration relaxations or the later
+implicit-arguments exclusion. The later eval-code diagnostic reports 218 passes
+and 252 failures: 160 previous failures now pass and 147 previous passes now
+fail. These include original lexical corrections and later eval-var extensions;
+the entire set has not been individually reviewed and remains nonzero. No
+directory or feature tag establishes an exemption. The source-hashed ledger now
+has 270 records, including 24 DataView ToIndex/Infinity ordering reviews against
+the retained historical gate. It remains an incomplete review ledger, not a
+passing full conformance run. Large RegExp quantifiers remain unfinished work.
+
+Further isolated work covers large RegExp quantifiers, assignment-target early
+errors, parenthesized destructuring defaults and prohibited method own fields.
+Those candidates are not part of this cache-68 application result. The RegExp
+candidate passes the complete pinned ES2015 suite; the combined candidate's full
+runs are still in progress. The later diagnostic remains nonzero and incompletely
+reviewed. Full ES2015 compliance has not yet been established.

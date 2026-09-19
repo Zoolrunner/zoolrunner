@@ -10,6 +10,13 @@
       "decision": "original-regression"
     },
     {
+      "test": "annexB/language/function-code/block-decl-func-skip-arguments.js",
+      "sha256": "8a225aefbeb41d9a8f5630403141e3b718330d1e946c15a9fb35678da9a90d01",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-block-level-function-declarations-web-legacy-compatibility-semantics",
+      "reason": "Original ES2015 B.3.3 excludes formal parameter bound names but does not separately exclude the implicit arguments binding. This later test requires that additional exclusion; the original declaration-position bridge can replace the implicit arguments binding."
+    },
+    {
       "test": "annexB/language/function-code/function-redeclaration-block.js",
       "sha256": "8d4a3f259dabceeee101959aac117a19f5bfe9e374e1178b45f45a1142195d9e",
       "decision": "later-requirement",
@@ -43,6 +50,174 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-array.prototype.sort",
       "reason": "Original ES2015 sort performs ToObject and length conversion before its sorting operations. This test requires the later entry-time comparator check to precede a throwing length getter."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getFloat32/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "d0c43d5082d39857e44ca0a61ec27180bd8831a84bc47ce14d692e7555f4da61",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getFloat64/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "e5de1594ec97ded01f2e4c7d394247eca5614ea11dc08eb2efbd3668551065fc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getInt16/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "ee0e0bd6cba465df24f36b1fe93109df7a2b6b43108abd75422863744449dbb0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getInt32/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "d362d68f2ec086c571b78730145cfdaab1665899910650ace60b5c82888801b3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getInt8/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "a25984562cceea4d8fc1d639c2eb2d921d46c79c8a314996056b89707d6892ac",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getUint16/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "c3a6cd52ac43046123918247132c00ac21645288204fa1d2f9d46c288f2c4131",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getUint32/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "020d5a9ae62ca3616dc5fcb0cc1bc237259afe4ad718c90023d4edfb20c565a8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/getUint8/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "3f32d59e92646e93759960a67d9bc1512adc8247a8b9a9009f00224da273aeb2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-getviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setFloat32/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "05dccaf32ae09e42b0d7261c0a65301966faf6b9bbaf146949424579ca901d2f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setFloat32/index-check-before-value-conversion.js",
+      "sha256": "54fa8c817266d9782d55a61b764153b222978fd8058bbe3a28ebb7008f7d12fa",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setFloat64/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "7b2b79888bd920b84d37f16a64e1d2d0afa972a1e2a9e333ce23b0ab0e5975b4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setFloat64/index-check-before-value-conversion.js",
+      "sha256": "9443b14627cf96515825f6e4bc0fc417ae3f9095ae407caf7f79d4c6a15a2008",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setInt16/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "f1956e2568ec621372f4c8bad6e01fada3c0641c648e1cbe915b99f175412abf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setInt16/index-check-before-value-conversion.js",
+      "sha256": "152496d0b13a4601c8b3d87bec6872fd69b5237abdbe7976b74182f33d3b02ec",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setInt32/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "f3a0e4c4f91a669f2c8701c58fa6bc190ac7134291fe16690647b8651d2a60ee",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setInt32/index-check-before-value-conversion.js",
+      "sha256": "5de830820704fcf61d1b4c816485b1c87269be8d9b5cc7a796396ab1172c68c6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setInt8/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "edda67bbed3227c5c166a1a3880e8d4f211d3031943a429146ce79ad591a06d9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setInt8/index-check-before-value-conversion.js",
+      "sha256": "36b9ed606e872579b53ac43e7b5c3dc2ff204fa5effeeaf229c7e0462f833622",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setUint16/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "58e11fcfb7e46293b73adab5429925bf71918fa51bf9db005728ee880b5d0f7f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setUint16/index-check-before-value-conversion.js",
+      "sha256": "b472c128f3a020f73f6738c3c1ef3865c9c58b5cb94b7f1eab5ff7f09aa77c06",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setUint32/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "a25988e60161e91ef0102efcd7e178fbf0776013f64724032e6d3507386182de",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setUint32/index-check-before-value-conversion.js",
+      "sha256": "026b54ae5be83fad8c8472fd023720ad6b8747bb523fb07ab0f2bf92bf45475b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setUint8/detached-buffer-after-toindex-byteoffset.js",
+      "sha256": "d4a3e97f7dda6c609e6b7a305133f37f43a8b0433157b32ee1fd8e77e7fef5c6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "Original ES2015 index conversion uses ToNumber followed by ToInteger; positive Infinity reaches the buffer detachment check before the final view bounds check, yielding TypeError for detached storage. This later test requires ToIndex to reject positive Infinity with RangeError before detachment."
+    },
+    {
+      "test": "built-ins/DataView/prototype/setUint8/index-check-before-value-conversion.js",
+      "sha256": "c25cd3ce3259f36af31286324204d0a80964ec22d54dec4e9c007ba2fd73eba8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-setviewvalue",
+      "reason": "The pinned historical gate explicitly requires positive Infinity to reach value conversion before final view bounds checking (the same method's range-check-after-value-conversion.js). This later test requires ToIndex to reject positive Infinity before value conversion, contradicting that retained historical gate. Negative/non-integral index rejection remains checked separately."
     },
     {
       "test": "built-ins/Date/UTC/infinity-make-day.js",
@@ -1135,6 +1310,13 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
       "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/object/__proto__-poisoned-object-prototype.js",
+      "sha256": "d40147e037d624da8dbb4c3e72fecfc3bd03238077f3613b00c3d12a475243af",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-__proto__-property-names-in-object-initializers",
+      "reason": "Original Annex B prototype initializer syntax invokes the internal prototype operation without reading or calling a public __proto__ accessor. The isolated modern correction uses the existing internal reflection helper and preserves earlier-edition assignment behavior."
     },
     {
       "test": "language/expressions/object/method-definition/gen-meth-eval-var-scope-syntax-err.js",

@@ -822,6 +822,114 @@ RestrictedBinding(JSContext *cx, JSAtom *atom)
            StrictReserved(atom);
 }
 
+/* Original ES2015 B.3.3 only extends function instantiation. Walk the
+ * completed body so later lexical declarations participate in eligibility.
+ * These scope records are traversal-local, never retained parser statements. */
+typedef struct AnnexScope {
+    JSObject *object;
+    struct AnnexScope *outer;
+} AnnexScope;
+
+static JSBool
+PrepareAnnexFunctions(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
+                      JSFunction *fun, JSParseNode *pn, AnnexScope *scope)
+{
+    AnnexScope current, *walk;
+    JSParseNode *item;
+    JSFunction *decl;
+    JSAtom *name;
+    JSScopeProperty *sprop;
+    JSObject *owner;
+    JSProperty *prop;
+    JSAtomListElement *ale;
+    JSBool existing;
+    int stackDummy;
+    if (!pn) return JS_TRUE;
+    if (!JS_CHECK_STACK_SIZE(cx, stackDummy)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
+        return JS_FALSE;
+    }
+    if (pn->pn_type == TOK_FUNCTION && pn->pn_arity == PN_FUNC) {
+        if (!(pn->pn_flags & PNF_BLOCK_FUNCTION)) return JS_TRUE;
+        decl = (JSFunction *)JS_GetPrivate(cx, ATOM_TO_OBJECT(pn->pn_funAtom));
+        if (FUN_IS_GENERATOR(decl)) return JS_TRUE;
+        name = decl->atom;
+        /* Ignore the declaration's own block, but not outer lexical names. */
+        for (walk = scope ? scope->outer : NULL; walk; walk = walk->outer) {
+            if (SCOPE_GET_PROPERTY(OBJ_SCOPE(walk->object), ATOM_TO_JSID(name)))
+                return JS_TRUE;
+        }
+        for (sprop = SCOPE_LAST_PROP(OBJ_SCOPE(fun->object)); sprop;
+             sprop = sprop->parent) {
+            if (JSID_IS_ATOM(sprop->id) &&
+                js_EqualStrings(ATOM_TO_STRING(JSID_TO_ATOM(sprop->id)),
+                                ATOM_TO_STRING(name)) &&
+                (sprop->getter == js_GetArgument ||
+                 (sprop->getter == js_GetLocalVariable &&
+                  (tc->restSlot == (intN)(uint16)sprop->shortid ||
+                   (FUN_HAS_NON_SIMPLE(fun) &&
+                    (uint16)sprop->shortid < tc->parameterLocalCount)))))
+                return JS_TRUE;
+        }
+        if (!js_LookupHiddenProperty(cx, fun->object, ATOM_TO_JSID(name),
+                                     &owner, &prop)) return JS_FALSE;
+        existing = prop && owner == fun->object;
+        if (prop) OBJ_DROP_PROPERTY(cx, owner, prop);
+        /* Ordinary functions already have an implicit arguments binding. */
+        if (!existing &&
+            !(name == cx->runtime->atomState.argumentsAtom && !FUN_IS_ARROW(fun))) {
+            if (fun->u.i.nvars == JS_BITMASK(16)) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_VARS);
+                return JS_FALSE;
+            }
+            if (!js_AddHiddenProperty(cx, fun->object, ATOM_TO_JSID(name),
+                                      js_GetLocalVariable, js_SetLocalVariable,
+                                      SPROP_INVALID_SLOT, JSPROP_PERMANENT | JSPROP_SHARED,
+                                      SPROP_HAS_SHORTID, fun->u.i.nvars))
+                return JS_FALSE;
+            ++fun->u.i.nvars;
+        }
+        ATOM_LIST_SEARCH(ale, &tc->decls, name);
+        if (!ale) {
+            ale = js_IndexAtom(cx, name, &tc->decls);
+            if (!ale) return JS_FALSE;
+            ALE_SET_JSOP(ale, JSOP_DEFVAR);
+        }
+        pn->pn_flags |= PNF_ANNEX_FUNCTION;
+        tc->flags |= TCF_FUN_HEAVYWEIGHT;
+        return JS_TRUE;
+    }
+    if (pn->pn_type == TOK_LEXICALSCOPE) {
+        /* Original Annex B.3.5 permits var names matching a simple catch
+         * parameter, but not a catch binding pattern. */
+        if (pn->pn_expr && pn->pn_expr->pn_type == TOK_CATCH &&
+            pn->pn_expr->pn_kid1->pn_type == TOK_NAME)
+            return PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_expr, scope);
+        current.object = ATOM_TO_OBJECT(pn->pn_atom);
+        current.outer = scope;
+        return PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_expr, &current);
+    }
+    switch (pn->pn_arity) {
+      case PN_LIST:
+        for (item = pn->pn_head; item; item = item->pn_next)
+            if (!PrepareAnnexFunctions(cx, ts, tc, fun, item, scope)) return JS_FALSE;
+        return JS_TRUE;
+      case PN_TERNARY:
+        return PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_kid1, scope) &&
+               PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_kid2, scope) &&
+               PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_kid3, scope);
+      case PN_BINARY:
+        return PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_left, scope) &&
+               PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_right, scope);
+      case PN_UNARY:
+        return PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_kid, scope);
+      case PN_NAME:
+        return PrepareAnnexFunctions(cx, ts, tc, fun, pn->pn_expr, scope);
+      default:
+        return JS_TRUE;
+    }
+}
+
 static JSParseNode *
 FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
              JSTreeContext *tc, JSBool expressionBody)
@@ -952,6 +1060,9 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
             }
         }
     }
+    if (pn && JS_VERSION_IS_ES2015(cx) && !(tc->flags & TCF_STRICT_MODE) &&
+        !PrepareAnnexFunctions(cx, ts, tc, fun, pn, NULL))
+        pn = NULL;
     ts->flags = (ts->flags & ~(TSF_STRICT_MODE | TSF_GENERATOR | TSF_NEW_TARGET_ALLOWED)) |
                 oldStrict | oldGenerator | oldNewTarget;
 
@@ -1510,7 +1621,7 @@ ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     return ok;
 }
 
-/* Materialize the lexical scope surrounding a strict block function, just as
+/* Materialize the lexical scope surrounding a modern block function, just as
  * the first let declaration in that statement list would. */
 static JSObject *
 EnsureFunctionBlockScope(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
@@ -1570,6 +1681,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 #endif
 
     JSBool generator, lexicalFunction = JS_FALSE;
+    JSBool labelledFunction = JS_VERSION_IS_ES2015(cx) && !lambda && tc->topStmt && tc->topStmt->type == STMT_LABEL;
     JSStmtInfo *functionBlock;
     JSObject *functionScope;
     uintN outerGenerator = ts->flags & TSF_GENERATOR;
@@ -1622,13 +1734,13 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
      * avoid optimizing variable references that might name a function.
      */
     if (!lambda && funAtom) {
-        if (!RecordDeclaration(cx, ts, tc, funAtom, JSOP_CLOSURE))
+        if (!RecordDeclaration(cx, ts, tc, funAtom, labelledFunction ? JSOP_DEFFUN : JSOP_CLOSURE))
             return NULL;
         functionBlock = tc->topStmt;
         while (functionBlock && !STMT_MAYBE_SCOPE(functionBlock))
             functionBlock = functionBlock->down;
-        lexicalFunction = JS_VERSION_IS_ES2015(cx) &&
-            (tc->flags & TCF_STRICT_MODE) && functionBlock &&
+        lexicalFunction = JS_VERSION_IS_ES2015(cx) && !labelledFunction &&
+            functionBlock &&
             !(functionBlock->flags & SIF_BODY_BLOCK);
         if (lexicalFunction) {
             functionScope = EnsureFunctionBlockScope(cx, ts, tc, functionBlock);
@@ -1667,14 +1779,14 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     return NULL;
                 }
             }
-            if (!AT_TOP_LEVEL(tc) && prevop == JSOP_DEFVAR)
+            if (!(AT_TOP_LEVEL(tc) || labelledFunction) && prevop == JSOP_DEFVAR)
                 tc->flags |= TCF_FUN_CLOSURE_VS_VAR;
         } else {
             ale = js_IndexAtom(cx, funAtom, &tc->decls);
             if (!ale)
                 return NULL;
         }
-        ALE_SET_JSOP(ale, AT_TOP_LEVEL(tc) ? JSOP_DEFFUN : JSOP_CLOSURE);
+        ALE_SET_JSOP(ale, (AT_TOP_LEVEL(tc) || labelledFunction) ? JSOP_DEFFUN : JSOP_CLOSURE);
 
         /*
          * A function nested at top level inside another's body needs only a
@@ -1684,7 +1796,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
          * wins when jsemit.c's BindNameToSlot can optimize a JSOP_NAME into a
          * JSOP_GETVAR bytecode).
          */
-        if (AT_TOP_LEVEL(tc) && (tc->flags & TCF_IN_FUNCTION)) {
+        if ((AT_TOP_LEVEL(tc) || labelledFunction) && (tc->flags & TCF_IN_FUNCTION)) {
             JSScopeProperty *sprop;
 
             /*
@@ -1969,7 +2081,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
          * the function's body
          */
         JS_ASSERT(!(funtc.flags & TCF_FUN_USES_NONLOCALS));
-        if (!lambda && funAtom && !AT_TOP_LEVEL(tc))
+        if (!lambda && funAtom && !(AT_TOP_LEVEL(tc) || labelledFunction))
             tc->flags |= TCF_FUN_HEAVYWEIGHT;
     }
 
@@ -1995,7 +2107,7 @@ FunctionDef(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         result->pn_pos = pn->pn_pos;
         result->pn_kid = pn;
         op = JSOP_ANONFUNOBJ;
-    } else if (!AT_TOP_LEVEL(tc)) {
+    } else if (!(AT_TOP_LEVEL(tc) || labelledFunction)) {
         /*
          * ECMA ed. 3 extension: a function expression statement not at the
          * top level, e.g., in a compound statement such as the "then" part
@@ -3856,6 +3968,25 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
               tc->topStmt->type != STMT_LABEL))) {
             LexicalSyntaxError(cx, ts);
             return NULL;
+        }
+        if (JS_VERSION_IS_ES2015(cx) && !allowLexical && tc->topStmt &&
+            (tc->topStmt->type == STMT_IF || tc->topStmt->type == STMT_ELSE)) {
+            JSStmtInfo arm;
+            JSParseNode *saved = tc->blockNode, *list, *wrapped, *decl;
+            list = NewParseNode(cx, ts, PN_LIST, tc);
+            if (!list) return NULL;
+            list->pn_type = TOK_LC;
+            PN_INIT_LIST(list);
+            tc->blockNode = list;
+            js_PushStatement(tc, &arm, STMT_BLOCK, -1);
+            decl = FunctionStmt(cx, ts, tc);
+            wrapped = tc->blockNode;
+            js_PopStatement(tc);
+            tc->blockNode = saved;
+            if (!decl) return NULL;
+            PN_APPEND(list, decl);
+            list->pn_pos = wrapped->pn_pos = decl->pn_pos;
+            return wrapped;
         }
         return FunctionStmt(cx, ts, tc);
 

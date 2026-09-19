@@ -1033,3 +1033,10 @@ follow-up is deferred to the next combined revision. Non-strict block-function
 scope/initialization and
 large RegExp quantifiers remain confirmed follow-up work; full ES2015 compliance
 is not yet established. See the [current regression work](js/tests/es6/README.md#html-comments-number-formatting-and-immutable-native-fields).
+
+Non-strict ES2015 block-function bindings and literal prototype initialization
+now pass both complete pinned suites and all four applications' build, package
+and desktop checks on macOS arm64 and x86_64. This cache-68 revision also passes
+Calendar's four views, Browser navigation and ChatZilla coverage. The latest
+Linux revision and Windows remain unvalidated; additional isolated RegExp,
+assignment-target and method-field corrections are still being tested. See [block functions and prototype literals](js/tests/es6/README.md#non-strict-block-functions-and-prototype-initializer-syntax).

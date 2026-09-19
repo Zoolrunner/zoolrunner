@@ -1744,3 +1744,21 @@ Immutable native data properties must retain their frozen values in standard
 modes. Run `frozen-native-properties.js` in both standard modes and
 `TestFrozenNativeProperties.c`; preserve explicit legacy behavior, live mutable
 fields, accessor properties and array/arguments/embedding native hooks.
+
+Modern non-strict block functions require entry-time lexical initialization and
+the original ES2015 B.3.3 function-body variable bridge. Check completed outer
+lexical scopes and all formal bound names before adding that bridge; preserve
+implicit arguments, simple versus destructured catch bindings, if-arm scope and
+labelled declaration hoisting. Copy the current lexical value at the declaration
+position, bypassing with objects. Do not import later global/eval bridges or the
+later implicit-arguments exclusion without an explicit edition review. Run
+`sloppy-block-functions.js`, `TestSloppyBlockFunctions.c` and
+`TestSloppyBlockWide.c`, including source/XDR, collection and wide atom operands.
+The bridge advances the bytecode cache to 68; rebuild XPConnect loaders and
+containing libraries before application checks. Keep its source-stack effect
+balanced with the hidden POP during decompilation.
+ES2015 literal `__proto__` initializers invoke the internal prototype operation,
+without reading a public property or dispatching its setter. Preserve computed
+keys, shorthand members, methods, accessors and earlier-edition behavior. Run
+`literal-prototype.js` and `TestLiteralPrototype.c`, including rooted prototype
+values across embedding callbacks, collection and saved-edition round trips.
