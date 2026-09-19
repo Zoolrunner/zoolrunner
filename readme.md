@@ -987,6 +987,11 @@ RegExp cache records now preserve their compilation edition (cache version 65).
 See [String/RegExp edge validation](js/tests/es6/README.md#canonical-comparison-and-incomplete-regexp-escapes).
 
 Date numeric and callback edge fixes pass both complete pinned suites and all
-four macOS arm64 application gates. Modern methods preserve conversion order
+four application gates on macOS arm64 and x86_64 (the latter through Rosetta). Modern methods preserve conversion order
 and Date snapshots while legacy methods retain their behavior; see [Date validation](js/tests/es6/README.md#date-arithmetic-and-callback-order)
 for the explicit date-only parsing compatibility policy and remaining checks.
+
+A parser follow-up rejects escaped modern modifiers and malformed class method
+parameter lists while preserving legacy accessor syntax and escaped property
+names. Both pinned suites and all four application gates pass on macOS arm64;
+x86_64 validation is running. See [contextual grammar checks](js/tests/es6/README.md#contextual-modifiers-and-class-parameter-lists).

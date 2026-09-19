@@ -1683,3 +1683,11 @@ exceptions, large fields and multiple timezones. Modern offsetless ISO
 date-times use local time. Date-only forms retain UTC for compatibility with
 the inherited pinned cases and later corrections; document this distinction
 from the published original ES2015 wording. Legacy parsing remains unchanged.
+
+Modern class/object modifiers require literal contextual-keyword spellings;
+escaped IdentifierNames remain valid property and ordinary method names.
+Keep historical object-accessor grammar in legacy editions. Class method and modern object-accessor keys
+must be followed immediately by their parameter list; the shared FunctionExpr
+parser must not consume a second function name or generator marker. Run
+`contextual-escapes.js` and `TestContextualEscapes.c`, including exact parse
+SyntaxErrors, legacy accessors and collected source/cache roundtrips.

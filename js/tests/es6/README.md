@@ -3728,8 +3728,19 @@ including Calendar's four views, Browser navigation/layout and Suite/XULRunner
 ChatZilla. There are 115 focused fixtures and 67 native fixtures; C89 checks
 pass. All four engines and the frozen runtime share SHA-256
 `b419a6d4e0ba5cd48280648e3c6a5a64e81b0cd384d1a964b3039d96db7aa349`.
-Reports use `artifacts/es6/date-numeric-final-*`. Fresh x86_64 validation is in
-progress; Linux and Windows have not been revalidated for this batch.
+Reports use `artifacts/es6/date-numeric-final-*`. Fresh macOS x86_64 validation
+also passes all 28,582 ES6 modes and 11,540 ES5 modes with zero errors, and all
+four build/package/relocated runtime gates, Calendar views, Browser navigation
+and Suite/XULRunner ChatZilla. These binaries ran through Rosetta on Apple
+Silicon, not physical Intel hardware. Its four engines and frozen runtime share
+SHA-256 `8197e6c350d44105d46d15cc1c4497871a7bc16abebf72dd9e03dd06c3d5c08d`.
+Reports use `date-numeric-x86-final-*`; all eight Date-batch package archives and
+checksums were preserved before the next parser build. Linux aarch64 Suite GTK2
+also passes its local `act` workflow at commit `57e7022a`: compilation, ABI checks,
+packaging, relocated runtime tests and both artifact uploads. Its complete pinned
+ES5 run passes 11,540 cases. Additional full ES6 package testing is running
+separately; Windows remains unvalidated for this batch. Linux reports are under
+`artifacts/es6/linux-date-act-suite-gtk2/`.
 
 The complete later Date directory records 1,194 diagnostic passes and 42
 failures (`date-local-parse-later.json`). Compared with the prior engine it gains
@@ -3739,3 +3750,29 @@ failures include those later setter rules, Temporal and the newer no-argument
 UTC requirement. Every selected row is retained. The ledger now has 177 reviewed
 records with matching pinned source hashes and original-specification anchors;
 it remains incomplete and does not turn diagnostic failures into passes.
+
+### Contextual modifiers and class parameter lists
+
+Modern parsing rejects escaped spellings used as static/get/set modifiers,
+while preserving escaped ordinary property and method names and legacy object
+accessor syntax. This follows the pre-ES2015 [TC39 clarification](https://archives.ecma-international.org/2013/TC39/tc39-2013-071.pdf#page=28)
+that contextual keywords use their literal spellings. Class method and modern object-accessor keys now
+require the parameter-list opening parenthesis immediately afterward. Previously
+the shared function parser could consume an extra name or generator star, so
+invalid forms such as `class C { a b() {} }` and `({get a b(){}})`
+compiled successfully.
+
+The isolated correction passes 88 focused checks and 25 native checks for exact
+SyntaxErrors, legacy accessors, collection, source decompilation and XDR execution
+across editions. All 115 existing focused fixtures and 67 existing native
+fixtures also pass. The first candidate only guarded modifier recognition and
+still accepted invalid class methods; that failed attempt remains recorded in
+`contextual-escape-followup-notes.txt`. No opcode or serialized record changes
+are involved, so bytecode cache version stays 65. Integrated macOS arm64 validation
+passes all 28,582 pinned ES6 modes and 11,540 pinned ES5 modes with zero errors,
+and all four build/package/relocated runtime gates, Calendar views, Browser
+navigation and Suite/XULRunner ChatZilla. The package checks now include 116
+focused fixtures and 68 native fixtures. Its four application engines share
+SHA-256 `46ef2c22ed4d21898f607322abe8b7940bc3eeab7d3df2ddadccef611785350b`;
+reports use `artifacts/es6/contextual-final-*`. Fresh x86_64 validation is running;
+Linux and Windows have not been revalidated for this parser change.

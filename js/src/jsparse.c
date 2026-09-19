@@ -6879,7 +6879,7 @@ ClassDefinition(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSAtom *dec
         if (tt == TOK_SEMI) continue;
         isStatic = generator = computed = JS_FALSE;
         accessor = JSOP_NOP;
-        if (tt == TOK_NAME &&
+        if (tt == TOK_NAME && !(CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) &&
             !strcmp(JS_GetStringBytes(ATOM_TO_STRING(CURRENT_TOKEN(ts).t_atom)), "static")) {
             tt = ClassKeyToken(cx, ts);
             if (tt == TOK_LP) { js_UngetToken(ts); tt = TOK_NAME; }
@@ -6890,6 +6890,7 @@ ClassDefinition(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSAtom *dec
             tt = ClassKeyToken(cx, ts);
         }
         if (!generator && tt == TOK_NAME &&
+            !(CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) &&
             (CURRENT_TOKEN(ts).t_atom == cx->runtime->atomState.getAtom ||
              CURRENT_TOKEN(ts).t_atom == cx->runtime->atomState.setAtom)) {
             JSAtom *a = CURRENT_TOKEN(ts).t_atom;
@@ -6914,6 +6915,9 @@ ClassDefinition(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, JSAtom *dec
                 key->pn_atom = CURRENT_TOKEN(ts).t_atom;
             }
         } else goto bad;
+        /* FunctionExpr also accepts a function's optional name/star. A class
+         * method has already consumed its property name and generator marker. */
+        if (js_PeekToken(cx, ts) != TOK_LP) goto bad;
         isConstructor = !isStatic && !computed && ClassKeyEquals(key, "constructor");
         if ((!computed && isStatic && ClassKeyEquals(key, "prototype")) ||
             (isConstructor && (constructor || generator || accessor != JSOP_NOP)))
@@ -7426,6 +7430,8 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     atom = CURRENT_TOKEN(ts).t_atom;
                     rt = cx->runtime;
                     if (!generatorMethod &&
+                        (!JS_VERSION_IS_ES2015(cx) ||
+                         !(CURRENT_TOKEN(ts).flags & TOKF_ESCAPE)) &&
                         (atom == rt->atomState.getAtom ||
                          atom == rt->atomState.setAtom)) {
                         op = (atom == rt->atomState.getAtom)
@@ -7450,6 +7456,10 @@ PrimaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                                 pn3->pn_atom = CURRENT_TOKEN(ts).t_atom;
 
                             /* We have to fake a 'function' token here. */
+                            if (JS_VERSION_IS_ES2015(cx) && js_PeekToken(cx, ts) != TOK_LP) {
+                                LexicalSyntaxError(cx, ts);
+                                return NULL;
+                            }
                             CURRENT_TOKEN(ts).t_op = JSOP_NOP;
                             CURRENT_TOKEN(ts).type = TOK_FUNCTION;
                             if (JS_VERSION_IS_ES2015(cx)) CURRENT_TOKEN(ts).flags |= TOKF_METHOD;
