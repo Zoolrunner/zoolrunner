@@ -107,6 +107,7 @@ extern JSBool js_UpdateSuperReference(JSContext *, JSObject *, JSBool, JSBool, j
 extern JSBool js_GeneratorFunction(JSContext *, JSObject *, uintN, jsval *, jsval *);
 
 extern JSBool js_CaptureArrowBindings(JSContext *, JSObject *, JSStackFrame *);
+extern JSBool js_HasNewTargetEnvironment(JSContext *, JSStackFrame *, JSBool *);
 extern JSBool js_GetArrowBindings(JSContext *, JSObject *, jsval *, JSObject **);
 
 /* Internal function flag; it is not a property attribute or a public API flag. */

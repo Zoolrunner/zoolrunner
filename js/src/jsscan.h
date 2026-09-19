@@ -278,6 +278,7 @@ struct JSTokenStream {
 #define TOKF_GENERATOR_METHOD 0x08
 #define TOKF_METHOD 0x10
 #define TOKF_DERIVED_CONSTRUCTOR 0x20
+#define TSF_NEW_TARGET_ALLOWED 0x100000 /* enclosing non-arrow function */
 #define TSF_MODULE     0x80000        /* Module source-text lexical goal */
 #define TSF_SUPER_CALL_ALLOWED 0x40000
 #define TSF_SUPER_ALLOWED 0x20000

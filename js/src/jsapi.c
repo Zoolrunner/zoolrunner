@@ -4087,6 +4087,7 @@ JS_PUBLIC_API(JSObject *)
 JS_GetModuleNamespace(JSContext *cx, JSObject *module)
 {
     CHECK_REQUEST(cx);
+    if (!js_InstantiateModule(cx, module)) return NULL;
     return js_GetModuleNamespace(cx, module);
 }
 

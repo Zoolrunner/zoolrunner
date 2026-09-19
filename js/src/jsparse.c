@@ -503,6 +503,7 @@ js_CompileTokenStream(JSContext *cx, JSObject *chain, JSTokenStream *ts,
     fp = cx->fp;
     MaybeSetupFrame(cx, chain, fp, &frame);
     flags = cx->fp->flags;
+    if (flags & JSFRAME_EVAL_FUNCTION) ts->flags |= TSF_NEW_TARGET_ALLOWED;
     if ((flags & JSFRAME_EVAL_COMPILER) && cx->fp->callee &&
         FUN_HAS_HOME_OBJECT((JSFunction *)JS_GetPrivate(cx, cx->fp->callee)))
         ts->flags |= TSF_SUPER_ALLOWED;
@@ -822,7 +823,7 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     JSStackFrame *fp, frame;
     JSObject *funobj;
     JSStmtInfo stmtInfo;
-    uintN oldflags, firstLine, oldStrict, oldGenerator;
+    uintN oldflags, firstLine, oldStrict, oldGenerator, oldNewTarget;
     JSParseNode *pn;
     JSScopeProperty *sprop;
     JSBool parametersOK;
@@ -856,6 +857,8 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
         ts->flags |= TSF_GENERATOR;
         tc->flags |= TCF_FUN_IS_GENERATOR;
     }
+    oldNewTarget = ts->flags & TSF_NEW_TARGET_ALLOWED;
+    if (!FUN_IS_ARROW(fun)) ts->flags |= TSF_NEW_TARGET_ALLOWED;
     oldStrict = ts->flags & TSF_STRICT_MODE;
     if (tc->flags & TCF_STRICT_MODE)
         ts->flags |= TSF_STRICT_MODE;
@@ -943,7 +946,8 @@ FunctionBody(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
             }
         }
     }
-    ts->flags = (ts->flags & ~(TSF_STRICT_MODE | TSF_GENERATOR)) | oldStrict | oldGenerator;
+    ts->flags = (ts->flags & ~(TSF_STRICT_MODE | TSF_GENERATOR | TSF_NEW_TARGET_ALLOWED)) |
+                oldStrict | oldGenerator | oldNewTarget;
 
     js_PopStatement(tc);
 
@@ -1399,6 +1403,7 @@ ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     jsint slot;
     size_t begin;
     uintN generatorFlags = ts->flags & TSF_GENERATOR;
+    uintN newTargetFlags = ts->flags & TSF_NEW_TARGET_ALLOWED;
     JSBool ok = JS_FALSE, rest, stopsLength = JS_FALSE;
     if (!bare && js_GetToken(cx, ts) != TOK_LP) return LexicalSyntaxError(cx, ts);
     begin = bare ? 0 : CURRENT_TOKEN(ts).sourceEnd;
@@ -1415,6 +1420,7 @@ ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     fun->flags |= JSFUN_INTERPRETED;
     tc->flags |= TCF_IN_FUNCTION;
     tc->initializingParameters = JS_TRUE;
+    if (!FUN_IS_ARROW(fun)) ts->flags |= TSF_NEW_TARGET_ALLOWED;
     ts->flags = (ts->flags & ~TSF_GENERATOR) |
                 (FUN_IS_GENERATOR(fun) ? TSF_GENERATOR : 0);
     if (!js_MatchToken(cx, ts, bare ? TOK_EOF : TOK_RP)) {
@@ -1491,7 +1497,8 @@ ModernFunctionParameters(JSContext *cx, JSTokenStream *ts, JSFunction *fun,
     LexicalSyntaxError(cx, ts);
  out:
     tc->initializingParameters = JS_FALSE;
-    ts->flags = (ts->flags & ~TSF_GENERATOR) | generatorFlags;
+    ts->flags = (ts->flags & ~(TSF_GENERATOR | TSF_NEW_TARGET_ALLOWED)) |
+                generatorFlags | newTargetFlags;
     cx->fp = outer;
     return ok;
 }
@@ -2007,7 +2014,8 @@ ArrowFunction(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             JSSTRING_LENGTH(formalText), ts->filename, position.begin.lineno, ts->principals);
         JSBool parsed;
         if (!formalTS) goto bad;
-        formalTS->flags |= ts->flags & (TSF_STRICT_MODE | TSF_SUPER_ALLOWED | TSF_SUPER_CALL_ALLOWED);
+        formalTS->flags |= ts->flags & (TSF_STRICT_MODE | TSF_SUPER_ALLOWED |
+                                       TSF_SUPER_CALL_ALLOWED | TSF_MODULE | TSF_NEW_TARGET_ALLOWED);
         parsed = ModernFunctionParameters(cx, formalTS, fun, &funtc, &pn->pn_source, JS_FALSE);
         if (parsed && js_GetToken(cx, formalTS) != TOK_EOF)
             parsed = LexicalSyntaxError(cx, formalTS);
@@ -3418,7 +3426,8 @@ static JSBool
 ModuleFrom(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc, uint32 *request)
 {
     JSAtom *word = ModuleName(cx, ts, JS_FALSE);
-    if (!word || !ModuleWord(word, "from") || js_GetToken(cx, ts) != TOK_STRING)
+    if (!word || (CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) ||
+        !ModuleWord(word, "from") || js_GetToken(cx, ts) != TOK_STRING)
         return LexicalSyntaxError(cx, ts);
     return js_AddModuleRequest(cx, tc->module, CURRENT_TOKEN(ts).t_atom, request);
 }
@@ -3541,7 +3550,8 @@ ModuleStatement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         }
         if (tt == TOK_STAR) {
             first = ModuleName(cx, ts, JS_FALSE);
-            if (!first || !ModuleWord(first, "as")) goto syntax;
+            if (!first || (CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) ||
+                !ModuleWord(first, "as")) goto syntax;
             first = ModuleName(cx, ts, JS_FALSE);
             if (!first || !ModuleNameAllowed(first, JS_TRUE) ||
                 !RecordDeclaration(cx, ts, tc, first, JSOP_NOP)) goto syntax;
@@ -3556,7 +3566,8 @@ ModuleStatement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 second = first;
                 if (js_PeekToken(cx, ts) == TOK_NAME) {
                     js_GetToken(cx, ts);
-                    if (!ModuleWord(CURRENT_TOKEN(ts).t_atom, "as")) goto syntax;
+                    if ((CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) ||
+                        !ModuleWord(CURRENT_TOKEN(ts).t_atom, "as")) goto syntax;
                     second = ModuleName(cx, ts, JS_FALSE);
                 }
                 if (!second || !ModuleNameAllowed(second, JS_TRUE) ||
@@ -3591,7 +3602,8 @@ ModuleStatement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             second = first;
             if (js_PeekToken(cx, ts) == TOK_NAME) {
                 js_GetToken(cx, ts);
-                if (!ModuleWord(CURRENT_TOKEN(ts).t_atom, "as")) goto syntax;
+                if ((CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) ||
+                        !ModuleWord(CURRENT_TOKEN(ts).t_atom, "as")) goto syntax;
                 second = ModuleName(cx, ts, JS_TRUE);
             }
             if (!second) return NULL;
@@ -3605,8 +3617,11 @@ ModuleStatement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
             }
         }
         if (js_PeekToken(cx, ts) == TOK_NAME) {
-            if (!ModuleFrom(cx, ts, tc, &request)) return NULL;
-            from = JS_TRUE;
+            js_GetToken(cx, ts);
+            from = !(CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) &&
+                   ModuleWord(CURRENT_TOKEN(ts).t_atom, "from");
+            js_UngetToken(ts);
+            if (from && !ModuleFrom(cx, ts, tc, &request)) return NULL;
         }
         for (item = list->pn_head; item; item = item->pn_next) {
             if (!from && !ModuleNameAllowed(item->pn_source, JS_FALSE)) goto syntax;
@@ -5742,8 +5757,7 @@ MemberExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
 
             tt = js_GetToken(cx, ts);
             if (tt != TOK_NAME || (CURRENT_TOKEN(ts).flags & TOKF_ESCAPE) ||
-                (!(tc->flags & TCF_IN_FUNCTION) &&
-                 !(cx->fp->flags & JSFRAME_EVAL_FUNCTION))) {
+                !(ts->flags & TSF_NEW_TARGET_ALLOWED)) {
                 LexicalSyntaxError(cx, ts);
                 return NULL;
             }

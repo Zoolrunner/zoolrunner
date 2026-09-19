@@ -3073,3 +3073,16 @@ counts. Follow-up probes also found escaped module-contextual keywords,
 export-list semicolon insertion, and top-level-arrow `new.target` gaps; fixes
 are being validated separately. No upstream assertions or failing cases were
 removed to obtain the complete historical pass.
+
+
+The module-context follow-up corrects literal `as`/`from` parsing, export-list
+semicolon insertion, and lexical `new.target` availability through arrows and
+direct eval. Public namespace retrieval now propagates failed module records.
+The integrated macOS arm64 run preserves **28,582/28,582 ES6** and
+**11,540/11,540 ES5**, with zero failures or unsupported cases. All four
+applications pass builds, packages and relocated desktop checks, including
+Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Reports: `artifacts/es6/module-context-final-*`. Focused coverage includes
+9 contextual-keyword, 8 module-production and 12 `new.target` checks, plus
+24 native module checks across five scripts. C89 checks pass. Other platforms
+remain unvalidated for this batch; the later-test review remains open.

@@ -104,6 +104,13 @@ int main(void)
     name = NULL;
     JS_GC(cx);
     CHECK(JS_CallFunctionName(cx, ns, "inc", 0, NULL, &value) && value == INT_TO_JSVAL(3));
+    a = compile(cx, global, "export let value=3;throw 29");
+    CHECK(a && !JS_EvaluateModule(cx, a));
+    CHECK(JS_GetPendingException(cx, &value) && value == INT_TO_JSVAL(29));
+    JS_ClearPendingException(cx);
+    CHECK(!JS_GetModuleNamespace(cx, a));
+    CHECK(JS_GetPendingException(cx, &value) && value == INT_TO_JSVAL(29));
+    JS_ClearPendingException(cx);
     CHECK(hookErrors == 0 && created >= 4);
     status = 0;
  out:

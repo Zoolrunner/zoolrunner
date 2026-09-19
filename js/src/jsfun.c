@@ -3286,6 +3286,26 @@ js_UpdateSuperReference(JSContext *cx, JSObject *reference, JSBool increment,
     return ok;
 }
 
+/* Direct eval in an arrow inherits the nearest ordinary function, not
+ * the arrow's own invocation. A top-level arrow has no new.target binding. */
+JSBool
+js_HasNewTargetEnvironment(JSContext *cx, JSStackFrame *frame, JSBool *has)
+{
+    jsval cell, owner;
+    *has = frame && frame->fun != NULL;
+    if (!*has || !FUN_IS_ARROW(frame->fun)) return JS_TRUE;
+    if (!JS_GetReservedSlot(cx, frame->callee, JSFUN_ARROW_SLOT(frame->fun), &cell))
+        return JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(cell) ||
+        OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(cell)) != &arrowBindingClass) {
+        JS_ReportError(cx, "missing arrow lexical binding");
+        return JS_FALSE;
+    }
+    if (!JS_GetReservedSlot(cx, JSVAL_TO_OBJECT(cell), 2, &owner)) return JS_FALSE;
+    *has = !JSVAL_IS_PRIMITIVE(owner);
+    return JS_TRUE;
+}
+
 JSBool
 js_GetArrowBindings(JSContext *cx, JSObject *function, jsval *thisValue,
                     JSObject **newTarget)

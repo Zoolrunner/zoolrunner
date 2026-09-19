@@ -1480,7 +1480,7 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSTempValueRooter scopeRoot, scriptRoot;
     const char *filename;
     uintN line;
-    JSBool direct, inheritedStrict, ok;
+    JSBool direct, inheritedStrict, ok, hasNewTarget = JS_FALSE;
 
 #if JS_HAS_SCRIPT_OBJECT
     /* Preserve explicit historical eval-with-scope use in JS 1.7 mode. */
@@ -1497,6 +1497,8 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
              (*caller->pc == JSOP_EVAL ||
               (*caller->pc == JSOP_CALLSPREAD && GET_UINT16(caller->pc) == 2));
     inheritedStrict = direct && caller->script->strictMode;
+    if (direct && !js_HasNewTargetEnvironment(cx, caller, &hasNewTarget))
+        return JS_FALSE;
     global = OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(argv[-2]));
     if (!global) global = cx->globalObject;
     while ((outer = OBJ_GET_PARENT(cx, global)) != NULL) global = outer;
@@ -1525,7 +1527,7 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     compilation.vars = direct ? caller->vars : NULL;
     compilation.nvars = direct ? caller->nvars : 0;
     compilation.flags = JSFRAME_EVAL | JSFRAME_EVAL_COMPILER |
-                        (direct && caller->fun ? JSFRAME_EVAL_FUNCTION : 0) |
+                        (hasNewTarget ? JSFRAME_EVAL_FUNCTION : 0) |
                         (inheritedStrict ? JSFRAME_STRICT_EVAL : 0);
     compilation.rval = JSVAL_VOID;
     compilation.sp = fp->sp;
