@@ -930,3 +930,11 @@ all four macOS arm64 application builds, packages and relocated runtime checks,
 Calendar’s four views, Browser navigation and Suite/XULRunner ChatZilla.
 Other operating systems have not been revalidated for this batch.
 See [property-conversion validation](js/tests/es6/README.md#property-queries-and-reentrant-array-length-conversion).
+
+
+The ES2015 property-order batch preserves creation order during
+descriptor replacement, creates interpreted constructor metadata in the
+original ES2015 order, and keeps dynamic-function compiler metadata out of
+reflection. Both complete pinned suites pass with zero failures, along with
+all four macOS arm64 builds, packages and relocated runtime checks;
+see [property ordering](js/tests/es6/README.md#property-replacement-and-function-creation-order).

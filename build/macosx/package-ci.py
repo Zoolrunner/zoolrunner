@@ -416,6 +416,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("regexp-original-ranges.js", "ORIGINAL-REGEXP-RANGES checks=13 failures=0"),
                 ("conversion-builtin-edges.js", "CONVERSION-BUILTIN-EDGES checks=18 failures=0"),
                 ("property-coercion.js", "PROPERTY-COERCION checks=22 failures=0"),
+                ("property-order.js", "PROPERTY-ORDER checks=16 failures=0"),
+                ("function-key-order.js", "FUNCTION-KEY-ORDER checks=20 failures=0"),
                 ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
                 ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),
                 ("tail-call-control.js", "TAIL-CONTROL checks=14 failures=0"),

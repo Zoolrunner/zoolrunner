@@ -1193,7 +1193,8 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
 {
     JSFunction *fun = (JSFunction *) JS_GetPrivate(cx, obj);
     JSAtom *name;
-    JSObject *proto;
+    JSObject *proto, *owner;
+    JSProperty *property;
 
     if (!fun)
         return JS_TRUE;
@@ -1205,8 +1206,6 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
     }
     if (fun->flags & JSFUN_BOUND_FUNCTION)
         return JS_TRUE;
-    if (FUN_IS_GENERATOR(fun) && !js_InitGeneratorFunction(cx, obj))
-        return JS_FALSE;
     if (!js_DefineNativeProperty(cx, obj,
                                 ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
                                 INT_TO_JSVAL(FUN_HAS_NON_SIMPLE(fun) && FUN_INTERPRETED(fun)
@@ -1215,6 +1214,19 @@ js_InitFunctionProperties(JSContext *cx, JSObject *obj)
         return JS_FALSE;
     if (FUN_IS_CLASS(fun))
         return JS_TRUE;
+    /* FunctionInitialize creates length before MakeConstructor creates the
+     * prototype; SetFunctionName follows both in the original ES2015 rules.
+     * Materialize interpreted constructors now, before user properties can
+     * make a lazy prototype's creation order observable. Native bootstrap
+     * functions and non-constructible methods keep their existing paths. */
+    if (FUN_IS_GENERATOR(fun)) {
+        if (!js_InitGeneratorFunction(cx, obj)) return JS_FALSE;
+    } else if (FUN_INTERPRETED(fun) && !(fun->flags & JSFUN_NO_CONSTRUCT)) {
+        if (!OBJ_LOOKUP_PROPERTY(cx, obj,
+                ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom),
+                &owner, &property)) return JS_FALSE;
+        if (property) OBJ_DROP_PROPERTY(cx, owner, property);
+    }
     /* Anonymous function expressions acquire a name only where the language
      * explicitly infers one. Function.prototype itself has the empty name. */
     name = fun->atom ? fun->atom : fun->inferredName;
@@ -1468,7 +1480,8 @@ fun_resolve(JSContext *cx, JSObject *obj, jsval id, uintN flags,
          * Beware of the wacky case of a user function named Object -- trying
          * to find a prototype for that will recur back here _ad perniciem_.
          */
-        if (!parentProto && fun->atom == CLASS_ATOM(cx, Object))
+        if (!parentProto && fun->atom == CLASS_ATOM(cx, Object) &&
+            (fun->edition < JSVERSION_ECMA_2015 || !FUN_INTERPRETED(fun)))
             return JS_TRUE;
 
         /*

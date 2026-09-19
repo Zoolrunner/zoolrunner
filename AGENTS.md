@@ -398,6 +398,10 @@ Native setter and descriptor changes must preserve modern assignment results
 without changing the native JSAPI's normalized output or explicit legacy
 behavior. Run `property-coercion.js` and `TestNativeSetterResult.c`, including
 collection and array-length callbacks that change descriptor attributes.
+Property replacement must preserve ES2015 creation order and keep compiler
+metadata private. Run `property-order.js` and `function-key-order.js`, including
+watchpoints, duplicate parameters, collection and deletion/re-addition. Keep
+explicit legacy ordering and native bootstrap conventions intact.
 Tail-call changes must preserve captured arguments/locals, direct eval,
 legacy editions and balanced debugger hooks. Run the `tail-call-*.js` fixtures
 and `TestTailCalls.c`, including branch cancellation, collection and script

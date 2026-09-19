@@ -3348,3 +3348,31 @@ match the frozen conformance runtime's SHA-256:
 `97f9d03208bca7f43113e05d65694e57c31d129ea66e4d52c9d4c683a7e66d87`.
 Property-order replacement is being tested separately. The complete later
 ES2015 inventory and validation on other operating systems remain unfinished.
+
+
+### Property replacement and function creation order
+
+Modern descriptor replacement now forks the immutable property-tree suffix
+without moving the replaced property to the end. Existing value slots, middle
+deletions, duplicate formal metadata and watchpoint setters are preserved.
+Explicit legacy language versions retain their historical ordering.
+
+Interpreted ES2015 constructors materialize their prototype after `length` and
+before `name`, as required by the original creation algorithms. This also
+handles generators and functions named `Object`; native bootstrap and
+non-constructible methods keep their existing paths. Reflection no longer
+exposes hidden compiler parameter/local metadata from dynamic functions.
+No bytecode format, cache version or embedding API changes are required.
+
+The final integrated runtime passes both complete pinned suites with zero
+failures: **28,582/28,582 ES6** and **11,540/11,540 ES5**. All four macOS arm64
+applications pass root build, package and relocated desktop validation, plus
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+The candidate also passes 100 existing focused fixtures, 63 native fixtures,
+36 new shell checks and C89 checks. All four application engine libraries match
+the frozen conformance runtime's SHA-256:
+`3e77fde23d592142a1339f7e6b43fc56a305def7a50ac4e93406e5008aa4055c`.
+Reports are under
+`artifacts/es6/property-order-stage-*`, `function-order-stage-*` and
+`function-order-final-*`. This is not a completed review of the later ES2015
+inventory or validation on other operating systems.

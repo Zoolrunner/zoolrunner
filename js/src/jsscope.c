@@ -866,6 +866,98 @@ ReportReadOnlyScope(JSContext *cx, JSScope *scope)
                          : LOCKED_OBJ_GET_CLASS(scope->object)->name);
 }
 
+/* Keep descriptor replacement at the property's original position. The
+ * property tree is immutable, so fork its suffix before publishing any of it. */
+typedef struct ScopeOrderRoot {
+    JSTempValueRooter root;
+    JSScopeProperty *oldLast, *newLast;
+} ScopeOrderRoot;
+
+static void
+MarkScopeOrder(JSContext *cx, JSTempValueRooter *root)
+{
+    ScopeOrderRoot *order = (ScopeOrderRoot *)root;
+    JSScopeProperty *p;
+    for (p = order->oldLast; p; p = p->parent) js_MarkScopeProperty(cx, p);
+    for (p = order->newLast; p; p = p->parent) js_MarkScopeProperty(cx, p);
+}
+
+static JSScopeProperty *
+ReplaceScopePropertyInOrder(JSContext *cx, JSScope *scope,
+                            JSScopeProperty *old, JSPropertyOp getter,
+                            JSPropertyOp setter, uint32 slot, uintN attrs,
+                            uintN flags, intN shortid)
+{
+    JSScopeProperty *p, *replacement = NULL, **nodes = NULL, **entry, child;
+    ScopeOrderRoot order;
+    size_t count = 0, i;
+    JSBool allocated = JS_FALSE, ok = JS_FALSE;
+
+    order.oldLast = scope->lastProp;
+    order.newLast = NULL;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkScopeOrder, &order.root);
+    /* A table identifies the live node when the suffix contains middle
+     * deletions or duplicate formal parameters; preserve those nodes too. */
+    if (!scope->table && !CreateScopeTable(cx, scope, JS_TRUE)) goto out;
+    for (p = order.oldLast; p != old; p = p->parent) {
+        JS_ASSERT(p);
+        if (++count > ((size_t)-1) / (2 * sizeof(*nodes))) {
+            JS_ReportOutOfMemory(cx);
+            goto out;
+        }
+    }
+    nodes = (JSScopeProperty **)JS_malloc(cx, count * 2 * sizeof(*nodes));
+    if (!nodes) goto out;
+    for (p = order.oldLast, i = 0; p != old; p = p->parent)
+        nodes[i++] = p;
+    if (!(flags & SPROP_IS_ALIAS)) {
+        if (attrs & JSPROP_SHARED) slot = SPROP_INVALID_SLOT;
+        else if (slot == SPROP_INVALID_SLOT) {
+            if (!js_AllocSlot(cx, scope->object, &slot)) goto out;
+            allocated = JS_TRUE;
+        }
+    }
+    if (!JS_CLIST_IS_EMPTY(&cx->runtime->watchPointList) &&
+        js_FindWatchPoint(cx->runtime, scope, old->id)) {
+        setter = js_WrapWatchedSetter(cx, old->id, attrs, setter);
+        if (!setter) goto out;
+    }
+    child.id = old->id;
+    child.getter = getter;
+    child.setter = setter;
+    child.slot = slot;
+    child.attrs = attrs;
+    child.flags = flags;
+    child.shortid = shortid;
+    replacement = GetPropertyTreeChild(cx, old->parent, &child);
+    if (!replacement) goto out;
+    order.newLast = replacement;
+    for (i = count; i > 0; --i) {
+        p = GetPropertyTreeChild(cx, order.newLast, nodes[i - 1]);
+        if (!p) goto out;
+        nodes[count + i - 1] = p;
+        order.newLast = p;
+    }
+    /* No allocation or callback from here until the coherent suffix and hash
+     * entries have all been published. Existing value slots are unchanged. */
+    entry = js_SearchScope(scope, old->id, JS_FALSE);
+    JS_ASSERT(SPROP_FETCH(entry) == old);
+    SPROP_STORE_PRESERVING_COLLISION(entry, replacement);
+    for (i = 0; i < count; ++i) {
+        entry = js_SearchScope(scope, nodes[i]->id, JS_FALSE);
+        if (SPROP_FETCH(entry) == nodes[i])
+            SPROP_STORE_PRESERVING_COLLISION(entry, nodes[count + i]);
+    }
+    scope->lastProp = order.newLast;
+    CHECK_ANCESTOR_LINE(scope, JS_TRUE);
+    ok = JS_TRUE;
+out:
+    if (!ok && allocated) js_FreeSlot(cx, scope->object, slot);
+    JS_free(cx, nodes);
+    JS_POP_TEMP_ROOT(cx, &order.root);
+    return ok ? replacement : NULL;
+}
+
 JSScopeProperty *
 js_AddScopeProperty(JSContext *cx, JSScope *scope, jsid id,
                     JSPropertyOp getter, JSPropertyOp setter, uint32 slot,
@@ -947,6 +1039,12 @@ js_AddScopeProperty(JSContext *cx, JSScope *scope, jsid id,
                                         flags, shortid)) {
             METER(redundantAdds);
             return sprop;
+        }
+
+        if (JS_VERSION_IS_ES2015(cx) && sprop != SCOPE_LAST_PROP(scope) &&
+            !((flags | sprop->flags) & SPROP_IS_DUPLICATE)) {
+            return ReplaceScopePropertyInOrder(cx, scope, sprop, getter, setter,
+                                                slot, attrs, flags, shortid);
         }
 
         /*

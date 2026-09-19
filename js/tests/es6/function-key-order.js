@@ -1,0 +1,37 @@
+'use strict';
+var checks=0;function check(v,m){checks++;if(!v)throw Error(m);}
+function keys(f){return Object.getOwnPropertyNames(f).join(',');}
+function declared(a){}declared.extra=1;
+check(keys(declared)==='length,prototype,name,extra','ordinary declaration original ES2015 creation order');
+var named=function named(a){};named.extra=1;
+check(keys(named)==='length,prototype,name,extra','named expression creation order');
+var inferred=function(a){};inferred.extra=1;
+check(keys(inferred)==='length,prototype,name,extra','inferred expression creation order');
+var anonymous=(0,function(a){});anonymous.extra=1;
+check(keys(anonymous)==='length,prototype,extra','original anonymous expression has no inferred name');
+function* generator(a){}generator.extra=1;
+check(keys(generator)==='length,prototype,name,extra','generator declaration creation order');
+var genMethod=({*method(a){}}).method;genMethod.extra=1;
+check(keys(genMethod)==='length,prototype,name,extra','generator method creation order');
+class C{}C.extra=1;check(keys(C)==='length,prototype,name,extra','class creation order');
+var arrow=(a)=>a;arrow.extra=1;check(keys(arrow)==='length,name,extra','arrow has no prototype');
+var method=({method(a){}}).method;method.extra=1;check(keys(method)==='length,name,extra','ordinary method has no prototype');
+function assigned(){}assigned.prototype={tag:1};var desc=Object.getOwnPropertyDescriptor(assigned,'prototype');
+check(desc.writable&&!desc.enumerable&&!desc.configurable&&desc.value.tag===1,'assignment preserves initial prototype descriptor');
+function nonextensible(){}Object.preventExtensions(nonextensible);check(Object.getPrototypeOf(new nonextensible())===nonextensible.prototype,'preventExtensions does not lose constructor prototype');
+var shadow=Function('return function Object(){}')();shadow.extra=1;
+check(keys(shadow)==='length,prototype,name,extra'&&Object.getPrototypeOf(new shadow())===shadow.prototype,'interpreted function named Object');
+var dynamic=Function('a','return a;');dynamic.extra=1;
+check(keys(dynamic)==='length,prototype,name,extra','dynamic function order');
+var GeneratorFunction=Object.getPrototypeOf(generator).constructor;
+var dynamicGen=GeneratorFunction('yield 3');dynamicGen.extra=1;
+check(keys(dynamicGen)==='length,prototype,name,extra'&&dynamicGen().next().value===3,'dynamic generator order');
+check(!Object.prototype.hasOwnProperty.call(Math.abs,'prototype'),'native method bootstrap remains nonconstructible');
+var hidden=Function('a','a','var local=1; return a+local;');
+check(keys(hidden)==='length,prototype,name'&&hidden(2,3)===4,'duplicate formal and local metadata remain private');
+check(!hidden.hasOwnProperty('a')&&!hidden.hasOwnProperty('local')&&Object.getOwnPropertyDescriptor(hidden,'a')===undefined,'hidden names are not public own properties');
+hidden.a=7;hidden.local=8;
+check(keys(hidden)==='length,prototype,name,a,local'&&hidden.a===7&&hidden(2,3)===4,'public names coexist with hidden metadata');
+check(Reflect.ownKeys(hidden).join(',')===keys(hidden),'Reflect own keys hide compiler metadata');
+Object.freeze(hidden);check(Object.isFrozen(hidden)&&hidden(2,3)===4,'freezing preserves hidden formal execution');
+print('FUNCTION-KEY-ORDER checks='+checks+' failures=0');

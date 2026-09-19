@@ -1121,7 +1121,7 @@ OwnNames(JSContext *cx, JSObject *target)
         if (scope->object == owner) {
             for (sprop = SCOPE_LAST_PROP(scope); sprop; sprop = sprop->parent) {
                 if (!SCOPE_HAS_PROPERTY(scope, sprop) ||
-                    (sprop->flags & SPROP_IS_ALIAS) ||
+                    (sprop->flags & (SPROP_IS_ALIAS | SPROP_IS_HIDDEN)) ||
                     (owner != target && !IsVirtualOwn(cx, target, owner, (JSProperty *)sprop)))
                     continue;
                 n = ids->length;
