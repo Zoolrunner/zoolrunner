@@ -3574,3 +3574,43 @@ switch/with modes gained and no previously passing modes were lost, with an
 unchanged runtime (`later-expanded-environment.json` and
 `later-environment-comparison.json`). Mixed later requirements and harness
 limitations remain visible; this is not an ES2015 conformance score.
+
+### JSON reviver descriptor rejection
+
+The untagged later-Test262 diagnostic exposed two original-ES2015 regressions:
+revivers could overwrite a later non-configurable array/object property because
+JSON used the low-level native definition hook. Reviver writes now share the
+complete data-descriptor implementation with standard property creation, with
+a separate acceptance result. A rejected definition leaves the property intact;
+exceptions still propagate. This also preserves ES5's non-throwing descriptor
+rejection requirement.
+
+`json-reviver.js` adds 93 checks in both default ES5 and ES2015 modes, covering
+arrays/objects, frozen properties, accessors, nonextensible containers, deletion,
+replacement descriptors, Proxy rejection/exception behavior, reentrant parsing
+and callback-triggered GC. The previous frozen runtime fails the new regression.
+The staged later JSON.parse diagnostic gains all four affected modes with no
+lost passes: 144 diagnostic passes and ten failures requiring later reviver
+source-context arguments. Final validation passes all 28,582 pinned ES6 modes
+and 11,540 ES5 modes, all four macOS arm64 builds/packages and relocated
+runtime checks, Calendar's four views, Browser navigation and Suite/XULRunner
+ChatZilla. The final full JSON diagnostic records 272 passes and 58 failures
+requiring further edition review (`json-reviver-final-later-json.json`).
+
+The first Suite lifecycle run exposed an asynchronous Inspector startup race;
+its unchanged rerun passes, and the original failure remains recorded in
+`json-reviver-final-suite-desktop.log`. A deterministic controller probe also
+reproduces the race with the previous engine; the startup-order fix is being
+validated separately. The completed retry is in
+`json-reviver-final-desktops-retry.log`. All four application engines and the
+frozen conformance runtime share SHA-256
+`a0ca2b2d7aa53e78068e611a245758034d17eed2f6be0951b177eb818763b4b2`.
+C89 checks pass. This batch has not been validated on other operating systems.
+
+The broader Array diagnostic records 5,333 passes, 768 failures and 18 harness
+errors across 6,119 modes (`later-all-array.json`). The JSON diagnostic before
+the fix records 268 passes and 62 failures across 330 modes
+(`later-all-json.json`). These mixed-edition diagnostics retain their failures
+and are not conformance scores. The edition ledger now has 147 exact-source
+records, including the JSON defects and reviewed later changes to Proxy
+invariants, revoked Proxy construction, Object.prototype and sort ordering.

@@ -540,6 +540,11 @@ js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
 extern JSBool
 js_ValueToPropertyId(JSContext *cx, jsval value, jsid *idp);
 
+/* With accepted, report rejection separately from exceptions; NULL throws. */
+extern JSBool
+js_CreateDataProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
+                      JSBool *accepted);
+
 extern JSBool
 js_CreateDataPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval value);
 

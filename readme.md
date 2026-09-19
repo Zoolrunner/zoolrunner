@@ -964,3 +964,10 @@ complete pinned suites pass with zero failures, along with all four macOS arm64
 build/package/runtime checks and the expanded native collection/cache probe.
 The broader edition review and other-platform validation remain unfinished; see
 [environment validation](js/tests/es6/README.md#switch-discriminant-environments).
+
+JSON reviver definitions now reject non-configurable replacements atomically
+while preserving callback exceptions. Both pinned suites and all four macOS
+arm64 build/package/runtime gates pass; a Suite lifecycle retry and the
+separately reproduced Inspector startup race are documented in the
+[JSON reviver validation](js/tests/es6/README.md#json-reviver-descriptor-rejection).
+Broader edition review and other-platform validation remain unfinished.

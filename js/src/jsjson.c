@@ -286,7 +286,7 @@ Walk(JSContext *cx, JSObject *holder, jsval key, jsval reviver, jsval *vp)
     jsuint i, length;
     jsid id;
     JSString *str;
-    JSBool array, ok = JS_FALSE;
+    JSBool array, accepted, ok = JS_FALSE;
 
     if (!JS_CHECK_STACK_SIZE(cx, roots)) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
@@ -317,10 +317,11 @@ Walk(JSContext *cx, JSObject *holder, jsval key, jsval reviver, jsval *vp)
             if (!Walk(cx, obj, roots[2], reviver, &roots[3]) ||
                 !JS_ValueToId(cx, roots[2], &id))
                 goto out;
+            /* Rejected redefinitions leave the property intact. Callback
+             * exceptions still propagate; a false definition result does not. */
             if (JSVAL_IS_VOID(roots[3])) {
                 if (!OBJ_DELETE_PROPERTY(cx, obj, id, &ignored)) goto out;
-            } else if (!OBJ_DEFINE_PROPERTY(cx, obj, id, roots[3], NULL, NULL,
-                                            JSPROP_ENUMERATE, NULL))
+            } else if (!js_CreateDataProperty(cx, obj, id, roots[3], &accepted))
                 goto out;
         }
     }

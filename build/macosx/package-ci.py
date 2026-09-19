@@ -425,6 +425,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("caller-reflection.js", "CALLER-REFLECTION checks=14 failures=0"),
                 ("switch-environments.js", "SWITCH-SCOPE checks=18 failures=0"),
                 ("with-binding-value.js", "WITH-BINDING-VALUE checks=13 failures=0"),
+                ("json-reviver.js", "JSON-REVIVER checks=93 failures=0"),
                 ("typedarray-zero-indices.js", "TYPEDARRAY-ZERO-INDICES checks=207 failures=0"),
                 ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
                 ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),

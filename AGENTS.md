@@ -1639,3 +1639,9 @@ script grammar. Module records own their scripts and cannot use ordinary script
 XDR caches. Namespace behavior follows the original ES2015 edition, including
 its key iterator and rejection of even no-op property/prototype definitions.
 The complete pinned corpus and all four application gates remain required.
+
+For JSON reviver writes, use complete own data descriptors and preserve atomic
+rejection: a non-configurable property must not be partially overwritten.
+Ignore false definition results while propagating callback exceptions. Run
+`json-reviver.js` in both default ES5 and ES2015 modes, including frozen and
+nonextensible containers, accessors, Proxy traps, reentrant parsing and GC.

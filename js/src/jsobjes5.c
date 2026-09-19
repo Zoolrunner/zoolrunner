@@ -879,7 +879,8 @@ DefineOwn(JSContext *cx, JSObject *target, jsid id, ES5Descriptor *d)
 /* A complete own data descriptor, bypassing inherited setters while keeping
  * the existing native/embedding descriptor validation and access checks. */
 JSBool
-js_CreateDataPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval value)
+js_CreateDataProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
+                      JSBool *accepted)
 {
     ES5Descriptor d;
     JSTempValueRooter root;
@@ -891,9 +892,15 @@ js_CreateDataPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval value)
     d.v[D_VALUE] = value;
     d.v[D_WRITE] = d.v[D_ENUM] = d.v[D_CONFIG] = JSVAL_TRUE;
     JS_PUSH_TEMP_ROOT(cx, D_COUNT, d.v, &root);
-    ok = DefineOwn(cx, obj, id, &d);
+    ok = DefineOwnInternal(cx, obj, id, &d, accepted);
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
+}
+
+JSBool
+js_CreateDataPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval value)
+{
+    return js_CreateDataProperty(cx, obj, id, value, NULL);
 }
 
 static JSBool

@@ -31,6 +31,13 @@
       "reason": "The original ES2015 Annex B range grammar and ClassAtomNoDash identity fallback differ from the later union-of-character-sets rule used by this test. The pinned original cases and original-range native regressions remain passing."
     },
     {
+      "test": "built-ins/Array/prototype/sort/comparefn-nonfunction-call-throws.js",
+      "sha256": "f481a5de1d76afbfd98f06fc970258f9919326c4c23e3bf1a774f8de3190db99",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-array.prototype.sort",
+      "reason": "Original ES2015 sort performs ToObject and length conversion before its sorting operations. This test requires the later entry-time comparator check to precede a throwing length getter."
+    },
+    {
       "test": "built-ins/Function/prototype/toString/proxy-arrow-function.js",
       "sha256": "edf647e1538d6ccc6291b4f69954d0b21b1a0e13466746336387f8674c3b9a3b",
       "decision": "later-requirement",
@@ -73,6 +80,48 @@
       "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
     },
     {
+      "test": "built-ins/JSON/parse/reviver-array-non-configurable-prop-create.js",
+      "sha256": "2d6c1dd2030e0856e259d175799299784fdc140e637999ff7c0f5c91e86c2ace",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-internalizejsonproperty",
+      "reason": "Original ES2015 requires CreateDataProperty, including atomic descriptor validation, while ignoring a false result. JSON reviver writes now use the complete descriptor path rather than bypassing validation through the native definition hook."
+    },
+    {
+      "test": "built-ins/JSON/parse/reviver-object-non-configurable-prop-create.js",
+      "sha256": "0765f5092eede7a0f6a4c9b0cd9b6b9968bae0ae44cb57f8517b82cdbf4ef5f0",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-internalizejsonproperty",
+      "reason": "Original ES2015 requires CreateDataProperty, including atomic descriptor validation, while ignoring a false result. JSON reviver writes now use the complete descriptor path rather than bypassing validation through the native definition hook."
+    },
+    {
+      "test": "built-ins/Object/getOwnPropertyNames/proxy-invariant-duplicate-symbol-entry.js",
+      "sha256": "8ddef6ea9958a8cdcf2a3137b441393ca943ba4c3c46ed10545c8a48e13e1a00",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys",
+      "reason": "Original ES2015 [[OwnPropertyKeys]] has no duplicate-entry rejection and returns the trap result for an extensible target without non-configurable keys. These tests require the later duplicate-entry invariant."
+    },
+    {
+      "test": "built-ins/Object/getOwnPropertySymbols/proxy-invariant-duplicate-string-entry.js",
+      "sha256": "48b5d9259fc253db0f43429190447f87c264faab231fe53e982ac5e8e44e80b1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys",
+      "reason": "Original ES2015 [[OwnPropertyKeys]] has no duplicate-entry rejection and returns the trap result for an extensible target without non-configurable keys. These tests require the later duplicate-entry invariant."
+    },
+    {
+      "test": "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values-__proto__.js",
+      "sha256": "c64769e0e1a7520604f8a826858eaea01fddd3c0eb3d5f023e3c3def06fe608d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-properties-of-the-object-prototype-object",
+      "reason": "Original ES2015 specifies Object.prototype as an ordinary, initially extensible object with a null prototype. These tests require the later immutable-prototype exotic-object restriction."
+    },
+    {
+      "test": "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values.js",
+      "sha256": "cfad6dd7e08245dc0a993be09884e30a11fc23698cd894092ae86600f3a248e6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-properties-of-the-object-prototype-object",
+      "reason": "Original ES2015 specifies Object.prototype as an ordinary, initially extensible object with a null prototype. These tests require the later immutable-prototype exotic-object restriction."
+    },
+    {
       "test": "built-ins/Promise/all/invoke-resolve-get-error.js",
       "sha256": "b287a20c3148f362d5e0fc8ee1821a4b5ed8f97d7e4473dc35366b8b25076318",
       "decision": "later-requirement",
@@ -101,11 +150,67 @@
       "reason": "Original ES2015 obtains the iterator before invoking constructor.resolve for each yielded value. This later test requires GetPromiseResolve before GetIterator and therefore reverses the observable abrupt-completion order."
     },
     {
+      "test": "built-ins/Proxy/create-handler-is-revoked-proxy.js",
+      "sha256": "5ed2e33703ef855dd1adeaf1001b357c3fff5154fdad0b4cd06479765228a022",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxycreate",
+      "reason": "Original ES2015 ProxyCreate steps 2 and 4 throw TypeError for a revoked Proxy target or handler. These tests require the later removal of those checks."
+    },
+    {
+      "test": "built-ins/Proxy/create-target-is-revoked-function-proxy.js",
+      "sha256": "0537b0ccadf985681d0d191ab50418f6507783db971cb0f871802f26a160e976",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxycreate",
+      "reason": "Original ES2015 ProxyCreate steps 2 and 4 throw TypeError for a revoked Proxy target or handler. These tests require the later removal of those checks."
+    },
+    {
+      "test": "built-ins/Proxy/create-target-is-revoked-proxy.js",
+      "sha256": "98275bed62c339ca874dec3944770e2e8560f9c606995dd46caf5b5b694ab75c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxycreate",
+      "reason": "Original ES2015 ProxyCreate steps 2 and 4 throw TypeError for a revoked Proxy target or handler. These tests require the later removal of those checks."
+    },
+    {
+      "test": "built-ins/Proxy/ownKeys/return-duplicate-entries-throws.js",
+      "sha256": "dfc0a51beb4c83bfd1eee9d2564fe8d28f357c74f21e7c5e69f9df66a48e0a65",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys",
+      "reason": "Original ES2015 [[OwnPropertyKeys]] has no duplicate-entry rejection and returns the trap result for an extensible target without non-configurable keys. These tests require the later duplicate-entry invariant."
+    },
+    {
+      "test": "built-ins/Proxy/ownKeys/return-duplicate-symbol-entries-throws.js",
+      "sha256": "f9386f3dc5b96298c8efade76abef14b61bd19f64b554988a30dc42b667fb9bf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys",
+      "reason": "Original ES2015 [[OwnPropertyKeys]] has no duplicate-entry rejection and returns the trap result for an extensible target without non-configurable keys. These tests require the later duplicate-entry invariant."
+    },
+    {
+      "test": "built-ins/Proxy/revocable/handler-is-revoked-proxy.js",
+      "sha256": "c2aa731b345a4df40764d96353e63101a283d426007f0f88c399e1b696743ea1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxycreate",
+      "reason": "Original ES2015 ProxyCreate steps 2 and 4 throw TypeError for a revoked Proxy target or handler. These tests require the later removal of those checks."
+    },
+    {
       "test": "built-ins/Proxy/revocable/revocation-function-name.js",
       "sha256": "6e8001ca68067ddf513ee7c113136080b13c1843ee0f27fbb1bc918d884f7ae6",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-standard-built-in-objects",
       "reason": "Original clause 17 excludes anonymous built-ins from the name requirement. The unchanged pinned ES2015 test requires no own name; the later test requires an own empty name."
+    },
+    {
+      "test": "built-ins/Proxy/revocable/target-is-revoked-function-proxy.js",
+      "sha256": "5ac44be10e2112ae98e8fb5790b49fcffe7bc7f88913ae9e5f932e8164c9b019",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxycreate",
+      "reason": "Original ES2015 ProxyCreate steps 2 and 4 throw TypeError for a revoked Proxy target or handler. These tests require the later removal of those checks."
+    },
+    {
+      "test": "built-ins/Proxy/revocable/target-is-revoked-proxy.js",
+      "sha256": "2143121857f731bf67dfe616be6c4fee2c3d61d257e8cedb2b87e8df8e3a5b00",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-proxycreate",
+      "reason": "Original ES2015 ProxyCreate steps 2 and 4 throw TypeError for a revoked Proxy target or handler. These tests require the later removal of those checks."
     },
     {
       "test": "built-ins/Proxy/setPrototypeOf/toboolean-trap-result-false.js",
