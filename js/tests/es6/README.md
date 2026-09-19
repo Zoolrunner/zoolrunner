@@ -2588,3 +2588,25 @@ The older focused tests now verify successful constant-key patterns and the
 original ES2015 ReferenceError for invalid new.target updates. Their previous
 unsupported-feature/error-type expectations no longer matched the implemented
 behavior. The pinned upstream tests and runner policy remain unchanged.
+
+
+### Computed object pattern keys
+
+Object patterns now evaluate computed keys, including Symbol conversion and
+yield expressions, and preserve their source through decompilation. Cache 51
+records the computed-key source-note regions. The focused fixture passes 25
+checks, including GC, primitive receivers, for-of bindings and long branches;
+the 13-check native pattern probe now includes computed keys through XDR and
+script decompilation. The complete pinned ES2015 run passes **28,002 modes**,
+with **566 failures**, 14 unsupported modules and no harness errors, crashes or
+timeouts: **five gained, zero lost**. All **11,540 required ES5 cases** pass on
+the same frozen macOS arm64 runtime, with unchanged binary hashes before and
+after both runs. Reports use `artifacts/es6/computed-patterns-final-*`.
+All four applications pass root build, package and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout checks and
+ChatZilla in Suite and XULRunner. The engine SHA-256 is identical in all four
+builds and the conformance runtime:
+`306d5709832f0c684fdbec3f8dace9ce5a441053e97c9c83ff2aa7dbd62e6af1`.
+C89 diagnostics pass. These results cover macOS arm64 only. Defaults, rest,
+assignment-reference ordering and complete array iterator behavior remain
+unfinished; this is not full ES2015 compliance.

@@ -723,3 +723,12 @@ report the original ES2015 early errors. The latest full macOS arm64 run passes
 (**57 gained, zero lost**), and all **11,540 ES5 cases**. All four application
 build/package/runtime checks pass. Full ES2015 compliance remains unfinished.
 See [the pattern validation record](js/tests/es6/README.md#basic-object-patterns-and-update-targets).
+
+Computed object-pattern keys now support Symbols, conversion callbacks and
+generator suspension, with source and bytecode-cache round trips. The latest
+full macOS arm64 run passes **28,002 ES2015 modes**, with **566 failures** and
+**14 unsupported modules** (**five gained, zero lost**), no harness errors,
+crashes or timeouts, and all **11,540 ES5 cases**. All four application
+build/package/runtime checks pass. Full ES2015 compliance remains unfinished;
+other platforms have not been revalidated for this batch. See
+[the computed-pattern validation record](js/tests/es6/README.md#computed-object-pattern-keys).

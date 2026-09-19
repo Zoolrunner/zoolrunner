@@ -1499,3 +1499,14 @@ before the error. The macOS arm64 baseline passes 27,997 ES2015 modes and all
 All four applications pass build/package/runtime checks. Computed pattern keys,
 defaults, rest and complete iterator-based array patterns still require work;
 other platforms remain unvalidated for this batch.
+
+
+Computed object-pattern keys use cache version 51. Run `computed-patterns.js`
+and retain Symbol conversion, null-before-key ordering, generator suspension,
+wide-branch decompilation, native XDR and real-window coverage. The validated
+macOS arm64 baseline passes 28,002 ES2015 modes and all 11,540 ES5 modes, with
+566 failures and 14 unsupported modules remaining and no harness errors,
+crashes or timeouts. All four applications pass build/package/runtime checks,
+including Calendar views and Suite/XULRunner ChatZilla. Defaults, rest,
+assignment-reference ordering and complete array iterator semantics still
+require work; other platforms remain unvalidated for this batch.

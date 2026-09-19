@@ -34,7 +34,11 @@ int main(void)
         "var hits=0;try{empty(null)}catch(e){if(e instanceof TypeError)hits++}"
         "var copy=eval('('+empty.toString()+')');"
         "try{copy(undefined)}catch(e){if(e instanceof TypeError)hits++}"
-        "pattern({get nested(){gc();return {x:9}},blank:3})===9 && hits===2";
+        "function computed(o,a,b){var {[(a,b)]:x}=o;return x}"
+        "var symbol=Symbol('key'),values={},key={};values[symbol]=21;"
+        "key[Symbol.toPrimitive]=function(){gc();return symbol};"
+        "pattern({get nested(){gc();return {x:9}},blank:3})===9 && hits===2 && "
+        "computed(values,null,key)===21";
     const char *legacy = "function old(v){var [a,b]=v;return a+b}old([3,4])===7";
     if (!rt) return 1;
     cx = JS_NewContext(rt,8192);

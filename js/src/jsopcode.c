@@ -1514,6 +1514,26 @@ DecompileDestructuring(SprintStack *ss, jsbytecode *pc, jsbytecode *endpc)
         saveop = op;
 
         switch (op) {
+          case JSOP_NOP:
+          {
+            ptrdiff_t savedOffset;
+            const char *key;
+            sn = js_GetSrcNote(jp->script, pc);
+            LOCAL_ASSERT(sn && SN_TYPE(sn) == SRC_PATTERNKEY);
+            pc2 = pc + js_GetSrcNoteOffset(sn, 0);
+            LOCAL_ASSERT(pc2 < endpc && *pc2 == JSOP_GETELEM);
+            *OFF2STR(&ss->sprinter, head) = '{';
+            savedOffset = ss->sprinter.offset;
+            ss->sprinter.offset += PAREN_SLOP;
+            if (!Decompile(ss, pc + JSOP_NOP_LENGTH,
+                           (intN)(pc2 - pc - JSOP_NOP_LENGTH))) return NULL;
+            key = PopStr(ss, JSOP_NOP);
+            ss->sprinter.offset = savedOffset;
+            if (Sprint(&ss->sprinter, "[(%s)]: ", key) < 0) return NULL;
+            pc = pc2;
+            LOAD_OP_DATA(pc);
+            break;
+          }
           case JSOP_POP:
             sn = js_GetSrcNote(jp->script, pc);
             if (sn && SN_TYPE(sn) == SRC_INITPROP)

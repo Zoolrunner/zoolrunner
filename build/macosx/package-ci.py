@@ -386,6 +386,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("generators.js", "ES6-GENERATORS checks=78 failures=0"),
                 ("typed-arrays.js", "ES6-TYPED-ARRAYS PASS checks=252"),
                 ("object-patterns.js", "ES6-OBJECT-PATTERNS PASS checks=27"),
+                ("computed-patterns.js", "ES6-COMPUTED-PATTERNS PASS checks=25"),
                 ("update-targets.js", "ES6-UPDATE-TARGETS PASS checks=19"),
                 ("for-of.js", "ES6-FOR-OF checks=66 failures=0"),
                 ("lexical-const.js", "ES6-LEXICAL-CONST checks=40 failures=0"),

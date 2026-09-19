@@ -2769,8 +2769,9 @@ CheckDestructuring(JSContext *cx, BindData *data,
                  * that representation when the cover grammar becomes a pattern. */
                 lhs->pn_left = lhs->pn_left->pn_kid;
             }
-            if (lhs->pn_left->pn_type == TOK_COMPUTED_NAME) {
-                /* Computed destructuring needs separate binding emission. */
+            if (lhs->pn_left->pn_type == TOK_COMPUTED_NAME &&
+                !JS_VERSION_IS_ES2015(cx)) {
+                /* Computed pattern keys belong to the modern grammar. */
                 js_ReportCompileErrorNumber(cx, lhs, JSREPORT_PN | JSREPORT_ERROR,
                                             JSMSG_STRICT_SYNTAX);
                 ok = JS_FALSE;

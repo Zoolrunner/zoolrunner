@@ -3471,6 +3471,7 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
     jsuint index;
     JSParseNode *pn2, *pn3;
     JSBool doElemOp;
+    ptrdiff_t keyStart, keyNote;
 
 #ifdef DEBUG
     intN stackDepth = cg->stackDepth;
@@ -3510,7 +3511,16 @@ EmitDestructuringOpsHelper(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn,
             JS_ASSERT(pn->pn_type == TOK_RC);
             JS_ASSERT(pn2->pn_type == TOK_COLON);
             pn3 = pn2->pn_left;
-            if (pn3->pn_type == TOK_NUMBER) {
+            if (pn3->pn_type == TOK_COMPUTED_NAME) {
+                keyStart = CG_OFFSET(cg);
+                keyNote = js_NewSrcNote(cx, cg, SRC_PATTERNKEY);
+                if (keyNote < 0 || js_Emit1(cx, cg, JSOP_NOP) < 0 ||
+                    !js_EmitTree(cx, cg, pn3->pn_kid) ||
+                    js_Emit1(cx, cg, JSOP_PROPERTYKEY) < 0 ||
+                    !js_SetSrcNoteOffset(cx, cg, (uintN)keyNote, 0,
+                                         CG_OFFSET(cg) - keyStart))
+                    return JS_FALSE;
+            } else if (pn3->pn_type == TOK_NUMBER) {
                 /*
                  * If we are emitting an object destructuring initialiser,
                  * annotate the index op with SRC_INITPROP so we know we are

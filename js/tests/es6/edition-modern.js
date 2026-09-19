@@ -161,6 +161,8 @@ function modernWindowEdition() {
                          return value===7 && caught; })() &&
            (function() { try { eval('1++'); } catch(e) { return e instanceof ReferenceError; }
                          return false; })() &&
+           (function() { var key=Symbol('pattern'), source={};source[key]=11;
+                         var {[key]:value}=source;return value===11; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();
