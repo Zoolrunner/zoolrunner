@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Package built Cocoa apps without links back into the developer checkout."""
 import argparse
+import json
 import os
 import platform
 import plistlib
@@ -426,6 +427,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("switch-environments.js", "SWITCH-SCOPE checks=18 failures=0"),
                 ("with-binding-value.js", "WITH-BINDING-VALUE checks=13 failures=0"),
                 ("json-reviver.js", "JSON-REVIVER checks=93 failures=0"),
+                ("json-realms-length.js", "JSON-REALMS-LENGTH checks=91 failures=0"),
                 ("typedarray-zero-indices.js", "TYPEDARRAY-ZERO-INDICES checks=207 failures=0"),
                 ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
                 ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),
@@ -463,6 +465,17 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             print(result.stdout)
             if result.returncode or marker not in result.stdout:
                 raise RuntimeError("Packaged runtime failed " + script)
+        if args.app == "suite":
+            inspector_source = root / "extensions/inspector/resources/content/inspector.js"
+            result = subprocess.run(
+                [str(runtime / "xpcshell"), "-e",
+                 "var inspectorSource=" + json.dumps(str(inspector_source)), "-f",
+                 str(root / "extensions/inspector/tests/load-order.js")],
+                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=60)
+            print(result.stdout)
+            if result.returncode or "INSPECTOR-LOAD-ORDER checks=12 failures=0" not in result.stdout:
+                raise RuntimeError("Inspector controller load-order regression")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
@@ -474,6 +487,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         embedding_env = dict(environment, DYLD_LIBRARY_PATH=str(runtime))
         for source, marker in (
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
+                ("es6/TestJSONRealms.c", "ES6-JSON-REALMS checks=28 failures=0"),
                 ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=14 failures=0"),
                 ("es6/TestReferenceEmbedding.c", "ES6-REFERENCE-EMBEDDING checks=38 failures=0"),
                 ("es6/TestGeneratorEmbedding.c", "ES6-GENERATOR-EMBEDDING PASS checks=14"),

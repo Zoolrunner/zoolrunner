@@ -98,6 +98,8 @@ InspectorApp.prototype =
   mShowBrowser: false,
   mClipboardHelper: null,
   mPromptService: null,
+  mDestroyed: false,
+  mPendingDocumentLoad: false,
   
   get document() { return this.mDocPanel.viewer.subject },
   get searchRegistry() { return this.mSearchService },
@@ -129,6 +131,12 @@ InspectorApp.prototype =
 
   destroy: function()
   {
+    this.mDestroyed = true;
+    this.mPendingDocumentLoad = false;
+    document.getElementById("bxBrowser").removeEventListener("pageshow", BrowserPageShowListener, true);
+    this.mPanelSet.removeObserver("panelsetready", this);
+    if (this.mDocPanel)
+      this.mDocPanel.removeObserver("subjectChange", this);
     InsUtil.persistAll("bxDocPanel");
     InsUtil.persistAll("bxObjectPanel");
   },
@@ -138,6 +146,8 @@ InspectorApp.prototype =
   
   initViewerPanels: function()
   {
+    if (this.mDestroyed)
+      return;
     this.mDocPanel = this.mPanelSet.getPanel(0);
     this.mDocPanel.addObserver("subjectChange", this, false);
     this.mObjectPanel = this.mPanelSet.getPanel(1);
@@ -151,10 +161,16 @@ InspectorApp.prototype =
       }
       this.mInitTarget = null;
     }
+    if (this.mPendingDocumentLoad) {
+      this.mPendingDocumentLoad = false;
+      this.documentLoaded();
+    }
   },
 
   onEvent: function(aEvent)
   {
+    if (this.mDestroyed)
+      return;
     switch (aEvent.type) {
       case "panelsetready":
         this.initViewerPanels();
@@ -416,6 +432,13 @@ InspectorApp.prototype =
 
   documentLoaded: function()
   {
+    if (this.mDestroyed)
+      return;
+    // The browser can finish loading before the asynchronous viewer registry.
+    if (!this.mDocPanel) {
+      this.mPendingDocumentLoad = true;
+      return;
+    }
     this.setTargetWindow(_content);
 
     var url = this.webNavigation.currentURI.spec;

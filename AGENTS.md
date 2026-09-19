@@ -1645,3 +1645,15 @@ rejection: a non-configurable property must not be partially overwritten.
 Ignore false definition results while propagating callback exceptions. Run
 `json-reviver.js` in both default ES5 and ES2015 modes, including frozen and
 nonextensible containers, accessors, Proxy traps, reentrant parsing and GC.
+
+Modern JSON methods retain their initialized edition when called from legacy
+scripts or cloned through JSAPI. Use ToLength for Proxy-array iteration and
+allocate results/root callback holders in the native method's realm. Preserve
+legacy ToUint32 behavior and interruptible native loops. Run
+`json-realms-length.js` and `TestJSONRealms.c`; give independent native test
+globals a null parent so primitive lookup cannot reach another global.
+
+Inspector browser pageshow can precede asynchronous viewer-registry readiness.
+Queue that load until the document panel exists, and discard pending work and
+listeners during teardown. Keep the controller load-order test alongside the
+real Suite lifecycle check; do not hide script errors by delaying the test.

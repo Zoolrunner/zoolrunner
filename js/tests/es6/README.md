@@ -3621,3 +3621,33 @@ Unicode exceptions instead of corrupting their JSON completion record. All 31
 runner controls pass. Rechecking the canonical-equivalence localeCompare case
 now records two real diagnostic failures, previously obscured by transport
 errors (`later-unicode-localecompare.json`); the engine issue remains under review.
+
+### JSON method realms and array lengths
+
+Modern JSON parse/stringify methods now use ToLength for Proxy-array traversal,
+including the replacer property list, and allocate parsed containers and root
+callback holders in the method's realm. Separate native entry points retain
+legacy ToUint32 behavior and preserve modern behavior when JSAPI clones a
+method into a legacy global. Traversal loops remain interruptible.
+
+The staged implementation passes 91 new shell checks and 28 native checks for
+wide/negative lengths, conversion order, collection, foreign realms, cloned
+methods, legacy globals and interruption. Independent native globals have
+explicitly null parents. All 111 existing focused fixtures and 63 native
+fixtures pass against the stage with current embedding components. An initial
+stage copied older XUL components and failed the debugger/tail-call fixture;
+that result is preserved in `json-realms-stage-focused.log`, with the complete
+current-component rerun in `json-realms-current-stage-focused.log`.
+
+The Suite's Inspector startup race is also fixed: a browser load waits for the
+asynchronous viewer registry, and teardown removes listeners and discards
+pending callbacks. The real controller passes 12 deterministic order/teardown
+checks; the unchanged controller reproduces the failure with the previous
+engine. Final `json-realms-final-*` validation passes all 28,582 pinned ES6
+modes and 11,540 ES5 modes with zero failures, all four macOS arm64 builds,
+packages and relocated desktop checks, Calendar's four views, Browser
+navigation/layout and Suite/XULRunner ChatZilla. The strengthened native realm
+probe passes against each application engine. All four and the frozen
+conformance runtime share SHA-256
+`5170c6b9d7e76e8085ac1252e8ae5b46d63b39450c6ec0dc15d4634f6896427d`. C89 checks pass. Other platforms and the broader edition inventory
+remain unvalidated for this batch.

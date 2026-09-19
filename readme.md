@@ -971,3 +971,9 @@ arm64 build/package/runtime gates pass; a Suite lifecycle retry and the
 separately reproduced Inspector startup race are documented in the
 [JSON reviver validation](js/tests/es6/README.md#json-reviver-descriptor-rejection).
 Broader edition review and other-platform validation remain unfinished.
+
+Modern JSON now preserves method-realm allocations and wide Proxy-array
+lengths, while legacy methods retain their historical length conversion.
+Inspector startup also handles browser loads arriving before viewer readiness.
+Both full pinned suites and all four macOS arm64 application gates pass; see
+[JSON realm and length validation](js/tests/es6/README.md#json-method-realms-and-array-lengths).
