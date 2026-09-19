@@ -2143,6 +2143,7 @@ JS_SetErrorReporter(JSContext *cx, JSErrorReporter er);
 #define JSREG_FOLD      0x01    /* fold uppercase to lowercase */
 #define JSREG_GLOB      0x02    /* global exec, creates array of matches */
 #define JSREG_MULTILINE 0x04    /* treat ^ and $ as begin and end of line */
+#define JSREG_UNICODE   0x10    /* ES2015 Unicode pattern */
 #define JSREG_STICKY    0x08    /* match only at lastIndex */
 
 extern JS_PUBLIC_API(JSObject *)

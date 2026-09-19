@@ -78,7 +78,7 @@ js_RegExpStatics_clear(JSContext *cx, JSRegExpStatics *res);
 typedef struct RECharSet {
     JSPackedBool    converted;
     JSPackedBool    sense;
-    uint16          length;
+    uint32          length;
     union {
         uint8       *bits;
         struct {

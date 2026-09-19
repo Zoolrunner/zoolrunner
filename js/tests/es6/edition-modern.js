@@ -172,6 +172,12 @@ function modernWindowEdition() {
                          ({x:destination().value}={get x(){events.push('get');return 7}});
                          return first===1 && rest.join()==='2,3' && target.value===7 &&
                                 events.join()==='target,get'; })() &&
+           (function() { var face='\uD83D\uDE00';
+                         return /^.$/u.test(face) && /[a-z]/iu.test('\u212A') &&
+                                /\u{1F600}/u.unicode &&
+                                face.match(/(?:)/ug).length===2 &&
+                                face.replace(/(?:)/ug,'-')==='-'+face+'-' &&
+                                (face+'x').split(/(?:)/u).join('|')===face+'|x'; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

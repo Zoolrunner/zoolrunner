@@ -751,3 +751,13 @@ harness errors, crashes or timeouts (**62 gained, zero lost**). All **11,540 ES5
 cases** and all four application build/package/runtime checks pass. Full ES2015
 compliance remains unfinished; other platforms remain unvalidated for this
 batch. See [the iterator-pattern validation record](js/tests/es6/README.md#iterator-based-patterns-and-captured-assignment-targets).
+
+ES2015 Unicode regular expressions pass macOS arm64 validation. The full run
+reaches **28,193 passes**, **375 failures**, and **14 unsupported modules**,
+with no harness errors, crashes or timeouts (46 gained, zero lost). The `u` flag
+adds code-point matching, strict escape grammar and Unicode simple case folding.
+Focused, native callback/cache and all pinned case-fold mapping checks pass;
+all **11,540 ES5 cases** and all four application build/package/desktop checks
+pass. Full ES2015 compliance remains unfinished; other platforms have not been
+revalidated for this batch. See the
+[Unicode regexp notes](js/tests/es6/README.md#unicode-regular-expressions).

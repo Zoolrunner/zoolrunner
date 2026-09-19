@@ -1211,6 +1211,12 @@ match_or_replace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 if (cx->regExpStatics.lastMatch.length == 0) {
                     if (index == length)
                         break;
+                    if ((re->flags & JSREG_UNICODE) && index + 1 < length &&
+                        JSSTRING_CHARS(str)[index] >= 0xD800 &&
+                        JSSTRING_CHARS(str)[index] <= 0xDBFF &&
+                        JSSTRING_CHARS(str)[index+1] >= 0xDC00 &&
+                        JSSTRING_CHARS(str)[index+1] <= 0xDFFF)
+                        ++index;
                     index++;
                 }
             }
@@ -1831,6 +1837,10 @@ find_split(JSContext *cx, JSString *str, JSRegExp *re, jsint *ip,
                  */
                 if ((size_t)i == length)
                     return -1;
+                if ((re->flags & JSREG_UNICODE) && (size_t)i + 1 < length &&
+                    chars[i] >= 0xD800 && chars[i] <= 0xDBFF &&
+                    chars[i+1] >= 0xDC00 && chars[i+1] <= 0xDFFF)
+                    ++i;
                 i++;
                 goto again;
             }

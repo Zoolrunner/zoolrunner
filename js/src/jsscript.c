@@ -448,8 +448,8 @@ XDRAtomMap(JSXDRState *xdr, JSAtomMap *map)
     return JS_FALSE;
 }
 
-JSBool
-js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
+static JSBool
+XDRScriptBody(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
 {
     JSContext *cx;
     JSScript *script, *newscript, *oldscript;
@@ -715,6 +715,20 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
         *scriptp = NULL;
     }
     return JS_FALSE;
+}
+
+JSBool
+js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
+{
+    JSBool ok;
+    JSRuntime *rt = xdr->cx->runtime;
+
+    /* Decoded atoms are not yet reachable from a rooted script. Regexp
+     * compilation and embedding callbacks may collect while decoding. */
+    JS_KEEP_ATOMS(rt);
+    ok = XDRScriptBody(xdr, scriptp, hasMagic);
+    JS_UNKEEP_ATOMS(rt);
+    return ok;
 }
 
 #if JS_HAS_XDR_FREEZE_THAW

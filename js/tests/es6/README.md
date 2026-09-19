@@ -2674,3 +2674,49 @@ inputs. Initial package-check logs are retained under
 The initial orchestration watchers stopped while a failed package log was being
 rotated. Their diagnostics are retained; complete restarted conformance and
 desktop runs above passed their required checks against the unchanged engine.
+
+## Unicode regular expressions
+
+ES2015 regular expressions accept `u`, expose the `unicode` accessor, and match
+code points while preserving UTF-16 offsets for captures and `lastIndex`.
+Patterns support supplementary literals, paired and braced Unicode escapes,
+code-point classes/ranges, Unicode-aware backreferences and strict Unicode
+escape grammar. Unicode ignore-case matching uses pinned Unicode 18.0.0
+simple/common case folds, including word-class/boundary canonicalization;
+non-Unicode matching and explicitly selected legacy editions retain their paths.
+Existing match/replace/split protocols advance empty Unicode matches by code point.
+
+Unicode class bitmaps are completed before publishing the regexp. Compilation
+callbacks can cancel, collect or compile another regexp. Decoded regexp objects
+and script atoms remain rooted across those callbacks. Cache version 55 records
+the new flag semantics; script/function source and XDR round-trips are exercised.
+
+`regexp-unicode.js` supplies 48 focused checks and `TestRegExpUnicode.c` supplies
+22 native embedding checks. The real-window edition fixture exercises Unicode
+matching and empty global matches. `test-regexp-casefold.py` checks every pinned
+simple/common mapping (15,330 assertions); see the [Unicode data guide](../../src/unicode/README.md).
+
+The final full macOS arm64 run passes **28,193 modes**, with **375 failures**,
+**14 unsupported modules**, and no harness errors, crashes or timeouts: **46 gained,
+zero lost** against iterator patterns. All **11,540 ES5 cases** pass against the
+same frozen runtime. All four applications pass root builds, packaging and
+relocated desktop checks, including Calendar's four views, 169 Browser
+navigation/layout checks and ChatZilla in Suite and XULRunner. Native, mapping,
+C89 and 9,450 optional Node differential checks pass. Final reports use
+`artifacts/es6/regexp-unicode-verified-final-*`. All four engine hashes match
+the frozen conformance runtime:
+`136d604f959eb1b7468ccd071c735e9a0349e465269fc79142d6075229f54af6`.
+Full ES2015 compliance remains unfinished; other platforms are not revalidated
+for this batch.
+
+The first desktop run exposed mixed-edition integration missing from the modern
+shell: historical globals did not expose the new `unicode` field, and their
+String match/replace/split loops advanced empty Unicode matches by a code unit.
+The legacy regexp property hook now reports the stored flag, and those loops
+advance paired surrogates together only for Unicode regexps. Existing callable
+regexp behavior and non-Unicode matching remain covered. The unchanged failing
+window assertions now pass, with additional replace/split assertions, after
+this engine correction. A second diagnostic run also caught an omitted legacy
+property-table entry; the strengthened native probe creates an independent
+legacy global and reproduces that failure before the correction. The first failure log is retained under
+`artifacts/es6/regexp-unicode-final-runtime/xulrunner/editions.log`.

@@ -46,7 +46,8 @@ scope. Passing these normalization checks does not establish full ES2015 support
 ES2015 globals use separate Unicode 18.0.0 full upper/lowercase mappings, including
 expansions, supplementary characters and language-independent Final_Sigma context.
 Legacy globals retain the historical tables. XPCOM casing, identifiers, regular
-expression case folding, layout and fonts are not changed. Explicit embedding
+expression case folding, layout and fonts are not changed by these string
+casing tables. Unicode regexp folding uses the separate table described below. Explicit embedding
 locale callbacks remain authoritative for the locale methods; without a callback,
 the modern default uses the same full mappings as the nonlocale methods.
 
@@ -97,3 +98,26 @@ python3 js/tests/es6/test-identifiers.py --ucd /path/to/ucd-18.0.0 \
 The boundary probe checks 15,736 combinations against upstream properties.
 Source reconstruction uses Unicode escapes for identifier names separately from
 string/XML escaping, including supplementary code-point escapes.
+
+## ES2015 Unicode regular expressions
+
+The `u` flag enables code-point matching and separate Unicode 18.0.0 C/S
+(simple/common) case folding when combined with `i`. Full multi-character and
+Turkic mappings are excluded, as required by ES2015's canonicalization rules.
+Non-Unicode regular expressions retain the historical case-folding path.
+
+`generate-regexp-casefold.py` verifies upstream `CaseFolding.txt` with SHA-256
+`a004797658a457bec4dc11683e39f69249ea3b595b752dbea6721c4c9f587b0d` and writes
+`../jsregexp-casefold.h`. Normal builds require neither Python nor UCD downloads.
+
+```sh
+python3 js/src/unicode/generate-regexp-casefold.py --ucd /path/to/ucd-18.0.0 \
+  --output js/src/jsregexp-casefold.h
+python3 js/tests/es6/test-regexp-casefold.py --ucd /path/to/ucd-18.0.0 \
+  --shell /path/to/runtime/xpcshell --log regexp-casefold.log
+```
+
+The mapping probe covers all 1,533 C/S mappings in both directions using literals,
+positive/negative classes, backreferences and case-sensitive controls: 15,330
+checks. Separate focused and native probes cover surrogate handling, regexp
+protocols, callback reentry, collection, cancellation and script-cache decoding.
