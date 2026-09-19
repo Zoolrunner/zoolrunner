@@ -1,0 +1,650 @@
+{
+  "purpose": "Manual edition review only; this incomplete ledger does not select, exclude, or count tests as passing. Diagnostic reports retain every selected failure.",
+  "revision": "35d566604512cba908054eec49f85e64a59f3091",
+  "records": [
+    {
+      "test": "annexB/language/function-code/function-redeclaration-block.js",
+      "sha256": "8d4a3f259dabceeee101959aac117a19f5bfe9e374e1178b45f45a1142195d9e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-block-static-semantics-early-errors",
+      "reason": "Original ES2015 rejects duplicate lexical declarations, including block/switch functions. These later Annex B tests require a subsequent relaxation."
+    },
+    {
+      "test": "annexB/language/function-code/function-redeclaration-switch.js",
+      "sha256": "780859b6d92926f14a7aff5df1baadc06cf5fd535929a0de88bc1a4d2bad4d24",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-block-static-semantics-early-errors",
+      "reason": "Original ES2015 rejects duplicate lexical declarations, including block/switch functions. These later Annex B tests require a subsequent relaxation."
+    },
+    {
+      "test": "annexB/language/literals/regexp/non-empty-class-ranges-no-dash.js",
+      "sha256": "b96c4991bc267376eec11c3f3b279b6682fd2482bfa63e31d7a73f4c292b311b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-regular-expressions-patterns",
+      "reason": "The original ES2015 Annex B range grammar and ClassAtomNoDash identity fallback differ from the later union-of-character-sets rule used by this test. The pinned original cases and original-range native regressions remain passing."
+    },
+    {
+      "test": "annexB/language/literals/regexp/non-empty-class-ranges.js",
+      "sha256": "6734b8e615f345e1dc2ed9c29b0c866d7611581d6afbe67b036f5fcdac083153",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-regular-expressions-patterns",
+      "reason": "The original ES2015 Annex B range grammar and ClassAtomNoDash identity fallback differ from the later union-of-character-sets rule used by this test. The pinned original cases and original-range native regressions remain passing."
+    },
+    {
+      "test": "built-ins/Function/prototype/toString/proxy-arrow-function.js",
+      "sha256": "edf647e1538d6ccc6291b4f69954d0b21b1a0e13466746336387f8674c3b9a3b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
+    },
+    {
+      "test": "built-ins/Function/prototype/toString/proxy-bound-function.js",
+      "sha256": "362bfcb98de66a6be13f7198afcb1bae9433dbfaa478bede7e0d90fe2d7eaa74",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
+    },
+    {
+      "test": "built-ins/Function/prototype/toString/proxy-class.js",
+      "sha256": "85f6829f92b0a37cca0e01024047e1c1ac3a5b04e543260178fdab28039efe9b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
+    },
+    {
+      "test": "built-ins/Function/prototype/toString/proxy-function-expression.js",
+      "sha256": "9070c6be3d3d25a1e6e37e4d10bd83edf374ed9681529ab28f4139847c56ced9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
+    },
+    {
+      "test": "built-ins/Function/prototype/toString/proxy-generator-function.js",
+      "sha256": "2c33314f9c4f567d49d1f66183531a9cb6696cab1583eb091795db34598c2142",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
+    },
+    {
+      "test": "built-ins/Function/prototype/toString/proxy-method-definition.js",
+      "sha256": "16ee1af4fea6da30f21c07ad10ac9f59b685401170f3e69047070ef885a0cfc8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function.prototype.tostring",
+      "reason": "Original ES2015 only accepts bound functions, built-in function objects or objects with ECMAScriptCode. A callable Proxy meets none of those branches and throws TypeError. The later test requires a native-function representation."
+    },
+    {
+      "test": "built-ins/Proxy/revocable/revocation-function-name.js",
+      "sha256": "6e8001ca68067ddf513ee7c113136080b13c1843ee0f27fbb1bc918d884f7ae6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-ecmascript-standard-built-in-objects",
+      "reason": "Original clause 17 excludes anonymous built-ins from the name requirement. The unchanged pinned ES2015 test requires no own name; the later test requires an own empty name."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/Symbol.search/lastindex-no-restore.js",
+      "sha256": "dae3bb175f95702882d94094d82228caffa490b6150e8347a4aa3a705cf2c658",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-regexp.prototype-@@search",
+      "reason": "Original ES2015 Symbol.search restores the prior lastIndex after RegExpExec without the later second-read/conditional-write optimization. This later test asserts the optimized observable access count."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/exec/failure-lastindex-access.js",
+      "sha256": "96bf3bdd4728d81791cb6c633092320f685570deb1f4df6b2deb1aa9910ca9d9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-regexpbuiltinexec",
+      "reason": "Original ES2015 RegExpBuiltinExec resets lastIndex on search exhaustion. This later test requires preserving it for a non-global, non-sticky unsuccessful search."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/sticky/this-val-non-obj.js",
+      "sha256": "5b4c590c563824da3a308188337541911349d4298be8dd7f7790949119d063c4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-numeric-literals",
+      "reason": "This revised test includes a BigInt literal (4n), outside the original ES2015 grammar. Its source is retained unchanged in the diagnostic; focused original primitive-receiver checks remain separate."
+    },
+    {
+      "test": "built-ins/RegExp/prototype/unicode/this-val-non-obj.js",
+      "sha256": "5d3ee9642539eba3fe97eb6f9a51e49994274db0bb34c542608576c8f1ec563e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-numeric-literals",
+      "reason": "This revised test includes a BigInt literal (4n), outside the original ES2015 grammar. Its source is retained unchanged in the diagnostic; focused original primitive-receiver checks remain separate."
+    },
+    {
+      "test": "built-ins/String/prototype/match/cstm-matcher-on-boolean-primitive.js",
+      "sha256": "a5ad19dc8ea1c07a94a155432320a3c83d6d25f73aa17b2ef100fecc121f0885",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.match",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/match/cstm-matcher-on-number-primitive.js",
+      "sha256": "12206e93ad42429c054063b92f0e290bb628781fc7f49924054d617fc31e6760",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.match",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/match/cstm-matcher-on-string-primitive.js",
+      "sha256": "b3cd13354f0acec6305838e7d2c7f7ea4d777f1e1fe21e7e751fe2c89938b9dc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.match",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/replace/cstm-replace-on-boolean-primitive.js",
+      "sha256": "401e59ac140885b6de9e2c3477edeb4ea9c066091150704d2e515ae8ca561be3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.replace",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/replace/cstm-replace-on-number-primitive.js",
+      "sha256": "8df1406a794e599595e2b091efc1abade921e575a97ffd659be388726ec4b0e0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.replace",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/replace/cstm-replace-on-string-primitive.js",
+      "sha256": "0a420cf20f677d99593d3b1d7fca7570ddc62cd3d49cfa6299d1f1cc9fa55ba0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.replace",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/search/cstm-search-on-boolean-primitive.js",
+      "sha256": "cbae2aea722e36b5ea93be76d80e5cca2c2158170c90b60d62adfe6be3da1d41",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.search",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/search/cstm-search-on-number-primitive.js",
+      "sha256": "e7d894dd30502f2ab1f965f0d92f88e0143a55ace9e23b51da6e6bd3cf2ad448",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.search",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/search/cstm-search-on-string-primitive.js",
+      "sha256": "6d7ded07a14a3846286bd37f8fc02e5b43a176f590dd4b32e5421d46f5941d1b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.search",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/split/cstm-split-on-boolean-primitive.js",
+      "sha256": "b8b8cc3eb66bcf9f98d68796bdc26744cb095e280d628f162081e476292f3483",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.split",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/split/cstm-split-on-number-primitive.js",
+      "sha256": "6fc9c40ff15cf24ada079789fb40e9ff6f83811a68b7b3b9007ee51575f6cfb7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.split",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/String/prototype/split/cstm-split-on-string-primitive.js",
+      "sha256": "6a72aa469045685b7ebf49a27f1b260f7eaff95a6ab6a1b02799acdb7de4a2f1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-string.prototype.split",
+      "reason": "Original ES2015 invokes GetMethod on every non-null/undefined argument, including primitives. These later cases require skipping the symbol lookup on primitive arguments."
+    },
+    {
+      "test": "built-ins/TypedArray/prototype/indexOf/fromIndex-minus-zero.js",
+      "sha256": "517b7584057d0a62ef4f28ccd1c2fe2b3ffff9a1fafe84080ca37593649b81fa",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-%typedarray%.prototype.indexof",
+      "reason": "Search algorithms address element zero after ToString of either signed zero. Normalizing the algorithmic index fixes negative-zero searches while the distinct canonical property string -0 remains invalid. Both unchanged later modes pass in the staged lexical/index candidate."
+    },
+    {
+      "test": "built-ins/TypedArray/prototype/lastIndexOf/fromIndex-minus-zero.js",
+      "sha256": "7098c8b70301a8e30c0dd223ebd25349628665d4018abb155e37d67081bceb6f",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-%typedarray%.prototype.lastindexof",
+      "reason": "Search algorithms address element zero after ToString of either signed zero. Normalizing the algorithmic index fixes negative-zero searches while the distinct canonical property string -0 remains invalid. Both unchanged later modes pass in the staged lexical/index candidate."
+    },
+    {
+      "test": "language/expressions/class/accessor-name-inst/literal-string-default-escaped-ext.js",
+      "sha256": "9c9fe4b356ae5faae47223f3390c24d2224abede79b6602ed2a49ed7c66df8d8",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/expressions/class/accessor-name-inst/literal-string-unicode-escape.js",
+      "sha256": "b118d70b93ef00bd04e800bdb6f75a073b811d9abe2bd5b1626ccbb8221cacf0",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/expressions/class/accessor-name-static/literal-string-default-escaped-ext.js",
+      "sha256": "be8482e654243b3037c6ee9ce8411d4bc406d6b50f9ee19d77cf1de6691f90b3",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/expressions/class/accessor-name-static/literal-string-unicode-escape.js",
+      "sha256": "4105068ab396957a138ab405e26444f9a87d64533525093901680bc096098f7f",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-escape-sequence-ZWJ.js",
+      "sha256": "05c26e51780e678b60eae90ada5e0fe1a6b149f0b8eadabfa6c180d9f9a16fd6",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-escape-sequence-ZWNJ.js",
+      "sha256": "f26cb7cce56c8e4f42e324bd8f7f364b69dc31696d18c5d6d5e7b72b6cd52802",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-escape-sequence-u2118.js",
+      "sha256": "1b177bde3e99d2931b07c6baeb4da6d211e411953a7b602ee0c2166949c7ec62",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-escape-sequence-u6F.js",
+      "sha256": "e303643f8059b586457f42e2fee38af4ca914ae7feafb0cc61f451603e7ac663",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-name-ZWJ.js",
+      "sha256": "6a64f1b4a06a0e5830ff57c9e341071dd3b75abb639221321d1e254915653068",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-name-ZWNJ.js",
+      "sha256": "28a711a3c2fbae5a135d7685f56f96ef4df4428a2fcefe3274dcb52fbe3e9bcd",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-name-common.js",
+      "sha256": "2349b8497e65deef8d035af38e7dcd880f7b8d627827d85a77b27681f3ffce6c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-name-dollar.js",
+      "sha256": "d5522d7a6129bd25ecaadfd139eabe033824bda957a556325514b2f90a8a7e17",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-name-u2118.js",
+      "sha256": "3de225b992e39e15cf18a222964de1ebd946ffec5f218f3d6fd0d2b118600a52",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/inst-private-name-underscore.js",
+      "sha256": "37b19ec2c8c434d67c0df3981a3c5ba9a2b839cf70000a181b4297042e98c0f5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-escape-sequence-ZWJ.js",
+      "sha256": "f98e4ecab3b8f2134ac1004786fa1ae42bd1a32fd9c0e0daf62f62fb3f692185",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-escape-sequence-ZWNJ.js",
+      "sha256": "64b824d7cf41c6e4d59355830b075c06a4051bdadeef88256ad6f527a709e385",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-escape-sequence-u2118.js",
+      "sha256": "0e158ab13dfbf562475f141fa7ceb1d47bfcf2ee225b24de62c4dd21dc28e1a0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-escape-sequence-u6F.js",
+      "sha256": "2b8055fe76cc1a60c3effea1540a6f5a52e318ab3357bdf499426bc7b0d578e1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-name-ZWJ.js",
+      "sha256": "d90ef859200c24f8e7ac5513d7c4ac083b6eb530d155d87a9b5212ea15a3e478",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-name-ZWNJ.js",
+      "sha256": "9021a9cf2bead423bfe6a5d376f718a4a61ba5cf684964d70cc06f65f0a8b2ae",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-name-common.js",
+      "sha256": "4465796b94a668a4a0fde095591e5aa608ebae20b9073ee2da364d49251a8019",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-name-dollar.js",
+      "sha256": "fd61f4d0772dab3c27fe9ceaf7f016304e1add60ba29bcbd809d30b4638f3bfc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-name-u2118.js",
+      "sha256": "91c91fc86083cb265d527936548e855b7eb4cb8bfdaa4c2e76bcf00b4898b8ae",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/expressions/class/elements/private-accessor-name/static-private-name-underscore.js",
+      "sha256": "ab5a42c092e6e9b2d452452b996d98a76e2e41d1e6c6fecf4e4a065d4134589c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/module-code/namespace/Symbol.toStringTag.js",
+      "sha256": "6315c6f95c2c060a0f21a777655a498a47c44efbdbd72939685829f98355dca8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-@@tostringtag",
+      "reason": "Original ES2015 explicitly specifies configurable:true for the module namespace Symbol.toStringTag property. The later test requires configurable:false."
+    },
+    {
+      "test": "language/statements/class/accessor-name-inst/literal-string-default-escaped-ext.js",
+      "sha256": "6e5ba707183a601fa6e6891437155e3bab3787e3988a1cfe320d0ea72fe9fd91",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/statements/class/accessor-name-inst/literal-string-unicode-escape.js",
+      "sha256": "5108da3b0a140a73c74e11d725323a9ad45d8bc37f7427cab01276f7b7dd7521",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/statements/class/accessor-name-static/literal-string-default-escaped-ext.js",
+      "sha256": "10035186bdccfd41692aed0198106ef57b67d566acec537ae6f3f544e52be41f",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/statements/class/accessor-name-static/literal-string-unicode-escape.js",
+      "sha256": "3a5a814c9ab6aac7fda462c99861fd04e90381a80e2ae6f0fdc8c5d7fcf9b7fc",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-literals-string-literals",
+      "reason": "ES2015 string UnicodeEscapeSequence permits the braced code-point form. Added to the staged scanner without enabling it in legacy editions; both unchanged later accessor modes pass in the staged lexical candidate. All 178 public-accessor diagnostic modes pass; the separate 80 private-accessor failures remain reported."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-escape-sequence-ZWJ.js",
+      "sha256": "3f737eba2f19125d52369fddf830144716a5b37644402791d3198115366fe1ed",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-escape-sequence-ZWNJ.js",
+      "sha256": "0153396d95fa2a96f1c56b2a2a9eb82a4970b96ef6a5e4669642a8b667557c06",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-escape-sequence-u2118.js",
+      "sha256": "15e9485ac9288b90fb2fe1d972e15850c1b3d8c867b1f65dfd847cec19629887",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-escape-sequence-u6F.js",
+      "sha256": "67909fb58ec20f62bcfd8f5dc81a33bf7ca92656f22dd22a1cd5e5095b7c0f46",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-name-ZWJ.js",
+      "sha256": "c8eecb8548b3e21b3f925d446fa7a96927759d0cecd8772907b667cc28528774",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-name-ZWNJ.js",
+      "sha256": "32add15642ac1c1f8867fd66e72f2643d78aa0abcecc1a92d1467c710ee3f425",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-name-common.js",
+      "sha256": "d47f987b343d1a678bb0f8e7051c4bd2cdcf2070e043654471b46bf564d235bf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-name-dollar.js",
+      "sha256": "07a6b9546dd65e6f05cf6948a76c2a0c502992f782874bd7695b93a3bbd754e9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-name-u2118.js",
+      "sha256": "5f0443217626d35771182faeca2d0eee78c8ebd5faa29b01eba0f218fb122dbf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/inst-private-name-underscore.js",
+      "sha256": "cc3eb2a42a875668ba6dd3d73f792f1d67b20e256dbba3f2a8a4efbf5f9b02ed",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-escape-sequence-ZWJ.js",
+      "sha256": "323fccc7a52ff09245fdc05a8e1059276e85655e3b26cd32c2a2195c18cb137e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-escape-sequence-ZWNJ.js",
+      "sha256": "8196ba8594bf3fed8fabbf27c280f4940483e2266e277da97967d77a4e49ef70",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-escape-sequence-u2118.js",
+      "sha256": "fff2818fe27277b637be2104642c7ee8886244611f932998cbbaba25068f1591",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-escape-sequence-u6F.js",
+      "sha256": "a79c0391146890f43643b74e2c2940da10d416a86680b00758dadfda99733cb9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-name-ZWJ.js",
+      "sha256": "363fbc5c4256b881c957863ba1a28b2b6df60cc968f77c8d8adb672dd594e564",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-name-ZWNJ.js",
+      "sha256": "3136a01c0845a4f573b5d9690910141633a3c2a7abd10ced3c77f32d29371163",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-name-common.js",
+      "sha256": "9e1f57377e73e35193144395200bf344a6abf800d58a54fc80b9545911627bd4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-name-dollar.js",
+      "sha256": "335c6f59e69b1d3bfc48bf7a9f964b22d5ccbe12ee7bdc8ac44dba549756c868",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-name-u2118.js",
+      "sha256": "fe7f580f43c51a7464c93864c99ce0679bde0fce6982113091e05acb26478356",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/class/elements/private-accessor-name/static-private-name-underscore.js",
+      "sha256": "16311a95b37b3204c621f3f8bc37385223add84458893e7747c68fac18ce3d02",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-class-definitions",
+      "reason": "This case requires private class accessors (# names). The original ES2015 ClassElement grammar has no private names."
+    },
+    {
+      "test": "language/statements/for-of/iterator-close-throw-get-method-abrupt.js",
+      "sha256": "770848caa62e596adcc1125cb0021e7dc864076ce8da37b218c89ddf9f00ca04",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-iteratorclose",
+      "reason": "Original IteratorClose propagates errors from GetMethod(return) before testing the existing throw completion. The later test gives the earlier throw priority."
+    },
+    {
+      "test": "language/statements/for-of/iterator-close-throw-get-method-non-callable.js",
+      "sha256": "49c0a851d2a34ce55a9e2ca7c4690ec84f95368bf1424819481843e00858aa26",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-iteratorclose",
+      "reason": "Original IteratorClose propagates errors from GetMethod(return) before testing the existing throw completion. The later test gives the earlier throw priority."
+    },
+    {
+      "test": "language/statements/for-of/iterator-next-reference.js",
+      "sha256": "603b59ab0fff792aedd1ff6d383eece75aee2e3d6bb8bb4c77d37026df637b04",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-iteratornext",
+      "reason": "Original IteratorNext invokes the next property on each step. The later iterator-record algorithm caches the method."
+    },
+    {
+      "test": "language/statements/let/syntax/let-newline-yield-in-generator-function.js",
+      "sha256": "50ed245ccbe23dc19f0657892ad0ef71d33d67235734d67e77a5ebe30bdaf979",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-let-and-const-declarations",
+      "reason": "yield is a BindingIdentifier grammar candidate, then prohibited by generator early errors. The newline does not allow ASI between let and its binding. Both later diagnostic modes pass unchanged in the staged lexical candidate."
+    },
+    {
+      "test": "language/statements/try/dstr/ary-ptrn-rest-ary-elem.js",
+      "sha256": "4314aaca5c3b8beea845e5aa3da82801c4aa8a24837042c33e28753ead620994",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/ary-ptrn-rest-ary-elision.js",
+      "sha256": "ebc79ee0286544df031a588ab8b33c5628ca4ecb25c9d63a7e6ccb7ad7121b41",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/ary-ptrn-rest-ary-empty.js",
+      "sha256": "68a9f102a63b0357f498b4c846c3b43430ad8781f8bd319d31370673ecf77344",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/ary-ptrn-rest-ary-rest.js",
+      "sha256": "f7a992c2862007a31182601bc544087204afda3a556f929cf92c5d5ae78116f0",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/ary-ptrn-rest-obj-id.js",
+      "sha256": "39d6bfbb0925bd2d4e26b61d9bfa884add92fd01b4fef33f4c038750f07812be",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/ary-ptrn-rest-obj-prop-id.js",
+      "sha256": "c16942091ab09a6d15547559502045bdd7af02e0896ad8b38f64de0b678e0233",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/obj-ptrn-rest-getter.js",
+      "sha256": "39835a860a04f1c9cffbc79d151309c8850da2df023a0fbde5f1aab0b41074b9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/obj-ptrn-rest-skip-non-enumerable.js",
+      "sha256": "f42c039b36f53027b00c922dd28a31e1796a6e31ddff3dc545951061358a6d90",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/dstr/obj-ptrn-rest-val-obj.js",
+      "sha256": "2618441c679b112cc2d2a96e688c2cc1ed45e46f5baf72e9efe89b7189db2c17",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-destructuring-binding-patterns",
+      "reason": "Original ES2015 BindingRestElement only permits a BindingIdentifier, and ObjectBindingPattern has no rest property. This test requires later nested array-rest binding patterns or object-rest syntax."
+    },
+    {
+      "test": "language/statements/try/scope-catch-block-lex-open.js",
+      "sha256": "42319b1be452506a22e7a0eadac1faab682d01bb4001dc80598a4b83cdd4e7eb",
+      "decision": "original-es2015-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-runtime-semantics-catchclauseevaluation",
+      "reason": "Parameter initialization precedes Block evaluation and its distinct lexical environment. Fixed in the staged catch environment candidate; later diagnostic passes unchanged."
+    }
+  ]
+}

@@ -777,6 +777,12 @@ RecordDeclaration(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     lexical = kind == JSOP_NOP ||
               (kind == JSOP_CLOSURE &&
                ((stmt && !(stmt->flags & SIF_BODY_BLOCK)) || (!stmt && tc->module)));
+    /* Catch parameter names also conflict with immediate body lexicals,
+     * even though their runtime environments are distinct. */
+    if (lexical && stmt && stmt->down && stmt->down->type == STMT_CATCH &&
+        SCOPE_GET_PROPERTY(OBJ_SCOPE(ATOM_TO_OBJECT(stmt->down->atom)),
+                           ATOM_TO_JSID(atom)))
+        return LexicalSyntaxError(cx, ts);
     for (;;) {
         lexicals = stmt ? &stmt->lexicalDecls : &tc->lexicalDecls;
         vars = stmt ? &stmt->varDecls : &tc->varDecls;
@@ -3442,7 +3448,11 @@ IsLexicalLet(JSContext *cx, JSTokenStream *ts)
         chars[1] != 'e' || chars[2] != 't')
         return JS_FALSE;
     next = js_PeekToken(cx, ts);
-    return next == TOK_NAME || next == TOK_LB || next == TOK_LC;
+    /* Yield is a BindingIdentifier grammar candidate even where the
+     * generator early errors forbid it; a newline cannot turn let into an
+     * expression statement followed by yield. */
+    return next == TOK_NAME || next == TOK_YIELD ||
+           next == TOK_LB || next == TOK_LC;
 }
 
 static JSParseNode *
@@ -4447,6 +4457,16 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                     pn3 = DestructuringExpr(cx, &data, tc, tt);
                     if (!pn3)
                         return NULL;
+                    if (JS_VERSION_IS_ES2015(cx)) {
+                        JSScopeProperty *binding;
+                        /* All pattern names exist, uninitialized, before any
+                         * default expression or iterator callback executes. */
+                        for (binding = SCOPE_LAST_PROP(OBJ_SCOPE(data.obj));
+                             binding; binding = binding->parent) {
+                            OBJ_SET_SLOT(cx, data.obj, binding->slot,
+                                         JSVAL_UNINITIALIZED);
+                        }
+                    }
                     break;
 #endif
 
@@ -4488,7 +4508,16 @@ Statement(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
                 MUST_MATCH_TOKEN(TOK_RP, JSMSG_PAREN_AFTER_CATCH);
 
                 MUST_MATCH_TOKEN(TOK_LC, JSMSG_CURLY_BEFORE_CATCH);
-                pn2->pn_kid3 = Statements(cx, ts, tc);
+                if (JS_VERSION_IS_ES2015(cx)) {
+                    JSStmtInfo bodyStmt;
+                    /* Parameter initialization precedes the catch body's
+                     * lexical environment, including closures it creates. */
+                    js_PushStatement(tc, &bodyStmt, STMT_BLOCK, -1);
+                    pn2->pn_kid3 = Statements(cx, ts, tc);
+                    js_PopStatement(tc);
+                } else {
+                    pn2->pn_kid3 = Statements(cx, ts, tc);
+                }
                 if (!pn2->pn_kid3)
                     return NULL;
                 MUST_MATCH_TOKEN(TOK_RC, JSMSG_CURLY_AFTER_CATCH);

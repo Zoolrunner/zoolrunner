@@ -1821,7 +1821,34 @@ retry:
                         c = (jschar)val;
                     } else if (c == 'u') {
                         jschar cp[4];
-                        if (PeekChars(ts, 4, cp) &&
+                        if (JS_VERSION_IS_ES2015(cx) && PeekChar(ts) == '{') {
+                            int32 value = 0, digit;
+                            JSBool any = JS_FALSE;
+                            GetChar(ts);
+                            while ((digit = GetChar(ts)) != '}') {
+                                if (!JS7_ISHEX(digit) ||
+                                    value > (0x10ffff - JS7_UNHEX(digit)) / 16) {
+                                    js_ReportCompileErrorNumber(cx, ts,
+                                        JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_SYNTAX_ERROR);
+                                    goto error;
+                                }
+                                value = value * 16 + JS7_UNHEX(digit);
+                                any = JS_TRUE;
+                            }
+                            if (!any) {
+                                js_ReportCompileErrorNumber(cx, ts,
+                                    JSREPORT_TS | JSREPORT_ERROR,
+                                    JSMSG_SYNTAX_ERROR);
+                                goto error;
+                            }
+                            if (value > 0xffff) {
+                                value -= 0x10000;
+                                ADD_TO_TOKENBUF(0xd800 + (value >> 10));
+                                value = 0xdc00 + (value & 0x3ff);
+                            }
+                            c = value;
+                        } else if (PeekChars(ts, 4, cp) &&
                             JS7_ISHEX(cp[0]) && JS7_ISHEX(cp[1]) &&
                             JS7_ISHEX(cp[2]) && JS7_ISHEX(cp[3])) {
                             c = (((((JS7_UNHEX(cp[0]) << 4)

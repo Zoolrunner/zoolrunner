@@ -18,7 +18,7 @@ def main():
     args = parser.parse_args()
     shell = args.shell.resolve()
     checks = 0
-    def control(source, expected, negative=None, harness='', mode='non-strict', flags=()):
+    def control(source, expected, negative=None, harness='', mode='non-strict', flags=(), fixtures=None):
         nonlocal checks
         record = dict(flags=list(flags))
         if negative:
@@ -26,7 +26,7 @@ def main():
         case = dict(source=source, mode=mode, test='control.js', record=record)
         with tempfile.TemporaryDirectory(prefix='zool-later-control-') as temporary:
             path = Path(temporary) / 'control.js'
-            path.write_text(later.phase_driver(case, harness, 'CONTROL '))
+            path.write_text(later.phase_driver(case, harness, 'CONTROL ', fixtures))
             proc = subprocess.run([str(shell), '-E', '-v', '2015', '-f', str(path)],
                                   env=dict(os.environ, DYLD_LIBRARY_PATH=str(shell.parent)),
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=15)
@@ -46,6 +46,24 @@ def main():
     control('export var =', 'pass', ('parse', 'SyntaxError'), mode='module')
     control('export var x=1;throw new TypeError("module runtime")', 'pass', ('runtime', 'TypeError'), mode='module')
     control('import "unprovided.js"', 'harness-error', ('resolution', 'SyntaxError'), mode='module')
+    control('import {x} from "./dep_FIXTURE.js";if(x!==7)throw Error("binding")', 'pass',
+            mode='module', fixtures={'dep_FIXTURE.js': 'export let x=7;'})
+    control('import {x} from "./dep_FIXTURE.js";import {x as y} from "./sub/../dep_FIXTURE.js";'
+            'if(x!==y||counter!==1)throw Error("duplicate evaluation")', 'pass',
+            harness='var counter=0;', mode='module',
+            fixtures={'dep_FIXTURE.js': 'counter++;export const x={};'})
+    control('import {f} from "./dep_FIXTURE.js";export function g(){return 9;}'
+            'if(f()!==9)throw Error("cycle")', 'pass', mode='module',
+            fixtures={'dep_FIXTURE.js': 'import {g} from "./control.js";export function f(){return g();}'})
+    control('import "./dep_FIXTURE.js"', 'pass', ('resolution', 'SyntaxError'), mode='module',
+            fixtures={'dep_FIXTURE.js': 'export var =;'})
+    control('import "./dep_FIXTURE.js";export var =;', 'pass', ('parse', 'SyntaxError'), mode='module',
+            fixtures={'dep_FIXTURE.js': 'export var =;'})
+    control('import "./dep_FIXTURE.js"', 'pass', ('runtime', 'TypeError'), mode='module',
+            fixtures={'dep_FIXTURE.js': 'throw new TypeError("dependency runtime");'})
+    control('import "./dep_FIXTURE.js"', 'fail', ('resolution', 'TypeError'), mode='module',
+            fixtures={'dep_FIXTURE.js': 'throw new TypeError("dependency runtime");'})
+    control('import "./missing_FIXTURE.js"', 'harness-error', ('resolution', 'SyntaxError'), mode='module')
     control('Promise.resolve().then(function(){$DONE()})', 'pass', flags=['async'])
     control('$DONE();$DONE()', 'fail', flags=['async'])
     control('$DONE(new TypeError("async"))', 'pass', ('runtime', 'TypeError'), flags=['async'])

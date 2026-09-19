@@ -8,6 +8,7 @@ result visible; edition decisions belong in the separate coverage review.
 import argparse
 import collections
 import concurrent.futures
+import functools
 import hashlib
 import importlib.util
 import json
@@ -41,12 +42,19 @@ historical = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(historical)
 
 
-def phase_driver(case, harness, marker):
+@functools.lru_cache(maxsize=2)
+def module_fixtures(suite):
+    root = suite / 'test'
+    return {path.relative_to(root).as_posix(): path.read_text(encoding='utf-8-sig')
+            for path in sorted(root.rglob('*_FIXTURE.js'))}
+
+
+def phase_driver(case, harness, marker, fixtures=None):
     source = ('"use strict";\n' if case['mode']=='strict' else '') + case['source']
     negative=case['record'].get('negative') or {}
     values=dict(source=source,harness=harness,marker=marker,filename=case['test'],
                 module=case['mode']=='module',async_='async' in case['record'].get('flags',[]),
-                expected=negative.get('type'),self='./'+case['test'].split('/')[-1])
+                expected=negative.get('type'),fixtures=fixtures or {})
     return '(function(p){\n'+r'''
 var realm=createTest262Realm(), emit=print, encode=JSON.stringify, stringify=String;
 var expected=p.expected ? realm.global[p.expected] : null;
@@ -63,10 +71,42 @@ try{realm.evalScript(p.harness)}catch(e){finish('harness-error','harness',e);ret
 try{unit=p.module?cm(p.source,p.filename):compile(p.source)}
 catch(e){finish('throw','parse',e);return;}
 if(p.module){
-  var requests=moduleRequests(unit);
-  for(var i=0;i<requests.length;i++){
-    if(requests[i]!==p.self){finish('harness-error','resolution','Unprovided module dependency: '+requests[i]);return;}
-    realm.linkModule(unit,requests[i],unit);
+  var units=Object.create(null), missing={}, missingName='';
+  units[p.filename]=unit;
+  function resolve(parent,request){
+    if(request.slice(0,2)!=='./' && request.slice(0,3)!=='../'){
+      missingName=request;throw missing;
+    }
+    var parts=parent.split('/');parts.pop();
+    var rest=request.split('/');
+    for(var i=0;i<rest.length;i++){
+      if(rest[i]==='.' || rest[i]==='')continue;
+      if(rest[i]==='..'){
+        if(!parts.length){missingName=request;throw missing;}
+        parts.pop();
+      }else parts.push(rest[i]);
+    }
+    return parts.join('/');
+  }
+  function linkDependencies(current,name){
+    var requests=moduleRequests(current);
+    for(var i=0;i<requests.length;i++){
+      var dependency=resolve(name,requests[i]);
+      if(!Object.prototype.hasOwnProperty.call(units,dependency)){
+        if(!Object.prototype.hasOwnProperty.call(p.fixtures,dependency)){
+          missingName=dependency;throw missing;
+        }
+        var child=cm(p.fixtures[dependency],dependency);
+        units[dependency]=child;
+        linkDependencies(child,dependency);
+      }
+      realm.linkModule(current,requests[i],units[dependency]);
+    }
+  }
+  try{linkDependencies(unit,p.filename)}catch(e){
+    if(e===missing)finish('harness-error','resolution','Unprovided module dependency: '+missingName);
+    else finish('throw','resolution',e);
+    return;
   }
   try{im(unit)}catch(e){finish('throw','resolution',e);return;}
 }
@@ -146,7 +186,8 @@ def run_case(case, suite, shell, timeout):
         with tempfile.TemporaryDirectory(prefix='zoolrunner-later-') as temporary:
             marker = 'LATER-' + Path(temporary).name + ' '
             driver = Path(temporary) / 'driver.js'
-            driver.write_text(phase_driver(case, harness, marker))
+            fixtures = module_fixtures(suite) if case['mode'] == 'module' else None
+            driver.write_text(phase_driver(case, harness, marker, fixtures))
             proc = subprocess.run([str(shell), '-E', '-v', '2015', '-f', str(driver)],
                                   env=dict(os.environ, DYLD_LIBRARY_PATH=str(shell.parent), TZ='America/Los_Angeles'),
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=timeout)

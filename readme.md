@@ -938,3 +938,12 @@ original ES2015 order, and keeps dynamic-function compiler metadata out of
 reflection. Both complete pinned suites pass with zero failures, along with
 all four macOS arm64 builds, packages and relocated runtime checks;
 see [property ordering](js/tests/es6/README.md#property-replacement-and-function-creation-order).
+
+
+The ES2015 parser/index batch corrects catch parameter/body environments,
+string code-point escapes, generator `let` parsing and negative-zero typed-array
+indices. Both complete pinned suites pass with zero failures, as do focused
+and native checks, all four macOS arm64 builds/packages and relocated application
+checks, including Calendar’s four views. Other operating systems have not been
+revalidated for this batch. See
+[parser and index validation](js/tests/es6/README.md#catch-environments-unicode-strings-and-signed-zero-indices).

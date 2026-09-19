@@ -398,6 +398,13 @@ Native setter and descriptor changes must preserve modern assignment results
 without changing the native JSAPI's normalized output or explicit legacy
 behavior. Run `property-coercion.js` and `TestNativeSetterResult.c`, including
 collection and array-length callbacks that change descriptor attributes.
+Catch parameter defaults must run outside the catch body lexical environment;
+pattern bindings must retain their temporal dead zone. Run `catch-environments.js`,
+`string-codepoint-escapes.js`, `generator-let-newline.js` and
+`typedarray-zero-indices.js` for parser/index changes. Keep numeric zero indices
+distinct from the canonical property string `"-0"`. Record later-edition
+Test262 reviews with exact source hashes; never treat a review ledger as a
+passing conformance run or a complete edition inventory.
 Property replacement must preserve ES2015 creation order and keep compiler
 metadata private. Run `property-order.js` and `function-key-order.js`, including
 watchpoints, duplicate parameters, collection and deletion/re-addition. Keep

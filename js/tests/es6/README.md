@@ -25,7 +25,7 @@ Harness setup is a separate script in the tested realm; bookkeeping stays in
 the shell realm, so a test can make its global nonextensible. Negative tests
 must throw the expected realm's constructor in their specified parse, resolution
 or runtime phase. Harness failures cannot satisfy a negative expectation.
-The runner has 18 executable phase, isolation, Unicode, module, async and metadata controls:
+The runner has 26 executable phase, isolation, Unicode, module-graph, async and metadata controls:
 
 ```sh
 python3 js/tests/es6/test-later-runner.py --shell /path/to/frozen/xpcshell
@@ -35,8 +35,12 @@ python3 js/tests/es6/diagnose-later-test262.py \
 ```
 
 A nonzero diagnostic exit retains all results, including expected edition
-conflicts, for review. The initial module host supports self-import fixtures;
-other dependencies report an explicit host error. Buffer detachment uses the
+conflicts, for review. The module host resolves relative imports against the
+entry module and the pinned suite's unchanged `*_FIXTURE.js` files, reuses
+canonical module identities, and supports cycles. Missing dependencies remain
+explicit host errors. Entry parse failures, dependency resolution/parse failures
+and runtime failures remain distinct; an unavailable file cannot satisfy a
+negative expectation. Buffer detachment uses the
 additive native `JS_DetachArrayBuffer` API and reports errors in the host method's
 own realm. Agent and other modern host capabilities are not implied. The
 informational `generated` flag does not change execution; unknown flags remain
@@ -2985,7 +2989,7 @@ Other platforms are not revalidated for this batch. Full parameter environments,
 module execution and full ES2015 conformance remain unfinished.
 
 
-## Catch variables and block function declarations (validation in progress)
+## Catch variables and block function declarations (integrated macOS arm64 validation)
 
 A catch-local slot used by an initializer no longer suppresses its separate
 outer `var` declaration in ES2015 scripts/eval. ES2015 also rejects duplicate
@@ -3346,7 +3350,7 @@ ChatZilla. C89 checks pass. Final reports are
 `artifacts/es6/property-coercion-final-*`; all four application engine libraries
 match the frozen conformance runtime's SHA-256:
 `97f9d03208bca7f43113e05d65694e57c31d129ea66e4d52c9d4c683a7e66d87`.
-Property-order replacement is being tested separately. The complete later
+Property-order replacement validation is recorded below. The complete later
 ES2015 inventory and validation on other operating systems remain unfinished.
 
 
@@ -3376,3 +3380,61 @@ Reports are under
 `artifacts/es6/property-order-stage-*`, `function-order-stage-*` and
 `function-order-final-*`. This is not a completed review of the later ES2015
 inventory or validation on other operating systems.
+
+
+### Catch environments, Unicode strings and signed-zero indices
+
+ES2015 catch parameter initialization now precedes a distinct body lexical
+environment. Pattern bindings start uninitialized, so later/self references
+throw rather than yielding `undefined`; abrupt initialization still closes
+iterators. Immediate body lexical conflicts remain errors, nested shadowing
+works, and legacy catch parsing remains unchanged.
+
+Ordinary ES2015 strings now accept braced Unicode code-point escapes, including
+supplementary points and leading zeroes, while rejecting empty, malformed and
+out-of-range sequences. Earlier language versions retain their grammar.
+Generator `let` declarations cannot use a newline to evade the forbidden
+`yield` binding. No bytecode format or embedding API changes are needed.
+
+Typed-array search and relative-index operations normalize numeric negative
+zero to element zero. This fixes searches and `fill` without accepting the
+distinct canonical property string `"-0"` or changing original ES2015 per-element
+fill conversion. The regression covers all nine ES2015 typed-array types.
+
+The combined candidate passes 102 existing focused fixtures, 63 native
+fixtures, 255 new shell checks and C89 checks. Integrated validation passes
+all 28,582 pinned ES6 modes and 11,540 pinned ES5 modes with zero failures,
+unsupported cases, timeouts, crashes or harness errors. All four macOS arm64
+applications build, package and pass relocated desktop checks, including
+Calendar’s four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+The frozen runtime and all four application engines share SHA-256
+`a2e992d6cb05578e92bca40b7bebc87e0bd50563fbab2a9e33fb9e4f7fed5a87`.
+Reports are
+`artifacts/es6/lexical-index-stage-*` and `lexical-index-final-*`. The earlier
+catch-only full runs were stopped incomplete when the parser batch expanded;
+they are not passing conformance results.
+
+The unchanged later diagnostics record 177/195 catch modes, 178/258 accessor
+modes, 2/2 generator-let modes and 4/12 signed-zero search modes passing. The
+remaining failures in those bounded groups require later rest-binding/object
+rest syntax, private class accessors or `includes`; they remain in the reports.
+[The edition review ledger](edition-review.json) records 92 manually reviewed
+paths with exact source hashes and original specification sections, including
+other normative differences. It is incomplete and is not a test selector or
+conformance score. The broader ES2015 inventory and other operating systems
+remain unvalidated for this batch.
+
+The refreshed 5,852-mode `es6id` diagnostic records 5,835 passes and 17 failures
+(`artifacts/es6/later-lexical-index-es6id.json`). All 17 remaining modes are
+listed in the review ledger as changed normative expectations or revised tests
+containing BigInt syntax. They remain failures in the diagnostic, which is not
+a replacement for the complete pinned suite or the unfinished broader inventory.
+
+The later diagnostic host now loads the pinned suite's module fixtures with
+canonical relative paths and cycle support; all 26 runner controls pass. The
+95-mode module diagnostic records 52 passes and 43 failures, with no harness
+errors (`artifacts/es6/later-module-fixtures-diagnostic.json`). All three
+original-language cases previously blocked by missing external fixtures now
+pass unchanged. The fourth requires later arbitrary module export names and
+now reports its actual dependency syntax failure. This bounded diagnostic
+retains its later-language and normative-difference failures.

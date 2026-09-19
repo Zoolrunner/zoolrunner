@@ -335,6 +335,9 @@ BinaryRelativeIndex(JSContext *cx, jsval value, jsdouble length, jsdouble *resul
 {
     if (!js_ValueToNumber(cx, value, result)) return JS_FALSE;
     *result = js_DoubleToInteger(*result);
+    /* These are algorithmic indices, whose property-key conversion would
+     * stringify either zero as "0", not the canonical numeric string "-0". */
+    if (*result == 0) *result = 0;
     *result = *result < 0 ? JS_MAX(length + *result, 0) : JS_MIN(*result, length);
     return JS_TRUE;
 }
@@ -1640,6 +1643,7 @@ TypedSearch(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSBool reverse)
     if (argc > 1) {
         if (!js_ValueToNumber(cx, argv[1], &index)) return JS_FALSE;
         index = js_DoubleToInteger(index);
+        if (index == 0) index = 0;
         if (reverse) index = index >= 0 ? JS_MIN(index, length - 1) : length + index;
         else index = index < 0 ? JS_MAX(length + index, 0) : index;
     }
