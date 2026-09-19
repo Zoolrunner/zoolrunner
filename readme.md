@@ -761,3 +761,12 @@ all **11,540 ES5 cases** and all four application build/package/desktop checks
 pass. Full ES2015 compliance remains unfinished; other platforms have not been
 revalidated for this batch. See the
 [Unicode regexp notes](js/tests/es6/README.md#unicode-regular-expressions).
+
+Global declaration preflight and ES2015 statement completion values pass macOS
+arm64 validation: **28,199 ES2015 passes**, **369 failures**, **14 unsupported
+modules**, no harness errors, crashes or timeouts (**six gained, zero lost**).
+All **11,540 ES5 cases** and all four application build/package/desktop checks
+pass. The changes preserve explicitly selected legacy behavior and exercise
+embedding callbacks, source reconstruction, XDR and real window globals. Full
+ES2015 compliance remains unfinished; other platforms are not revalidated for
+this batch. See the [validation notes](js/tests/es6/README.md#global-declarations-and-statement-completion-values).

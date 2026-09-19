@@ -7447,6 +7447,9 @@ js_FoldConstants(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
 
     switch (pn->pn_type) {
       case TOK_IF:
+        /* Preserve ES2015 statement UpdateEmpty even for constant tests. */
+        if (JS_VERSION_IS_ES2015(cx))
+            break;
         if (ContainsStmt(pn2, TOK_VAR) || ContainsStmt(pn3, TOK_VAR))
             break;
         /* FALL THROUGH */

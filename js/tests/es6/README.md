@@ -2720,3 +2720,42 @@ this engine correction. A second diagnostic run also caught an omitted legacy
 property-table entry; the strengthened native probe creates an independent
 legacy global and reproduces that failure before the correction. The first failure log is retained under
 `artifacts/es6/regexp-unicode-final-runtime/xulrunner/editions.log`.
+
+## Global declarations and statement completion values
+
+Modern native-global scripts and eval validate all function/variable declarations
+before creating any of them. Function checks run in reverse declaration order,
+ignore earlier duplicate functions, and inspect own descriptors without invoking
+getters. Configurable properties can become functions; allowed nonconfigurable
+data properties retain their attributes. Inherited properties do not prevent an
+own variable binding. Local/strict eval and explicitly selected legacy editions
+retain their separate paths. Persistent global lexical environments remain
+unfinished; these checks do not implement global `let`/`const` semantics.
+
+Result-producing modern statements implement ES2015's undefined completion for
+empty branches/loops/handlers. Finally preserves a normal try/handler result;
+abrupt finally completion still overrides it. The immutable script edition
+controls finally stack layout even if an embedding callback changes the context's
+selected edition. Explicit legacy scripts retain their old completion behavior.
+Cache version 56 records this layout change. Constant folding, source
+reconstruction, wide branches, generators and XDR round trips are covered.
+
+The focused declaration fixture has 22 checks; its native embedding probe has
+13. Completion fixtures cover 27 basic, four wide-branch and ten error-source
+checks, plus 17 native embedding assertions. The real-window edition fixture
+also checks statement results and caught errors. An initial isolated full run
+exposed incorrect stack accounting in error-source reconstruction: a hidden
+PUSH/POPV reset must be skipped as a pair, and finally needs its additional saved
+completion slot. All 96 affected cases pass after correction; original diagnostic
+reports are retained under `artifacts/es6/completion-stage-*` and
+`completion-reviewed-*`. The complete final macOS arm64 run passes **28,199
+ES2015 modes**, with **369 failures**, **14 unsupported modules** and no harness
+errors, crashes or timeouts: **six gained, zero lost**. All **11,540 ES5 cases**
+pass on the same frozen runtime. All four applications pass root builds,
+packaging and relocated desktop checks, including Calendar's four views,
+169 Browser navigation/layout checks and ChatZilla in Suite and XULRunner.
+Final reports use `artifacts/es6/completion-final-*`. All four engine hashes
+match the frozen conformance runtime:
+`387d3d062c068c8387587beeb29bec7e9c767d89943a7ae8f56a95fbbd0eec74`.
+C89 diagnostics pass. Full ES2015 compliance remains unfinished; other platforms
+have not been revalidated for this batch.

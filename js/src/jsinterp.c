@@ -1682,6 +1682,126 @@ js_InternalGetOrSetValue(JSContext *cx, JSObject *obj, jsval thisv,
     return js_InternalInvokeValue(cx, thisv, fval, 0, argc, argv, rval);
 }
 
+
+/* Validate global declarations before the prolog creates any bindings. */
+static JSBool
+IsModernGlobalDeclaration(JSContext *cx, JSObject *obj)
+{
+    return JS_VERSION_IS_ES2015(cx) && obj && OBJ_IS_NATIVE(obj) &&
+           ((OBJ_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) ||
+            obj == cx->globalObject);
+}
+
+static JSBool
+CanDeclareGlobal(JSContext *cx, JSObject *global, jsid id, JSBool function,
+                  uintN *attributes)
+{
+    JSObject *owner;
+    JSProperty *property;
+    uintN attrs;
+    JSBool ok;
+
+    if (!js_LookupOwnProperty(cx, global, id, &owner, &property))
+        return JS_FALSE;
+    if (property && owner != global) {
+        OBJ_DROP_PROPERTY(cx, owner, property);
+        property = NULL;
+    }
+    if (!property) {
+        ok = !(OBJ_SCOPE(global)->flags & SCOPE_NONEXTENSIBLE);
+    } else {
+        ok = OBJ_GET_ATTRIBUTES(cx, owner, id, property, &attrs);
+        OBJ_DROP_PROPERTY(cx, owner, property);
+        if (!ok)
+            return JS_FALSE;
+        ok = !function || !(attrs & JSPROP_PERMANENT) ||
+             ((attrs & JSPROP_ENUMERATE) &&
+              !(attrs & (JSPROP_READONLY | JSPROP_GETTER | JSPROP_SETTER)));
+        if (ok && function && (attrs & JSPROP_PERMANENT) && attributes)
+            *attributes = attrs;
+    }
+    if (!ok)
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+    return ok;
+}
+
+static JSBool
+CheckGlobalDeclarations(JSContext *cx, JSStackFrame *fp)
+{
+    JSScript *script = fp->script;
+    jsbytecode *pc, **declarations;
+    size_t count = 0, i;
+    jsint length;
+    jsatomid index;
+    JSOp op;
+    JSAtom *atom;
+    JSFunction *fun;
+    JSAtomList seen;
+    JSAtomListElement *entry;
+    void *mark;
+    JSBool ok = JS_FALSE;
+
+    if (!IsModernGlobalDeclaration(cx, fp->varobj))
+        return JS_TRUE;
+    for (pc = script->code; pc < script->main; pc += length) {
+        op = js_GetEffectiveOpcode(cx, script, pc, &length, NULL);
+        if (length <= 0)
+            return JS_FALSE;
+        if (op == JSOP_DEFFUN || op == JSOP_DEFVAR)
+            ++count;
+    }
+    if (!count)
+        return JS_TRUE;
+    if (count > (size_t)-1 / sizeof(*declarations)) {
+        JS_ReportOutOfMemory(cx);
+        return JS_FALSE;
+    }
+    declarations = (jsbytecode **)JS_malloc(cx, count * sizeof(*declarations));
+    if (!declarations)
+        return JS_FALSE;
+    i = 0;
+    for (pc = script->code; pc < script->main; pc += length) {
+        op = js_GetEffectiveOpcode(cx, script, pc, &length, NULL);
+        if (op == JSOP_DEFFUN || op == JSOP_DEFVAR)
+            declarations[i++] = pc;
+    }
+    mark = JS_ARENA_MARK(&cx->tempPool);
+    ATOM_LIST_INIT(&seen);
+    for (i = count; i != 0;) {
+        pc = declarations[--i];
+        op = js_GetEffectiveOpcode(cx, script, pc, NULL, &index);
+        if (op != JSOP_DEFFUN)
+            continue;
+        fun = (JSFunction *)JS_GetPrivate(cx,
+                  ATOM_TO_OBJECT(js_GetAtom(cx, &script->atomMap, index)));
+        atom = fun->atom;
+        ATOM_LIST_SEARCH(entry, &seen, atom);
+        if (entry)
+            continue;
+        if (!js_IndexAtom(cx, atom, &seen) ||
+            !CanDeclareGlobal(cx, fp->varobj, ATOM_TO_JSID(atom), JS_TRUE, NULL))
+            goto out;
+    }
+    for (i = 0; i != count; ++i) {
+        pc = declarations[i];
+        op = js_GetEffectiveOpcode(cx, script, pc, NULL, &index);
+        if (op != JSOP_DEFVAR)
+            continue;
+        atom = js_GetAtom(cx, &script->atomMap, index);
+        ATOM_LIST_SEARCH(entry, &seen, atom);
+        if (entry)
+            continue;
+        if (!js_IndexAtom(cx, atom, &seen) ||
+            !CanDeclareGlobal(cx, fp->varobj, ATOM_TO_JSID(atom), JS_FALSE, NULL))
+            goto out;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_ARENA_RELEASE(&cx->tempPool, mark);
+    JS_free(cx, declarations);
+    return ok;
+}
+
 JSBool
 js_Execute(JSContext *cx, JSObject *chain, JSScript *script,
            JSStackFrame *down, uintN flags, jsval *result)
@@ -2580,6 +2700,10 @@ js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result)
         printf("JS INTERPRETER CALLED WITH PENDING EXCEPTION %lx\n",
                (unsigned long) cx->exception);
 #endif
+        goto out;
+    }
+    if (pc == script->code && !CheckGlobalDeclarations(cx, fp)) {
+        ok = JS_FALSE;
         goto out;
     }
     obj = NULL;
@@ -5364,10 +5488,17 @@ interrupt:
             /* Lookup id in order to check for redeclaration problems. */
             id = ATOM_TO_JSID(atom);
             SAVE_SP_AND_PC(fp);
-            ok = js_CheckRedeclaration(cx, obj, id, attrs, &obj2, &prop);
+            ok = op == JSOP_DEFVAR && IsModernGlobalDeclaration(cx, obj)
+                 ? js_LookupOwnProperty(cx, obj, id, &obj2, &prop)
+                 : js_CheckRedeclaration(cx, obj, id, attrs, &obj2, &prop);
             if (!ok)
                 goto out;
 
+            if (op == JSOP_DEFVAR && IsModernGlobalDeclaration(cx, obj) &&
+                prop && obj2 != obj) {
+                OBJ_DROP_PROPERTY(cx, obj2, prop);
+                prop = NULL;
+            }
             /* Bind a variable only if it's not yet defined. */
             if (!prop) {
                 if (op == JSOP_DEFCONST && OBJ_IS_NATIVE(obj)) {
@@ -5493,7 +5624,9 @@ interrupt:
              */
             parent = fp->varobj;
             SAVE_SP_AND_PC(fp);
-            ok = js_CheckRedeclaration(cx, parent, id, attrs, NULL, NULL);
+            ok = IsModernGlobalDeclaration(cx, parent)
+                 ? CanDeclareGlobal(cx, parent, id, JS_TRUE, &attrs)
+                 : js_CheckRedeclaration(cx, parent, id, attrs, NULL, NULL);
             if (ok) {
                 ok = OBJ_DEFINE_PROPERTY(cx, parent, id, rval,
                                          (flags & JSPROP_GETTER)
@@ -6118,6 +6251,10 @@ interrupt:
           END_CASE(JSOP_SETSP)
 
           BEGIN_CASE(JSOP_GOSUB)
+            if (((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)) {
+                PUSH(fp->rval);
+                fp->rval = JSVAL_VOID;
+            }
             JS_ASSERT(cx->exception != JSVAL_HOLE);
             if (!cx->throwing) {
                 lval = JSVAL_HOLE;
@@ -6132,6 +6269,10 @@ interrupt:
           END_VARLEN_CASE
 
           BEGIN_CASE(JSOP_GOSUBX)
+            if (((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)) {
+                PUSH(fp->rval);
+                fp->rval = JSVAL_VOID;
+            }
             JS_ASSERT(cx->exception != JSVAL_HOLE);
             if (!cx->throwing) {
                 lval = JSVAL_HOLE;
@@ -6149,6 +6290,8 @@ interrupt:
             rval = POP();
             JS_ASSERT(JSVAL_IS_INT(rval));
             lval = POP();
+            if (((script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015))
+                fp->rval = POP();
             if (lval != JSVAL_HOLE) {
                 /*
                  * Exception was pending during finally, throw it *before* we

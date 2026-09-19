@@ -1407,6 +1407,10 @@ EmitNonLocalJumpFixup(JSContext *cx, JSCodeGenerator *cg, JSStmtInfo *toStmt,
                 return JS_FALSE;
             if (js_Emit1(cx, cg, JSOP_POP2) < 0)
                 return JS_FALSE;
+            if (JS_VERSION_IS_ES2015(cx) &&
+                (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                 js_Emit1(cx, cg, JSOP_POP) < 0))
+                return JS_FALSE;
             break;
 
           default:;
@@ -4323,6 +4327,26 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
     /* Emit notes to tell the current bytecode's source line number. */
     UPDATE_LINE_NUMBER_NOTES(cx, cg, pn);
 
+    /* ES2015 UpdateEmpty supplies undefined for statement completions.
+     * Function bodies discard expression completions; eval/embedding scripts
+     * retain them through the same policy as expression statements below. */
+    if (JS_VERSION_IS_ES2015(cx) &&
+        (!cx->fp->fun || !FUN_INTERPRETED(cx->fp->fun) ||
+         (cx->fp->flags & JSFRAME_SPECIAL))) {
+        switch (pn->pn_type) {
+          case TOK_IF: case TOK_WHILE: case TOK_DO: case TOK_FOR:
+          case TOK_SWITCH: case TOK_WITH: case TOK_TRY:
+            if (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+                js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+                js_Emit1(cx, cg, JSOP_POPV) < 0)
+                return JS_FALSE;
+            top = CG_OFFSET(cg);
+            break;
+          default:
+            break;
+        }
+    }
+
     switch (pn->pn_type) {
       case TOK_FUNCTION:
       {
@@ -5352,7 +5376,7 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
              * exception) and one for the [retsub] pc-index.
              */
             JS_ASSERT(cg->stackDepth == depth);
-            cg->stackDepth += 2;
+            cg->stackDepth += JS_VERSION_IS_ES2015(cx) ? 3 : 2;
             if ((uintN)cg->stackDepth > cg->maxStackDepth)
                 cg->maxStackDepth = cg->stackDepth;
 
@@ -5367,7 +5391,8 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
             }
 
             /* Restore stack depth budget to its balanced state. */
-            JS_ASSERT(cg->stackDepth == depth + 2);
+            JS_ASSERT(cg->stackDepth == depth +
+                      (JS_VERSION_IS_ES2015(cx) ? 3 : 2));
             cg->stackDepth = depth;
         }
         if (!js_PopStatementCG(cx, cg))
@@ -5480,6 +5505,15 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
                 return JS_FALSE;
             }
         }
+
+        /* The handler has its own completion, independent of the try body. */
+        if (JS_VERSION_IS_ES2015(cx) &&
+            (!cx->fp->fun || !FUN_INTERPRETED(cx->fp->fun) ||
+             (cx->fp->flags & JSFRAME_SPECIAL)) &&
+            (js_NewSrcNote(cx, cg, SRC_HIDDEN) < 0 ||
+             js_Emit1(cx, cg, JSOP_PUSH) < 0 ||
+             js_Emit1(cx, cg, JSOP_POPV) < 0))
+            return JS_FALSE;
 
         /* Emit the catch body. */
         if (!js_EmitTree(cx, cg, pn->pn_kid3))

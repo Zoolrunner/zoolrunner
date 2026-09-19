@@ -178,6 +178,10 @@ function modernWindowEdition() {
                                 face.match(/(?:)/ug).length===2 &&
                                 face.replace(/(?:)/ug,'-')==='-'+face+'-' &&
                                 (face+'x').split(/(?:)/u).join('|')===face+'|x'; })() &&
+           (function() { return eval('1;if(false)2')===undefined &&
+                                eval('try{2}finally{3}')===2 &&
+                                eval('try{2;throw 0}catch(e){}')===undefined &&
+                                eval('try{null.value}catch(e){e instanceof TypeError}'); })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

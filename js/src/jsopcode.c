@@ -2367,6 +2367,13 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 break;
 
               case JSOP_PUSH:
+                sn = js_GetSrcNote(jp->script, pc);
+                if (sn && SN_TYPE(sn) == SRC_HIDDEN && pc + 1 < endpc &&
+                    pc[1] == JSOP_POPV) {
+                    len = JSOP_PUSH_LENGTH + JSOP_POPV_LENGTH;
+                    todo = -2;
+                    break;
+                }
 #if JS_HAS_DESTRUCTURING
                 sn = js_GetSrcNote(jp->script, pc);
                 if (sn && SN_TYPE(sn) == SRC_GROUPASSIGN) {
@@ -2403,6 +2410,11 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                  * address, popped by JSOP_RETSUB and counted by script->depth
                  * but not by ss->top (see JSOP_SETSP, below).
                  */
+                if ((jp->script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015) {
+                    todo = SprintCString(&ss->sprinter, "");
+                    if (todo < 0 || !PushOff(ss, todo, op))
+                        return NULL;
+                }
                 todo = Sprint(&ss->sprinter, exception_cookie);
                 if (todo < 0 || !PushOff(ss, todo, op))
                     return NULL;
@@ -2414,6 +2426,8 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 LOCAL_ASSERT(strcmp(rval, retsub_pc_cookie) == 0);
                 lval = POP_STR();
                 LOCAL_ASSERT(strcmp(lval, exception_cookie) == 0);
+                if ((jp->script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015)
+                    (void)POP_STR();
                 todo = -2;
                 break;
 
@@ -5356,8 +5370,13 @@ js_DecompileValueGenerator(JSContext *cx, intN spindex, jsval v,
           default:;
         }
 
-        if (sn && SN_TYPE(sn) == SRC_HIDDEN)
+        if (sn && SN_TYPE(sn) == SRC_HIDDEN) {
+            /* A completion reset is one hidden PUSH/POPV pair. */
+            if (op == JSOP_PUSH && pc + oplen < begin &&
+                pc[oplen] == JSOP_POPV)
+                oplen += JSOP_POPV_LENGTH;
             continue;
+        }
 
         nuses = cs->nuses;
         if (nuses < 0) {
@@ -5366,7 +5385,8 @@ js_DecompileValueGenerator(JSContext *cx, intN spindex, jsval v,
         } else if (op == JSOP_RETSUB) {
             /* Pop [exception or hole, retsub pc-index]. */
             JS_ASSERT(nuses == 0);
-            nuses = 2;
+            nuses = (script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015
+                    ? 3 : 2;
         } else if (op == JSOP_LEAVEBLOCK || op == JSOP_LEAVEBLOCKEXPR) {
             JS_ASSERT(nuses == 0);
             nuses = GET_UINT16(pc);
@@ -5378,7 +5398,8 @@ js_DecompileValueGenerator(JSContext *cx, intN spindex, jsval v,
         if (op == JSOP_FINALLY) {
             /* Push [exception or hole, retsub pc-index]. */
             JS_ASSERT(ndefs == 0);
-            ndefs = 2;
+            ndefs = (script->version & JSVERSION_MASK) >= JSVERSION_ECMA_2015
+                    ? 3 : 2;
         } else if (op == JSOP_ENTERBLOCK) {
             jsatomid atomIndex;
             JSAtom *atom;
