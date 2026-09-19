@@ -6399,6 +6399,28 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
          */
         oldflags = cg->treeContext.flags;
         cg->treeContext.flags &= ~TCF_IN_FOR_INIT;
+        if (pn->pn_extra & PNX_COVERREST) {
+            uintN index = 0, kind;
+            EMIT_UINT16_IMM_OP(JSOP_INTRINSIC, JSProto_Array);
+            if (js_Emit1(cx, cg, JSOP_PUSHOBJ) < 0 ||
+                js_Emit1(cx, cg, JSOP_NEWINIT) < 0)
+                return JS_FALSE;
+            for (pn2 = pn2->pn_next; pn2; pn2 = pn2->pn_next) {
+                kind = pn2->pn_type == TOK_ELLIPSIS ? 2 : 0;
+                if (!js_EmitTree(cx, cg, kind ? pn2->pn_kid : pn2))
+                    return JS_FALSE;
+                EMIT_UINT16_IMM_OP(JSOP_ARRAYAPPEND, kind | (index ? 4 : 0));
+                ++index;
+            }
+            if (js_Emit1(cx, cg, JSOP_ENDINIT) < 0)
+                return JS_FALSE;
+            cg->treeContext.flags |= oldflags & TCF_IN_FOR_INIT;
+            if (js_NewSrcNote2(cx, cg, SRC_PCBASE, CG_OFFSET(cg) - off) < 0)
+                return JS_FALSE;
+            EMIT_UINT16_IMM_OP(JSOP_CALLSPREAD,
+                              pn->pn_op == JSOP_NEW ? 1 : pn->pn_op == JSOP_EVAL ? 2 : 0);
+            break;
+        }
         for (pn2 = pn2->pn_next; pn2; pn2 = pn2->pn_next) {
             if (!js_EmitTree(cx, cg, pn2))
                 return JS_FALSE;
@@ -6578,6 +6600,19 @@ js_EmitTree(JSContext *cx, JSCodeGenerator *cg, JSParseNode *pn)
 #endif /* JS_HAS_GENERATORS */
 
         for (atomIndex = 0; pn2; atomIndex++, pn2 = pn2->pn_next) {
+            if (pn->pn_extra & PNX_COVERREST) {
+                uintN kind = pn2->pn_type == TOK_ELLIPSIS ? 2 :
+                             pn2->pn_type == TOK_COMMA ? 1 : 0;
+                if (kind == 1) {
+                    if (js_Emit1(cx, cg, JSOP_HOLE) < 0)
+                        return JS_FALSE;
+                } else if (!js_EmitTree(cx, cg, kind == 2 ? pn2->pn_kid : pn2)) {
+                    return JS_FALSE;
+                }
+                /* Bit 2 retains the static separator, including leading holes. */
+                EMIT_UINT16_IMM_OP(JSOP_ARRAYAPPEND, kind | (atomIndex ? 4 : 0));
+                continue;
+            }
             if (!EmitNumberOp(cx, atomIndex, cg))
                 return JS_FALSE;
 

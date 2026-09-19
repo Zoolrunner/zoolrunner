@@ -114,7 +114,7 @@ ReflectInvoke(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSBool constr
     }
     oldsp = frame->sp;
     frame->sp = base + count + 2;
-    ok = construct ? js_InvokeConstructorWithNewTarget(cx, base, count, newTarget)
+    ok = construct ? js_InternalInvokeConstructorWithNewTarget(cx, base, count, newTarget)
                    : js_Invoke(cx, count, JSINVOKE_INTERNAL | JSINVOKE_SKIP_CALLER);
     if (ok) *rval = base[0];
     frame->sp = oldsp;

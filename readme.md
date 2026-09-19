@@ -770,3 +770,12 @@ pass. The changes preserve explicitly selected legacy behavior and exercise
 embedding callbacks, source reconstruction, XDR and real window globals. Full
 ES2015 compliance remains unfinished; other platforms are not revalidated for
 this batch. See the [validation notes](js/tests/es6/README.md#global-declarations-and-statement-completion-values).
+
+Array literals, function calls and constructors support iterator-based spread.
+Focused, native embedding, wide-argument, cache/source and differential checks
+pass. macOS arm64 validation retains **28,199 ES2015 passes**, **369 failures**
+and **14 unsupported modules**, with no lost passes, harness errors, crashes or
+timeouts. All **11,540 ES5 cases** and all four application build/package/desktop
+checks pass. Full ES2015 compliance remains unfinished; other platforms have
+not been revalidated for this batch. See the
+[spread validation notes](js/tests/es6/README.md#array-call-and-constructor-spread).

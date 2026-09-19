@@ -385,6 +385,18 @@ js_AllocStack(JSContext *cx, uintN nslots, void **markp)
         return JS_ARENA_MARK(&cx->stackPool);
     }
 
+    /* Internal calls may temporarily point fp->sp into a separate rooted
+     * argument segment. Clear the operand tail only while sp still belongs
+     * to this frame, before a caller redirects it. Nested allocations must
+     * never walk from an unrelated arena address to the frame's end. */
+    fp = cx->fp;
+    if (fp && fp->script && fp->spbase &&
+        JS_UPTRDIFF(fp->sp, fp->spbase) / sizeof(jsval) <= fp->script->depth) {
+        end = fp->spbase + fp->script->depth;
+        for (vp = fp->sp; vp < end; ++vp)
+            *vp = JSVAL_VOID;
+    }
+
     /* Allocate 2 extra slots for the stack segment header we'll likely need. */
     sp = js_AllocRawStack(cx, 2 + nslots, markp);
     if (!sp)
@@ -398,24 +410,6 @@ js_AllocStack(JSContext *cx, uintN nslots, void **markp)
         sh->nslots += nslots;
         a->avail -= 2 * sizeof(jsval);
     } else {
-        /*
-         * Need a new stack segment, so we must initialize unused slots in the
-         * current frame.  See js_GC, just before marking the "operand" jsvals,
-         * where we scan from fp->spbase to fp->sp or through fp->script->depth
-         * (whichever covers fewer slots).
-         */
-        fp = cx->fp;
-        if (fp && fp->script && fp->spbase) {
-#ifdef DEBUG
-            jsuword depthdiff = fp->script->depth * sizeof(jsval);
-            JS_ASSERT(JS_UPTRDIFF(fp->sp, fp->spbase) <= depthdiff);
-            JS_ASSERT(JS_UPTRDIFF(*markp, fp->spbase) >= depthdiff);
-#endif
-            end = fp->spbase + fp->script->depth;
-            for (vp = fp->sp; vp < end; vp++)
-                *vp = JSVAL_VOID;
-        }
-
         /* Allocate and push a stack segment header from the 2 extra slots. */
         sh = (JSStackHeader *)sp;
         sh->nslots = nslots;
@@ -1683,6 +1677,58 @@ js_InternalGetOrSetValue(JSContext *cx, JSObject *obj, jsval thisv,
 }
 
 
+/* The literal array and input are rooted by the interpreter stack. */
+static JSBool
+AppendArrayLiteral(JSContext *cx, JSObject *array, jsval input, uintN kind)
+{
+    jsuint length;
+    jsid id;
+    JSObject *state;
+    jsval roots[2];
+    JSTempValueRooter root;
+    JSBool more, ok = JS_FALSE;
+    uint32 iterations = 0;
+
+    if (!js_GetLengthProperty(cx, array, &length))
+        return JS_FALSE;
+    roots[0] = JSVAL_VOID;
+    roots[1] = input;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    if (kind == 2) {
+        state = js_ForOfStart(cx, input);
+        if (!state) goto out;
+        roots[0] = OBJECT_TO_JSVAL(state);
+        for (;;) {
+            if (cx->branchCallback && !(iterations++ & 127) &&
+                !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ForOfNext(cx, state, &more)) goto out;
+            if (!more) break;
+            if (length == (jsuint)-1) goto too_long;
+            JS_GetReservedSlot(cx, state, 1, &roots[1]);
+            if (!js_ArrayLikeIndex(cx, length, &id) ||
+                !OBJ_DEFINE_PROPERTY(cx, array, id, roots[1], NULL, NULL,
+                                     JSPROP_ENUMERATE, NULL)) goto out;
+            ++length;
+        }
+    } else {
+        if (length == (jsuint)-1) goto too_long;
+        if (kind == 1) {
+            if (!js_SetLengthProperty(cx, array, length + 1)) goto out;
+        } else if (!js_ArrayLikeIndex(cx, length, &id) ||
+                   !OBJ_DEFINE_PROPERTY(cx, array, id, input, NULL, NULL,
+                                        JSPROP_ENUMERATE, NULL)) {
+            goto out;
+        }
+    }
+    ok = JS_TRUE;
+    goto out;
+  too_long:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 /* Validate global declarations before the prolog creates any bindings. */
 static JSBool
 IsModernGlobalDeclaration(JSContext *cx, JSObject *obj)
@@ -2207,9 +2253,9 @@ js_ConstructorGlobal(JSContext *cx, JSObject *constructor)
     return constructor;
 }
 
-JSBool
-js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
-                                  JSObject *newTarget)
+static JSBool
+InvokeConstructorWithFlags(JSContext *cx, jsval *vp, uintN argc,
+                           JSObject *newTarget, uintN flags)
 {
     JSFunction *fun;
     JSObject *obj, *obj2, *proto, *parent;
@@ -2257,7 +2303,7 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
         /* ProxyCreate does not read newTarget.prototype or allocate an
          * ordinary receiver. The native constructor returns its own object. */
         vp[1] = JSVAL_NULL;
-        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
+        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags, newTarget ? newTarget : obj2);
     }
     if (fun && (FUN_NATIVE(fun) == js_ArrayBufferConstructor ||
                 FUN_NATIVE(fun) == js_DataViewConstructor ||
@@ -2266,13 +2312,13 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
         /* These constructors validate or convert arguments before observing
          * newTarget.prototype, and allocate their own internal slots. */
         vp[1] = JSVAL_NULL;
-        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
+        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags, newTarget ? newTarget : obj2);
     }
     if (fun && FUN_NATIVE(fun) == js_ModernRegExpConstructor) {
         /* RegExp checks @@match and source/flags before allocating or
          * observing newTarget.prototype. Its native entry owns allocation. */
         vp[1] = JSVAL_NULL;
-        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget ? newTarget : obj2);
+        return InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags, newTarget ? newTarget : obj2);
     }
     clasp = &js_ObjectClass;
     if (!obj2) {
@@ -2319,7 +2365,7 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
 
     /* Now we have an object with a constructor method; call it. */
     vp[1] = OBJECT_TO_JSVAL(obj);
-    if (!InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT, newTarget)) {
+    if (!InvokeWithNewTarget(cx, argc, JSINVOKE_CONSTRUCT | flags, newTarget)) {
         cx->weakRoots.newborn[GCX_OBJECT] = NULL;
         return JS_FALSE;
     }
@@ -2339,6 +2385,52 @@ js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
 
     JS_RUNTIME_METER(cx->runtime, constructs);
     return JS_TRUE;
+}
+
+JSBool
+js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                  JSObject *newTarget)
+{
+    return InvokeConstructorWithFlags(cx, vp, argc, newTarget, 0);
+}
+
+JSBool
+js_InternalInvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                          JSObject *newTarget)
+{
+    return InvokeConstructorWithFlags(cx, vp, argc, newTarget, JSINVOKE_INTERNAL);
+}
+
+static JSBool
+InvokeSpread(JSContext *cx, jsval callee, jsval receiver, JSObject *array,
+             JSBool construct, jsval *result)
+{
+    JSStackFrame *frame = cx->fp;
+    jsval *base, *oldsp;
+    jsuint count, index;
+    void *mark;
+    JSBool ok = JS_FALSE;
+    if (!js_GetLengthProperty(cx, array, &count)) return JS_FALSE;
+    if (count >= ARRAY_INIT_LIMIT) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS);
+        return JS_FALSE;
+    }
+    base = js_AllocStack(cx, count + 2, &mark);
+    if (!base) return JS_FALSE;
+    for (index = 0; index < count + 2; ++index) base[index] = JSVAL_VOID;
+    base[0] = callee; base[1] = receiver;
+    for (index = 0; index < count; ++index) {
+        if (!JS_GetElement(cx, array, index, &base[index + 2])) goto out;
+    }
+    oldsp = frame->sp;
+    frame->sp = base + count + 2;
+    ok = construct ? InvokeConstructorWithFlags(cx, base, count, NULL, JSINVOKE_INTERNAL)
+                   : js_Invoke(cx, count, JSINVOKE_INTERNAL);
+    if (ok) *result = base[0];
+    frame->sp = oldsp;
+  out:
+    js_FreeStack(cx, mark);
+    return ok;
 }
 
 JSBool
@@ -4417,6 +4509,19 @@ interrupt:
             PUSH_OPND(obj ? OBJECT_TO_JSVAL(obj) : JSVAL_VOID);
           END_CASE(JSOP_PUSHOBJ)
 
+          BEGIN_CASE(JSOP_CALLSPREAD)
+            SAVE_SP_AND_PC(fp);
+            ok = InvokeSpread(cx, FETCH_OPND(-3), FETCH_OPND(-2),
+                              JSVAL_TO_OBJECT(FETCH_OPND(-1)), GET_UINT16(pc) == 1,
+                              &rval);
+            LOAD_BRANCH_CALLBACK(cx);
+            LOAD_INTERRUPT_HANDLER(rt);
+            if (!ok) goto out;
+            sp -= 2;
+            STORE_OPND(-1, rval);
+            obj = NULL;
+          END_CASE(JSOP_CALLSPREAD)
+
           BEGIN_CASE(JSOP_TAGCALL)
           BEGIN_CASE(JSOP_CALL)
           BEGIN_CASE(JSOP_EVAL)
@@ -6074,6 +6179,14 @@ interrupt:
             if (!ok) goto out;
             STORE_OPND(-1, ID_TO_VALUE(id));
           END_CASE(JSOP_PROPERTYKEY)
+
+          BEGIN_CASE(JSOP_ARRAYAPPEND)
+            SAVE_SP_AND_PC(fp);
+            ok = AppendArrayLiteral(cx, JSVAL_TO_OBJECT(FETCH_OPND(-2)),
+                                    FETCH_OPND(-1), GET_UINT16(pc) & 3);
+            if (!ok) goto out;
+            --sp;
+          END_CASE(JSOP_ARRAYAPPEND)
 
           BEGIN_CASE(JSOP_INITCOMPUTED)
           BEGIN_CASE(JSOP_INITNAMEDCOMPUTED)

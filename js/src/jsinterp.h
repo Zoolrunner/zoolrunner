@@ -372,6 +372,10 @@ extern JSBool
 js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc);
 
 extern JSBool
+js_InternalInvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                          JSObject *newTarget);
+
+extern JSBool
 js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
                                   JSObject *newTarget);
 extern JSObject *

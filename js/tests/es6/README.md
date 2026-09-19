@@ -2759,3 +2759,44 @@ match the frozen conformance runtime:
 `387d3d062c068c8387587beeb29bec7e9c767d89943a7ae8f56a95fbbd0eec74`.
 C89 diagnostics pass. Full ES2015 compliance remains unfinished; other platforms
 have not been revalidated for this batch.
+
+## Array, call and constructor spread
+
+The validated implementation adds iterator-based array literals and function/
+constructor argument spread. Array accumulation preserves holes around spreads,
+UTF-16 string iteration, own element definitions and evaluation order. It uses
+neither mutable array methods nor indexed reads in place of iteration. Call
+accumulation retains the callee and receiver before evaluating arguments, keeps
+direct `eval` attached to its original caller, and uses the existing constructor,
+new-target, bound-function and Proxy paths. Temporary constructor argument
+vectors are marked as internal invocations, including native constructors and
+bound/Reflect/Proxy forwarding.
+
+Fixed-arity opcodes 253/254 describe array accumulation and spread invocation;
+cache version 58 records them. Source reconstruction preserves comma expressions
+and parentheses around constructor expressions. Selected legacy editions still
+reject spread syntax. Focused array/call fixtures supply 21/20 checks, with
+23 assertions in each native embedding probe covering collection, callback
+reentry, cancellation, XDR and source round trips. Optional Node differential
+checks cover 970 array and 624 call/constructor cases without differences.
+Real-window checks include array holes, method receivers, construction and direct
+eval. Seven additional checks exercise 66,000 arguments through ordinary,
+Proxy and bound construction, direct/indirect eval and source round trips.
+These exposed an allocator assumption about a caller's operand stack: nested
+internal invocations can temporarily point the stack pointer into another rooted
+argument segment. Operand-tail initialization now checks its frame bounds and
+runs before redirecting that pointer. The native probe also collects during
+large Proxy, bound and Reflect construction. The original failure and LLDB
+trace remain under `artifacts/es6/call-spread-wide*`.
+
+The final corrected runtime retains **28,199 passes**, **369 failures** and
+**14 unsupported modules**, with zero lost passes, harness errors, crashes or
+timeouts. All **11,540 ES5 cases** pass on the same frozen runtime. All four
+applications pass root builds, packaging and relocated desktop checks, including
+Calendar's four views, 169 Browser navigation/layout checks and ChatZilla in
+Suite and XULRunner. Final reports use `artifacts/es6/spread-wide-final-*`.
+All four application engine hashes match the frozen conformance runtime:
+`cbe636e5eb1ed8d075c1a21337c98299cf15e4396e8fe8fd7387e379a2b6e30e`.
+The earlier corpus runs alone missed the wide-argument regression; the added
+wide and native collection probes cover it. Full ES2015 compliance remains
+unfinished; validation of this batch is macOS arm64 only.

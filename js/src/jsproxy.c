@@ -724,7 +724,7 @@ js_ProxyConstruct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         base[0] = roots.v[P_TARGET]; base[1] = JSVAL_NULL;
         for (i = 0; i < argc; ++i) base[2 + i] = argv[i];
         oldsp = frame->sp; frame->sp = base + argc + 2;
-        ok = js_InvokeConstructorWithNewTarget(cx, base, argc, newTarget);
+        ok = js_InternalInvokeConstructorWithNewTarget(cx, base, argc, newTarget);
         if (ok) *rval = base[0];
         frame->sp = oldsp;
         js_FreeStack(cx, mark);

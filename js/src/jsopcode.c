@@ -3488,6 +3488,17 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 }
                 break;
 
+              case JSOP_CALLSPREAD:
+                rval = PopStr(ss, JSOP_NOP);
+                (void)PopStr(ss, JSOP_NOP);
+                lval = PopStr(ss, GET_UINT16(pc) == 1 ? JSOP_NEW : JSOP_CALL);
+                LOCAL_ASSERT(rval[0] == '[' && strlen(rval) >= 2);
+                todo = Sprint(&ss->sprinter, "%s%s%s(%.*s)",
+                              GET_UINT16(pc) == 1 ? "new (" : "", lval,
+                              GET_UINT16(pc) == 1 ? ")" : "",
+                              (int)strlen(rval) - 2, rval + 1);
+                break;
+
               case JSOP_NEW:
               case JSOP_TAGCALL:
               case JSOP_CALL:
@@ -4487,6 +4498,16 @@ Decompile(SprintStack *ss, jsbytecode *pc, intN nb)
                 lval = POP_STR();
                 todo = Sprint(&ss->sprinter, "%s%s[(%s)]:%s", lval,
                               (lval[1] != '\0') ? ", " : "", xval, rval);
+                break;
+
+              case JSOP_ARRAYAPPEND:
+                rval = POP_STR();
+                lval = POP_STR();
+                i = GET_UINT16(pc);
+                todo = Sprint(&ss->sprinter, "%s%s%s%s", lval,
+                              (i & 4) ? ", " : "",
+                              (i & 3) == 2 ? "..." : "",
+                              (i & 3) == 1 ? "" : rval);
                 break;
 
               case JSOP_INITELEM:

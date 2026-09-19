@@ -1493,7 +1493,8 @@ obj_eval(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     str = JSVAL_TO_STRING(*rval);
     caller = JS_GetScriptedCaller(cx, fp);
     direct = caller && fp->down == caller && caller->pc &&
-             *caller->pc == JSOP_EVAL;
+             (*caller->pc == JSOP_EVAL ||
+              (*caller->pc == JSOP_CALLSPREAD && GET_UINT16(caller->pc) == 2));
     inheritedStrict = direct && caller->script->strictMode;
     global = OBJ_GET_PARENT(cx, JSVAL_TO_OBJECT(argv[-2]));
     if (!global) global = cx->globalObject;

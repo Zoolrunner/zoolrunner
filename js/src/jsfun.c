@@ -2234,7 +2234,7 @@ js_InvokeBoundWithNewTarget(JSContext *cx, JSObject *bound, uintN argc, jsval *a
     for (i = 0; i < argc; i++) *sp++ = argv[i];
     oldsp = fp->sp;
     fp->sp = sp;
-    ok = construct ? js_InvokeConstructorWithNewTarget(cx, base, count + argc, newTarget) :
+    ok = construct ? js_InternalInvokeConstructorWithNewTarget(cx, base, count + argc, newTarget) :
          js_Invoke(cx, count + argc, JSINVOKE_INTERNAL | JSINVOKE_SKIP_CALLER);
     if (ok) *rval = base[0];
     fp->sp = oldsp;

@@ -182,6 +182,13 @@ function modernWindowEdition() {
                                 eval('try{2}finally{3}')===2 &&
                                 eval('try{2;throw 0}catch(e){}')===undefined &&
                                 eval('try{null.value}catch(e){e instanceof TypeError}'); })() &&
+           (function() { var a=[0,...[1,2],,3];
+                         function C(x,y) {this.total=x+y;this.target=new.target;}
+                         var c=new C(...[3,4]);
+                         var local=9;
+                         return a.length===5 && !(3 in a) &&
+                                a.slice(...[1,3]).join()==='1,2' &&
+                                c.total===7 && c.target===C && eval(...['local'])===9; })() &&
            typeof /a/ === "object";
 }
 var modernWindowLoaded = modernWindowEdition();

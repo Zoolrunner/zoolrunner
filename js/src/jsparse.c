@@ -5039,7 +5039,20 @@ ArgumentList(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
     ts->flags &= ~TSF_OPERAND;
     if (!matched) {
         do {
-            JSParseNode *argNode = AssignExpr(cx, ts, tc);
+            JSParseNode *argNode;
+            ts->flags |= TSF_OPERAND;
+            matched = JS_VERSION_IS_ES2015(cx) && js_MatchToken(cx, ts, TOK_ELLIPSIS);
+            ts->flags &= ~TSF_OPERAND;
+            if (matched) {
+                argNode = NewParseNode(cx, ts, PN_UNARY, tc);
+                if (!argNode) return JS_FALSE;
+                argNode->pn_type = TOK_ELLIPSIS;
+                argNode->pn_kid = AssignExpr(cx, ts, tc);
+                if (!argNode->pn_kid) return JS_FALSE;
+                listNode->pn_extra |= PNX_COVERREST;
+            } else {
+                argNode = AssignExpr(cx, ts, tc);
+            }
             if (!argNode)
                 return JS_FALSE;
 #if JS_HAS_GENERATORS
@@ -7326,9 +7339,8 @@ js_FoldConstants(JSContext *cx, JSParseNode *pn, JSTreeContext *tc)
         return JS_FALSE;
     }
 
-    if (pn->pn_arity == PN_LIST &&
-        ((pn->pn_type == TOK_RC && (pn->pn_extra & PNX_COVERINIT)) ||
-         (pn->pn_type == TOK_RB && (pn->pn_extra & PNX_COVERREST)))) {
+    if (pn->pn_arity == PN_LIST && pn->pn_type == TOK_RC &&
+        (pn->pn_extra & PNX_COVERINIT)) {
         js_ReportCompileErrorNumber(cx, pn, JSREPORT_PN | JSREPORT_ERROR,
                                     JSMSG_STRICT_SYNTAX);
         return JS_FALSE;
