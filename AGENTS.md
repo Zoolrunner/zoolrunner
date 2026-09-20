@@ -1784,3 +1784,6 @@ the let-square-bracket lookahead restriction and ordinary ASI elsewhere. Run
 `let-statement-newline.js`, `generator-let-newline.js` and existing lexical and
 embedding probes. Do not turn newline-separated lexical declarations in a
 statement list into expression statements.
+
+
+For Math.max/min, standard-edition calls convert all arguments even after an earlier NaN, preserving subsequent callbacks and exceptions. Explicit legacy callers retain historical behavior. Run `js/tests/es6/math-extrema-conversion.js` (264 checks) and both pinned full conformance suites. Preserve callback-triggered collection, conversion order and cross-edition conversion.

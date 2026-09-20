@@ -4230,3 +4230,8 @@ Promise resolve lookup, anonymous built-in names, RegExp prototype accessors and
 template cache identity/escape grammar. The ledger is incomplete and does not
 convert any failing execution into a pass. Full ES2015 compliance and current
 cross-platform application validation remain unfinished.
+
+
+### Math extrema conversion order
+
+Standard-edition `Math.max` and `Math.min` continue `ToNumber` conversion after an earlier NaN, preserving callbacks and thrown exceptions. Explicit legacy editions retain their existing early return. `math-extrema-conversion.js` checks left-to-right conversion, callbacks that collect and reenter, signed zero, conversion exceptions, cross-edition objects and legacy behavior. It passes 264 assertions on the isolated macOS arm64 candidate. The isolated candidate passes all 28,582 pinned ES2015 modes and all 11,540 pinned ES5.1 modes with zero failures. After integration and a macOS arm64 XULRunner rebuild, both full suites pass again against the integrated source; the ES2015 runner confirms the runtime hash is unchanged. Application builds and runtime checks across supported OSes are deferred until the language implementation work is complete. Two exact source-hashed upstream Math cases require this behavior per original clauses 20.2.2.24 and 20.2.2.25; see the diagnostic review artifact.

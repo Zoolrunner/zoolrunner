@@ -1050,3 +1050,6 @@ and 11,540 ES5.1 cases with zero failures. Each package passes 137 focused
 fixtures and 83 native probes. Current Linux validation and the broader later
 Test262 review are still running; Windows remains unvalidated for this revision. See the
 [edge-case validation details](js/tests/es6/README.md#large-regexp-counts-and-assignmentmethod-grammar-edges).
+
+
+The macOS arm64 Math change corrects `Math.max`/`Math.min` argument conversion after NaN while retaining explicit legacy behavior. It passes 264 focused assertions and both complete pinned suites, including an integrated XULRunner rebuild. Application matrix validation will follow completion of the remaining JavaScript implementation work.

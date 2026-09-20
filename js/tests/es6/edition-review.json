@@ -493,6 +493,18 @@
       "reason": "Original ES2015 requires CreateDataProperty, including atomic descriptor validation, while ignoring a false result. JSON reviver writes now use the complete descriptor path rather than bypassing validation through the native definition hook."
     },
     {
+      "test": "built-ins/Math/max/Math.max_each-element-coerced.js",
+      "sha256": "4b2d825d53da80c263d98265334f98d3f7d19b3b3b08c55c4ede99122db7ba03",
+      "edition_review": "es2015-required",
+      "reason": "Original ES2015 20.2.2.24 requires ToNumber on each argument. NaN determines the eventual numeric result but does not suppress subsequent conversions or abrupt completion. Standard edition callers implement all conversions; explicit legacy callers retain their prior early return."
+    },
+    {
+      "test": "built-ins/Math/min/Math.min_each-element-coerced.js",
+      "sha256": "3185875ccd9e950ed35cf73e2dcad9472e3822ea5345e686da04c8b10bb06a80",
+      "edition_review": "es2015-required",
+      "reason": "Original ES2015 20.2.2.25 requires ToNumber on each argument. NaN determines the eventual numeric result but does not suppress subsequent conversions or abrupt completion. Standard edition callers implement all conversions; explicit legacy callers retain their prior early return."
+    },
+    {
       "test": "built-ins/Math/proto.js",
       "sha256": "5a9a70968e07b007f2e9cfbc6705ec0d2223726222ad09ee20136c0c63a04309",
       "decision": "original-regression",

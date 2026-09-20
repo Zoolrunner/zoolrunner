@@ -247,6 +247,9 @@ math_max(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsdouble x, z = *cx->runtime->jsNegativeInfinity;
     uintN i;
+    JSBool sawNaN = JS_FALSE;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
     if (argc == 0) {
         *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNegativeInfinity);
@@ -256,13 +259,23 @@ math_max(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (!js_ValueToNumber(cx, argv[i], &x))
             return JS_FALSE;
         if (JSDOUBLE_IS_NaN(x)) {
-            *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
-            return JS_TRUE;
+            /* Standard editions still convert subsequent arguments. Preserve
+             * explicit legacy callers' historical early return. */
+            if (!standard) {
+                *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+                return JS_TRUE;
+            }
+            sawNaN = JS_TRUE;
+            continue;
         }
         if (x == 0 && x == z && fd_copysign(1.0, z) == -1)
             z = x;
         else
             z = (x > z) ? x : z;
+    }
+    if (sawNaN) {
+        *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+        return JS_TRUE;
     }
     return js_NewNumberValue(cx, z, rval);
 }
@@ -272,6 +285,9 @@ math_min(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsdouble x, z = *cx->runtime->jsPositiveInfinity;
     uintN i;
+    JSBool sawNaN = JS_FALSE;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
     if (argc == 0) {
         *rval = DOUBLE_TO_JSVAL(cx->runtime->jsPositiveInfinity);
@@ -281,13 +297,23 @@ math_min(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (!js_ValueToNumber(cx, argv[i], &x))
             return JS_FALSE;
         if (JSDOUBLE_IS_NaN(x)) {
-            *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
-            return JS_TRUE;
+            /* Standard editions still convert subsequent arguments. Preserve
+             * explicit legacy callers' historical early return. */
+            if (!standard) {
+                *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+                return JS_TRUE;
+            }
+            sawNaN = JS_TRUE;
+            continue;
         }
         if (x == 0 && x == z && fd_copysign(1.0,x) == -1)
             z = x;
         else
             z = (x < z) ? x : z;
+    }
+    if (sawNaN) {
+        *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+        return JS_TRUE;
     }
     return js_NewNumberValue(cx, z, rval);
 }
