@@ -1268,6 +1268,16 @@ lexHex:
                 localMax = n;
                 break;
             case 'd':
+                if (state->modern && (inRange || (src < end - 1 && *src == '-'))) {
+                    if (inRange) {
+                        localMax = JS_MAX(localMax, (uintN)rangeStart);
+                        inRange = JS_FALSE;
+                    } else {
+                        ++src;
+                    }
+                    localMax = JS_MAX(JS_MAX(localMax, (uintN)'9'), (uintN)'-');
+                    break;
+                }
                 if (inRange || (src < end - 1 && *src == '-')) {
                     if (state->modern) {
                         /* Original ES2015 Annex B ClassAtomInRange falls
@@ -1287,6 +1297,16 @@ lexHex:
             case 'S':
             case 'w':
             case 'W':
+                if (state->modern && (inRange || (src < end - 1 && *src == '-'))) {
+                    if (inRange) {
+                        localMax = JS_MAX(localMax, (uintN)rangeStart);
+                        inRange = JS_FALSE;
+                    } else {
+                        ++src;
+                    }
+                    localMax = 65535;
+                    break;
+                }
                 if (inRange || (src < end - 1 && *src == '-')) {
                     if (state->modern) {
                         /* Original ES2015 Annex B ClassAtomInRange falls
@@ -2926,6 +2946,14 @@ ProcessCharSet(REGlobalData *gData, RECharSet *charSet)
             case 'S':
             case 'w':
             case 'W':
+                if (charSet->modern && (inRange || (src < end - 1 && *src == '-'))) {
+                    AddCharacterToCharSet(charSet, '-');
+                    if (inRange) {
+                        AddCharacterToCharSet(charSet, rangeStart);
+                        inRange = JS_FALSE;
+                    }
+                    else ++src;
+                }
                 /* Such endpoints are accepted only by the ES2015 parser;
                  * retain that decision when lazily building the bitmap from
                  * a different caller edition. Unicode uses UnicodeClass. */
@@ -5034,7 +5062,8 @@ RegExpBuiltinExec(JSContext *cx, JSObject *obj, JSString *str, JSObject *globalO
     if (!re) { RegExpReceiverError(cx, "exec"); goto out; }
     index = (size_t)lastIndex;
     if (!ExecuteRegExp(cx, re, str, &index, JS_FALSE, sticky, globalObject, rval)) goto out;
-    if (*rval == JSVAL_NULL) ok = SetRegExpIndexValue(cx, obj, JSVAL_ZERO);
+    if (*rval == JSVAL_NULL)
+        ok = SetRegExpIndexValue(cx, obj, JSVAL_ZERO);
     else if (global || sticky)
         ok = js_NewNumberValue(cx, index, &values[1]) &&
              SetRegExpIndexValue(cx, obj, values[1]);
@@ -5126,10 +5155,10 @@ RegExpSymbolSearch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval 
     str = js_ValueToString(cx, argv[0]);
     if (!str) goto out;
     values[0] = STRING_TO_JSVAL(str);
-    if (!JS_GetProperty(cx, obj, "lastIndex", &values[1]) ||
-        !SetRegExpIndexValue(cx, obj, JSVAL_ZERO) ||
-        !RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
-    /* ES2015 always performs both writes, and does not restore on exec throw. */
+    if (!JS_GetProperty(cx, obj, "lastIndex", &values[1])) goto out;
+    if (!SetRegExpIndexValue(cx, obj, JSVAL_ZERO)) goto out;
+    if (!RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+    /* ES2015 restores the saved value after a successful RegExpExec call. */
     if (!SetRegExpIndexValue(cx, obj, values[1])) goto out;
     if (values[2] == JSVAL_NULL) {
         *rval = INT_TO_JSVAL(-1); ok = JS_TRUE;

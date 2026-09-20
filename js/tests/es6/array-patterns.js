@@ -23,6 +23,11 @@ var events=[],target={};i=iterable(function(){events.push('next');return {done:f
 function dest(){events.push('target');return target}[dest().x]=i;
 check(events.join()==='target,next,close'&&target.x===4,'target order');
 var out=[];for(const [n] of [[1],[2]])out.push(n);check(out.join()==='1,2','const for-of binding');
+var nextGets=0,nextCalls=0,patternIterator={};
+Object.defineProperty(patternIterator,'next',{get:function(){++nextGets;var method=function(){++nextCalls;return {done:nextCalls>2,value:nextCalls}};gc();return method}});
+patternIterator[Symbol.iterator]=function(){return this};
+var [patternFirst,...patternRest]=patternIterator;
+check(patternFirst===1&&patternRest.length===1&&patternRest[0]===2&&nextGets===3&&nextCalls===3,'pattern reads next method for each step');
 function f(v){var [a,,b=3]=v;return a+b}
 function g(v,d){[d.x,d.y=4]=v;return d.x+d.y}
 function h(v){var [[a],{x:b=4}]=v;return a+b}

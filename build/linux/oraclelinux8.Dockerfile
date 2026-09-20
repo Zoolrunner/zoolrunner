@@ -2,7 +2,7 @@ FROM oraclelinux:8@sha256:21916d0f9527aa5d0b84034dcb3f6d2f01b59e633e31221b498550
 RUN dnf -y install \
     gcc-toolset-14-gcc gcc-toolset-14-gcc-c++ gcc-toolset-14-binutils \
     gcc-toolset-14-libstdc++-devel.x86_64 gcc-toolset-14-libstdc++-devel.i686 glibc-devel.i686 \
-    make autoconf automake perl python3 flex bison pkgconf-pkg-config \
+    make autoconf automake perl python3 git flex bison pkgconf-pkg-config \
     glib2-devel.x86_64 glib2-devel.i686 gtk2-devel.x86_64 gtk2-devel.i686 \
     libXt-devel.x86_64 libXt-devel.i686 \
     xorg-x11-server-Xvfb xorg-x11-fonts-misc dejavu-sans-fonts \

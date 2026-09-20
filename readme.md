@@ -1047,9 +1047,52 @@ early errors, parenthesized default emission, method own-field restrictions and
 contextual-let statement parsing. All eight macOS arm64/x86_64 build, package
 and application checks pass; both architectures pass 28,582 pinned ES2015 modes
 and 11,540 ES5.1 cases with zero failures. Each package passes 137 focused
-fixtures and 83 native probes. Current Linux validation and the broader later
-Test262 review are still running; Windows remains unvalidated for this revision. See the
+fixtures and 83 native probes. Linux application validation is deferred until
+the language implementation work is complete; Windows remains unvalidated for
+this revision. See the
 [edge-case validation details](js/tests/es6/README.md#large-regexp-counts-and-assignmentmethod-grammar-edges).
 
 
-The macOS arm64 Math change corrects `Math.max`/`Math.min` argument conversion after NaN while retaining explicit legacy behavior. It passes 264 focused assertions and both complete pinned suites, including an integrated XULRunner rebuild. Application matrix validation will follow completion of the remaining JavaScript implementation work.
+The macOS arm64 Math change corrects `Math.max`/`Math.min` argument conversion after NaN while retaining explicit legacy behavior. It passes 264 focused assertions and both complete pinned suites, including an integrated XULRunner rebuild. The current arm64 Suite was also rebuilt and packaged; its frozen runtime passes all 28,582 pinned ES2015 modes, all 11,540 ES5.1 cases, 38 later-runner controls and relocated application/lifecycle checks. Broader current-Test262 edition review remains incomplete. Cross-OS application validation will follow completion of the JavaScript implementation work.
+
+The latest macOS arm64 Suite build passes the complete pinned ES2015 Test262
+suite (28,582/28,582 modes) and the complete pinned ES5.1 suite (11,540/11,540
+modes), with zero failures, unsupported cases, timeouts, crashes or harness
+errors. The relocated Suite package also passes its GUI and lifecycle checks,
+including ChatZilla, Composer, Address Book, Inspector and Venkman; all 38
+later-runner host controls pass. A separate later-corpus ES2015-tagged
+diagnostic records 5,839 passes and 13 failures across eight files. Each
+failure has an exact-hash edition review identifying a later requirement or
+later syntax; those diagnostic failures are not counted as passes or omitted
+from the report. Full original-edition ES2015 and ES5.1 conformance is complete
+on macOS arm64. Build and runtime validation across the remaining applications,
+architectures and operating systems is now underway. See the
+[ES6 validation record](js/tests/es6/README.md#completed-es2015-gate-on-the-macos-arm64-suite).
+
+Cross-platform follow-up: all four applications on modern macOS arm64 and
+x86_64 pass build, package and relocated runtime checks. Linux aarch64 passes
+all eight application/backend entries on GTK2 and Xlib, including complete
+pinned ES5.1 and ES2015 suites. The i686 Suite GTK2 entry also passes build,
+package, ABI, application and complete ES2015 checks; its x87 Number rounding
+fix is covered by a focused regression. The x86_64 Suite GTK2 entry now also
+passes build, package, relocated runtime checks, 310 focused/native probes and
+all 28,582 pinned ES2015 modes in QEMU emulation on Apple Silicon. The Linux
+x86_64 Browser and Calendar GTK2 entries also pass current build/package/runtime
+checks and all 28,582 ES2015 modes; Calendar's eight compatibility tests pass.
+XULRunner GTK2 likewise passes build/package/runtime and all 28,582 ES2015
+modes. Linux x86_64 Suite Xlib also passes build/package/runtime, all 24
+lifecycle checks, and all 28,582 ES2015 modes. Linux i686 Suite GTK2 is also
+complete. The other 10 Linux x86
+application/backend entries and remaining OS targets are not yet validated. See
+[`js/tests/es6/README.md`](js/tests/es6/README.md#current-cross-platform-validation)
+for per-platform reports and limits.
+
+Current-checkout macOS arm64 and x86_64 validation is complete for Suite,
+Browser, Calendar and XULRunner using SDK 11.3: all eight application targets
+build and package, pass relocated application startup and image/relaunch probes.
+The x86_64 packages were run through Rosetta on Apple Silicon. Browser arm64
+and Suite on both architectures pass all 28,582 pinned ES2015 modes and 11,540
+pinned ES5.1 cases. Calendar on both architectures passes its compatibility
+tests and fresh-profile startup with all four views. These local results are
+recorded under `artifacts/macos-modern-validation/`; the remaining operating-
+system and architecture matrix is still underway.

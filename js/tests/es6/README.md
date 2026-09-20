@@ -106,15 +106,14 @@ checks that selection during preflight. `--edition legacy` reproduces the
 original default-language baseline. Reports identify the selected edition;
 do not compare a legacy run with an ES2015 run as if the semantics were equal.
 
-Modules are currently reported as **unsupported**, not passed or skipped.
-The runner drains the engine's pending jobs after test evaluation, before
-checking `$DONE`. A job exception cannot satisfy a synchronous negative test.
-Async tests that still do not complete are reported as unsupported. Promise and
-application checkpoints are covered in the implementation notes below. These
-statuses count against completion and give the runner a failing exit status.
-Every result is recorded. `--filter` is only a diagnostic subset and cannot
-establish a full-suite pass. Engine and host support must eventually execute
-these tests normally; do not turn unsupported cases into exclusions.
+Module tests now use the native module compiler, the diagnostic host's explicit
+dependency linker, and the engine's module evaluator. The pinned module cases
+run as part of the full suite; no module modes are marked unsupported in the
+current complete macOS arm64 run. The runner drains pending jobs before checking
+`$DONE`, and a job exception cannot satisfy a synchronous negative test. An
+async test that does not complete remains unsupported and counts against the
+gate. Every result is recorded. `--filter` is only a diagnostic subset and
+cannot establish a full-suite pass.
 
 ## Implementation and compatibility gates
 
@@ -4213,18 +4212,18 @@ on both architectures. All eight archives and runtime hashes are preserved;
 normalized engine payload comparisons pass across the applications. The 38
 later-runner host controls also pass on both production architectures.
 
-The frozen Linux aarch64 source for this revision is queued for all eight
-application/backend jobs after the macOS checks. Its results remain separate
-from the earlier successful Linux revision; current Windows validation is still
-outstanding. A fresh complete 93,197-mode later diagnostic is running against
-the frozen arm64 cache-69 runtime, retaining every failure and host error.
+The frozen Linux aarch64 source for this revision was deferred on user direction
+until the ES2015 implementation is complete. Its results remain separate from
+the earlier successful Linux revision; current Windows validation is also
+outstanding. A fresh complete 93,197-mode later diagnostic ran against the
+frozen arm64 cache-69 runtime and retained every failure and host error.
 
 Exact later diagnostics pass both large-quantifier modes, both method-own-field
 cases and 14 original contextual-let statement cases. The two additional
-for-await-of cases remain later-edition failures. The assignment-target diagnostic
+for-await-of cases remain later-edition failures. The earlier assignment-target diagnostic
 records 149 passes and 485 failures: original ES2015 early ReferenceError rules
 and later SyntaxError/runtime-call-target rules differ. Its complete transitions
-are retained; it is not a zero-failure gate. The review ledger now holds 313
+are retained; it is not a zero-failure gate. The review ledger then held 313
 source-hashed records, including original regressions and later changes to
 Promise resolve lookup, anonymous built-in names, RegExp prototype accessors and
 template cache identity/escape grammar. The ledger is incomplete and does not
@@ -4235,3 +4234,164 @@ cross-platform application validation remain unfinished.
 ### Math extrema conversion order
 
 Standard-edition `Math.max` and `Math.min` continue `ToNumber` conversion after an earlier NaN, preserving callbacks and thrown exceptions. Explicit legacy editions retain their existing early return. `math-extrema-conversion.js` checks left-to-right conversion, callbacks that collect and reenter, signed zero, conversion exceptions, cross-edition objects and legacy behavior. It passes 264 assertions on the isolated macOS arm64 candidate. The isolated candidate passes all 28,582 pinned ES2015 modes and all 11,540 pinned ES5.1 modes with zero failures. After integration and a macOS arm64 XULRunner rebuild, both full suites pass again against the integrated source; the ES2015 runner confirms the runtime hash is unchanged. Application builds and runtime checks across supported OSes are deferred until the language implementation work is complete. Two exact source-hashed upstream Math cases require this behavior per original clauses 20.2.2.24 and 20.2.2.25; see the diagnostic review artifact.
+
+### Current macOS arm64 Suite validation
+
+After integrating the Math change, the arm64 Suite was rebuilt and packaged
+from the current source. Its frozen packaged shell passes the complete pinned
+ES2015 suite (28,582/28,582) and ES5.1 suite (11,540/11,540), each with zero
+failures, unsupported cases, timeouts, crashes or harness errors. The 38 later
+runner controls pass. The relocated Suite package also passes the application,
+window/bootstrap, Promise, ChatZilla and Composer lifecycle checks. Reports and
+logs are under `artifacts/es6/math-extrema-suite-*`. One validation wrapper used
+the ES2015 expected count for its ES5 assertion and exited after both reports
+were complete; the raw ES5 report has the expected 11,540/11,540 result.
+
+The later full-corpus diagnostic remains a separate mixed-edition inventory,
+not a conformance result: 93,197 modes recorded 52,616 diagnostic passes,
+37,273 failures and 3,308 harness errors. Most failures exercise later-edition
+features or changed requirements, but every applicable ES2015 case still needs
+source-hash review. The ledger currently has 474 records and is incomplete.
+Full ES2015 compliance and cross-platform application validation remain
+unfinished.
+
+### Latest macOS arm64 Suite assignment-grammar validation
+
+The parser now retains an expression's grammar category through constant
+folding. In ES2015 mode a bare binary or unary expression cannot be an
+assignment target and fails during parsing with SyntaxError; a parenthesized
+expression is a grammar-valid LeftHandSideExpression and keeps the original
+ES2015 early ReferenceError behavior. Explicit legacy editions are unchanged.
+The focused assignment fixture passes 187 assertions, including constant-folded
+addition and paired bare/parenthesized cases. The later-corpus assignment-target
+diagnostic now records 328 passes and 306 failures across 634 modes, up from 326
+passes and 308 failures. The newly passing source-hashed additive case is
+reviewed against the original grammar in `edition-review.json`. All failing
+source files in this bounded assignment-target selection now have exact-hash
+reviews: the remaining SyntaxError expectations and Annex B call-target cases
+require later rules. This diagnostic is not a zero-failure ES2015 gate.
+
+The rebuilt, frozen macOS arm64 Suite package passes all 28,582 pinned ES2015
+modes and 11,540 pinned ES5.1 modes with zero failures, unsupported cases,
+timeouts, crashes or harness errors. Package native probes, the 38 later-runner
+controls and relocated Suite application/window/ChatZilla/Composer regressions
+also pass. The exact package, reports and logs are under
+`artifacts/es6/assignment-target-final-suite-*`. Work on the full ES2015
+implementation continues; all-application and cross-OS validation remains
+deferred until then.
+
+The earlier GetIterator note above was based on a misread of later-edition
+iterator records and a stale object file. The rebuilt engine reads `next` for
+each iterator step in both for-of and array patterns, matching the pinned
+ES2015 abstract operations; the corresponding focused regressions now exercise
+getter reentrancy and collection.
+
+### Completed ES2015 gate on the macOS arm64 Suite
+
+The current source was rebuilt and packaged as the macOS arm64 Suite. Its
+frozen packaged runtime passes **all 28,582 modes** in the complete pinned
+2015 Test262 snapshot and **all 11,540 modes** in the pinned ES5.1 suite, with
+zero failures, unsupported cases, timeouts, crashes or harness errors. All 38
+later-runner host controls pass. The relocated desktop Suite tests pass chrome
+startup and navigation, error pages, chrome/content bootstrap, ChatZilla,
+Composer editing and teardown, Address Book, Inspector, Venkman and profile
+lifecycle checks. Artifacts are under `artifacts/es6/edge-suite-*` and the
+package is `artifacts/zoolrunner-macos-arm64-suite-sdk11.3.tar.gz`.
+
+The separate 5,852-mode later-corpus `es6id` diagnostic records 5,839
+diagnostic passes and 13 diagnostic failures across eight files. Every failing
+source hash matches an exact-hash review in `edition-review.json`: later
+Annex B duplicate-function relaxation, anonymous built-in naming, RegExp
+lastIndex observability, BigInt syntax in revised accessor tests, and the
+module namespace tag descriptor. These are edition-review findings, not
+passing Test262 results or exclusions from the pinned ES2015 gate. The broader
+later-edition inventory remains incomplete. The original ES2015 and ES5.1
+conformance gates are complete on macOS arm64; cross-application and
+cross-operating-system validation is now the remaining project phase.
+
+### Current cross-platform validation
+
+The current source also passes build, package and relocated runtime checks for
+all eight Linux aarch64 application/backend entries: Suite, Browser, Calendar
+and XULRunner on GTK2 and Xlib. Each entry passes the pinned ES2015 suite
+(28,582/28,582) and ES5.1 suite (11,540/11,540); Calendar also passes all eight
+compatibility tests and its four-view window check. Logs and packages are
+under `artifacts/matrix/linux/aarch64/`.
+
+The i686 Suite GTK2 entry passes its build, package, ABI check, application
+smoke tests and native probes. Its ES2015 Test262 run was stopped on user
+direction at approximately 18,000 of 28,582 modes; it is incomplete and is not
+a passing suite result. The i686 interpreter explicitly rounds binary
+arithmetic through the x87 53-bit precision control and restores the embedding
+thread's control word immediately, preserving host libm behavior and
+application state. `double-rounding.js` covers the regression. Local QEMU
+validation used longer per-case and native-probe timeouts; the workflow's
+native-host defaults remain unchanged. Partial logs and reports are under
+`/tmp/zool-linux-i686-suite-gtk2-current/` and
+`artifacts/matrix/linux/i686/suite/gtk2/`.
+
+The Linux x86_64 Suite GTK2 entry has also passed its full build, package and
+relocated application/runtime checks under QEMU, including all 28,582 pinned
+ES2015 modes and 310 focused/native embedding checks. Test262 reported zero
+failures, unsupported cases, timeouts, crashes or harness errors; its report,
+package and logs are under `artifacts/matrix/linux/x86_64/suite/gtk2/`. This
+was an emulated x86_64 validation on Apple Silicon, not a native x86_64 host
+run.
+
+All four applications on modern macOS arm64 and x86_64 have also passed their
+build, package and relocated runtime checks. Linux x86_64 Suite GTK2 coverage
+is complete; Linux x86_64 also has Browser and Calendar GTK2 complete. Linux
+x86_64 Suite Xlib is also complete. Linux i686 Suite GTK2 built and passed
+application checks, but its Test262 run was interrupted and remains incomplete.
+The other 10 Linux x86 application/backend entries and the remaining
+supported OS/architecture matrices are still in progress. Do not infer their
+status from these results. GitHub-hosted
+workflow runs and physical minimum-version runtime validation remain separate
+checks.
+
+### Current macOS arm64 application matrix
+
+On the current checkout, Suite, Browser, Calendar and XULRunner each pass
+macOS arm64 SDK 11.3 build and package validation, relocated application
+startup, and image/relaunch platform probes. Browser also passes the complete
+pinned ES2015 suite (28,582/28,582) and ES5.1 suite (11,540/11,540), with zero
+failures, timeouts, crashes or harness errors. Calendar's package compatibility
+tests pass, and its fresh-profile GUI check passes startup and all four views
+(day, week, multiweek and month), with zero console errors. Suite additionally
+passes its Composer/editor and classic application lifecycle checks. Logs and
+reports are under `artifacts/macos-modern-validation/arm64-*-current-*`; the
+current application packages are under `artifacts/zoolrunner-macos-arm64-*`.
+This completes the macOS arm64 application matrix locally. The broader
+cross-OS/architecture matrix remains in progress; Linux x86_64 Suite Xlib and
+Suite/Browser/Calendar/XULRunner GTK2 are complete. Linux i686 Suite GTK2's
+Test262 run was interrupted and remains incomplete.
+
+The current-checkout Linux x86_64 Calendar GTK2 target also passes build,
+package, runtime and focused/native embedding probes, plus all 28,582 pinned
+ES2015 modes with zero failures, unsupported cases, timeouts, crashes or
+harness errors. It ran under QEMU on Apple Silicon, not on a native x86_64
+host. Its logs and archive are under
+`artifacts/matrix/linux/x86_64/calendar/gtk2/`.
+
+The current-checkout Linux x86_64 XULRunner GTK2 target passes build, CPU
+probe, package, standalone XUL application runtime and focused/native probes,
+plus all 28,582 pinned ES2015 modes with zero failures, unsupported cases,
+timeouts, crashes or harness errors. This was QEMU emulation on Apple Silicon,
+not a native x86_64 host run. Its logs and package are under
+`artifacts/matrix/linux/x86_64/xulrunner/gtk2/`.
+
+The current-checkout Linux x86_64 Suite Xlib target passes build, CPU probe,
+package, GUI navigation and lifecycle checks (24/24), native embedding probes,
+and all 28,582 pinned ES2015 modes with zero failures, unsupported cases,
+timeouts, crashes or harness errors. This was QEMU emulation on Apple Silicon,
+not a native x86_64 host run. Its logs and package are under
+`artifacts/matrix/linux/x86_64/suite/xlib/`.
+
+The current-checkout macOS x86_64 matrix is now also complete under Rosetta:
+Suite, Browser, Calendar and XULRunner pass SDK 11.3 build/package, relocated
+application startup and platform image/relaunch checks. Suite passes all
+28,582 pinned ES2015 and 11,540 pinned ES5.1 cases; Calendar passes all eight
+compatibility tests and its fresh-profile four-view GUI test. These Intel
+package runs use Rosetta on Apple Silicon and are not physical Intel hardware
+validation. Logs and reports are under
+`artifacts/macos-modern-validation/x86_64-*-current-*`.

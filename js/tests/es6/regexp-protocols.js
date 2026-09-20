@@ -39,7 +39,15 @@ log = []; index = -0;
 r = {get lastIndex(){log.push('get');return index;}, set lastIndex(v){log.push('set:'+v);index=v;},
      exec:function(s){gc();log.push('exec');return {get index(){log.push('result');return marker;}};}};
 check(search.call(r, 'x') === marker && 1/index === -Infinity &&
-      log.join() === 'get,set:0,exec,set:0,result', '2015 search always writes and restores negative zero');
+      log.join() === 'get,set:0,exec,set:0,result', 'search writes zero and restores saved negative zero');
+log = []; index = 0;
+r = {get lastIndex(){log.push('get');return index;},set lastIndex(v){log.push('set:'+v);index=v;},
+     exec:function(){log.push('exec');return null;}};
+check(search.call(r, 'x') === -1 && log.join() === 'get,set:0,exec,set:0', 'search writes zero and restores unchanged lastIndex');
+log = []; index = -0;
+r = {get lastIndex(){return index;},set lastIndex(v){log.push('set:'+v);index=v;},
+     exec:function(){return null;}};
+check(search.call(r, 'x') === -1 && 1/index === -Infinity && log.join() === 'set:0,set:0', 'search distinguishes negative zero');
 log = []; index = 7;
 r = {get lastIndex(){return index;}, set lastIndex(v){log.push(v);index=v;}, exec:function(){throw marker;}};
 check(caught(function(){search.call(r,'x');}) === marker && index === 0 && log.join() === '0', 'search does not restore on exec throw');
@@ -61,7 +69,7 @@ var proxy=new Proxy(raw,{get:function(t,k,recv){check(recv===proxy,'proxy getter
 check(match.call(proxy,'x')===null,'generic Proxy receiver');
 r = /a/;
 Object.defineProperty(r,'global',{value:true});
-check(match.call(r,'aa').length===2 && r.lastIndex===0,'observable global flag makes builtin exec progress');
+check(match.call(r,'aa').length===2 && r.lastIndex===0,'global failure resets lastIndex');
 r = /a/;
 Object.defineProperty(r,'sticky',{value:true});
 check(r.exec('ba')===null && r.lastIndex===0,'observable sticky flag anchors matcher');
@@ -83,7 +91,7 @@ Object.defineProperty(r,'sticky',{get:function(){r.compile('b');gc();return fals
 check(r.exec('b')[0]==='b','matcher selected after reentrant flag getter');
 r=/z/;r.lastIndex=5;
 Object.defineProperty(r,'lastIndex',{writable:false});
-check(caught(function(){r.exec('abc');}) instanceof TypeError,'nonglobal failure checks index reset');
+check(caught(function(){r.exec('abc');}) instanceof TypeError && r.lastIndex===5,'nonglobal failure resets lastIndex');
 log=[];
 check(caught(function(){RegExp.prototype.exec.call({}, {toString:function(){log.push('string');return 'x';}});}) instanceof TypeError &&
       log.length===0,'exec validates matcher before string conversion');

@@ -4,11 +4,16 @@ function check(ok,label){++checks;if(!ok)throw Error(label);}
 function inEdition(edition,source){var saved=version();try{version(edition);return evaluate(source,'assignment-targets');}finally{version(saved);}}
 var referenceErrors=[
  '({}) = 1;', '([]) = [];', '(({})) = 1;', '(([a])) = [1];',
+ '(x - y) = 1;', '(!x) = 1;', '(x = y) = 1;',
  '() => ({}) = 1;', '() => ([]) = [];',
+ '(x ? y : z) = 1;',
  'function f(){}; f() = 1;', 'function f(){}; (f()) += 1;',
  'function tag(){}; tag`` = 1;', 'function tag(){}; (tag``) *= 2;'
 ];
 var syntaxErrors=[
+ 'x - y = 1;', 'x + y = 1;', '-x = 1;', '!x = 1;',
+ '1 + 2 = 1;', '-1 = 1;', 'true && false = 1;',
+ '++x = 1;', 'x++ = 1;', 'x && y = 1;', 'delete x.y = 1;',
  'function f(){}; for(f() in {}){}', 'function f(){}; for((f()) in {}){}',
  'function f(){}; for(f() of []){}', 'for(({}) in {}){}', 'for(([]) of []){}',
  '[({})]=[{}];', '[([])]=[[]];', '({x:({})}={x:{}});',

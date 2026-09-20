@@ -971,105 +971,105 @@
       "sha256": "5c2afa7b7579b9e3ad86bc4393e77e660001717959b70a4c34c26fe5d0d0947c",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/buffer-arg/use-custom-proto-if-object.js",
       "sha256": "8b69d6e9a9c5b672192f13298c1b77c91dcbc391ac3630227e4661441d18f5fa",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/buffer-arg/use-default-proto-if-custom-proto-is-not-object.js",
       "sha256": "85bc28d8f316039a900d3cc3ac0379ec239f06d08f084acf85fd905c1aca7189",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/length-arg/custom-proto-access-throws.js",
       "sha256": "3f9c3fd4f3ff68d5061e8d16ad7e1b3e6b81d84767acad33fdfb48258cb57531",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/length-arg/use-custom-proto-if-object.js",
       "sha256": "55722a64ecdd430b75f5e3e5325133348f5dea35c5a81b6a8b8dafe30b71c000",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/length-arg/use-default-proto-if-custom-proto-is-not-object.js",
       "sha256": "50dd75f589201ada8c3433abc687cc36b9971f9e57e9ba6e2a1d0050ac07abdd",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/no-args/custom-proto-access-throws.js",
       "sha256": "afa67ef362f97b36e4068ac753ef8cd704e56a755ea741d2ae464fd179b1d6fc",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/no-args/use-custom-proto-if-object.js",
       "sha256": "9c98c3f9c9f26b71d59ae11702e545528e75459048028807f08d6a27f32f7742",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/no-args/use-default-proto-if-custom-proto-is-not-object.js",
       "sha256": "d400fe52c2d9a697f5ce2bb27b8aee8ee2b5a093e721d5a8d137d13ba9b7f280",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/object-arg/custom-proto-access-throws.js",
       "sha256": "a54196626913dd200b3b4ae0ef1c48659632fedb7c0d7e2177248ccd3da88c3b",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/object-arg/use-custom-proto-if-object.js",
       "sha256": "09d50bb5e9ef85d327c8c65a355a1821fdb9cb75f90ae0763b75d9c53168be5e",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/object-arg/use-default-proto-if-custom-proto-is-not-object.js",
       "sha256": "d25ddd2106257645dd5f275a4189d89babbe39be4127fd95a1c005e145b96ea5",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/typedarray-arg/custom-proto-access-throws.js",
       "sha256": "56ba21f24f1ca930a829fea0d2926063568c344fe6d197bfc0e546cbbce72e3a",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/typedarray-arg/use-custom-proto-if-object.js",
       "sha256": "cad836eb6c6bc1f1cddc2f7619fcb6476dd72e2f63e64af537ec17aff3c907d5",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/TypedArrayConstructors/ctors/typedarray-arg/use-default-proto-if-custom-proto-is-not-object.js",
       "sha256": "8db6e9175095a3103a3bba2f2971e4c453d409c5ee7832cf309f175d67fe7078",
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-allocatetypedarray",
-      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget\u2019s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
+      "reason": "Original ES2015 determines the typed-array kind by walking NewTarget’s constructor prototype chain before reading NewTarget.prototype. These tests supply an unrelated ordinary or bound function and require the later allocation algorithm that determines the kind from the active typed-array constructor instead."
     },
     {
       "test": "built-ins/decodeURIComponent/throw-URIError.js",
@@ -1441,6 +1441,13 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-iteratorbindinginitialization",
       "reason": "Original ES2015 FormalParameter IteratorBindingInitialization creates a separate paramVarEnv for each initializer, inside the shared parameter bindings, then restores the original environment. This later test instead requires the revised shared eval-var environment outside parameter bindings, changing eval shadowing and visibility between initializers and the body."
+    },
+    {
+      "test": "language/expressions/function/name.js",
+      "sha256": "017c87887a8ccd8b50fa3faf5454cdb4f2951111782a1d32cadba99684a5febd",
+      "decision": "pre-final-test-conflict",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-function-definitions-runtime-semantics-evaluation",
+      "reason": "This historical V8-origin test requires an own empty name property on a standalone anonymous FunctionExpression. Final ES2015 clause 14.1.20 creates that closure with FunctionCreate and MakeConstructor, but does not call SetFunctionName for this production; SetFunctionName is called only for the BindingIdentifier production. The expected own property is therefore not required by final ES2015 and conflicts with the explicit modern regression preserving uninferred anonymous functions without an own name."
     },
     {
       "test": "language/expressions/generators/eval-var-scope-syntax-err.js",
@@ -2204,6 +2211,1112 @@
       "decision": "later-requirement",
       "original_specification": "https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s",
       "reason": "Original ES2015 object-environment SetMutableBinding delegates directly to Set without a new HasProperty check or a separate missing-binding ReferenceError. This test requires the later added existence check."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-additiveexpression-plus-multiplicativeexpression-1.js",
+      "sha256": "c51493db30e9e70fe5fdde66291b72c7280f7cee0364fcca5f4d442faca775e9",
+      "decision": "original-regression",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "A bare additive expression is not a LeftHandSideExpression, so this direct assignment is a parse-time SyntaxError under the original grammar. Parenthesized expression forms remain grammar-valid LeftHandSideExpressions and preserve their original early ReferenceError behavior."
+    },
+    {
+      "test": "annexB/language/expressions/assignmenttargettype/callexpression-as-for-of-lhs.js",
+      "sha256": "02e812e0db5a61f582e64e237f6e41e64f95bb0365322055b6bc0f398f29763f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This 2025 Test262 case requires Annex B Runtime Errors for Function Call Assignment Targets, which permits a function call to execute before a runtime ReferenceError. That web-compatibility extension is absent from original ES2015, whose early-error rules reject this call target during parsing; that original behavior is retained."
+    },
+    {
+      "test": "annexB/language/expressions/assignmenttargettype/callexpression-in-postfix-update.js",
+      "sha256": "400f421376861d41f5e7999c94776fa25b9a9ffadb1187e2dd0d1e6103e83ac2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This 2025 Test262 case requires Annex B Runtime Errors for Function Call Assignment Targets, which permits a function call to execute before a runtime ReferenceError. That web-compatibility extension is absent from original ES2015, whose early-error rules reject this call target during parsing; that original behavior is retained."
+    },
+    {
+      "test": "annexB/language/expressions/assignmenttargettype/callexpression-in-prefix-update.js",
+      "sha256": "c0dc7733eaa4afdad6ac5f78d1a479e94e8cda9235e329ac6f44d66c8e78fd03",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This 2025 Test262 case requires Annex B Runtime Errors for Function Call Assignment Targets, which permits a function call to execute before a runtime ReferenceError. That web-compatibility extension is absent from original ES2015, whose early-error rules reject this call target during parsing; that original behavior is retained."
+    },
+    {
+      "test": "annexB/language/expressions/assignmenttargettype/cover-callexpression-and-asyncarrowhead.js",
+      "sha256": "578275d7d48dfb962a9150930ae16fc1d1ee3fd4ceb5134194e60c80717162d1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This 2025 Test262 case requires Annex B Runtime Errors for Function Call Assignment Targets, which permits a function call to execute before a runtime ReferenceError. That web-compatibility extension is absent from original ES2015, whose early-error rules reject this call target during parsing; that original behavior is retained."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-arrowfunction-1.js",
+      "sha256": "8de8d59a0a243844b87d218b7a4c71d45cf8fd8feab1c010f3601d72c6167705",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-arrowfunction-2.js",
+      "sha256": "66ecd486e3cdb383ac6cdd655b70fc495b61bff90e6a125e491d9f1ed183c9f3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-arrowfunction-3.js",
+      "sha256": "af27a7889bfd89419ec08cceb3ed3ab88846381b359123c5174bfe0cc8348487",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-arrowfunction-4.js",
+      "sha256": "87690659568361adebc92adb9da5e6d4d8353ab0f9122d67d8c663b77815956d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-arrowfunction-5.js",
+      "sha256": "8804f2a5cb9e1cf34d12d62566af10bc2d2e094388bc82ffc29c4758167932d5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-arrowfunction-6.js",
+      "sha256": "532218fc9ad45ddefc4a01786e9c15863ea8b6b98fe284b95416a7b71b275555",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-callexpression-in-compound-assignment.js",
+      "sha256": "8ed70fa765ec14eb581c1c4f74fad4b59cd0694d1750b1af5ea369bffe3e36d7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-callexpression-in-postfix-update.js",
+      "sha256": "a28d0fd04accda8b682bd1fd50a5a083328bdef3fe4ec0c5d42d67f371c660cf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-callexpression-in-prefix-update.js",
+      "sha256": "06568f0d9d4624e32a774d7e4eaf72c49474296d1c1c6a929934af923e785314",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-callexpression-templateliteral.js",
+      "sha256": "e757dd459bff50c0aec527c67cbb999d1db87c8aa78c9106ed79bf1927e3c0df",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-callexpression.js",
+      "sha256": "dbc882b6e5ad3a1f52b8a9632536d21f090f6d0f27caecfb410f69867fe6778c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-expression-comma-assignmentexpression-0.js",
+      "sha256": "05936784a1e087424cf62a3e198ca311e56b2f5920355df8fc297d6d551804cf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-expression-comma-assignmentexpression-1.js",
+      "sha256": "91ff7eadf14cdfb4c3c695fdb3aafd9556587ade6882d3635c69cb2bc43e2ce7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-expression-comma-assignmentexpression-2.js",
+      "sha256": "7d0d9d0ce82246508c3cbef7e99e0bd23d0d5bb309092264025963b9d747cff7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-lefthandsideexpression-assignment-assignmentexpression-0.js",
+      "sha256": "4ac1d5ca41144a90c6438efae7d63e7825dcc611ae22d09be9e240b3f2673b36",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-lefthandsideexpression-assignment-assignmentexpression-1.js",
+      "sha256": "4b1929d8585cf4c231451b2ed9285fdc136547e282cbac7ee57e551181742982",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-lefthandsideexpression-assignment-assignmentexpression-2.js",
+      "sha256": "3214f8354db3c18af70c42a53c5305431159e69627b0fea9dbd00bd24e818041",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-memberexpression-templateliteral.js",
+      "sha256": "7ad4b6cf5d5c63ee46f358b3b2046d020c2b055f144bbc74aacdbae29bb172d7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-new-memberexpression-arguments.js",
+      "sha256": "46f53057e7f3043881fa3ca4540ee46fe35f6011cf2843c88ba1df0a13d1b9f2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-new-newexpression.js",
+      "sha256": "6773e9a6e6ba041805e66c47472313938fd42ea73c486352a16249c6153d1c7f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-literal-boolean.js",
+      "sha256": "321e41d7b2d4fe20dee25d1e96a847e33671ba9195cda54d78b750209e1639d1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-literal-null.js",
+      "sha256": "d7cc468ac19022775b377d1dbdc32ad9195a849d5415f7254bb3a62f9a0691ad",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-literal-numeric.js",
+      "sha256": "2458841d66443c1831b0a0e6edb391553af40051727a67ea10453a3600433839",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-literal-string.js",
+      "sha256": "cd5b9e4d0f1e94c8e5779e4fd9029ddc9d308f6db806f8aae77babd1655a0f66",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-regularexpressionliteral.js",
+      "sha256": "82769da261b3df60c7e6297f85674174162e017eeaef9c0cba87c984f8103714",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-templateliteral.js",
+      "sha256": "c43fa9fb66bf4582d4cb157c2d7031d0a5c3428f570e0c0b65152555db93c131",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-primaryexpression-this.js",
+      "sha256": "f94103f54d9fcd6dd10563a460a24bb7003b4ebd8469106b6a1f47ad449c8336",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-shortcircuitexpression-question-assignmentexpression-else-assignmentexpression-0.js",
+      "sha256": "b952c74dfbadd65e72352a7ae022cd969e7477ddfae827e95e2a407215781ec1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-shortcircuitexpression-question-assignmentexpression-else-assignmentexpression-1.js",
+      "sha256": "81f91eeb973f16338b79f82413dba492a18df6df6d94991594d95bd5c2301994",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/direct-shortcircuitexpression-question-assignmentexpression-else-assignmentexpression-2.js",
+      "sha256": "903417bc643a7aaaf0e71c9d97874a91b8591075b7e5010f0df3ef472edbffa9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "This generated assignment has a grammar-valid LeftHandSideExpression whose AssignmentTargetType is invalid. Original ES2015 §12.14.1 requires an early ReferenceError; this later test expects the subsequent SyntaxError rule. The engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-additiveexpression-minus-multiplicativeexpression-0.js",
+      "sha256": "1f6abea9536aadec199d33f8056295d37cfd401c6da376c478b128309a1f9844",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-additiveexpression-minus-multiplicativeexpression-1.js",
+      "sha256": "840bad5f97ecd12f27eacb0bd04fe7e3f70747112fd166c26344a2ccc54ef9a3",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-additiveexpression-minus-multiplicativeexpression-2.js",
+      "sha256": "8f1dca778c65f69bf33a9a1f2e8c25b058e613ae02135e1a6963fa7b445e221e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-additiveexpression-plus-multiplicativeexpression-0.js",
+      "sha256": "013e0d396d7b7214ac5e81dfaad1d12a31da1e2005fe38175c32630035773f47",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-additiveexpression-plus-multiplicativeexpression-1.js",
+      "sha256": "dab07d635c16f1bc8b910903ea91a9667abbaad34e066f000d759fb107354484",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-additiveexpression-plus-multiplicativeexpression-2.js",
+      "sha256": "cba4793e987b5a5a9681b218f2d7102a627977544937a3a4f3ea2b7b67d97ec5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-0.js",
+      "sha256": "eacea0e2a1b952514de88a0e99e6a4cdacc0de2e63bbb115bb5fb32ec662a10e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-1.js",
+      "sha256": "4188f5458c2d788300da50ff5e91f25f49008f9a5b4984db8e15508b5f7cafb1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-2.js",
+      "sha256": "62472f339885865a35d3c61461d1e1c9dc76cf6d269b886be055698ee3dc904c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-3.js",
+      "sha256": "de6ddcb4deabcfbfb9815a8edfa44226c52b6bb4f829e2cba82280d1b8d3fd88",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-4.js",
+      "sha256": "0d947cee1ee8d789abacc7a18e7b1df83e2ba4744a55f11ae70f945977580c82",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-5.js",
+      "sha256": "05ac3373f143b092c57493fc252d6ed587a8b4d8c44e08b39326eba8444f6b21",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-arrowfunction-6.js",
+      "sha256": "efcde2230335fc72fca9dbd32689a23af182729f12d402280771ada26a8992e5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwiseandexpression-bitwise-and-equalityexpression-0.js",
+      "sha256": "d37748305ebed4a5ecab94c8bb2b30adcd525d2fd682162f9781454cd2c075ac",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwiseandexpression-bitwise-and-equalityexpression-1.js",
+      "sha256": "b28eb592fe1bc01b3e45aab96e62aa400b7b2080689fb997244f52fb55ba7155",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwiseandexpression-bitwise-and-equalityexpression-2.js",
+      "sha256": "bb5b302ef0798dce49ac793e4dbff812b3ef0ad06231dfe905788d22c2806ee8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwiseorexpression-bitwise-or-bitwisexorexpression-0.js",
+      "sha256": "6af9e0255b49bad926fbfe68d13173c15717a6e135dd546d52ce8cfb5638bb46",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwiseorexpression-bitwise-or-bitwisexorexpression-1.js",
+      "sha256": "95dbeed1ddc40f10cca814d6c3c3e88f4c36e79950cd8a327d499597dc46cda7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwiseorexpression-bitwise-or-bitwisexorexpression-2.js",
+      "sha256": "42ddf8fcb0dd47d61360d9fdb45fb50b17ad5e85d7269e78911f1788fb1fa0b8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwisexorexpression-bitwise-xor-bitwiseandexpression-0.js",
+      "sha256": "437a417edea9e3a1bcc7c68dfbbd05c3a5ea8d73f965be0039d57b322e8c1e23",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwisexorexpression-bitwise-xor-bitwiseandexpression-1.js",
+      "sha256": "5bb174d3d54d9f4b67d5152ee902311ed7686b43072df73c9df2c1a838680fc4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-bitwisexorexpression-bitwise-xor-bitwiseandexpression-2.js",
+      "sha256": "f3fd64a51daf8f0622d67ee493a0bd51300c9f6afbba45c2ce72348f0de504f8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-callexpression-in-compound-assignment.js",
+      "sha256": "02965fc80972f5230ccce83efbfa9b61a186da92d28eb2df2fad276137ae42f2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-callexpression-templateliteral.js",
+      "sha256": "5e18bceeb39939f79e74695f819f688e218919bc0538bc44b2babedb2683f330",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-callexpression.js",
+      "sha256": "6efa3d841c93c301437e54c83a77b0824650cbbc702fb1000b5a5f92a59b74fc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-equal-relationalexpression-0.js",
+      "sha256": "38f44f14e9dfa85b72f3d058e1436dcb8fab1d68c4f92e8b43903d58619e7489",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-equal-relationalexpression-1.js",
+      "sha256": "2d1bbcf0fed2de4270829d1010763415368e7a9cf2ad25d773b9b6653c31723d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-equal-relationalexpression-2.js",
+      "sha256": "ee58e002ed6060492f5bdcaaa7fccc5f7f6ca36d26680639f2800c7d4b399003",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-not-equal-relationalexpression-0.js",
+      "sha256": "f92876decdd6d3c31be700e103145fc9a1073aa7c13e9a120ad611176c5ea8de",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-not-equal-relationalexpression-1.js",
+      "sha256": "35fa0c1a9d378fee78a9368abd028105404b3bdca177c4f0f769c609afd57684",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-abstract-not-equal-relationalexpression-2.js",
+      "sha256": "2d923c769bedb57072a8071ed3f3027a79fe839637942e91e23b86352028827e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-strict-equal-relationalexpression-0.js",
+      "sha256": "08ef6a71bbe1e3f155f691ed4f3f0aed5cf11c846008ed48a3a6bfedbe3642ef",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-strict-equal-relationalexpression-1.js",
+      "sha256": "03ada415bebf37d7c19a9321ea7ef6a281a1da9f3c932e5f481b4589c87f7f8a",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-strict-equal-relationalexpression-2.js",
+      "sha256": "355b18ac54bd0f778d50191041de7b1c51c0653399974d5b9420145ae98a0f7e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-strict-not-equal-relationalexpression-0.js",
+      "sha256": "d6c9bc98242840f5d64f96aff3095cd18b165b8478ae836ee0b85e52eb22c9dd",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-strict-not-equal-relationalexpression-1.js",
+      "sha256": "d687d5c8dffb37132e9edcf9971df320930339a8d67d4bed66d84a4a921ec134",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-equalityexpression-strict-not-equal-relationalexpression-2.js",
+      "sha256": "7c97af5f15f86aaef95c7fb084a3a2a65042e13876d59c7077060ac315e5e6b4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-expression-comma-assignmentexpression-0.js",
+      "sha256": "c30a981816750ccf67e52f850368d631bbe3b0efdc66598ca4f8f12f08a9cd8e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-expression-comma-assignmentexpression-1.js",
+      "sha256": "cce1a669a6a5fc28973382dd990b0089785a3b9f2de356dfc38f4431c90dfab9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-expression-comma-assignmentexpression-2.js",
+      "sha256": "0a804cbfca715d3f3311297facf2d4636e7d176d07091f5e9d14314c54403b8b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-lefthandsideexpression-assignment-assignmentexpression-0.js",
+      "sha256": "8270fb243091a599e9962e49c813ec09a87e716788b67db0c0b11d61f90621bc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-lefthandsideexpression-assignment-assignmentexpression-1.js",
+      "sha256": "2a5820ffbe6046be5a22dd387d1aa80998ae78d6298052113b93c5606fcda3ba",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-lefthandsideexpression-assignment-assignmentexpression-2.js",
+      "sha256": "e5f68996c9ec465c5ef54905fa301b45105a27b88ac4b36ecce471ff851ed704",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-lefthandsideexpression-minus-minus.js",
+      "sha256": "347547ebaec7ab461392229cf10937276a7bb0b11651127bfd87a95e15cc1168",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-lefthandsideexpression-plus-plus.js",
+      "sha256": "efb16918a45eb2accde32ba79548191eade24cf293779237e92bf0b8caecf65b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-logicalandexpression-logical-and-bitwiseorexpression-0.js",
+      "sha256": "191b01f676471aed78b53f8d969e6935ad45834bd3414a84d2b00042e1628a29",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-logicalandexpression-logical-and-bitwiseorexpression-1.js",
+      "sha256": "c648ff79a3d9bba3d1088c5b180a23c7c0e54e52333b432c1bc9ff4b2a6b07f9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-logicalandexpression-logical-and-bitwiseorexpression-2.js",
+      "sha256": "4e4997265c849ff4f465e68dc89ce83adf663eb7e9eed76cbc3c96be559fbd42",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-logicalorexpression-logical-or-logicalandexpression-0.js",
+      "sha256": "c2793d71bb51365aeba84c541ebd2ff2237c4064f63e54ff9fc25469d5bc014f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-logicalorexpression-logical-or-logicalandexpression-1.js",
+      "sha256": "a949d41b5c41e8c511116ccba4ee8bf11edd35d1e0c1e437ce85d7807d64bf52",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-logicalorexpression-logical-or-logicalandexpression-2.js",
+      "sha256": "1e280f20e2c45dde25014ec84e31981b2455a583858973cb31cd2ccd232c28b2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-memberexpression-templateliteral.js",
+      "sha256": "c9dce688a9a24992bd3dcaa6b081101a38af7f877405f88442d3f14721173b16",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-minus-minus-unaryexpression.js",
+      "sha256": "06204c971e33e19003aadf75cb3a997af2dfd67ec74726ef1ffd5b80b695bb4c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-multiplicativeexpression-multiplicativeoperator-exponentiationexpression-0.js",
+      "sha256": "90ac5eaf7fcb4f28641f08684bccacc6359629b399ecb128512961cf62259ffc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-multiplicativeexpression-multiplicativeoperator-exponentiationexpression-1.js",
+      "sha256": "15afe1dcdd26e4a99362ce0c26007ace13f4164dcef2c14872c565c0c369096d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-multiplicativeexpression-multiplicativeoperator-exponentiationexpression-2.js",
+      "sha256": "b4e2e891f70453030e98b1b8521f50c5f669fb345576597400968627289d61fb",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-multiplicativeexpression-multiplicativeoperator-exponentiationexpression-3.js",
+      "sha256": "b5b2956dcca3871d1ff3e79dd8a867d1f63fd7281916836d3350dff96bb68213",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-multiplicativeexpression-multiplicativeoperator-exponentiationexpression-4.js",
+      "sha256": "bb9508d870f96da95284477659e15d61d783a2c77dce525dbdb80e8cea1fb3d2",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-multiplicativeexpression-multiplicativeoperator-exponentiationexpression-5.js",
+      "sha256": "6decdc625b6dcbb236e66718d92172cb331fd0420b382e1f6dc3053259128bb5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-new-memberexpression-arguments.js",
+      "sha256": "861dc7fa9e38575ac5bf9c8cea12282e55592c0701af022006c624f6c0c0345d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-new-newexpression.js",
+      "sha256": "d84626c9a508e3d5e0a0843a1dc3bf13057cce522c0f2d0fd02aae0af4da1eda",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-plus-plus-unaryexpression.js",
+      "sha256": "6409e0257f7bf1dd1a87d2d1d4f6fe7457e5d3adb37c8f9f3e6a8cf2bd7fce71",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-classexpression.js",
+      "sha256": "8327a2c11ef45eb11f0954ce0cf09477861bb0da83fc1ebb7ee4c4501804323a",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-functionexpression.js",
+      "sha256": "ab66f1cfcc259d80fd4588cc32d2b616e2c7b426f322fb4f7dcaef8cabb77fed",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-generatorexpression.js",
+      "sha256": "fd3179a8beda334e96e7c9f4f754151f6735ec88ed89f18b088cb68227e3fc06",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-literal-boolean.js",
+      "sha256": "a3e59076f76336faeecf9c464f3a0f97caf5bd7ad4fb250c4b389ac087aee4d8",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-literal-null.js",
+      "sha256": "e649dea66a2cfa8f2951bdcedb80c71dc2973a348e6822ede0b017f14de630a5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-literal-numeric.js",
+      "sha256": "a1bae4704ba26e955646784dc0e36e765b9f8beffc313be4310cdba27310000f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-literal-string.js",
+      "sha256": "321e588ea26ad2a8ae47860e6a15bfb30d14ed5843b2e4f24fb8c619d3aecd54",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-objectliteral.js",
+      "sha256": "cb92adf9ea42e8c073b313d4f7773dbbd3e1fc894b71e1bde9e9e04d14ca5573",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-regularexpressionliteral.js",
+      "sha256": "712e5f45c5ebc8298c84fbdb7e2ff309145ac1ecfa2c9f36140eb29e0e8b13ce",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-templateliteral.js",
+      "sha256": "5363c6a2c8bc8ecd9e8b4a75f7f5eb9a38f2cc08b8050e037f6df2ea07f69d41",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-primaryexpression-this.js",
+      "sha256": "1d1a1ffc5077672cb4a2c27ee514af73d2dba2390d25b46dc0257fa5c484eeff",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-greater-than-or-equal-to-shiftexpression-0.js",
+      "sha256": "2f762df7327fbdf1a50bc180f57f8791da45299c35e90848eb74b06969b30cf9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-greater-than-or-equal-to-shiftexpression-1.js",
+      "sha256": "3c7569857eebf6754419bcf2d3355a15f707af81eac0d0e918af46ba525626fc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-greater-than-or-equal-to-shiftexpression-2.js",
+      "sha256": "119f53704d739eabbaa7fd5b66acba57520d970c678e505f85748821c1852d30",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-greater-than-shiftexpression-0.js",
+      "sha256": "5969a759e856e303c5303a2be63b929b746ffe063807ee022e1a74a2fd68d75e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-greater-than-shiftexpression-1.js",
+      "sha256": "1c4afb743188537f52c2f5109ce7d5a9062b654de0a49df948ae8716d2f2984e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-greater-than-shiftexpression-2.js",
+      "sha256": "d61b4f1839c0093a52ede2a4fe04e1a8b9fbebfe2b03e078ba4932732779c23f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-in-shiftexpression-0.js",
+      "sha256": "882c0da4e39dfc6665ac8b0a79d4e2ba8b9bbc50416aa815e98bbb40f87314bf",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-in-shiftexpression-1.js",
+      "sha256": "d6dd0ac4bf7e772e3c8cc1d8ac0dcd18e481e1820636eba3f6c02d32b516b498",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-in-shiftexpression-2.js",
+      "sha256": "3af492ece2a0b9e03e11ea55715dad10f5f21da903280e93db0d76802ab9e7dc",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-instanceof-shiftexpression-0.js",
+      "sha256": "5c8c1e87ab5401d0ef17225681c2c2296236c1588d4a42347a8e4b112d3d0488",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-instanceof-shiftexpression-1.js",
+      "sha256": "df3acb82a925e6e7849da4e470bc6aedad228999bde4e232c5d5df5ef0e3a68f",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-instanceof-shiftexpression-2.js",
+      "sha256": "0c2377968d0c4b55585ffa3f4de8481c2fc6d222cb8eed5b572bd35431405cc9",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-less-than-or-equal-to-shiftexpression-0.js",
+      "sha256": "360972228eb7958428d36823b4cb2e28556386a38250a51c3e773ddd6464ddfb",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-less-than-or-equal-to-shiftexpression-1.js",
+      "sha256": "0f9dfb998bb0ed7246860d5ffd33aee439d12c231b4a2143d5b0f44f1dab1e02",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-less-than-or-equal-to-shiftexpression-2.js",
+      "sha256": "9ccde5d6483b66363624485d25cf75690782361646923eda38b1d2f99fa0ba0e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-less-than-shiftexpression-0.js",
+      "sha256": "7a547a539f8210196df7650376b3fb2f80ec01f0fb70421bcb615237b476dd7c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-less-than-shiftexpression-1.js",
+      "sha256": "9e9941467f070900b6b71ea896ad9c06f43680c51947852634034fb81b6e6d81",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-relationalexpression-less-than-shiftexpression-2.js",
+      "sha256": "3512db561e7a7f8ca36d1b6c7b87e159ef51c985864a1107f564b8e6bb2c1c75",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-bitwise-left-additiveexpression-0.js",
+      "sha256": "f4ab41b51b4559fce48ae0382f36d15331b380ae5249d01ca3005278195f29ea",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-bitwise-left-additiveexpression-1.js",
+      "sha256": "e4f61e109cf31ca12366da84fba080ee33c1737e0894e52dc57997c6887cb1f1",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-bitwise-left-additiveexpression-2.js",
+      "sha256": "f9b64b8ff354f4666849c43895874a3a7e345ddb047c3d2662405daa8a10afae",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-bitwise-right-additiveexpression-0.js",
+      "sha256": "c58580e33e7fb9920e35569fa6e104a9f22163837a9cf1ba1e5d8c8a7ceeba00",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-bitwise-right-additiveexpression-1.js",
+      "sha256": "c84f91c2e50bff3a08141f641dac38343eaf8c1710f68d5ea575428284bd7151",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-bitwise-right-additiveexpression-2.js",
+      "sha256": "8aaf2206a77dffcc0e6a9722e68f89154750083b9dfa8f46a68d5531e027c062",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-unsigned-bitwise-right-additiveexpression-0.js",
+      "sha256": "53343c660598a5c82b5ca7214e591dbebe0da2e17b078780bafb634a177d54bd",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-unsigned-bitwise-right-additiveexpression-1.js",
+      "sha256": "ef6869d22df4bfde314450ee7cc567da30376321f8ca3d74ff9ea9ee16bc3b0b",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shiftexpression-unsigned-bitwise-right-additiveexpression-2.js",
+      "sha256": "5d1f771e7179d1bc38474790988e9397b770fc0c7165e26de91815768f677c02",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shortcircuitexpression-question-assignmentexpression-else-assignmentexpression-0.js",
+      "sha256": "1f5b9a5fb016cabca619d10c5d7516863344ed914c030396bef3cd21dff42cc4",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shortcircuitexpression-question-assignmentexpression-else-assignmentexpression-1.js",
+      "sha256": "861eaec2c812546ac9e66fce8394cc4518b4966de0b62843305681478f2d0e1a",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-shortcircuitexpression-question-assignmentexpression-else-assignmentexpression-2.js",
+      "sha256": "e62f3be84bc199d520c903902f67c8b59d1cfc66c0a6dfc2c997c2227349f860",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-delete-unaryexpression.js",
+      "sha256": "f5ce9592d4583cfcc7d0399f47c7dad5f48fedd647f951e013e1789a65a2e646",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-exclamation-unaryexpression-0.js",
+      "sha256": "ab823cfe9027f726e6b523473310018567532f9c173cf616e8bf8dc58abba3b7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-exclamation-unaryexpression-1.js",
+      "sha256": "368774f69f0047b8ed07ba1db73a1e20b0dd11dd1b6b76c49d02eb869945d78e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-exclamation-unaryexpression-2.js",
+      "sha256": "f45c2aefe60f4e1b2298c744979986106536671f4a54ece17371147bf4e8d240",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-minus-unaryexpression-0.js",
+      "sha256": "3b4978ee6c1e6b99a77e732c6984ae6300919fb94c4d7e545503858bff25398d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-minus-unaryexpression-1.js",
+      "sha256": "ccc5ae43e0ddee27b0351bd72efd383cfbb67caeaa6d98ddcf0da27300f8bb7c",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-minus-unaryexpression-2.js",
+      "sha256": "cc5faa1ab2de416f459e08b287e305a48cf2489d42ea18b4cabebcbb0e532605",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-plus-unaryexpression-0.js",
+      "sha256": "92da23cc598a46234380e97f67d3b64f87b6480a2fd8ed1c9db9024df6b3b597",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-plus-unaryexpression-1.js",
+      "sha256": "f713bdd9a69eb6f83d28db4545768f714887c58aac01b55dee0bd7151f7ffb45",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-plus-unaryexpression-2.js",
+      "sha256": "d5a6b125baa8b3bbb3f5f45b30c47a8df8cefb8f6ba9d6e03b3db97e98fa7602",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-tilde-unaryexpression-0.js",
+      "sha256": "9757efc9ec6d991cf9edc0697a4eaafccdeeb31be271c415b03784d13ba221b7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-tilde-unaryexpression-1.js",
+      "sha256": "8ca4f47346e0bf88c9d38b27496713aabf0f8a0f3c6e799f71e89af4e2e1803e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-tilde-unaryexpression-2.js",
+      "sha256": "630a360cdde95838c3b48872d342515654b3065dba9ee02b65b479f678bb7459",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-typeof-unaryexpression-0.js",
+      "sha256": "120c4f0244cedbe8bfa2eb569492757458ec54ce26e19126f43b7f93d9471bce",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-typeof-unaryexpression-1.js",
+      "sha256": "05ab6e1b076f6f388b570536f41ad15d18beefc9d3c2fb83eb715a1bdef7e5b5",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-typeof-unaryexpression-2.js",
+      "sha256": "9f6a070719cd26f05e3a1c0d4bef40efe8b5e806eac6b0035644e7231085e90d",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-void-unaryexpression-0.js",
+      "sha256": "5486dab79bbc38d07a35463aaa4fbe39775df43ae8aa6c0cd507181740772dca",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-void-unaryexpression-1.js",
+      "sha256": "f9d2a05379224948f9317722cc4b68e5c30f1a8ca5df5adf324852d240589ca7",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-unaryexpression-void-unaryexpression-2.js",
+      "sha256": "fe5518570f582cfc568178dbe0e7231719043dccd1d4159a4ce891dc3a33bacd",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
+    },
+    {
+      "test": "language/expressions/assignmenttargettype/parenthesized-yieldexpression-1.js",
+      "sha256": "ce64d92910e49da63ea4565df41fc4b76f039c17edc7a131006a574ec8a0ba0e",
+      "decision": "later-requirement",
+      "original_specification": "https://262.ecma-international.org/6.0/#sec-assignment-operators-static-semantics-early-errors",
+      "reason": "The generated ParenthesizedExpression is a grammar-valid LeftHandSideExpression. Original ES2015 §12.14.1 specifies an early ReferenceError when it is not a simple assignment target. This later test expects the subsequent SyntaxError rule; the engine preserves the original ReferenceError."
     }
   ]
 }

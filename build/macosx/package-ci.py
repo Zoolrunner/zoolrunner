@@ -206,6 +206,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("destructuring-errors.js", "DESTRUCTURING-ERRORS checks=54 failures=0"),
                 ("strict-parameter-history.js", "STRICT-PARAMETER-HISTORY checks=30 failures=0"),
                 ("../es6/number.js", "ES6-NUMBER checks=156 failures=0"),
+                ("../es6/double-rounding.js",
+                 "ES6-DOUBLE-ROUNDING checks=2 failures=0"),
                 ("../es6/math-integer.js", "ES6-MATH-INTEGER checks=169 failures=0"),
                 ("../es6/math-extrema-conversion.js", "ES6-MATH-EXTREMA checks=264 failures=0"),
                 ("../es6/string-additions.js", "ES6-STRING-ADDITIONS checks=175 failures=0"),
@@ -379,14 +381,14 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, timeout=60)
         print(result.stdout)
-        if result.returncode or "ES6-PROXY checks=65 failures=0" not in result.stdout:
+        if result.returncode or "ES6-PROXY checks=66 failures=0" not in result.stdout:
             raise RuntimeError("Packaged runtime failed Proxy")
         for script, marker in (
                 ("annex-prototype.js", "ES6-ANNEX-PROTOTYPE checks=32 failures=0"),
                 ("annex-html.js", "ES6-ANNEX-HTML checks=27 failures=0"),
                 ("annex-globals.js", "ES6-ANNEX-GLOBALS checks=25 failures=0"),
                 ("regexp-fields.js", "ES6-REGEXP-FIELDS checks=66 failures=0"),
-                ("regexp-protocols.js", "ES6-REGEXP-PROTOCOLS checks=56 failures=0"),
+                ("regexp-protocols.js", "ES6-REGEXP-PROTOCOLS checks=58 failures=0"),
                 ("regexp-constructor.js", "ES6-REGEXP-CONSTRUCTOR checks=35 failures=0"),
                 ("regexp-split.js", "ES6-REGEXP-SPLIT checks=33 failures=0"),
                 ("regexp-replace.js", "ES6-REGEXP-REPLACE checks=34 failures=0"),
@@ -417,7 +419,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("pattern-defaults.js", "ES6-PATTERN-DEFAULTS PASS checks=28"),
                 ("array-patterns-wide.js", "ES6-ARRAY-PATTERNS-WIDE PASS checks=4"),
                 ("array-rest.js", "ES6-ARRAY-REST PASS checks=20"),
-                ("array-patterns.js", "ES6-ARRAY-PATTERNS PASS checks=17"),
+                ("array-patterns.js", "ES6-ARRAY-PATTERNS PASS checks=18"),
                 ("regexp-unicode.js", "REGEXP-UNICODE PASS checks=48"),
                 ("global-declarations.js", "GLOBAL-DECLARATIONS-EXTENDED PASS checks=22"),
                 ("completion.js", "COMPLETION PASS checks=27"),
@@ -434,7 +436,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("sloppy-block-functions.js", "SLOPPY-BLOCK-SEMANTICS checks=49 failures=0"),
                 ("literal-prototype.js", "LITERAL-PROTOTYPE checks=46 failures=0"),
                 ("regexp-large-quantifiers.js", "REGEXP-LARGE-QUANTIFIERS checks=106 failures=0"),
-                ("assignment-targets.js", "ES6-ASSIGNMENT-TARGETS checks=127 failures=0"),
+                ("assignment-targets.js", "ES6-ASSIGNMENT-TARGETS checks=187 failures=0"),
                 ("method-function-fields.js", "ES6-METHOD-FIELDS checks=121 failures=0"),
                 ("let-statement-newline.js", "ES6-LET-STATEMENT-NEWLINE checks=72 failures=0"),
                 ("number-formatting.js", "NUMBER-FORMATTING checks=146 failures=0"),

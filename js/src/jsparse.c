@@ -229,7 +229,10 @@ NewOrRecycledNode(JSContext *cx, JSTreeContext *tc)
             maxparsenodes = parsenodes - recyclednodes;
     }
 #endif
-    if (pn) pn->pn_parens = 0;
+    if (pn) {
+        pn->pn_parens = 0;
+        pn->pn_grammar_flags = 0;
+    }
     return pn;
 }
 
@@ -316,6 +319,7 @@ NewBinary(JSContext *cx, JSTokenType tt,
     if (tt == TOK_PLUS &&
         left->pn_type == TOK_NUMBER &&
         right->pn_type == TOK_NUMBER) {
+        left->pn_grammar_flags |= PNGF_NOT_LHS;
         left->pn_dval += right->pn_dval;
         left->pn_pos.end = right->pn_pos.end;
         RecycleTree(right, tc);
@@ -330,6 +334,7 @@ NewBinary(JSContext *cx, JSTokenType tt,
     pn->pn_pos.end = right->pn_pos.end;
     pn->pn_op = op;
     pn->pn_arity = PN_BINARY;
+    pn->pn_grammar_flags |= PNGF_NOT_LHS;
     pn->pn_left = left;
     pn->pn_right = right;
     pn->pn_next = NULL;
@@ -787,8 +792,7 @@ RecordDeclaration(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc,
         lexicals = stmt ? &stmt->lexicalDecls : &tc->lexicalDecls;
         vars = stmt ? &stmt->varDecls : &tc->varDecls;
         ATOM_LIST_SEARCH(ale, lexicals, atom);
-        /* ES2015 13.2.1 rejects duplicate lexical names, including two
-         * block functions. Later-edition Annex B relaxations are not ES2015. */
+        /* ES2015 rejects duplicate lexical names, including block functions. */
         if (ale)
             return LexicalSyntaxError(cx, ts);
         if (lexical) {
@@ -5490,6 +5494,20 @@ AssignExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
             LexicalSyntaxError(cx, ts);
             return NULL;
         }
+        /* AssignmentExpression's left operand is grammatically a
+         * LeftHandSideExpression. A bare unary/binary/conditional expression
+         * cannot reach the early-error rule for a non-simple target; it is a
+         * parse-time SyntaxError. Parenthesized expressions are
+         * LeftHandSideExpressions, so their invalid targets retain the
+         * original ES2015 early ReferenceError below. TOK_NEW is unary in the
+         * parse tree too, but NewExpression is a LeftHandSideExpression. */
+        if (JS_VERSION_IS_ES2015(cx) && pn == pn2 &&
+            ((pn2->pn_grammar_flags & PNGF_NOT_LHS) || pn2->pn_arity == PN_TERNARY ||
+             (pn2->pn_arity == PN_UNARY && pn2->pn_type != TOK_NEW))) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_SYNTAX_ERROR);
+            return NULL;
+        }
         js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                     JSMSG_BAD_LEFTSIDE_OF_ASS);
         return NULL;
@@ -5518,6 +5536,7 @@ CondExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn = NewParseNode(cx, ts, PN_TERNARY, tc);
         if (!pn)
             return NULL;
+        pn->pn_grammar_flags |= PNGF_NOT_LHS;
         /*
          * Always accept the 'in' operator in the middle clause of a ternary,
          * where it's unambiguous, even if we might be parsing the init of a
@@ -5802,6 +5821,7 @@ UnaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
             return NULL;
         pn->pn_type = TOK_UNARYOP;      /* PLUS and MINUS are binary */
         pn->pn_op = CURRENT_TOKEN(ts).t_op;
+        pn->pn_grammar_flags |= PNGF_NOT_LHS;
         pn2 = UnaryExpr(cx, ts, tc);
         if (!pn2)
             return NULL;
@@ -5814,6 +5834,7 @@ UnaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn = NewParseNode(cx, ts, PN_UNARY, tc);
         if (!pn)
             return NULL;
+        pn->pn_grammar_flags |= PNGF_NOT_LHS;
         pn2 = JS_VERSION_IS_ES2015(cx) ? UnaryExpr(cx, ts, tc)
                                       : MemberExpr(cx, ts, tc, JS_TRUE);
         if (!pn2)
@@ -5827,6 +5848,7 @@ UnaryExpr(JSContext *cx, JSTokenStream *ts, JSTreeContext *tc)
         pn = NewParseNode(cx, ts, PN_UNARY, tc);
         if (!pn)
             return NULL;
+        pn->pn_grammar_flags |= PNGF_NOT_LHS;
         pn2 = UnaryExpr(cx, ts, tc);
         if (!pn2)
             return NULL;

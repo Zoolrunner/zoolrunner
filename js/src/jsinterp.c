@@ -225,6 +225,39 @@ js_EnablePropertyCache(JSContext *cx)
         STORE_OPND(n, v_);                                                    \
     JS_END_MACRO
 
+#if defined(__linux__) && defined(__i386__) && defined(__GNUC__)
+/* x87's 80-bit temporaries can double-round at the ECMAScript binary64
+ * boundary. Round each interpreter arithmetic operation at 53 bits while
+ * restoring the embedding thread's control word immediately afterward. */
+#define DEFINE_BINARY64_OP(name, op)                                          \
+    static jsdouble name(jsdouble left, jsdouble right)                       \
+    {                                                                         \
+        unsigned short oldControl, doubleControl;                             \
+        volatile jsdouble result;                                             \
+        __asm__ __volatile__("fnstcw %0" : "=m" (oldControl) : : "memory");  \
+        doubleControl = (unsigned short)((oldControl & ~0x0300) | 0x0200);    \
+        __asm__ __volatile__("fldcw %0" : : "m" (doubleControl) : "memory");\
+        result = left op right;                                               \
+        __asm__ __volatile__("" : : : "memory");                            \
+        __asm__ __volatile__("fldcw %0" : : "m" (oldControl) : "memory");   \
+        return result;                                                        \
+    }
+
+DEFINE_BINARY64_OP(js_AddBinary64, +)
+DEFINE_BINARY64_OP(js_SubBinary64, -)
+DEFINE_BINARY64_OP(js_MulBinary64, *)
+DEFINE_BINARY64_OP(js_DivBinary64, /)
+#define JS_BINARY_ADD(left, right) js_AddBinary64(left, right)
+#define JS_BINARY_SUB(left, right) js_SubBinary64(left, right)
+#define JS_BINARY_MUL(left, right) js_MulBinary64(left, right)
+#define JS_BINARY_DIV(left, right) js_DivBinary64(left, right)
+#else
+#define JS_BINARY_ADD(left, right) ((left) + (right))
+#define JS_BINARY_SUB(left, right) ((left) - (right))
+#define JS_BINARY_MUL(left, right) ((left) * (right))
+#define JS_BINARY_DIV(left, right) ((left) / (right))
+#endif
+
 #define FETCH_NUMBER(cx, n, d)                                                \
     JS_BEGIN_MACRO                                                            \
         jsval v_;                                                             \
@@ -4665,7 +4698,7 @@ interrupt:
                 } else {
                     VALUE_TO_NUMBER(cx, lval, d);
                     VALUE_TO_NUMBER(cx, rval, d2);
-                    d += d2;
+                    d = JS_BINARY_ADD(d, d2);
                     sp--;
                     STORE_NUMBER(cx, -1, d);
                 }
@@ -4676,17 +4709,17 @@ interrupt:
     JS_BEGIN_MACRO                                                            \
         FETCH_NUMBER(cx, -2, d);                                              \
         FETCH_NUMBER(cx, -1, d2);                                              \
-        d = d OP d2;                                                          \
+        d = JS_BINARY_##OP(d, d2);                                            \
         sp--;                                                                 \
         STORE_NUMBER(cx, -1, d);                                              \
     JS_END_MACRO
 
           BEGIN_CASE(JSOP_SUB)
-            BINARY_OP(-);
+            BINARY_OP(SUB);
           END_CASE(JSOP_SUB)
 
           BEGIN_CASE(JSOP_MUL)
-            BINARY_OP(*);
+            BINARY_OP(MUL);
           END_CASE(JSOP_MUL)
 
           BEGIN_CASE(JSOP_DIV)
@@ -4708,7 +4741,7 @@ interrupt:
                     rval = DOUBLE_TO_JSVAL(rt->jsPositiveInfinity);
                 STORE_OPND(-1, rval);
             } else {
-                d /= d2;
+                d = JS_BINARY_DIV(d, d2);
                 STORE_NUMBER(cx, -1, d);
             }
           END_CASE(JSOP_DIV)

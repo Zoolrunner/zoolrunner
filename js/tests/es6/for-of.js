@@ -46,7 +46,7 @@
     test('close failure does not close twice','(function(){var n=0,error={};try{for(var x of iterable(function(){return {value:1}},function(){n++;throw error}))break}catch(e){return e===error&&n===1}return false})()');
     test('GC during next and close','(function(){var closed=0;for(var x of iterable(function(){gc();return {value:{a:7}}},function(){gc();closed++;return {}})){gc();if(x.a!==7)return false;break}return closed===1})()');
     test('iterator method receiver','(function(){var obj={},called=0;obj[Symbol.iterator]=function(){if(this!==obj)throw Error("receiver");called++;return {next:function(){return {done:true}}}};for(var x of obj){}return called===1})()');
-    test('read next anew each iteration','(function(){var gets=0,it={get next(){gets++;return function(){return {value:gets,done:gets>2}}}},obj={};obj[Symbol.iterator]=function(){return it};var out=[];for(var x of obj)out.push(x);return out.join()==="1,2"&&gets===3})()');
+    test('read next method each iteration','(function(){var gets=0,calls=0,it={get next(){gets++;var method=function(){return {value:++calls,done:calls>2}};gc();return method}},obj={};obj[Symbol.iterator]=function(){return it};var out=[];for(var x of obj)out.push(x);return out.join()==="1,2"&&gets===3&&calls===3})()');
     test('unparenthesized RHS comma rejected','(function(){try{eval("for(var x of [],[]){}");return false}catch(e){return e instanceof SyntaxError}})()');
     test('initializer rejected','(function(){try{eval("for(var x=1 of []){}");return false}catch(e){return e instanceof SyntaxError}})()');
     test('assigned local','(function(){var x,n=0;for(x of [3,4])n+=x;return n===7&&x===4})()');

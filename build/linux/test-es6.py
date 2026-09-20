@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import tempfile
 
@@ -61,13 +62,18 @@ def main():
     before = digest(engine)
     if before != digest(obj / 'dist/bin/libmozjs.so'):
         raise RuntimeError('Package engine differs from the build providing unit-test objects')
-    env = dict(os.environ, LD_LIBRARY_PATH=str(runtime),
+    probe_timeout = int(os.environ.get('ZR_ES6_PROBE_TIMEOUT', '180'))
+    # Keep standard system tools available even when a caller supplies a
+    # restricted PATH while launching the packaged runtime checks.
+    env = dict(os.environ, PATH=os.environ.get('PATH', '') + os.pathsep + '/usr/bin:/bin',
+               LD_LIBRARY_PATH=str(runtime),
                MOZILLA_FIVE_HOME=str(runtime), MOZ_NO_REMOTE='1',
                TZ='America/Los_Angeles')
+    git = shutil.which('git', path=env['PATH']) or '/usr/bin/git'
     focused, native = fixtures(root)
     results = []
 
-    def run(command, label, marker=None, timeout=180, data=None, cwd=None):
+    def run(command, label, marker=None, timeout=probe_timeout, data=None, cwd=None):
         command = [str(x) for x in command]
         timed_out = False
         with (logs / (label + '.log')).open('w') as output:
@@ -129,16 +135,18 @@ def main():
 
         suite = args.suite.resolve() if args.suite else base / 'test262'
         if args.suite is None:
-            for command, label in [(['git', 'init', suite], 'suite-init'),
-                                   (['git', '-C', suite, 'fetch', '--depth=1',
+            for command, label in [([git, 'init', suite], 'suite-init'),
+                                   ([git, '-C', suite, 'fetch', '--depth=1',
                                      'https://github.com/tc39/test262.git', REVISION], 'suite-fetch'),
-                                   (['git', '-C', suite, 'checkout', '--detach', REVISION], 'suite-checkout')]:
+                                   ([git, '-C', suite, 'checkout', '--detach', REVISION], 'suite-checkout')]:
                 if not run(command, label, timeout=600):
                     raise RuntimeError('Cannot prepare pinned ES2015 corpus')
         report = logs / 'test262.json'
+        case_timeout = os.environ.get('ZR_TEST262_CASE_TIMEOUT', '60')
+        suite_timeout = int(os.environ.get('ZR_TEST262_SUITE_TIMEOUT', '1800'))
         full_pass = run(['python3', root / 'js/tests/es6/run-test262.py', '--suite', suite,
                          '--shell', shell, '--report', report, '--jobs', '4',
-                         '--timeout', '60'], 'test262', timeout=1800)
+                         '--timeout', case_timeout], 'test262', timeout=suite_timeout)
         counts = json.loads(report.read_text())['counts'] if report.exists() else None
         expected = {'pass': 28582, 'fail': 0, 'unsupported': 0,
                     'timeout': 0, 'crash': 0, 'harness-error': 0}
