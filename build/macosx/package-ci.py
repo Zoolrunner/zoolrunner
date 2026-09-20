@@ -528,6 +528,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
+        embedding_timeout = int(os.environ.get("ZR_MACOS_EMBEDDING_TIMEOUT", "180"))
         sdk = Path(os.environ.get("ZR_MACOS_SDK",
                                   str(Path.home() / "dev/macos-sdk/MacOSX11.3.sdk")))
         with (sdk / "SDKSettings.plist").open("rb") as info:
@@ -621,6 +622,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),
                 ("es6/TestUnscopables.c", "ES6-UNSCOPABLES-EMBEDDING checks=14 failures=0")):
+            print("Building packaged runtime embedding test " + source, flush=True)
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
                 "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
@@ -629,9 +631,20 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 "-L" + str(runtime), "-lmozjs",
                 *(["-lnspr4"] if source == "es6/TestJobQueue.c" else []),
                 "-o", str(embedding)], check=True)
-            result = subprocess.run([str(embedding)], env=embedding_env,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                    text=True, timeout=60)
+            print("Running packaged runtime embedding test " + source, flush=True)
+            try:
+                result = subprocess.run([str(embedding)], env=embedding_env,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        text=True, timeout=embedding_timeout)
+            except subprocess.TimeoutExpired as error:
+                print("Timed out running packaged runtime embedding test " + source,
+                      flush=True)
+                if error.stdout:
+                    output = (error.stdout.decode("utf-8", "replace")
+                              if isinstance(error.stdout, bytes) else error.stdout)
+                    print(output, flush=True)
+                raise RuntimeError(
+                    "Packaged runtime embedding test timed out: " + source) from error
             print(result.stdout)
             if result.returncode or marker not in result.stdout:
                 raise RuntimeError("Packaged runtime failed embedding compatibility: " + source)

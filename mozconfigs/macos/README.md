@@ -119,7 +119,10 @@ unit tests pass, including memory and
 SQLite provider operations. No Calendar application scripts were changed.
 Native packaging also requires 58 legacy-language assertions and 18 JSAPI
 embedding checks; Calendar packaging runs its unit tests against the staged
-runtime. Intel GUI startup and minimum-OS runtime compatibility were not tested.
+runtime. Native embedding checks have a 180-second per-test limit, overridable
+with `ZR_MACOS_EMBEDDING_TIMEOUT`; the package runner prints each test name and
+its captured output if one times out. Intel GUI startup and minimum-OS runtime
+compatibility were not tested.
 
 The new builds required small macOS fixes: Browser's bundle paths now handle
 its spaced name and its plist declares the actual executable; Browser and
