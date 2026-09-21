@@ -274,6 +274,7 @@ nsCSSSelector::nsCSSSelector(void)
     mAttrList(nsnull), 
     mOperator(0),
     mNegations(nsnull),
+    mSelectorList(nsnull),
     mNext(nsnull)
 {
   MOZ_COUNT_CTOR(nsCSSSelector);
@@ -299,6 +300,13 @@ nsCSSSelector::Clone(PRBool aDeepNext, PRBool aDeepNegations) const
   if (aDeepNegations) {
     NS_IF_DEEP_CLONE(nsCSSSelector, mNegations, (PR_TRUE, PR_FALSE));
   }
+  if (mSelectorList) {
+    result->mSelectorList = mSelectorList->Clone();
+    if (!result->mSelectorList) {
+      delete result;
+      return nsnull;
+    }
+  }
 
   if (aDeepNext) {
     NS_IF_DEEP_CLONE(nsCSSSelector, mNext, (PR_FALSE, PR_TRUE));
@@ -314,6 +322,8 @@ nsCSSSelector::~nsCSSSelector(void)
   // No need to worry about multiple levels of recursion since an
   // mNegations can't have an mNext.
   NS_IF_DEEP_DELETE(nsCSSSelector, mNext);
+  delete mSelectorList;
+  mSelectorList = nsnull;
 }
 
 void nsCSSSelector::Reset(void)
@@ -327,6 +337,8 @@ void nsCSSSelector::Reset(void)
   // No need to worry about multiple levels of recursion since an
   // mNegations can't have an mNext.
   NS_IF_DEEP_DELETE(nsCSSSelector, mNegations);
+  delete mSelectorList;
+  mSelectorList = nsnull;
   mOperator = PRUnichar(0);
 }
 

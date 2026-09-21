@@ -50,6 +50,9 @@
 #include "nsIPrivateDOMEvent.h"
 #include "nsIEventStateManager.h"
 #include "nsContentList.h"
+#include "nsCSSRuleProcessor.h"
+#include "nsICSSParser.h"
+#include "nsICSSStyleRule.h"
 #include "nsIObserver.h"
 #include "nsIBaseWindow.h"
 #include "nsIDocShell.h"
@@ -84,6 +87,7 @@
 #include "nsIPresShell.h"
 #include "nsPresContext.h"
 #include "nsContentUtils.h"
+#include "nsVoidArray.h"
 #include "nsNodeInfoManager.h"
 #include "nsIXBLService.h"
 #include "nsIXPointer.h"
@@ -944,6 +948,7 @@ NS_INTERFACE_MAP_BEGIN(nsDocument)
   NS_INTERFACE_MAP_ENTRY(nsIDocument_MOZILLA_1_8_BRANCH3)
   NS_INTERFACE_MAP_ENTRY(nsIDOMDocument)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNSDocument)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMNSDocument2)
   NS_INTERFACE_MAP_ENTRY(nsIDOMDocumentEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOM3DocumentEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMDocumentStyle)
@@ -2654,6 +2659,118 @@ nsDocument::GetDocumentElement(nsIDOMElement** aDocumentElement)
   }
 
   return rv;
+}
+
+static nsresult
+ParseDOMSelectorList(const nsAString& aSelectors,
+                     nsAutoPtr<nsCSSSelectorList>& aSelectorList)
+{
+  nsCOMPtr<nsICSSParser> parser;
+  nsresult rv = NS_NewCSSParser(getter_AddRefs(parser));
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsCSSSelectorList* selectors = nsnull;
+  rv = parser->ParseSelectorString(aSelectors, &selectors);
+  if (rv == NS_ERROR_OUT_OF_MEMORY)
+    return rv;
+  if (NS_FAILED(rv))
+    return NS_ERROR_DOM_SYNTAX_ERR;
+
+  aSelectorList = selectors;
+  return NS_OK;
+}
+
+class nsDOMSelectorContentList : public nsBaseContentList
+{
+public:
+  PRBool AppendDOMElement(nsIContent* aElement)
+  {
+    return mElements.AppendObject(aElement);
+  }
+};
+
+static nsresult
+CollectDOMSelectorMatches(nsDocument* aDocument,
+                          nsCSSSelectorList* aSelectors,
+                          nsDOMSelectorContentList* aMatches,
+                          nsIContent** aFirstMatch)
+{
+  if (aFirstMatch)
+    *aFirstMatch = nsnull;
+  nsIContent* root = aDocument->GetRootContent();
+  if (!root)
+    return NS_OK;
+
+  nsIPresShell* shell = aDocument->GetShellAt(0);
+  nsPresContext* presContext = shell ? shell->GetPresContext() : nsnull;
+  nsAutoVoidArray pending;
+  if (!pending.AppendElement(root))
+    return NS_ERROR_OUT_OF_MEMORY;
+
+  while (pending.Count()) {
+    PRInt32 last = pending.Count() - 1;
+    nsIContent* content = NS_STATIC_CAST(nsIContent*, pending.FastElementAt(last));
+    pending.RemoveElementAt(last);
+
+    if (content->IsContentOfType(nsIContent::eELEMENT) &&
+        nsCSSSelectorListMatches(presContext, content, aSelectors, root)) {
+      if (aFirstMatch) {
+        *aFirstMatch = content;
+        return NS_OK;
+      }
+      if (!aMatches->AppendDOMElement(content))
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+
+    PRUint32 childCount = content->GetChildCount();
+    while (childCount) {
+      nsIContent* child = content->GetChildAt(--childCount);
+      if (!pending.AppendElement(child))
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDocument::QuerySelector(const nsAString& aSelectors,
+                          nsIDOMElement** aResult)
+{
+  NS_ENSURE_ARG_POINTER(aResult);
+  *aResult = nsnull;
+
+  nsAutoPtr<nsCSSSelectorList> selectors;
+  nsresult rv = ParseDOMSelectorList(aSelectors, selectors);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsIContent* match = nsnull;
+  rv = CollectDOMSelectorMatches(this, selectors, nsnull, &match);
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (match)
+    return CallQueryInterface(match, aResult);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDocument::QuerySelectorAll(const nsAString& aSelectors,
+                             nsIDOMNodeList** aResult)
+{
+  NS_ENSURE_ARG_POINTER(aResult);
+  *aResult = nsnull;
+
+  nsAutoPtr<nsCSSSelectorList> selectors;
+  nsresult rv = ParseDOMSelectorList(aSelectors, selectors);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsRefPtr<nsDOMSelectorContentList> matches = new nsDOMSelectorContentList();
+  NS_ENSURE_TRUE(matches, NS_ERROR_OUT_OF_MEMORY);
+  rv = CollectDOMSelectorMatches(this, selectors, matches, nsnull);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  *aResult = matches;
+  NS_ADDREF(*aResult);
+  return NS_OK;
 }
 
 NS_IMETHODIMP

@@ -54,6 +54,7 @@ interface nsIDOMElement;
 interface nsIDOMEntity;
 interface nsIDOMEntityReference;
 interface nsIDOMNSDocument;
+interface nsIDOMNSDocument2;
 interface nsIDOMNamedNodeMap;
 interface nsIDOMNode;
 interface nsIDOMNodeList;
@@ -124,4 +125,3 @@ interface nsIDOMRange;
 interface nsIDOMCRMFObject;
 interface nsIDOMCrypto;
 interface nsIDOMPkcs11;
-

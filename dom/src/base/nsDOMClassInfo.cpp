@@ -72,12 +72,14 @@
 #include "nsIDOM3Document.h"
 #include "nsIDOMXMLDocument.h"
 #include "nsIDOMNSDocument.h"
+#include "nsIDOMNSDocument2.h"
 #include "nsIDOMEvent.h"
 #include "nsIDOMNSEvent.h"
 #include "nsIDOMKeyEvent.h"
 #include "nsIDOMEventListener.h"
 #include "nsINodeInfo.h"
 #include "nsContentUtils.h"
+#include "nsHTMLAtoms.h"
 
 // Window scriptable helper includes
 #include "nsIDocShell.h"
@@ -1658,6 +1660,7 @@ nsDOMClassInfo::RegisterExternalClasses()
 
 #define DOM_CLASSINFO_DOCUMENT_MAP_ENTRIES                                    \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocument)                                 \
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocument2)                                \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentEvent)                              \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentStyle)                              \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocumentStyle)                            \
@@ -5392,6 +5395,58 @@ NS_DOMClassInfo_PreserveNodeWrapper(nsIXPConnectWrappedNative *aWrapper)
   return nsDOMClassInfo::PreserveNodeWrapper(aWrapper);
 }
 
+static nsresult
+ConsoleLogArguments(JSContext *cx, uintN argc, jsval *argv, uintN firstArg,
+                    const PRUnichar *prefix)
+{
+  nsCOMPtr<nsIConsoleService> consoleService =
+    do_GetService("@mozilla.org/consoleservice;1");
+  if (!consoleService) {
+    return NS_OK;
+  }
+
+  nsAutoString message(prefix);
+  for (uintN i = firstArg; i < argc; ++i) {
+    JSString *arg = ::JS_ValueToString(cx, argv[i]);
+    if (!arg) {
+      return NS_ERROR_FAILURE;
+    }
+    if (i != firstArg) {
+      message.Append(PRUnichar(' '));
+    }
+    message.Append(nsDependentString(::JS_GetStringChars(arg),
+                                     ::JS_GetStringLength(arg)));
+  }
+
+  return consoleService->LogStringMessage(message.get());
+}
+
+static JSBool JS_DLL_CALLBACK
+ConsoleAssert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+              jsval *rval)
+{
+  JSBool condition = JS_FALSE;
+  *rval = JSVAL_VOID;
+  if (argc && !::JS_ValueToBoolean(cx, argv[0], &condition)) {
+    return JS_FALSE;
+  }
+  if (condition) {
+    return JS_TRUE;
+  }
+
+  return NS_SUCCEEDED(ConsoleLogArguments(cx, argc, argv, argc ? 1 : 0,
+                                           NS_LITERAL_STRING("Assertion failed: ").get()));
+}
+
+static JSBool JS_DLL_CALLBACK
+ConsoleLog(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+           jsval *rval)
+{
+  *rval = JSVAL_VOID;
+  return NS_SUCCEEDED(ConsoleLogArguments(cx, argc, argv, 0,
+                                           NS_LITERAL_STRING("").get()));
+}
+
 // static
 nsresult
 nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
@@ -5401,6 +5456,26 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
   *did_resolve = PR_FALSE;
 
   extern nsScriptNameSpaceManager *gNameSpaceManager;
+
+  // The classic Error Console collects engine diagnostics, but web pages also
+  // expect the common window.console methods used by diagnostics and tests.
+  if (::JS_GetStringLength(str) == 7 &&
+      !memcmp(::JS_GetStringChars(str), NS_LITERAL_STRING("console").get(),
+              7 * sizeof(jschar))) {
+    JSObject *console = ::JS_DefineObject(cx, obj, "console", nsnull,
+                                          nsnull, JSPROP_ENUMERATE);
+    if (!console ||
+        !::JS_DefineFunction(cx, console, "assert", ConsoleAssert, 1, 0) ||
+        !::JS_DefineFunction(cx, console, "log", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "info", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "warn", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "error", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "debug", ConsoleLog, 0, 0)) {
+      return NS_ERROR_FAILURE;
+    }
+    *did_resolve = PR_TRUE;
+    return NS_OK;
+  }
 
   NS_ENSURE_TRUE(gNameSpaceManager, NS_ERROR_NOT_INITIALIZED);
 
@@ -7021,6 +7096,313 @@ nsDOMGCParticipantSH::Mark(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 
 
 // Element helper
+
+// classList is implemented as a live DOMTokenList-like object here because
+// this branch predates generated WebIDL bindings. Keep the backing element
+// alive for as long as script retains the token list.
+struct DOMTokenListData {
+  nsCOMPtr<nsIContent> mElement;
+};
+
+static JSBool DOMTokenListGetTokens(JSContext *cx, JSObject *obj,
+                                    nsTArray<nsString>& tokens)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) return JS_FALSE;
+
+  nsAutoString value;
+  data->mElement->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value);
+  PRUint32 i = 0, length = value.Length();
+  while (i < length) {
+    while (i < length && (value[i] == ' ' || value[i] == '\t' ||
+           value[i] == '\n' || value[i] == '\r' || value[i] == '\f')) ++i;
+    PRUint32 start = i;
+    while (i < length && value[i] != ' ' && value[i] != '\t' &&
+           value[i] != '\n' && value[i] != '\r' && value[i] != '\f') ++i;
+    if (i > start) {
+      nsAutoString token(Substring(value, start, i - start));
+      if (tokens.IndexOf(token) == nsTArray<nsString>::NoIndex)
+        tokens.AppendElement(token);
+    }
+  }
+  return JS_TRUE;
+}
+
+static nsresult DOMTokenListSetTokens(JSContext *cx, JSObject *obj,
+                                      nsTArray<nsString>& tokens)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  NS_ENSURE_TRUE(data && data->mElement, NS_ERROR_UNEXPECTED);
+  nsAutoString value;
+  for (PRUint32 i = 0; i < tokens.Length(); ++i) {
+    if (i) value.Append(PRUnichar(' '));
+    value.Append(tokens[i]);
+  }
+  data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value, PR_TRUE);
+  return NS_OK;
+}
+
+static JSBool DOMTokenListValidate(JSContext *cx, JSString *str,
+                                   nsString& token)
+{
+  if (!str) return JS_FALSE;
+  token.Assign(nsDependentString(JS_GetStringChars(str),
+                                 JS_GetStringLength(str)));
+  if (token.IsEmpty()) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SYNTAX_ERR);
+    return JS_FALSE;
+  }
+  for (PRUint32 i = 0; i < token.Length(); ++i) {
+    if (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' ||
+        token[i] == '\r' || token[i] == '\f') {
+      nsDOMClassInfo::ThrowJSException(cx,
+                                      NS_ERROR_DOM_INVALID_CHARACTER_ERR);
+      return JS_FALSE;
+    }
+  }
+  return JS_TRUE;
+}
+
+static void JS_DLL_CALLBACK
+DOMTokenListFinalize(JSContext *cx, JSObject *obj)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  delete data;
+}
+
+static JSBool DOMTokenListValueGetter(JSContext *cx, JSObject *obj,
+                                      jsval id, jsval *vp)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) return JS_FALSE;
+  nsAutoString value;
+  data->mElement->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value);
+  JSString *str = JS_NewUCStringCopyN(cx,
+    NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
+  if (!str) return JS_FALSE;
+  *vp = STRING_TO_JSVAL(str);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListToString(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval)
+{
+  return DOMTokenListValueGetter(cx, obj, JSVAL_VOID, rval);
+}
+
+static JSBool DOMTokenListValueSetter(JSContext *cx, JSObject *obj,
+                                      jsval id, jsval *vp)
+{
+  JSString *str = JS_ValueToString(cx, *vp);
+  if (!str) return JS_FALSE;
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) return JS_FALSE;
+  nsDependentString value(JS_GetStringChars(str), JS_GetStringLength(str));
+  data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value, PR_TRUE);
+  *vp = STRING_TO_JSVAL(str);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListLengthGetter(JSContext *cx, JSObject *obj,
+                                       jsval id, jsval *vp)
+{
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  *vp = INT_TO_JSVAL(tokens.Length());
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListItem(JSContext *cx, JSObject *obj, uintN argc,
+                               jsval *argv, jsval *rval)
+{
+  uint32 index = 0;
+  if (argc && !JS_ValueToECMAUint32(cx, argv[0], &index)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  if (index >= tokens.Length()) { *rval = JSVAL_NULL; return JS_TRUE; }
+  JSString *str = JS_NewUCStringCopyN(cx,
+    NS_REINTERPRET_CAST(const jschar *, tokens[index].get()),
+    tokens[index].Length());
+  if (!str) return JS_FALSE;
+  *rval = STRING_TO_JSVAL(str);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListContains(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval)
+{
+  if (!argc) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  JSString *str = JS_ValueToString(cx, argv[0]);
+  nsString token;
+  if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  *rval = BOOLEAN_TO_JSVAL(tokens.IndexOf(token) !=
+                           nsTArray<nsString>::NoIndex);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListMutate(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval, PRBool add)
+{
+  nsTArray<nsString> requested;
+  for (uintN i = 0; i < argc; ++i) {
+    JSString *str = JS_ValueToString(cx, argv[i]);
+    nsString token;
+    if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+    if (requested.IndexOf(token) == nsTArray<nsString>::NoIndex)
+      requested.AppendElement(token);
+  }
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  PRBool changed = PR_FALSE;
+  for (PRUint32 i = 0; i < requested.Length(); ++i) {
+    PRInt32 at = tokens.IndexOf(requested[i]);
+    if (add && at < 0) { tokens.AppendElement(requested[i]); changed = PR_TRUE; }
+    if (!add && at >= 0) { tokens.RemoveElementAt(at); changed = PR_TRUE; }
+  }
+  if (changed) {
+    nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+    if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  }
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListAdd(JSContext *cx, JSObject *obj, uintN argc,
+                              jsval *argv, jsval *rval)
+{ return DOMTokenListMutate(cx, obj, argc, argv, rval, PR_TRUE); }
+
+static JSBool DOMTokenListRemove(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval)
+{ return DOMTokenListMutate(cx, obj, argc, argv, rval, PR_FALSE); }
+
+static JSBool DOMTokenListToggle(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval)
+{
+  if (!argc) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  JSString *str = JS_ValueToString(cx, argv[0]);
+  nsString token;
+  if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  PRInt32 at = tokens.IndexOf(token);
+  PRBool force = argc > 1, present = at >= 0;
+  if (!force || JSVAL_IS_VOID(argv[1])) {
+    if (present) tokens.RemoveElementAt(at);
+    else tokens.AppendElement(token);
+    present = !present;
+  } else {
+    JSBool wanted;
+    if (!JS_ValueToBoolean(cx, argv[1], &wanted)) return JS_FALSE;
+    if (wanted && !present) { tokens.AppendElement(token); present = PR_TRUE; }
+    if (!wanted && present) { tokens.RemoveElementAt(at); present = PR_FALSE; }
+  }
+  nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  *rval = BOOLEAN_TO_JSVAL(present);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListReplace(JSContext *cx, JSObject *obj, uintN argc,
+                                  jsval *argv, jsval *rval)
+{
+  if (argc < 2) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  JSString *oldStr = JS_ValueToString(cx, argv[0]);
+  JSString *newStr = JS_ValueToString(cx, argv[1]);
+  nsString oldToken, newToken;
+  if (!DOMTokenListValidate(cx, oldStr, oldToken) ||
+      !DOMTokenListValidate(cx, newStr, newToken)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  PRInt32 at = tokens.IndexOf(oldToken);
+  if (at < 0) { *rval = JSVAL_FALSE; return JS_TRUE; }
+  PRInt32 duplicate = tokens.IndexOf(newToken);
+  if (duplicate >= 0 && duplicate != at) tokens.RemoveElementAt(duplicate);
+  at = tokens.IndexOf(oldToken);
+  tokens[at] = newToken;
+  nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  *rval = JSVAL_TRUE;
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListSupports(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval)
+{
+  JS_ReportError(cx, "classList does not define supported tokens");
+  return JS_FALSE;
+}
+
+static JSFunctionSpec sDOMTokenListFunctions[] = {
+  { "item", DOMTokenListItem, 1, 0, 0 },
+  { "contains", DOMTokenListContains, 1, 0, 0 },
+  { "add", DOMTokenListAdd, 1, 0, 0 },
+  { "remove", DOMTokenListRemove, 1, 0, 0 },
+  { "toggle", DOMTokenListToggle, 1, 0, 0 },
+  { "replace", DOMTokenListReplace, 2, 0, 0 },
+  { "supports", DOMTokenListSupports, 1, 0, 0 },
+  { "toString", DOMTokenListToString, 0, 0, 0 },
+  { 0, 0, 0, 0, 0 }
+};
+
+static JSClass sDOMTokenListClass = {
+  "DOMTokenList", JSCLASS_HAS_PRIVATE,
+  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, DOMTokenListFinalize
+};
+
+NS_IMETHODIMP
+nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
+                        JSObject *obj, jsval id, PRUint32 flags,
+                        JSObject **objp, PRBool *_retval)
+{
+  if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
+    JSString *name = JSVAL_TO_STRING(id);
+    if (JS_GetStringLength(name) == 9 &&
+        !memcmp(JS_GetStringChars(name), NS_LITERAL_STRING("classList").get(), 9 * sizeof(jschar))) {
+      // Respect the normal element wrapper's security and cross-origin checks.
+      nsresult rv = nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp,
+                                         _retval);
+      NS_ENSURE_SUCCESS(rv, rv);
+      if (!*_retval) return NS_OK;
+      if (ObjectIsNativeWrapper(cx, obj)) return NS_OK;
+
+      nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper));
+      NS_ENSURE_TRUE(content, NS_ERROR_UNEXPECTED);
+      JSObject *list = JS_NewObject(cx, &sDOMTokenListClass, nsnull,
+                                    JS_GetParent(cx, obj));
+      if (!list) return NS_ERROR_OUT_OF_MEMORY;
+      DOMTokenListData *data = new DOMTokenListData();
+      if (!data) return NS_ERROR_OUT_OF_MEMORY;
+      data->mElement = content;
+      if (!JS_SetPrivate(cx, list, data) ||
+          !JS_DefineFunctions(cx, list, sDOMTokenListFunctions) ||
+          !JS_DefineUCProperty(cx, list,
+              NS_REINTERPRET_CAST(const jschar *, NS_LITERAL_STRING("value").get()),
+              5, JSVAL_VOID, DOMTokenListValueGetter, DOMTokenListValueSetter,
+              JSPROP_ENUMERATE | JSPROP_SHARED) ||
+          !JS_DefineUCProperty(cx, list,
+              NS_REINTERPRET_CAST(const jschar *, NS_LITERAL_STRING("length").get()),
+              6, JSVAL_VOID, DOMTokenListLengthGetter, nsnull,
+              JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_READONLY)) {
+        if (JS_GetPrivate(cx, list) != data) delete data;
+        return NS_ERROR_FAILURE;
+      }
+      if (!JS_DefineProperty(cx, obj, "classList", OBJECT_TO_JSVAL(list),
+                             nsnull, nsnull, JSPROP_ENUMERATE | JSPROP_READONLY))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
+  }
+  return nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp, _retval);
+}
 
 NS_IMETHODIMP
 nsElementSH::PostCreate(nsIXPConnectWrappedNative *wrapper, JSContext *cx,

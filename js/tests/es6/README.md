@@ -125,8 +125,15 @@ objects, wrappers, signed zero, fractional and safe-integer boundaries,
 constant descriptors and non-constructible native methods.
 
 `window-app/application.ini` is a standalone XULRunner fixture; use a disposable
-profile and require `ES6-WINDOW checks=15 failures=0`. It checks the additions
-in chrome and content window globals as well as an unchanged legacy XUL setter.
+profile and require `ES6-WINDOW checks=15 failures=0`. It checks additions in
+chrome and content window globals as well as an unchanged legacy XUL setter.
+The desktop application runner also exercises `window-queryselector.xul` and
+requires `DOM-QUERY-SELECTOR checks=17 failures=0`. It checks tree order,
+combinators, basic functional selectors, `:scope`, static list behavior and
+syntax errors. This focused fixture does not establish complete Selectors
+Level 4 compliance. Forgiving invalid members in `:is()`/`:where()`, `:has()`,
+modern `:nth-*` grammar, and several state and attribute selector details
+remain unfinished.
 The focused shell test requires `ES6-NUMBER checks=156 failures=0`.
 
 The original Number subset has 338 passes and 26 failures in 364 test/mode

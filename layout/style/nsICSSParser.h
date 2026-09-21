@@ -51,6 +51,7 @@ class nsICSSLoader;
 class nsICSSRule;
 class nsISupportsArray;
 class nsMediaList;
+struct nsCSSSelectorList;
 
 #define NS_ICSS_PARSER_IID    \
 { 0x94d1d921, 0xd6f6, 0x435f, \
@@ -128,6 +129,11 @@ public:
                             PRUint32 aLineNumber, // for error reporting
                             nsMediaList* aMediaList,
                             PRBool aHTMLMode) = 0;
+
+  // Parse a complete selector-list string for DOM selector APIs. Unlike
+  // ParseRule(), this rejects trailing tokens and returns the parsed selectors.
+  NS_IMETHOD ParseSelectorString(const nsAString& aSelectors,
+                                 nsCSSSelectorList** aResult) = 0;
 
   /**
    * Parse aBuffer into a nscolor |aColor|.  If aHandleAlphaColors is

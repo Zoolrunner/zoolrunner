@@ -1,0 +1,112 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="DOM selector test" onload="setTimeout(run, 1000)">
+  <script><![CDATA[
+var checks = 0, failures = 0;
+function check(value, label) {
+    ++checks;
+    if (!value) ++failures;
+    dump((value ? "PASS " : "FAIL ") + label + "\n");
+}
+function run() {
+  try {
+    var body = document.createElement("body");
+    var first = document.createElement("div");
+    first.setAttribute("class", "item first");
+    var nested = document.createElement("span");
+    nested.setAttribute("class", "item nested");
+    first.appendChild(nested);
+    var second = document.createElement("div");
+    second.setAttribute("class", "item second");
+    body.appendChild(first);
+    body.appendChild(second);
+    document.documentElement.appendChild(body);
+
+    check(document.querySelector(".item") === first, "first match in tree order");
+    check(document.querySelector(".nested") === nested, "descendant selector");
+    check(document.querySelector(".missing") === null, "no match returns null");
+    check(document.querySelector(":scope") === document.documentElement,
+          "document scope is document element");
+    check(document.querySelector(".missing, .second") === second,
+          "selector list uses first tree-order match");
+    check(document.querySelector(":is(.missing, .second)") === second,
+          ":is() selector list");
+    check(document.querySelector(":where(.missing, .second)") === second,
+          ":where() selector list");
+    check(document.querySelector(".item:not(.first)") === nested,
+          ":not() compound selector matching");
+    check(document.querySelector(".item:not(.first, .second)") === nested,
+          ":not() selector-list matching");
+    check(document.querySelector("div > span.item") === nested,
+          "child combinator");
+    check(document.querySelector("div span.item") === nested,
+          "descendant combinator");
+    check(document.querySelector("div + div") === second,
+          "adjacent sibling combinator");
+    check(document.querySelector("div ~ div") === second,
+          "general sibling combinator");
+
+    var tokens = first.classList;
+    check(tokens === first.classList, "classList object identity");
+    check(tokens.length === 2 && tokens.item(0) === "item" &&
+          tokens.item(1) === "first" && tokens.item(2) === null,
+          "ordered tokens, length and item");
+    check(tokens.toString() === tokens.value, "stringifier returns value");
+    check(tokens.contains("first") && !tokens.contains("missing"),
+          "contains");
+    tokens.add("third", "fourth", "third");
+    check(first.getAttribute("class") === "item first third fourth" &&
+          tokens.length === 4, "add deduplicates and preserves order");
+    tokens.remove("first", "missing", "fourth");
+    check(first.getAttribute("class") === "item third", "remove tokens");
+    check(tokens.toggle("third") === false && tokens.toggle("new") === true &&
+          tokens.toggle("new", true) === true &&
+          tokens.toggle("item", false) === false &&
+          first.getAttribute("class") === "new",
+          "toggle and forced toggle");
+    check(tokens.replace("new", "renamed") === true &&
+          tokens.item(0) === "renamed" &&
+          tokens.replace("missing", "ignored") === false,
+          "replace token");
+    tokens.value = "alpha  beta alpha";
+    check(first.getAttribute("class") === "alpha  beta alpha" &&
+          tokens.length === 2 && tokens.item(0) === "alpha" &&
+          tokens.item(1) === "beta", "value setter and ordered-set parsing");
+    first.setAttribute("class", "changed externally");
+    check(tokens.value === "changed externally" && tokens.contains("externally"),
+          "live attribute reflects external changes");
+    first.setAttribute("class", "one  two");
+    tokens.add("one");
+    check(first.getAttribute("class") === "one  two",
+          "no-op add preserves original attribute serialization");
+    var threw = false;
+    try { tokens.add(""); }
+    catch (e) { threw = e && e.name === "SyntaxError" && e.code === 12; }
+    check(threw, "empty token throws SyntaxError");
+    threw = false;
+    try { tokens.contains("two words"); }
+    catch (e) { threw = e && e.name === "InvalidCharacterError" && e.code === 5; }
+    check(threw, "whitespace token throws InvalidCharacterError");
+
+    var list = document.querySelectorAll(".item");
+    check(list.length === 3 && list.item(0) === first && list.item(1) === nested &&
+          list.item(2) === second, "static result in tree order");
+    body.removeChild(second);
+    check(list.length === 3 && list.item(2) === second,
+          "querySelectorAll result is a static snapshot");
+
+    var threw = false;
+    try { document.querySelector("div["); }
+    catch (e) { threw = e && e.name === "SyntaxError" && e.code === 12; }
+    check(threw, "invalid selector throws SyntaxError DOMException");
+    threw = false;
+    try { document.querySelector(""); }
+    catch (e) { threw = e && e.name === "SyntaxError" && e.code === 12; }
+    check(threw, "empty selector throws SyntaxError DOMException");
+  } catch (e) { check(false, String(e)); }
+  dump("DOM-QUERY-SELECTOR checks=" + checks + " failures=" + failures + "\n");
+  Components.classes["@mozilla.org/toolkit/app-startup;1"]
+      .getService(Components.interfaces.nsIAppStartup).quit(failures ? 1 : 0);
+}
+  ]]></script>
+</window>

@@ -22,6 +22,9 @@ function checkWindow(w, label) {
     check(O.getPrototypeOf(O) === F.prototype, label + " Object constructor chain");
     check(O.getPrototypeOf(F.prototype) === O.prototype, label + " Function prototype chain");
     check(O.prototype.constructor === O, label + " constructor identity");
+    var hasConsole = w.console && typeof w.console.assert == "function";
+    if (hasConsole) w.console.assert(true, "console.assert smoke test");
+    check(!!hasConsole, label + " console.assert");
     var legacy = new O();
     legacy.__defineGetter__("getter", function() { return 7; });
     legacy.watch("watched", function(id, oldValue, newValue) { return newValue + 1; });

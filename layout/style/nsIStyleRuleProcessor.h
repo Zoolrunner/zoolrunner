@@ -69,14 +69,21 @@ struct RuleProcessorData {
   void* operator new(size_t sz, nsPresContext* aContext) CPP_THROW_NEW {
     return aContext->AllocateFromShell(sz);
   }
+  void* operator new(size_t sz) CPP_THROW_NEW { return ::operator new(sz); }
+  void operator delete(void* aPtr) { ::operator delete(aPtr); }
   void Destroy(nsPresContext* aContext) {
-    this->~RuleProcessorData();
-    aContext->FreeToShell(sizeof(RuleProcessorData), this);
+    if (aContext) {
+      this->~RuleProcessorData();
+      aContext->FreeToShell(sizeof(RuleProcessorData), this);
+    } else {
+      delete this;
+    }
   };
 
   const nsString* GetLang();
 
   nsPresContext*   mPresContext;
+  PRPackedBool     mUseShellArena;
   nsIContent*       mContent;       // weak ref
   nsIContent*       mParentContent; // if content, content->GetParent(); weak ref
   nsRuleWalker*     mRuleWalker; // Used to add rules to our results.

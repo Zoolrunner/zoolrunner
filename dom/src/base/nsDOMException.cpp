@@ -115,6 +115,14 @@ NSResultToNameAndMessage(nsresult aNSResult,
                          const char** aName,
                          const char** aMessage)
 {
+  // DOMException's Web-visible name is the legacy DOM exception name, not
+  // the internal nsresult symbol. In particular, code 12 is SyntaxError.
+  if (aNSResult == NS_ERROR_DOM_SYNTAX_ERR) {
+    *aName = "SyntaxError";
+    *aMessage = "An invalid or illegal string was specified";
+    return;
+  }
+
   ResultStruct* result_struct = gDOMErrorMsgMap;
 
   while (result_struct->mName) {

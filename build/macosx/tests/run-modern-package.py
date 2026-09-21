@@ -61,6 +61,8 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
     for name in ['window-editions.xul', 'window-editions.html', 'edition-modern.js',
                  'window-promise.xul', 'window-promise.html', 'promise-child.xul']:
         shutil.copy2(root / 'js/tests/es6' / name, fixture / name)
+    shutil.copy2(root / 'js/tests/es6/window-app/chrome/window-queryselector.xul',
+                  fixture / 'window-queryselector.xul')
     edition_fixture = fixture / 'window-editions.xul'
     edition_fixture.write_text(edition_fixture.read_text().replace(
         'chrome://es6window/content/window-editions.html',
@@ -109,9 +111,11 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
                     pass
     try:
         cases = [('application', 'early-application.xul', 'APPLICATION PASS:'),
-                 ('window', 'window-bootstrap.xul', 'WINDOW-BOOTSTRAP checks=17 failures=0'),
+                 ('window', 'window-bootstrap.xul', 'WINDOW-BOOTSTRAP checks=19 failures=0'),
                  ('editions', 'window-editions.xul', 'ES6-WINDOW-EDITIONS checks=5 failures=0'),
-                 ('promises', 'window-promise.xul', 'ES6-PROMISE-WINDOW checks=16 failures=0')]
+                 ('promises', 'window-promise.xul', 'ES6-PROMISE-WINDOW checks=16 failures=0'),
+                 ('queryselector', 'window-queryselector.xul',
+                  'DOM-QUERY-SELECTOR checks=30 failures=0')]
         if args.app == 'suite':
             cases.append(('chatzilla', 'chatzilla.xul', 'SUITE-CHATZILLA initialized=true'))
         original = code

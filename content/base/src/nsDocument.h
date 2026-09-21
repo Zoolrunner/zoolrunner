@@ -51,6 +51,7 @@
 #include "nsIDOMDocumentView.h"
 #include "nsIDOMDocumentXBL.h"
 #include "nsIDOMNSDocument.h"
+#include "nsIDOMNSDocument2.h"
 #include "nsIDOMNSDocumentStyle.h"
 #include "nsIDOMDocumentRange.h"
 #include "nsIDOMDocumentTraversal.h"
@@ -369,7 +370,7 @@ class nsDocument : public nsIDocument,
                    public nsIDocument_MOZILLA_1_8_BRANCH2,
                    public nsIDocument_MOZILLA_1_8_BRANCH3,
                    public nsIDOMXMLDocument, // inherits nsIDOMDocument
-                   public nsIDOMNSDocument,
+                   public nsIDOMNSDocument2,
                    public nsIDOMDocumentEvent,
                    public nsIDOM3DocumentEvent,
                    public nsIDOMNSDocumentStyle,
@@ -675,6 +676,9 @@ public:
 
   // nsIDOMNSDocument
   NS_DECL_NSIDOMNSDOCUMENT
+
+  // nsIDOMNSDocument2
+  NS_DECL_NSIDOMNSDOCUMENT2
 
   // nsIDOMDocumentEvent
   NS_DECL_NSIDOMDOCUMENTEVENT
