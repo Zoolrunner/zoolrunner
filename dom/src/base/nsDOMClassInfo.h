@@ -670,6 +670,14 @@ protected:
   }
 
 public:
+  static JSBool JS_DLL_CALLBACK QuerySelector(JSContext *cx, JSObject *obj,
+                                               uintN argc, jsval *argv,
+                                               jsval *rval);
+  static JSBool JS_DLL_CALLBACK QuerySelectorAll(JSContext *cx, JSObject *obj,
+                                                  uintN argc, jsval *argv,
+                                                  jsval *rval);
+  static JSBool QuerySelectorHelper(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval, PRBool all);
   NS_IMETHOD NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                         JSObject *obj, jsval id, PRUint32 flags,
                         JSObject **objp, PRBool *_retval);

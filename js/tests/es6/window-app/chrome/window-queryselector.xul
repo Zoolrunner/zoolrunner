@@ -26,6 +26,12 @@ function run() {
 
     check(document.querySelector(".item") === first, "first match in tree order");
     check(document.querySelector(".nested") === nested, "descendant selector");
+    check(first.querySelector(".nested") === nested &&
+          first.querySelector(".second") === null,
+          "element querySelector is scoped to descendants");
+    var scopedList = first.querySelectorAll(".nested");
+    check(scopedList.length === 1 && scopedList.item(0) === nested,
+          "element querySelectorAll returns scoped matches");
     check(nested.dataset.id === "speedometer-item" &&
           nested.dataset.userId === "42", "data-* attributes exposed through dataset");
     check(document.querySelector(".missing") === null, "no match returns null");

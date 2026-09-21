@@ -39,6 +39,7 @@
 
 #include "nscore.h"
 #include "nsDOMClassInfo.h"
+#include "nsDOMSelector.h"
 #include "nsCRT.h"
 #include "nsIServiceManager.h"
 #include "nsICategoryManager.h"
@@ -1200,6 +1201,8 @@ jsval nsDOMClassInfo::sAll_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sTags_id            = JSVAL_VOID;
 jsval nsDOMClassInfo::sAddEventListener_id= JSVAL_VOID;
 static jsval sXMLHttpRequestSend_id        = JSVAL_VOID;
+static jsval sElementQuerySelector_id      = JSVAL_VOID;
+static jsval sElementQuerySelectorAll_id   = JSVAL_VOID;
 
 const JSClass *nsDOMClassInfo::sObjectClass = nsnull;
 const JSClass *nsDOMClassInfo::sXPCNativeWrapperClass = nsnull;
@@ -1388,6 +1391,8 @@ nsDOMClassInfo::DefineStaticJSVals(JSContext *cx)
   SET_JSVAL_TO_STRING(sTags_id,            cx, "tags");
   SET_JSVAL_TO_STRING(sAddEventListener_id,cx, "addEventListener");
   SET_JSVAL_TO_STRING(sXMLHttpRequestSend_id, cx, "send");
+  SET_JSVAL_TO_STRING(sElementQuerySelector_id, cx, "querySelector");
+  SET_JSVAL_TO_STRING(sElementQuerySelectorAll_id, cx, "querySelectorAll");
 
   return NS_OK;
 }
@@ -7590,6 +7595,22 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 {
   if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *name = JSVAL_TO_STRING(id);
+    JSBool querySelectorAll =
+      JS_GetStringLength(name) == 15 &&
+      !memcmp(JS_GetStringChars(name),
+              NS_LITERAL_STRING("querySelectorAll").get(), 15 * sizeof(jschar));
+    JSBool querySelector =
+      JS_GetStringLength(name) == 12 &&
+      !memcmp(JS_GetStringChars(name),
+              NS_LITERAL_STRING("querySelector").get(), 12 * sizeof(jschar));
+    if (querySelector || querySelectorAll) {
+      JSBool all = querySelectorAll;
+      JSFunction *fnc = JS_DefineFunction(cx, obj,
+          all ? "querySelectorAll" : "querySelector",
+          all ? QuerySelectorAll : QuerySelector, 1, JSPROP_ENUMERATE);
+      *objp = obj;
+      return fnc ? NS_OK : NS_ERROR_UNEXPECTED;
+    }
     if (JS_GetStringLength(name) == 7 &&
         !memcmp(JS_GetStringChars(name), NS_LITERAL_STRING("dataset").get(), 7 * sizeof(jschar))) {
       nsresult rv = nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp,
@@ -7645,6 +7666,88 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     }
   }
   return nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp, _retval);
+}
+
+JSBool JS_DLL_CALLBACK
+nsElementSH::QuerySelector(JSContext *cx, JSObject *obj, uintN argc,
+                           jsval *argv, jsval *rval)
+{
+  return QuerySelectorHelper(cx, obj, argc, argv, rval, PR_FALSE);
+}
+
+JSBool JS_DLL_CALLBACK
+nsElementSH::QuerySelectorAll(JSContext *cx, JSObject *obj, uintN argc,
+                              jsval *argv, jsval *rval)
+{
+  return QuerySelectorHelper(cx, obj, argc, argv, rval, PR_TRUE);
+}
+
+JSBool
+nsElementSH::QuerySelectorHelper(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval, PRBool all)
+{
+  jsval method = all ? sElementQuerySelectorAll_id :
+                       sElementQuerySelector_id;
+  if (NS_FAILED(sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, method,
+        nsIXPCSecurityManager::ACCESS_GET_PROPERTY)) ||
+      NS_FAILED(sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, method,
+        nsIXPCSecurityManager::ACCESS_CALL_METHOD))) {
+    return JS_FALSE;
+  }
+
+  if (!argc) {
+    ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
+    return JS_FALSE;
+  }
+
+  JSString *selector = JS_ValueToString(cx, argv[0]);
+  if (!selector) return JS_FALSE;
+  nsDependentJSString selectors(selector);
+
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsresult rv = sXPConnect->GetWrappedNativeOfJSObject(
+    cx, obj, getter_AddRefs(wrapper));
+  if (NS_FAILED(rv)) {
+    ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper, &rv));
+  if (NS_FAILED(rv) || !content) {
+    ThrowJSException(cx, NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  if (all) {
+    nsCOMPtr<nsIDOMNodeList> matches;
+    rv = NS_QuerySelectorAll(content, PR_FALSE, selectors,
+                             getter_AddRefs(matches));
+    if (NS_SUCCEEDED(rv)) {
+      rv = WrapNative(cx, obj, matches, NS_GET_IID(nsIDOMNodeList), rval,
+                      getter_AddRefs(holder));
+    }
+  } else {
+    nsCOMPtr<nsIDOMElement> match;
+    rv = NS_QuerySelector(content, PR_FALSE, selectors,
+                          getter_AddRefs(match));
+    if (NS_SUCCEEDED(rv)) {
+      if (match) {
+        rv = WrapNative(cx, obj, match, NS_GET_IID(nsIDOMElement), rval,
+                        getter_AddRefs(holder));
+      } else {
+        *rval = JSVAL_NULL;
+      }
+    }
+  }
+
+  if (NS_FAILED(rv)) {
+    ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
 }
 
 NS_IMETHODIMP
