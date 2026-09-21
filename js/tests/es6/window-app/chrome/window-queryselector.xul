@@ -15,6 +15,8 @@ function run() {
     first.setAttribute("class", "item first");
     var nested = document.createElement("span");
     nested.setAttribute("class", "item nested");
+    nested.setAttribute("data-id", "speedometer-item");
+    nested.setAttribute("data-user-id", "42");
     first.appendChild(nested);
     var second = document.createElement("div");
     second.setAttribute("class", "item second");
@@ -24,6 +26,8 @@ function run() {
 
     check(document.querySelector(".item") === first, "first match in tree order");
     check(document.querySelector(".nested") === nested, "descendant selector");
+    check(nested.dataset.id === "speedometer-item" &&
+          nested.dataset.userId === "42", "data-* attributes exposed through dataset");
     check(document.querySelector(".missing") === null, "no match returns null");
     check(document.querySelector(":scope") === document.documentElement,
           "document scope is document element");

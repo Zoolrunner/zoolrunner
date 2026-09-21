@@ -7457,6 +7457,67 @@ static JSClass sDOMTokenListClass = {
   JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, DOMTokenListFinalize
 };
 
+// Expose HTML data-* attributes through the string-valued dataset properties
+// used by classic applications such as TodoMVC. This is a snapshot object;
+// reads of attributes present when dataset is first accessed are supported.
+static JSObject *
+DOMCreateDataset(JSContext *cx, JSObject *parent, nsIContent *content)
+{
+  JSObject *dataset = JS_NewObject(cx, nsnull, nsnull, parent);
+  if (!dataset) return nsnull;
+
+  PRUint32 count = content->GetAttrCount();
+  for (PRUint32 i = 0; i < count; ++i) {
+    PRInt32 nameSpace;
+    nsCOMPtr<nsIAtom> nameAtom;
+    nsCOMPtr<nsIAtom> prefixAtom;
+    if (NS_FAILED(content->GetAttrNameAt(i, &nameSpace,
+                                          getter_AddRefs(nameAtom),
+                                          getter_AddRefs(prefixAtom))) ||
+        nameSpace != kNameSpaceID_None || !nameAtom) {
+      continue;
+    }
+
+    nsAutoString attrName;
+    nameAtom->ToString(attrName);
+    if (attrName.Length() <= 5 ||
+        !Substring(attrName, 0, 5).Equals(NS_LITERAL_STRING("data-"))) {
+      continue;
+    }
+
+    nsAutoString propertyName;
+    PRBool uppercaseNext = PR_FALSE;
+    for (PRUint32 j = 5; j < attrName.Length(); ++j) {
+      PRUnichar ch = attrName[j];
+      if (ch == '-' && j + 1 < attrName.Length() &&
+          attrName[j + 1] >= 'a' && attrName[j + 1] <= 'z') {
+        uppercaseNext = PR_TRUE;
+        continue;
+      }
+      if (uppercaseNext) {
+        ch = ch - ('a' - 'A');
+        uppercaseNext = PR_FALSE;
+      }
+      propertyName.Append(ch);
+    }
+    if (propertyName.IsEmpty()) continue;
+
+    nsAutoString value;
+    content->GetAttr(kNameSpaceID_None, nameAtom, value);
+    JSString *jsValue = JS_NewUCStringCopyN(
+      cx, NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
+    if (!jsValue ||
+        !JS_DefineUCProperty(cx, dataset,
+          NS_REINTERPRET_CAST(const jschar *, propertyName.get()),
+          propertyName.Length(), STRING_TO_JSVAL(jsValue), nsnull, nsnull,
+          JSPROP_ENUMERATE)) {
+      return nsnull;
+    }
+  }
+
+  return dataset;
+}
+
 NS_IMETHODIMP
 nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                         JSObject *obj, jsval id, PRUint32 flags,
@@ -7464,6 +7525,23 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 {
   if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *name = JSVAL_TO_STRING(id);
+    if (JS_GetStringLength(name) == 7 &&
+        !memcmp(JS_GetStringChars(name), NS_LITERAL_STRING("dataset").get(), 7 * sizeof(jschar))) {
+      nsresult rv = nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp,
+                                         _retval);
+      NS_ENSURE_SUCCESS(rv, rv);
+      if (!*_retval || ObjectIsNativeWrapper(cx, obj)) return NS_OK;
+
+      nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper));
+      NS_ENSURE_TRUE(content, NS_ERROR_UNEXPECTED);
+      JSObject *dataset = DOMCreateDataset(cx, JS_GetParent(cx, obj), content);
+      if (!dataset) return NS_ERROR_OUT_OF_MEMORY;
+      if (!JS_DefineProperty(cx, obj, "dataset", OBJECT_TO_JSVAL(dataset),
+                             nsnull, nsnull, JSPROP_ENUMERATE | JSPROP_READONLY))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
     if (JS_GetStringLength(name) == 9 &&
         !memcmp(JS_GetStringChars(name), NS_LITERAL_STRING("classList").get(), 9 * sizeof(jschar))) {
       // Respect the normal element wrapper's security and cross-origin checks.
