@@ -1090,7 +1090,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
 
   NS_DEFINE_CLASSINFO_DATA(XMLHttpProgressEvent, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(XMLHttpRequest, nsDOMGCParticipantSH,
+  NS_DEFINE_CLASSINFO_DATA(XMLHttpRequest, nsXMLHttpRequestSH,
                            GCPARTICIPANT_SCRIPTABLE_FLAGS)
 
   // Define MOZ_SVG_FOREIGNOBJECT here so that when it gets switched on,
@@ -1199,6 +1199,7 @@ jsval nsDOMClassInfo::sAdd_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sAll_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sTags_id            = JSVAL_VOID;
 jsval nsDOMClassInfo::sAddEventListener_id= JSVAL_VOID;
+static jsval sXMLHttpRequestSend_id        = JSVAL_VOID;
 
 const JSClass *nsDOMClassInfo::sObjectClass = nsnull;
 const JSClass *nsDOMClassInfo::sXPCNativeWrapperClass = nsnull;
@@ -1386,6 +1387,7 @@ nsDOMClassInfo::DefineStaticJSVals(JSContext *cx)
   SET_JSVAL_TO_STRING(sAll_id,             cx, "all");
   SET_JSVAL_TO_STRING(sTags_id,            cx, "tags");
   SET_JSVAL_TO_STRING(sAddEventListener_id,cx, "addEventListener");
+  SET_JSVAL_TO_STRING(sXMLHttpRequestSend_id, cx, "send");
 
   return NS_OK;
 }
@@ -7173,6 +7175,69 @@ nsEventReceiverSH::AddProperty(nsIXPConnectWrappedNative *wrapper,
 // XXX nsEventReceiverSH::Finalize: clear event handlers in mListener...
 
 // DOMGCParticipant helper
+
+JSBool JS_DLL_CALLBACK
+nsXMLHttpRequestSH::Send(JSContext *cx, JSObject *obj, uintN argc,
+                         jsval *argv, jsval *rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsresult rv = nsDOMClassInfo::sXPConnect->GetWrappedNativeOfJSObject(
+    cx, obj, getter_AddRefs(wrapper));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  if (NS_FAILED(nsDOMClassInfo::sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, sXMLHttpRequestSend_id,
+        nsIXPCSecurityManager::ACCESS_GET_PROPERTY)) ||
+      NS_FAILED(nsDOMClassInfo::sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, sXMLHttpRequestSend_id,
+        nsIXPCSecurityManager::ACCESS_CALL_METHOD))) {
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXMLHttpRequest> request(do_QueryWrappedNative(wrapper, &rv));
+  if (NS_FAILED(rv) || !request) {
+    nsDOMClassInfo::ThrowJSException(cx,
+      NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIVariant> body;
+  if (argc && NS_FAILED(rv = nsDOMClassInfo::sXPConnect->JSToVariant(cx, argv[0],
+                                                      getter_AddRefs(body)))) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  rv = request->Send(body);
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+NS_IMETHODIMP
+nsXMLHttpRequestSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
+                               JSContext *cx, JSObject *obj, jsval id,
+                               PRUint32 flags, JSObject **objp,
+                               PRBool *_retval)
+{
+  if (id == sXMLHttpRequestSend_id && !(flags & JSRESOLVE_ASSIGNING)) {
+    JSFunction *fnc = JS_DefineFunction(cx, obj, "send",
+                                        nsXMLHttpRequestSH::Send, 0,
+                                        JSPROP_ENUMERATE);
+    *objp = obj;
+    return fnc ? NS_OK : NS_ERROR_UNEXPECTED;
+  }
+
+  return nsDOMGCParticipantSH::NewResolve(wrapper, cx, obj, id, flags, objp,
+                                           _retval);
+}
 
 NS_IMETHODIMP
 nsDOMGCParticipantSH::Finalize(nsIXPConnectWrappedNative *wrapper,

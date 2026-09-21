@@ -64,6 +64,14 @@ function run() {
     window.dispatchEvent(event);
     check(eventReceived, "addEventListener defaults omitted capture to false");
 
+    var xhr = new XMLHttpRequest();
+    var xhrSendNoArgAccepted = true;
+    try { xhr.send(); }
+    catch (e) {
+      xhrSendNoArgAccepted = String(e).indexOf("0x80570001") < 0;
+    }
+    check(xhrSendNoArgAccepted, "XMLHttpRequest.send accepts omitted body");
+
     var tokens = first.classList;
     check(tokens === first.classList, "classList object identity");
     check(tokens.length === 2 && tokens.item(0) === "item" &&
