@@ -6920,7 +6920,7 @@ JSBool JS_DLL_CALLBACK
 nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
                                           uintN argc, jsval *argv, jsval *rval)
 {
-  if (argc < 3 || argc > 4) {
+  if (argc < 2 || argc > 4) {
     ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
 
     return JS_FALSE;
@@ -7007,8 +7007,8 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     }
   }
 
-  JSBool useCapture;
-  if (!JS_ValueToBoolean(cx, argv[2], &useCapture)) {
+  JSBool useCapture = JS_FALSE;
+  if (argc >= 3 && !JS_ValueToBoolean(cx, argv[2], &useCapture)) {
     return JS_FALSE;
   }
 
@@ -7123,10 +7123,10 @@ nsEventReceiverSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
 
   if (id == sAddEventListener_id && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *str = JSVAL_TO_STRING(id);
-    // addEventListener always takes at least 3 arguments.
+    // The capture flag is optional, as in the DOM event-target API.
     JSFunction *fnc =
       ::JS_DefineFunction(cx, obj, ::JS_GetStringBytes(str),
-                          AddEventListenerHelper, 3, JSPROP_ENUMERATE);
+                          AddEventListenerHelper, 2, JSPROP_ENUMERATE);
 
     *objp = obj;
 

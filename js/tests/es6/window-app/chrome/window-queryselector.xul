@@ -51,6 +51,15 @@ function run() {
     check(window.getComputedStyle(first, null) !== null,
           "getComputedStyle accepts explicit null pseudo-element");
 
+    var eventReceived = false;
+    window.addEventListener("optional-capture-test", function() {
+      eventReceived = true;
+    });
+    var event = document.createEvent("Events");
+    event.initEvent("optional-capture-test", false, false);
+    window.dispatchEvent(event);
+    check(eventReceived, "addEventListener defaults omitted capture to false");
+
     var tokens = first.classList;
     check(tokens === first.classList, "classList object identity");
     check(tokens.length === 2 && tokens.item(0) === "item" &&
