@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory(prefix='zool-modern-' + args.arch + '-' + args.
                  ('editions', 'window-editions.xul', 'ES6-WINDOW-EDITIONS checks=5 failures=0'),
                  ('promises', 'window-promise.xul', 'ES6-PROMISE-WINDOW checks=16 failures=0'),
                  ('queryselector', 'window-queryselector.xul',
-                  'DOM-QUERY-SELECTOR checks=37 failures=0')]
+                  'DOM-QUERY-SELECTOR checks=38 failures=0')]
         if args.app == 'suite':
             cases.append(('chatzilla', 'chatzilla.xul', 'SUITE-CHATZILLA initialized=true'))
         original = code

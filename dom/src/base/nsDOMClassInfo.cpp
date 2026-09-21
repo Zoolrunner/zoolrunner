@@ -7596,13 +7596,13 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *name = JSVAL_TO_STRING(id);
     JSBool querySelectorAll =
-      JS_GetStringLength(name) == 15 &&
+      JS_GetStringLength(name) == 16 &&
       !memcmp(JS_GetStringChars(name),
-              NS_LITERAL_STRING("querySelectorAll").get(), 15 * sizeof(jschar));
+              NS_LITERAL_STRING("querySelectorAll").get(), 16 * sizeof(jschar));
     JSBool querySelector =
-      JS_GetStringLength(name) == 12 &&
+      JS_GetStringLength(name) == 13 &&
       !memcmp(JS_GetStringChars(name),
-              NS_LITERAL_STRING("querySelector").get(), 12 * sizeof(jschar));
+              NS_LITERAL_STRING("querySelector").get(), 13 * sizeof(jschar));
     if (querySelector || querySelectorAll) {
       JSBool all = querySelectorAll;
       JSFunction *fnc = JS_DefineFunction(cx, obj,

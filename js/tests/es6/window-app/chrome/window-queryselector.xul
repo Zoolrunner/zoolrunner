@@ -29,6 +29,15 @@ function run() {
     check(first.querySelector(".nested") === nested &&
           first.querySelector(".second") === null,
           "element querySelector is scoped to descendants");
+    var htmlListItem = document.createElementNS(
+      "http://www.w3.org/1999/xhtml", "li");
+    var htmlListChild = document.createElementNS(
+      "http://www.w3.org/1999/xhtml", "span");
+    htmlListChild.setAttribute("class", "speedometer-child");
+    htmlListItem.appendChild(htmlListChild);
+    check(typeof htmlListItem.querySelector === "function" &&
+          htmlListItem.querySelector(".speedometer-child") === htmlListChild,
+          "HTMLLIElement querySelector binding");
     var scopedList = first.querySelectorAll(".nested");
     check(scopedList.length === 1 && scopedList.item(0) === nested,
           "element querySelectorAll returns scoped matches");
