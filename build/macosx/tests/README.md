@@ -31,7 +31,7 @@ and restore the Suite's selected profile after their checks.
 
 The package runner checks the focused JavaScript suites, regexp cancellation,
 application chrome and components, the 19 window-global assertions (including
-`console.assert` in chrome and content windows), and 30 DOM selector/token-list
+`console.assert` in chrome and content windows), and 32 DOM/CSSOM selector/token-list
 assertions. The token-list checks cover its live value, ordered methods,
 validation errors and attribute synchronization. The classic Error
 Console remains the destination for logged messages. Suite also runs the 24

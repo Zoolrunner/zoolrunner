@@ -499,6 +499,9 @@ protected:
                                 PRBool *did_resolve);
 
 public:
+  static JSBool JS_DLL_CALLBACK GetComputedStyle(JSContext *cx, JSObject *obj,
+                                                  uintN argc, jsval *argv,
+                                                  jsval *rval);
   NS_IMETHOD PreCreate(nsISupports *nativeObj, JSContext *cx,
                        JSObject *globalObj, JSObject **parentObj);
   NS_IMETHOD GetProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,

@@ -45,6 +45,11 @@ function run() {
           "adjacent sibling combinator");
     check(document.querySelector("div ~ div") === second,
           "general sibling combinator");
+    var computed = window.getComputedStyle(first);
+    check(computed && typeof computed.getPropertyValue === "function",
+          "getComputedStyle accepts omitted pseudo-element");
+    check(window.getComputedStyle(first, null) !== null,
+          "getComputedStyle accepts explicit null pseudo-element");
 
     var tokens = first.classList;
     check(tokens === first.classList, "classList object identity");

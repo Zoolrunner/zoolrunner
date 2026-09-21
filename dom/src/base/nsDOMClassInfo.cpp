@@ -5890,6 +5890,76 @@ ContentWindowGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
   return ::JS_GetProperty(cx, obj, "content", rval);
 }
 
+// CSSOM makes the pseudo-element argument optional in JavaScript, while this
+// historical XPIDL method still requires two arguments.
+JSBool JS_DLL_CALLBACK
+nsWindowSH::GetComputedStyle(JSContext *cx, JSObject *obj, uintN argc,
+                             jsval *argv, jsval *rval)
+{
+  if (argc < 1) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
+    return JS_FALSE;
+  }
+  if (JSVAL_IS_PRIMITIVE(argv[0])) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_WRONG_TYPE_ERR);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXPConnectWrappedNative> windowWrapper;
+  nsresult rv = sXPConnect->GetWrappedNativeOfJSObject(
+    cx, obj, getter_AddRefs(windowWrapper));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIDOMViewCSS> view(do_QueryWrappedNative(windowWrapper));
+  if (!view) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXPConnectWrappedNative> elementWrapper;
+  rv = sXPConnect->GetWrappedNativeOfJSObject(
+    cx, JSVAL_TO_OBJECT(argv[0]), getter_AddRefs(elementWrapper));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIDOMElement> element(do_QueryWrappedNative(elementWrapper));
+  if (!element) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_WRONG_TYPE_ERR);
+    return JS_FALSE;
+  }
+
+  nsAutoString pseudo;
+  if (argc > 1 && !JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
+    JSString *str = JS_ValueToString(cx, argv[1]);
+    if (!str) return JS_FALSE;
+    pseudo.Assign(nsDependentString(JS_GetStringChars(str),
+                                    JS_GetStringLength(str)));
+  }
+
+  nsCOMPtr<nsIDOMCSSStyleDeclaration> style;
+  rv = view->GetComputedStyle(element, pseudo, getter_AddRefs(style));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  if (!style) {
+    *rval = JSVAL_NULL;
+    return JS_TRUE;
+  }
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  rv = nsDOMClassInfo::WrapNative(cx, obj, style,
+                                  NS_GET_IID(nsIDOMCSSStyleDeclaration), rval,
+                                  getter_AddRefs(holder));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
 NS_IMETHODIMP
 nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                        JSObject *obj, jsval id, PRUint32 flags,
@@ -5958,6 +6028,23 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 #ifdef DEBUG_SH_FORWARDING
       printf(" --- Forwarding resolve to inner window %p\n", (void *)innerWin);
 #endif
+
+      // Resolve this CSSOM method on the inner global before the inherited
+      // XPIDL declaration is found. Its native interface requires two args,
+      // but the JavaScript API permits the pseudo-element argument to be
+      // omitted.
+      if (!(flags & JSRESOLVE_ASSIGNING) && JSVAL_IS_STRING(id) &&
+          JS_GetStringLength(JSVAL_TO_STRING(id)) == 16 &&
+          !memcmp(JS_GetStringChars(JSVAL_TO_STRING(id)),
+                  NS_LITERAL_STRING("getComputedStyle").get(),
+                  16 * sizeof(jschar))) {
+        JSFunction *fn = ::JS_DefineFunction(
+          cx, innerObj, "getComputedStyle", nsWindowSH::GetComputedStyle, 2,
+          JSPROP_ENUMERATE);
+        if (!fn) return NS_ERROR_FAILURE;
+        *objp = innerObj;
+        return NS_OK;
+      }
 
       jsid interned_id;
       JSObject *pobj;
@@ -6084,6 +6171,19 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     // The context is not yet initialized so there's nothing we can do
     // here yet.
 
+    return NS_OK;
+  }
+
+  if (!(flags & JSRESOLVE_ASSIGNING) && !ObjectIsNativeWrapper(cx, obj) &&
+      JS_GetStringLength(JSVAL_TO_STRING(id)) == 16 &&
+      !memcmp(JS_GetStringChars(JSVAL_TO_STRING(id)),
+              NS_LITERAL_STRING("getComputedStyle").get(),
+              16 * sizeof(jschar))) {
+    JSFunction *fn = ::JS_DefineFunction(cx, obj, "getComputedStyle",
+                                         nsWindowSH::GetComputedStyle, 2,
+                                         JSPROP_ENUMERATE);
+    if (!fn) return NS_ERROR_FAILURE;
+    *objp = obj;
     return NS_OK;
   }
 
