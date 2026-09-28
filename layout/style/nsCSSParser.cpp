@@ -78,6 +78,7 @@
 #include "nsILookAndFeel.h"
 
 #include "prprf.h"
+#include "nsDOMError.h"
 #include "math.h"
 
 //----------------------------------------------------------------------
@@ -155,6 +156,9 @@ public:
                               nscolor* aColor);
 
   void AppendRule(nsICSSRule* aRule);
+
+  nsresult ParseDOMSelectors(const nsAString& aSource,
+                             nsCSSSelectorList** aResult);
 
 protected:
   nsresult InitScanner(nsIUnicharInputStream* aInput, nsIURI* aSheetURI,
@@ -1736,6 +1740,48 @@ PRBool CSSParserImpl::ParseRuleSet(nsresult& aErrorCode, RuleAppendFunc aAppendF
   (*aAppendFunc)(rule, aData);
 
   return PR_TRUE;
+}
+
+nsresult
+CSSParserImpl::ParseDOMSelectors(const nsAString& aSource,
+                                nsCSSSelectorList** aResult)
+{
+  *aResult = nsnull;
+  nsresult rv = InitScanner(aSource, nsnull, 0, nsnull);
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCSSSelectorList* head = nsnull;
+  nsCSSSelectorList** tail = &head;
+  for (;;) {
+    if (!ParseSelectorGroup(rv, *tail)) {
+      if (NS_SUCCEEDED(rv))
+        rv = NS_ERROR_DOM_SYNTAX_ERR;
+      break;
+    }
+    if (!GetToken(rv, PR_TRUE))
+      break;
+    if (mToken.mType != eCSSToken_Symbol || mToken.mSymbol != ',') {
+      rv = NS_ERROR_DOM_SYNTAX_ERR;
+      break;
+    }
+    tail = &(*tail)->mNext;
+  }
+  CLEAR_ERROR();
+  ReleaseScanner();
+  if (NS_FAILED(rv)) {
+    delete head;
+    return rv;
+  }
+  *aResult = head;
+  return NS_OK;
+}
+
+nsresult
+NS_ParseDOMSelectors(const nsAString& aSource, PRBool aCaseSensitive,
+                     nsCSSSelectorList** aResult)
+{
+  CSSParserImpl parser;
+  parser.SetCaseSensitive(aCaseSensitive);
+  return parser.ParseDOMSelectors(aSource, aResult);
 }
 
 PRBool CSSParserImpl::ParseSelectorList(nsresult& aErrorCode,

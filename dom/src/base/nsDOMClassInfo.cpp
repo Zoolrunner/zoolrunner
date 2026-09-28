@@ -113,6 +113,7 @@
 #include "nsIDOMDOMException.h"
 #include "nsIDOMNode.h"
 #include "nsIDOM3Node.h"
+#include "nsIDOMNodeSelector.h"
 #include "nsIDOMNodeList.h"
 #include "nsIDOMNamedNodeMap.h"
 #include "nsIDOMDOMStringList.h"
@@ -182,6 +183,7 @@
 #include "nsIFrame.h"
 #include "nsIPresShell.h"
 #include "nsIDOMViewCSS.h"
+#include "nsIDOMWindowCSS.h"
 #include "nsIDOMElement.h"
 #include "nsIDOMCSSStyleDeclaration.h"
 #include "nsIScriptGlobalObject.h"
@@ -1657,6 +1659,7 @@ nsDOMClassInfo::RegisterExternalClasses()
   }
 
 #define DOM_CLASSINFO_DOCUMENT_MAP_ENTRIES                                    \
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)                               \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocument)                                 \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentEvent)                              \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentStyle)                              \
@@ -1670,6 +1673,7 @@ nsDOMClassInfo::RegisterExternalClasses()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
 
 #define DOM_CLASSINFO_GENERIC_HTML_MAP_ENTRIES                                \
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)                               \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSHTMLElement_MOZILLA_1_8_BRANCH)           \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMElementCSSInlineStyle)                      \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)                                \
@@ -1747,6 +1751,7 @@ nsDOMClassInfo::Init()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMJSWindow)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMWindowInternal)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMWindowCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMViewCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMAbstractView)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageWindow)
@@ -1819,11 +1824,13 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(DocumentFragment, nsIDOMDocumentFragment)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentFragment)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(Element, nsIDOMElement)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMElement)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
@@ -2365,6 +2372,7 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_END_WITH_XPATH
 
   DOM_CLASSINFO_MAP_BEGIN(XULElement, nsIDOMXULElement)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMXULElement)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
@@ -2429,6 +2437,7 @@ nsDOMClassInfo::Init()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     // XXXjst: Do we want this on chrome windows?
     // DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageWindow)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMWindowCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMViewCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMAbstractView)
   DOM_CLASSINFO_MAP_END
@@ -2490,6 +2499,7 @@ nsDOMClassInfo::Init()
 
 #ifdef MOZ_SVG
 #define DOM_CLASSINFO_SVG_ELEMENT_MAP_ENTRIES \
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector) \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMSVGElement) \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
 
@@ -6745,7 +6755,7 @@ JSBool JS_DLL_CALLBACK
 nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
                                           uintN argc, jsval *argv, jsval *rval)
 {
-  if (argc < 3 || argc > 4) {
+  if (argc < 2) {
     ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
 
     return JS_FALSE;
@@ -6800,22 +6810,24 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     return JS_FALSE;
   }
 
-  if (JSVAL_IS_PRIMITIVE(argv[1])) {
-    // The second argument must be a function, or a
-    // nsIDOMEventListener. Throw an error.
-    ThrowJSException(cx, NS_ERROR_XPC_BAD_CONVERT_JS);
-
-    return JS_FALSE;
-  }
-
   JSString* jsstr = JS_ValueToString(cx, argv[0]);
   if (!jsstr) {
-    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_OUT_OF_MEMORY);
-
+    // Preserve exceptions thrown by the type's string conversion.
     return JS_FALSE;
   }
 
+  // Keep the converted type alive while wrapping a listener can collect.
+  argv[0] = STRING_TO_JSVAL(jsstr);
   nsDependentJSString type(jsstr);
+
+  if (JSVAL_IS_NULL(argv[1]) || JSVAL_IS_VOID(argv[1])) {
+    *rval = JSVAL_VOID;
+    return JS_TRUE;
+  }
+  if (JSVAL_IS_PRIMITIVE(argv[1])) {
+    ThrowJSException(cx, NS_ERROR_XPC_BAD_CONVERT_JS);
+    return JS_FALSE;
+  }
 
   nsCOMPtr<nsIDOMEventListener> listener;
 
@@ -6832,12 +6844,12 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     }
   }
 
-  JSBool useCapture;
-  if (!JS_ValueToBoolean(cx, argv[2], &useCapture)) {
+  JSBool useCapture = JS_FALSE;
+  if (argc > 2 && !JS_ValueToBoolean(cx, argv[2], &useCapture)) {
     return JS_FALSE;
   }
 
-  if (argc == 4) {
+  if (argc >= 4) {
     JSBool wantsUntrusted;
     if (!JS_ValueToBoolean(cx, argv[3], &wantsUntrusted)) {
       return JS_FALSE;
@@ -6948,10 +6960,11 @@ nsEventReceiverSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
 
   if (id == sAddEventListener_id && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *str = JSVAL_TO_STRING(id);
-    // addEventListener always takes at least 3 arguments.
+    // The capture argument defaults to false. Keep the historical fourth
+    // wantsUntrusted argument for privileged Mozilla applications.
     JSFunction *fnc =
       ::JS_DefineFunction(cx, obj, ::JS_GetStringBytes(str),
-                          AddEventListenerHelper, 3, JSPROP_ENUMERATE);
+                          AddEventListenerHelper, 2, JSPROP_ENUMERATE);
 
     *objp = obj;
 

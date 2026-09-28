@@ -96,6 +96,9 @@
 #include "nsFont.h"
 #include "nsQuickSort.h"
 #include "nsContentUtils.h"
+#include "nsCSSSelectorQuery.h"
+#include "nsCSSPseudoElements.h"
+#include "nsIHTMLDocument.h"
 #include "nsIJSContextStack.h"
 #include "nsIScriptSecurityManager.h"
 #include "nsAttrValue.h"
@@ -2658,11 +2661,12 @@ MOZ_DECL_CTOR_COUNTER(RuleProcessorData)
 RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
                                      nsIContent* aContent, 
                                      nsRuleWalker* aRuleWalker,
-                                     nsCompatibility* aCompat /*= nsnull*/)
+                                     nsCompatibility* aCompat /*= nsnull*/,
+                                     PRBool aForDOMQuery /*= PR_FALSE*/)
 {
   MOZ_COUNT_CTOR(RuleProcessorData);
 
-  NS_PRECONDITION(aPresContext, "null pointer");
+  NS_PRECONDITION(aPresContext || aForDOMQuery, "null pointer");
   NS_ASSERTION(!aContent || aContent->IsContentOfType(nsIContent::eELEMENT),
                "non-element leaked into SelectorMatches");
 
@@ -2680,6 +2684,7 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
   mIsSimpleXLink = PR_FALSE;
   mLinkState = eLinkState_Unknown;
   mEventState = 0;
+  mForDOMQuery = aForDOMQuery;
   mNameSpaceID = kNameSpaceID_Unknown;
   mPreviousSiblingData = nsnull;
   mParentData = nsnull;
@@ -2687,7 +2692,8 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
 
   // get the compat. mode (unless it is provided)
   if(!aCompat) {
-    mCompatMode = mPresContext->CompatibilityMode();
+    mCompatMode = mPresContext ? mPresContext->CompatibilityMode()
+                              : eCompatibility_FullStandards;
   } else {
     mCompatMode = *aCompat;
   }
@@ -2702,7 +2708,10 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
     mParentContent = aContent->GetParent();
 
     // get the event state
-    mPresContext->EventStateManager()->GetContentState(aContent, mEventState);
+    if (mPresContext)
+      mPresContext->EventStateManager()->GetContentState(aContent, mEventState);
+    else
+      mEventState = aContent->IntrinsicState();
 
     // get the styledcontent interface and the ID
     if (NS_SUCCEEDED(aContent->QueryInterface(NS_GET_IID(nsIStyledContent), (void**)&mStyledContent))) {
@@ -2728,7 +2737,20 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
 
     // if HTML content and it has some attributes, check for an HTML link
     // NOTE: optimization: cannot be a link if no attributes (since it needs an href)
-    if (mIsHTMLContent && mHasAttributes) {
+    if (mForDOMQuery) {
+      // Selectors exposed to script must not consult or reveal history.
+      mIsHTMLLink = mIsHTMLContent &&
+        (mContentTag == nsHTMLAtoms::a || mContentTag == nsHTMLAtoms::area ||
+         mContentTag == nsHTMLAtoms::link) &&
+        aContent->HasAttr(kNameSpaceID_None, nsHTMLAtoms::href);
+      if (!mIsHTMLContent && !aContent->IsContentOfType(nsIContent::eXUL)) {
+        nsCOMPtr<nsIURI> uri = nsContentUtils::GetXLinkURI(aContent);
+        mIsSimpleXLink = uri != nsnull;
+      }
+      if (mIsHTMLLink || mIsSimpleXLink)
+        mLinkState = eLinkState_Unvisited;
+    }
+    else if (mIsHTMLContent && mHasAttributes) {
       // check if it is an HTML Link
       if(nsStyleUtil::IsHTMLLink(aContent, mContentTag, mPresContext, &mLinkState)) {
         mIsHTMLLink = PR_TRUE;
@@ -2737,7 +2759,7 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
 
     // if not an HTML link, check for a simple xlink (cannot be both HTML link and xlink)
     // NOTE: optimization: cannot be an XLink if no attributes (since it needs an 
-    if(!mIsHTMLLink &&
+    if(!mForDOMQuery && !mIsHTMLLink &&
        mHasAttributes && 
        !(mIsHTMLContent || aContent->IsContentOfType(nsIContent::eXUL)) && 
        nsStyleUtil::IsSimpleXlink(aContent, mPresContext, &mLinkState)) {
@@ -2919,11 +2941,14 @@ static PRBool AttrMatchesValue(const nsAttrSelector* aAttrSelector,
     case NS_ATTR_FUNC_DASHMATCH: 
       return nsStyleUtil::DashMatchCompare(aValue, aAttrSelector->mValue, comparator);
     case NS_ATTR_FUNC_ENDSMATCH:
-      return StringEndsWith(aValue, aAttrSelector->mValue, comparator);
+      return !aAttrSelector->mValue.IsEmpty() &&
+             StringEndsWith(aValue, aAttrSelector->mValue, comparator);
     case NS_ATTR_FUNC_BEGINSMATCH:
-      return StringBeginsWith(aValue, aAttrSelector->mValue, comparator);
+      return !aAttrSelector->mValue.IsEmpty() &&
+             StringBeginsWith(aValue, aAttrSelector->mValue, comparator);
     case NS_ATTR_FUNC_CONTAINSMATCH:
-      return FindInReadable(aAttrSelector->mValue, aValue, comparator);
+      return !aAttrSelector->mValue.IsEmpty() &&
+             FindInReadable(aAttrSelector->mValue, aValue, comparator);
     default:
       NS_NOTREACHED("Shouldn't be ending up here");
       return PR_FALSE;
@@ -3049,7 +3074,11 @@ static PRBool SelectorMatches(RuleProcessorData &data,
       result = localTrue == (child == nsnull);
     }
     else if (nsCSSPseudoClasses::root == pseudoClass->mAtom) {
-      if (data.mParentContent) {
+      if (data.mForDOMQuery) {
+        nsIDocument* doc = data.mContent->GetCurrentDoc();
+        result = localTrue == (doc && doc->GetRootContent() == data.mContent);
+      }
+      else if (data.mParentContent) {
         result = localFalse;
       }
       else {
@@ -3396,7 +3425,8 @@ static PRBool SelectorMatchesTree(RuleProcessorData& aPrevData,
               data = new (prevdata->mPresContext)
                           RuleProcessorData(prevdata->mPresContext, content,
                                             prevdata->mRuleWalker,
-                                            &prevdata->mCompatMode);
+                                            &prevdata->mCompatMode,
+                                            prevdata->mForDOMQuery);
               prevdata->mPreviousSiblingData = data;    
               break;
             }
@@ -3410,11 +3440,12 @@ static PRBool SelectorMatchesTree(RuleProcessorData& aPrevData,
       data = prevdata->mParentData;
       if (!data) {
         nsIContent *content = prevdata->mContent->GetParent();
-        if (content) {
+        if (content && content->IsContentOfType(nsIContent::eELEMENT)) {
           data = new (prevdata->mPresContext)
                       RuleProcessorData(prevdata->mPresContext, content,
                                         prevdata->mRuleWalker,
-                                        &prevdata->mCompatMode);
+                                        &prevdata->mCompatMode,
+                                        prevdata->mForDOMQuery);
           prevdata->mParentData = data;    
         }
       }
@@ -3452,6 +3483,29 @@ static PRBool SelectorMatchesTree(RuleProcessorData& aPrevData,
     prevdata = data;
   }
   return PR_TRUE; // all the selectors matched.
+}
+
+PRBool
+NS_MatchDOMSelectors(nsIContent* aContent, nsCSSSelectorList* aSelectors)
+{
+  nsIDocument* doc = aContent->GetOwnerDoc();
+  nsIPresShell* shell = doc ? doc->GetShellAt(0) : nsnull;
+  nsPresContext* context = shell ? shell->GetPresContext() : nsnull;
+  nsCompatibility compat = eCompatibility_FullStandards;
+  nsCOMPtr<nsIHTMLDocument> htmlDoc = do_QueryInterface(doc);
+  if (htmlDoc)
+    compat = htmlDoc->GetCompatibilityMode();
+  RuleProcessorData data(context, aContent, nsnull, &compat, PR_TRUE);
+  for (nsCSSSelectorList* list = aSelectors; list; list = list->mNext) {
+    nsCSSSelector* selector = list->mSelectors;
+    // A pseudo-element selector cannot select a DOM element.
+    if (selector->mTag && nsCSSPseudoElements::IsPseudoElement(selector->mTag))
+      continue;
+    if (SelectorMatches(data, selector, 0, nsnull, 0) &&
+        (!selector->mNext || SelectorMatchesTree(data, selector->mNext)))
+      return PR_TRUE;
+  }
+  return PR_FALSE;
 }
 
 static void ContentEnumFunc(nsICSSStyleRule* aRule, nsCSSSelector* aSelector,

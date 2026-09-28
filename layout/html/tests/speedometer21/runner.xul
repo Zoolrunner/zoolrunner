@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        width="1100" height="850" onload="run()">
+<browser id="content" type="content" flex="1"/>
+<script><![CDATA[
+var C = Components.classes, I = Components.interfaces;
+var prefs = C['@mozilla.org/preferences-service;1'].getService(I.nsIPrefBranch);
+var done = false, started = false, deadline, browser, mode;
+var consoleService = C['@mozilla.org/consoleservice;1'].getService(I.nsIConsoleService);
+var listener = { observe: function(message) {
+  try {
+    var e = message.QueryInterface(I.nsIScriptError);
+    if (!(e.flags & I.nsIScriptError.warningFlag))
+      dump('SPEEDOMETER-CONSOLE ' + e.errorMessage + ' ' + e.sourceName + ':' + e.lineNumber + '\n');
+  } catch (ignored) {}
+}};
+function finish(ok, detail) {
+  if (done) return;
+  done = true;
+  dump('SPEEDOMETER-RESULT ' + JSON.stringify({pass:ok, mode:mode, detail:detail}) + '\n');
+  consoleService.unregisterListener(listener);
+  C['@mozilla.org/toolkit/app-startup;1'].getService(I.nsIAppStartup).quit(I.nsIAppStartup.eForceQuit);
+}
+function run() {
+  consoleService.registerListener(listener);
+  mode = prefs.getCharPref('zoolrunner.speedometer.mode');
+  deadline = Date.now() + prefs.getIntPref('zoolrunner.speedometer.timeout') * 1000;
+  browser = document.getElementById('content');
+  browser.setAttribute('src', prefs.getCharPref('zoolrunner.speedometer.url'));
+  setTimeout(poll, 100);
+}
+function poll() {
+  if (done) return;
+  try {
+    var w = browser.contentWindow.wrappedJSObject || browser.contentWindow;
+    if (mode == 'probe' && w.testDone) {
+      for (var i = 0; i < w.testResults.length; ++i)
+        dump('SPEEDOMETER-PROBE ' + w.testResults[i] + '\n');
+      finish(w.testFailures === 0, {failures:w.testFailures, results:w.testResults});
+      return;
+    }
+    if (mode == 'benchmark' && !started && typeof w.startTest == 'function') {
+      started = true;
+      // Observe completion after the original UI callback succeeds. Do not
+      // change suites, iteration counts, workload sources, or measured steps.
+      w.eval('(function () { var original = benchmarkClient.didFinishLastIteration;' +
+        'benchmarkClient.didFinishLastIteration = function () {' +
+        'original.apply(this, arguments); window.zoolrunnerBenchmarkDone = true;' +
+        '}; })();');
+      w.startTest();
+    }
+    if (mode == 'benchmark' && w.zoolrunnerBenchmarkDone) {
+      var client = w.benchmarkClient;
+      var values = client._measuredValuesList;
+      var complete = client.suitesCount === 16 && client.iterationCount === 10 &&
+                     values.length === 10 && client._finishedTestCount === client.stepCount;
+      for (var iteration = 0; iteration < values.length; ++iteration) {
+        var count = 0;
+        for (var suite in values[iteration].tests) ++count;
+        complete = complete && count === 16;
+      }
+      finish(complete, {suites:client.suitesCount, iterations:values.length,
+                       steps:client._finishedTestCount, results:values});
+      return;
+    }
+    if (Date.now() > deadline) {
+      finish(false, {error:'timeout', url:String(w.location), started:started,
+        steps:w.benchmarkClient ? w.benchmarkClient._finishedTestCount : null});
+      return;
+    }
+  } catch (e) {
+    finish(false, {error:String(e), stack:e.stack || ''});
+    return;
+  }
+  setTimeout(poll, 100);
+}
+]]></script></window>

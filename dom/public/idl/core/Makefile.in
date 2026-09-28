@@ -67,6 +67,7 @@ SDK_XPIDLSRCS =                                 \
 	nsIDOMText.idl				\
 	$(NULL)
 XPIDLSRCS =                                     \
+	nsIDOMNodeSelector.idl                       \
 	nsIDOM3Document.idl			\
 	nsIDOM3Node.idl				\
 	nsIDOMDOMStringList.idl			\

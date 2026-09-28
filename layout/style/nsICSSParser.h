@@ -169,4 +169,11 @@ public:
 nsresult
 NS_NewCSSParser(nsICSSParser** aInstancePtrResult);
 
+struct nsCSSSelectorList;
+// Parse a complete selector string without accepting stylesheet recovery or
+// declarations.  The caller owns the returned list.  Kept outside the frozen
+// parser interface so existing binary consumers retain their vtable.
+nsresult NS_ParseDOMSelectors(const nsAString& aSource, PRBool aCaseSensitive,
+                             nsCSSSelectorList** aResult);
+
 #endif /* nsCSS1Parser_h___ */

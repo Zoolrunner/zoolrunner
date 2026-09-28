@@ -401,6 +401,16 @@ callbacks may close windows, collect scripts, or turn debugging off.
 
 Selected ECMAScript 2015/ES6 features may also be implemented when practical.
 
+Complete, unmodified Speedometer 2.1 execution is an approved compatibility
+target, including the ES2015 features its workloads require. Do not add
+post-ES2015 language features for this target. Preserve legacy JavaScript
+modes and Mozilla 1.8.1/XULRunner application interfaces; fix compatibility
+regressions in the engine rather than changing applications. Validate first
+in native LoongArch Linux Suite. Only after all enabled Speedometer workloads
+complete in Suite, validate Browser, Calendar and XULRunner. Record actual
+benchmark, standards and application results separately; a benchmark pass
+does not establish exhaustive specification conformance.
+
 Potentially useful additions include things such as:
 
 * `let`

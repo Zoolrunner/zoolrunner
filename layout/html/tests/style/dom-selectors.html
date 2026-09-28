@@ -1,0 +1,84 @@
+<!doctype html>
+<html><head><title>DOM selector regression</title></head><body>
+<div id="outside"><div id="scope"><span id="first" class="item a" data-v="alpha beta"></span><!-- gap --><span id="second" class="item" data-v=""></span><input id="checked" type="checkbox" checked></div></div>
+<pre id="results"></pre>
+<script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? "PASS " : "FAIL ") + name +
+    (ok ? "" : ": got " + actual + ", expected " + expected));
+}
+function runTests() {
+  try {
+    var scope = document.getElementById('scope');
+    var first = document.getElementById('first');
+    var second = document.getElementById('second');
+    check(document.querySelector('#first'), first, 'document query');
+    check(scope.querySelector('.item'), first, 'first in tree order');
+    check(scope.querySelector('#scope'), null, 'root excluded');
+    check(scope.querySelector('#outside .item'), first, 'ancestors outside scope');
+    check(scope.querySelector('span + span'), second, 'adjacent element sibling');
+    check(scope.querySelector('span ~ input').id, 'checked', 'general sibling');
+    check(scope.querySelector('[data-v~="beta"]'), first, 'attribute token');
+    check(scope.querySelector('[data-v^=""]'), null, 'empty prefix never matches');
+    check(scope.querySelector('[data-v$=""]'), null, 'empty suffix never matches');
+    check(scope.querySelector('[data-v*=""]'), null, 'empty substring never matches');
+    check(scope.querySelector('[data-v=""]'), second, 'empty equality matches');
+    check(scope.querySelector('.item:not(.a)'), second, 'negation');
+    check(scope.querySelector(':checked').id, 'checked', 'checked state');
+    document.getElementById('checked').checked = false;
+    check(scope.querySelector(':checked'), null, 'changed checked state');
+    check(document.querySelector(':root'), document.documentElement, 'document root');
+    check(scope.querySelector('span::before'), null, 'pseudo-element result');
+    var list = scope.querySelectorAll('#second, .item, #first');
+    check(list.length, 2, 'selector groups de-duplicated');
+    check(list.item(0), first, 'list tree order');
+    check(list[1], second, 'indexed NodeList');
+    check(list.item(99), null, 'out-of-range item');
+    scope.removeChild(first);
+    check(list.length, 2, 'snapshot length after removal');
+    check(list[0], first, 'snapshot retains removed node');
+    check(scope.querySelectorAll('.item').length, 1, 'new query reflects mutation');
+    var detached = document.createElement('div');
+    detached.appendChild(first);
+    check(detached.querySelector('.item'), first, 'detached subtree');
+    check(detached.querySelector(':root'), null, 'detached element is not document root');
+    var fragment = document.createDocumentFragment();
+    fragment.appendChild(detached);
+    check(fragment.querySelector('div > span'), first, 'fragment query');
+    check(fragment.querySelector(':root'), null, 'fragment has no document root');
+    check(fragment.querySelectorAll('span, div').length, 2, 'fragment descendants');
+    var invalid = ['', ' ', 'div,', ',div', 'div >', '[', 'div { color:red }', ':no-such-pseudo'];
+    for (var i = 0; i < invalid.length; ++i) {
+      var code = 0;
+      try { document.querySelector(invalid[i]); } catch (e) { code = e.code; }
+      check(code, 12, 'syntax error: ' + invalid[i]);
+    }
+    var anchor = document.createElement('a');
+    anchor.href = location.href;
+    fragment.appendChild(anchor);
+    check(fragment.querySelector(':visited'), null, 'visited state hidden');
+    check(fragment.querySelector(':link'), anchor, 'links exposed as unvisited');
+    check(fragment.querySelector('a:not(:visited)'), anchor, 'negated visited state hidden');
+    var xml = document.implementation.createDocument('', 'Root', null);
+    var upper = xml.createElement('Item');
+    xml.documentElement.appendChild(upper);
+    check(xml.querySelector('Item'), upper, 'XML case preserved');
+    check(xml.querySelector('item'), null, 'XML case distinguished');
+    var nullElement = xml.createElement('null');
+    var undefinedElement = xml.createElement('undefined');
+    xml.documentElement.appendChild(nullElement);
+    xml.documentElement.appendChild(undefinedElement);
+    check(xml.querySelector(null), nullElement, 'null is converted to a string');
+    check(xml.querySelector(undefined), undefinedElement, 'undefined is converted to a string');
+  } catch (e) {
+    check(String(e), 'no exception', 'unexpected exception');
+  }
+  document.getElementById('results').appendChild(document.createTextNode(testResults.join('\n')));
+  document.title = (testFailures ? 'FAIL' : 'PASS') + ': DOM selectors';
+  testDone = true;
+}
+window.onload = runTests;
+</script></body></html>

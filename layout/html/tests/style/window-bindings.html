@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><title>Window binding regression</title>
+<style>#target { color: rgb(1, 2, 3); } #target:before { content: 'before'; color: rgb(4, 5, 6); }</style>
+</head><body><div id="parent"><div id="target"></div></div><pre id="results"></pre>
+<script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name +
+    (ok ? '' : ': got ' + actual + ', expected ' + expected));
+}
+window.onload = function() {
+  try {
+    var target = document.getElementById('target');
+    var parent = document.getElementById('parent');
+    check(getComputedStyle(target).color, 'rgb(1, 2, 3)', 'omitted pseudo-element');
+    check(getComputedStyle(target, null).color, 'rgb(1, 2, 3)', 'legacy null pseudo-element');
+    check(getComputedStyle(target, undefined).color, 'rgb(1, 2, 3)', 'undefined pseudo-element');
+    check(getComputedStyle(target, ':before').color, 'rgb(4, 5, 6)', 'explicit pseudo-element');
+    var conversions = 0;
+    check(getComputedStyle(target, {toString:function() { ++conversions; return ':before'; }}).color,
+          'rgb(4, 5, 6)', 'pseudo-element conversion');
+    check(conversions, 1, 'convert pseudo-element once');
+    var sentinel = {}, caught;
+    try { getComputedStyle(target, {toString:function() { throw sentinel; }}); }
+    catch (e) { caught = e; }
+    check(caught, sentinel, 'conversion exception preserved');
+    var order = [];
+    function capture() { order.push('capture'); }
+    function bubble() { order.push('bubble'); }
+    function atTarget() { order.push('target'); }
+    parent.addEventListener('zool-test', capture, true);
+    parent.addEventListener('zool-test', bubble);
+    target.addEventListener('zool-test', atTarget);
+    var event = document.createEvent('Events');
+    event.initEvent('zool-test', true, true);
+    target.dispatchEvent(event);
+    check(order.join(','), 'capture,target,bubble', 'capture defaults to false');
+    parent.removeEventListener('zool-test', capture, true);
+    parent.removeEventListener('zool-test', bubble, false);
+    target.removeEventListener('zool-test', atTarget, false);
+    target.addEventListener({toString:function() { ++conversions; return 'ignored'; }}, null);
+    target.addEventListener('ignored', undefined);
+    check(conversions, 2, 'null listener still converts type');
+    check(target.addEventListener.length, 2, 'listener function arity');
+    caught = null;
+    try { target.addEventListener({toString:function() { throw sentinel; }}, null); }
+    catch (e) { caught = e; }
+    check(caught, sentinel, 'event type conversion exception preserved');
+  } catch (e) { check(String(e), 'no exception', 'unexpected exception'); }
+  document.getElementById('results').appendChild(document.createTextNode(testResults.join('\n')));
+  testDone = true;
+};
+</script></body></html>

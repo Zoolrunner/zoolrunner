@@ -1,0 +1,9 @@
+#include "domstubs.idl"
+
+// Script-facing optional pseudo-element argument. The frozen nsIDOMViewCSS
+// interface remains available to existing native clients.
+[scriptable, uuid(54c7b584-839f-40cb-acee-67dca35fe392)]
+interface nsIDOMWindowCSS : nsISupports
+{
+  nsIDOMCSSStyleDeclaration getComputedStyle(in nsIDOMElement element);
+};

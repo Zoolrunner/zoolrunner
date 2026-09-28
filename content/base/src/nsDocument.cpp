@@ -937,7 +937,11 @@ nsDocument::~nsDocument()
 PRBool gCheckedForXPathDOM = PR_FALSE;
 PRBool gHaveXPathDOM = PR_FALSE;
 
+#include "nsNodeSelector.h"
+
 NS_INTERFACE_MAP_BEGIN(nsDocument)
+  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMNodeSelector,
+    new nsNodeSelector(NS_STATIC_CAST(nsIDocument*, this)))
   NS_INTERFACE_MAP_ENTRY(nsIDocument)
   NS_INTERFACE_MAP_ENTRY(nsIDocument_MOZILLA_1_8_0_BRANCH)
   NS_INTERFACE_MAP_ENTRY(nsIDocument_MOZILLA_1_8_BRANCH2)

@@ -61,17 +61,21 @@ struct RuleProcessorData {
   RuleProcessorData(nsPresContext* aPresContext,
                     nsIContent* aContent, 
                     nsRuleWalker* aRuleWalker,
-                    nsCompatibility* aCompat = nsnull);
+                    nsCompatibility* aCompat = nsnull,
+                    PRBool aForDOMQuery = PR_FALSE);
   
   // NOTE: not |virtual|
   ~RuleProcessorData();
 
   void* operator new(size_t sz, nsPresContext* aContext) CPP_THROW_NEW {
-    return aContext->AllocateFromShell(sz);
+    return aContext ? aContext->AllocateFromShell(sz) : ::operator new(sz);
   }
   void Destroy(nsPresContext* aContext) {
     this->~RuleProcessorData();
-    aContext->FreeToShell(sizeof(RuleProcessorData), this);
+    if (aContext)
+      aContext->FreeToShell(sizeof(RuleProcessorData), this);
+    else
+      ::operator delete(this);
   };
 
   const nsString* GetLang();
@@ -90,6 +94,7 @@ struct RuleProcessorData {
   PRPackedBool      mIsSimpleXLink; // if content, calls nsStyleUtil::IsSimpleXLink
   nsCompatibility   mCompatMode;    // Possibly remove use of this in SelectorMatches?
   PRPackedBool      mHasAttributes; // if content, content->GetAttrCount() > 0
+  PRPackedBool      mForDOMQuery; // Never expose visited history to scripts.
   nsLinkState       mLinkState;     // if a link, this is the state, otherwise unknown
   PRInt32           mEventState;    // if content, eventStateMgr->GetContentState()
   PRInt32           mNameSpaceID;   // if content, content->GetNameSapce()

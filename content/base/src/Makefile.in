@@ -83,6 +83,7 @@ EXPORTS		= \
 		$(NULL)
 
 CPPSRCS		= \
+		nsNodeSelector.cpp \
 		mozSanitizingSerializer.cpp \
 		nsAtomListUtils.cpp \
 		nsAttrAndChildArray.cpp \

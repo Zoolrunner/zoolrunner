@@ -2,6 +2,10 @@ These regression probes exercise layout features used by the Basilisk and
 Pale Moon websites. They are small, locally authored fixtures; the website's HTML,
 stylesheets, images, and fonts are not bundled here.
 
+`dom-selectors.html` adds native DOM selector regressions used during
+[Speedometer 2.1 compatibility work](../speedometer21/README.md). It runs as
+ordinary content, including detached trees and documents without a presentation.
+
 Open `structural-inline-block.html`, `viewport-media-queries.html`,
 `background-size.html`, `linear-gradient.html`, and `faq-toggle.html` in a ZoolRunner browser
 or Suite build. Each page reports PASS/FAIL results. The

@@ -158,6 +158,11 @@ of specification correctness or a result for every operating system. The
 focused regressions, and embedding checks. Selected later JavaScript features
 may be added when they fit the existing architecture.
 
+Unmodified Speedometer 2.1 is an additional compatibility target, including
+the ES2015 features required by its workloads, while preserving historical
+application behavior. This work is in progress; a complete benchmark pass
+has not been established. See the [Speedometer validation notes](layout/html/tests/speedometer21/README.md).
+
 Application compatibility is tested separately from language conformance:
 
 * Unchanged ChatZilla initializes in Suite and a temporary standalone XULRunner
