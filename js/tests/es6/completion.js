@@ -1,0 +1,34 @@
+var completionChecks=0;
+function check(source, expected) {
+ var value=(0,eval)(source);completionChecks++;
+ if(value!==expected)throw Error(source+' got '+value+' wanted '+expected);
+}
+check('1; if(false)2',undefined);
+check('1; if(true)2',2);
+check('1; if(true){}',undefined);
+check('1; if(false)2;else if(false)3',undefined);
+check('1; while(false)2',undefined);
+check('1; do {} while(false)',undefined);
+check('1; for(;false;)2',undefined);
+check('1; for(var key in {})2',undefined);
+check('1; for(var value of [])2',undefined);
+check('1; switch(0){case 1:2}',undefined);
+check('1; with({}){}',undefined);
+check('1; try{}catch(e){}',undefined);
+check('1; try{2;throw 0}catch(e){}',undefined);
+check('1; try{2}finally{3}',2);
+check('1; try{2}finally{if(false)3}',2);
+check('1; try{2;throw 0}catch(e){3}finally{4}',3);
+check('1; try{}finally{2}',undefined);
+check('1; label:{break label}',1);
+check('1; label:{if(true)break label}',undefined);
+check('1; for(var count=0;;){if(count===3)break;else count++}',undefined);
+check('for(;;){try{1}finally{2;break}}',2);
+check('for(;;){try{1}finally{if(true)break}}',undefined);
+check('(function(){try{return 7}finally{3}})()',7);
+check('(function(){try{return 7}finally{return 9}})()',9);
+check('(function(){var n=0;while(n++<2){try{return 7}finally{continue}}return 9})()',9);
+check('(function*(){try{yield 1;return 7}finally{yield 2}})().next().value',1);
+var g=(function*(){try{yield 1;return 7}finally{yield 2}})();
+g.next();g.next();completionChecks++;if(g.next().value!==7)throw Error('generator finally return');
+print('COMPLETION PASS checks='+completionChecks);

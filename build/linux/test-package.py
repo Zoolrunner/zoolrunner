@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         run(['git', '-C', suite, 'checkout', '--detach', revision], 'test262-checkout')
         report = logs / 'test262.json'
         run(['python3', root / 'js/tests/es5/run-test262.py', '--suite', suite,
-             '--shell', shell, '--report', report, '--jobs', '4',
+             '--shell', shell, '--report', report, '--jobs', '4', '--timeout', '60',
              '--timezone', 'America/Los_Angeles'], 'test262', timeout=1800)
         counts = json.loads(report.read_text())['counts']
         if counts != {'pass': 11540, 'fail': 0, 'timeout': 0, 'crash': 0, 'harness-error': 0}:
@@ -168,5 +168,8 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                            'chrome://zooltest/content/compatibility-overlay.xul\n')
         run([executable, '-profile', profile], 'calendar-window',
             'CALENDAR-WINDOW views=4 failures=0')
+    run(['python3', root / 'build/linux/test-es6.py', a.arch,
+         '--root', root, '--objdir', root / objname, '--runtime', runtime,
+         '--logs', logs / 'es6'], 'es6', 'ES2015 PASS:', timeout=2400)
 (logs / 'runtime-result.txt').write_text('PASS: ' + a.arch + ' ' + a.toolkit + ' ' + a.app + '\n')
 print(a.arch + ' ' + a.toolkit + ' ' + a.app + ': packaged runtime checks passed')

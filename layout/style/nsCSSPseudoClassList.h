@@ -56,6 +56,9 @@ CSS_PSEUDO_CLASS(lang, ":lang")
 CSS_PSEUDO_CLASS(notPseudo, ":not")
 CSS_PSEUDO_CLASS(mozBoundElement, ":-moz-bound-element")
 CSS_PSEUDO_CLASS(root, ":root")
+CSS_PSEUDO_CLASS(scope, ":scope")
+CSS_PSEUDO_CLASS(is, ":is")
+CSS_PSEUDO_CLASS(where, ":where")
 
 CSS_PSEUDO_CLASS(link, ":link")
 CSS_PSEUDO_CLASS(mozAnyLink, ":-moz-any-link") // what matches :link or :visited

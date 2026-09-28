@@ -119,7 +119,10 @@ unit tests pass, including memory and
 SQLite provider operations. No Calendar application scripts were changed.
 Native packaging also requires 58 legacy-language assertions and 18 JSAPI
 embedding checks; Calendar packaging runs its unit tests against the staged
-runtime. Intel GUI startup and minimum-OS runtime compatibility were not tested.
+runtime. Native embedding checks have a 180-second per-test limit, overridable
+with `ZR_MACOS_EMBEDDING_TIMEOUT`; the package runner prints each test name and
+its captured output if one times out. Intel GUI startup and minimum-OS runtime
+compatibility were not tested.
 
 The new builds required small macOS fixes: Browser's bundle paths now handle
 its spaced name and its plist declares the actual executable; Browser and
@@ -229,3 +232,11 @@ allow initial Rosetta startup; actual cases retained the ten-second timeout.
 This is a result for the pinned suite, not proof of complete specification
 conformance. Local reports, logs and archive hashes are preserved under
 `artifacts/macos-modern-validation/`, with the summary in `results.json`.
+
+Package validation initializes the freshly copied runtime in a separate process
+before running JavaScript fixtures. Cold Suite component registration was
+measured at 100.6 seconds under Rosetta during concurrent validation, before
+JavaScript execution. Initialization has a 180-second limit and must print its
+readiness marker; every fixture keeps its existing timeout and assertions.
+The original 60-second first-fixture failures and loader samples remain under
+`artifacts/es6/discarded-suite-*` and `discarded-effects-x86-*`.

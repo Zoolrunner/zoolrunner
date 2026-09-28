@@ -30,8 +30,12 @@ Run these GUI tests sequentially. They use disposable package copies/profiles
 and restore the Suite's selected profile after their checks.
 
 The package runner checks the focused JavaScript suites, regexp cancellation,
-application chrome and components, and the 17 window-global assertions. Suite
-also runs the 24 lifecycle checks and initializes ChatZilla without connecting.
+application chrome and components, the 19 window-global assertions (including
+`console.assert` in chrome and content windows), and 38 DOM/CSSOM selector/token-list
+assertions. The token-list checks cover its live value, ordered methods,
+validation errors and attribute synchronization. The classic Error
+Console remains the destination for logged messages. Suite also runs the 24
+lifecycle checks and initializes ChatZilla without connecting.
 Calendar deliberately omits the `data:` protocol, so the disposable window
 fixture uses an ordinary local HTML file for its content global. The platform
 runner checks image rows/channels and absolute, relative and PATH-based relaunch.

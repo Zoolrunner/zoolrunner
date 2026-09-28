@@ -42,6 +42,12 @@ function runNext() {
             check(!!w.document.getElementById(app[2]), app[0] + " startup");
             if (app[0] == "composer") {
                 editor = w.GetCurrentEditor();
+                // Command notifications track clean/dirty transitions. A new
+                // about:blank document can already be dirty after startup;
+                // establish a clean fixture before installing our observer.
+                editor.resetModificationCount();
+                if (editor.documentModified)
+                    throw new Error("Could not establish a clean editor fixture");
                 // Deliberately leave this observer registered, as old apps do.
                 // A dying document must stop updates at the platform layer.
                 w.GetCurrentCommandManager().addCommandObserver({

@@ -47,6 +47,8 @@
 
 JS_BEGIN_EXTERN_C
 
+extern JSBool js_RequestTailCall(JSContext *, jsval, jsval, uintN, jsval *, jsval *);
+
 /*
  * JS stack frame, may be allocated on the C stack by native callers.  Always
  * allocated on cx->stackPool for calls from the interpreter to an interpreted
@@ -82,6 +84,7 @@ struct JSStackFrame {
     JSStackFrame    *dormantNext;   /* next dormant frame chain */
     JSObject        *xmlNamespace;  /* null or default xml namespace in E4X */
     JSObject        *blockChain;    /* active compile-time block scopes */
+    JSObject        *newTarget;     /* valid only with JSFRAME_NEW_TARGET */
 };
 
 typedef struct JSInlineFrame {
@@ -114,6 +117,14 @@ typedef struct JSInlineFrame {
 
 #define JSFRAME_EVAL_COMPILER 0x4000 /* explicit eval compilation environment */
 #define JSFRAME_STRICT_EVAL   0x8000 /* inherit strictness for direct eval */
+
+#define JSFRAME_NEW_TARGET    0x10000 /* constructor frame has newTarget */
+#define JSFRAME_PARAMETER_INIT 0x80000 /* evaluating parameter initializers */
+#define JSFRAME_MODULE 0x100000 /* compiling or evaluating a module body */
+#define JSFRAME_TAIL_FORWARD 0x400000 /* native call forwards a retired tail activation */
+#define JSFRAME_MODULE_THIS 0x200000 /* module lexical this, including eval */
+#define JSFRAME_JOB           0x20000 /* host job entry with an owning scope */
+#define JSFRAME_EVAL_FUNCTION 0x40000 /* eval compiler has a function environment */
 
 #define JSFRAME_OVERRIDE_SHIFT 24   /* override bit-set params; see jsfun.c */
 #define JSFRAME_OVERRIDE_BITS  8
@@ -316,6 +327,7 @@ js_Invoke(JSContext *cx, uintN argc, uintN flags);
  * See jsfun.h for the latter four and flag renaming macros.
  */
 #define JSINVOKE_CONSTRUCT      JSFRAME_CONSTRUCTING
+#define JSINVOKE_TAIL_FORWARD  JSFRAME_TAIL_FORWARD
 #define JSINVOKE_INTERNAL       JSFRAME_INTERNAL
 #define JSINVOKE_SKIP_CALLER    JSFRAME_SKIP_CALLER
 #define JSINVOKE_ITERATOR       JSFRAME_ITERATOR
@@ -365,6 +377,16 @@ js_StrictlyEqual(jsval lval, jsval rval);
 
 extern JSBool
 js_InvokeConstructor(JSContext *cx, jsval *vp, uintN argc);
+
+extern JSBool
+js_InternalInvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                          JSObject *newTarget);
+
+extern JSBool
+js_InvokeConstructorWithNewTarget(JSContext *cx, jsval *vp, uintN argc,
+                                  JSObject *newTarget);
+extern JSObject *
+js_ConstructorGlobal(JSContext *cx, JSObject *constructor);
 
 extern JSBool
 js_Interpret(JSContext *cx, jsbytecode *pc, jsval *result);

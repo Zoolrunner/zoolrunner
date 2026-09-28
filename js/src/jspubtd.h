@@ -72,6 +72,8 @@ typedef enum JSVersion {
     JSVERSION_1_6     = 160,
     JSVERSION_1_7     = 170,
     JSVERSION_1_8     = 180,
+    /* Opt-in ES2015 semantics; historical values and DEFAULT stay unchanged. */
+    JSVERSION_ECMA_2015 = 2015,
     JSVERSION_DEFAULT = 0,
     JSVERSION_UNKNOWN = -1
 } JSVersion;
@@ -89,6 +91,7 @@ typedef enum JSType {
     JSTYPE_BOOLEAN,             /* boolean */
     JSTYPE_NULL,                /* null */
     JSTYPE_XML,                 /* xml object */
+    JSTYPE_SYMBOL,              /* ES2015 Symbol primitive */
     JSTYPE_LIMIT
 } JSType;
 

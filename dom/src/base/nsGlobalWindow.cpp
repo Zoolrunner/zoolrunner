@@ -582,7 +582,6 @@ NS_INTERFACE_MAP_BEGIN(nsGlobalWindow)
   NS_INTERFACE_MAP_ENTRY(nsPIDOMWindow_MOZILLA_1_8_BRANCH)
   NS_INTERFACE_MAP_ENTRY(nsPIDOMWindow_MOZILLA_1_8_BRANCH2)
   NS_INTERFACE_MAP_ENTRY(nsIDOMViewCSS)
-  NS_INTERFACE_MAP_ENTRY(nsIDOMWindowCSS)
   NS_INTERFACE_MAP_ENTRY(nsIDOMAbstractView)
   NS_INTERFACE_MAP_ENTRY(nsIDOMStorageWindow)
   NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
@@ -5744,33 +5743,6 @@ nsGlobalWindow::GetRootFocusController()
 //*****************************************************************************
 // nsGlobalWindow::nsIDOMViewCSS
 //*****************************************************************************
-
-NS_IMETHODIMP
-nsGlobalWindow::GetComputedStyle(nsIDOMElement* aElt,
-                                 nsIDOMCSSStyleDeclaration** aReturn)
-{
-  nsAutoString pseudo;
-  nsCOMPtr<nsIXPCNativeCallContext> ncc;
-  nsresult rv = nsContentUtils::XPConnect()->
-    GetCurrentNativeCallContext(getter_AddRefs(ncc));
-  NS_ENSURE_SUCCESS(rv, rv);
-  if (ncc) {
-    PRUint32 argc;
-    jsval* argv;
-    JSContext* cx;
-    ncc->GetArgc(&argc);
-    ncc->GetArgvPtr(&argv);
-    ncc->GetJSContext(&cx);
-    if (argc > 1 && !JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
-      JSString* str = JS_ValueToString(cx, argv[1]);
-      if (!str)
-        return ncc->SetExceptionWasThrown(PR_TRUE);
-      argv[1] = STRING_TO_JSVAL(str);
-      pseudo.Assign(JS_GetStringChars(str), JS_GetStringLength(str));
-    }
-  }
-  return GetComputedStyle(aElt, pseudo, aReturn);
-}
 
 NS_IMETHODIMP
 nsGlobalWindow::GetComputedStyle(nsIDOMElement* aElt,

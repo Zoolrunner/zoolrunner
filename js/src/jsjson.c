@@ -9,9 +9,12 @@
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
+#include "jsrealm.h"
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsstr.h"
+#include "jssymbol.h"
 
 /* Grow UTF-16 output with checked arithmetic on both 32- and 64-bit hosts. */
 typedef struct JSONBuffer {
@@ -73,6 +76,7 @@ Word(JSContext *cx, JSONBuffer *b, const char *s)
 typedef struct JSONParser {
     JSContext *cx;
     const jschar *at, *end;
+    JSObject *global;
 } JSONParser;
 
 static void
@@ -152,6 +156,29 @@ out:
     return ok;
 }
 
+/* Keep edition policy attached to the native method, not its caller. */
+static JSBool
+JSONLength(JSContext *cx, JSObject *obj, JSBool modern, jsdouble *length)
+{
+    jsuint oldLength;
+    if (modern) return js_ArrayLikeLength(cx, obj, length);
+    if (!js_GetLengthProperty(cx, obj, &oldLength)) return JS_FALSE;
+    *length = oldLength;
+    return JS_TRUE;
+}
+
+static JSObject *
+JSONContainer(JSContext *cx, JSObject *global, JSBool array)
+{
+    JSObject *proto;
+    if (!global) return array ? js_NewArrayObject(cx, 0, NULL) :
+                               js_NewObject(cx, &js_ObjectClass, NULL, NULL);
+    proto = js_BuiltinPrototype(cx, global, array ? JSProto_Array : JSProto_Object);
+    if (!proto) return NULL;
+    return array ? js_NewArrayObjectWithProto(cx, 0, NULL, proto, global) :
+                   js_NewObject(cx, &js_ObjectClass, proto, global);
+}
+
 static JSBool ParseValue(JSONParser *p, jsval *vp);
 
 static JSBool
@@ -166,8 +193,7 @@ ParseContainer(JSONParser *p, jsval *vp, JSBool array)
     jschar close = array ? ']' : '}';
     jsid id;
 
-    obj = array ? js_NewArrayObject(cx, 0, NULL) :
-                  js_NewObject(cx, &js_ObjectClass, NULL, NULL);
+    obj = JSONContainer(cx, p->global, array);
     if (!obj)
         return JS_FALSE;
     *vp = OBJECT_TO_JSVAL(obj); /* caller roots the result while we recurse */
@@ -277,15 +303,17 @@ ParseValue(JSONParser *p, jsval *vp)
 /* Walk uses snapshots of array length and own enumerable keys. User callbacks
  * can remove or add properties, throw, reenter JSON, or trigger collection. */
 static JSBool
-Walk(JSContext *cx, JSObject *holder, jsval key, jsval reviver, jsval *vp)
+Walk(JSContext *cx, JSObject *holder, jsval key, jsval reviver, jsval *vp,
+     JSBool modern)
 {
     jsval roots[4], args[2], ignored;
     JSTempValueRooter root;
     JSObject *obj;
-    jsuint i, length;
+    jsdouble i, length;
+    uint32 iterations = 0;
     jsid id;
     JSString *str;
-    JSBool array, ok = JS_FALSE;
+    JSBool array, accepted, ok = JS_FALSE;
 
     if (!JS_CHECK_STACK_SIZE(cx, roots)) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
@@ -297,29 +325,32 @@ Walk(JSContext *cx, JSObject *holder, jsval key, jsval reviver, jsval *vp)
         goto out;
     if (!JSVAL_IS_PRIMITIVE(roots[0])) {
         obj = JSVAL_TO_OBJECT(roots[0]);
-        array = OBJ_GET_CLASS(cx, obj) == &js_ArrayClass;
+        if (!js_IsArray(cx, obj, &array)) goto out;
         if (array) {
-            if (!js_GetLengthProperty(cx, obj, &length)) goto out;
+            if (!JSONLength(cx, obj, modern, &length)) goto out;
         } else {
             if (!js_ObjectKeys(cx, NULL, 1, roots, &roots[1]) ||
-                !js_GetLengthProperty(cx, JSVAL_TO_OBJECT(roots[1]), &length))
+                !JSONLength(cx, JSVAL_TO_OBJECT(roots[1]), JS_FALSE, &length))
                 goto out;
         }
         for (i = 0; i < length; i++) {
+            if (cx->branchCallback && !(iterations++ & 127) &&
+                !cx->branchCallback(cx, NULL)) goto out;
             if (array) {
                 if (!JS_NewNumberValue(cx, i, &roots[2])) goto out;
-            } else if (!JS_GetElement(cx, JSVAL_TO_OBJECT(roots[1]), i, &roots[2]))
+            } else if (!JS_GetElement(cx, JSVAL_TO_OBJECT(roots[1]), (jsuint)i, &roots[2]))
                 goto out;
             str = js_ValueToString(cx, roots[2]);
             if (!str) goto out;
             roots[2] = STRING_TO_JSVAL(str);
-            if (!Walk(cx, obj, roots[2], reviver, &roots[3]) ||
+            if (!Walk(cx, obj, roots[2], reviver, &roots[3], modern) ||
                 !JS_ValueToId(cx, roots[2], &id))
                 goto out;
+            /* Rejected redefinitions leave the property intact. Callback
+             * exceptions still propagate; a false definition result does not. */
             if (JSVAL_IS_VOID(roots[3])) {
                 if (!OBJ_DELETE_PROPERTY(cx, obj, id, &ignored)) goto out;
-            } else if (!OBJ_DEFINE_PROPERTY(cx, obj, id, roots[3], NULL, NULL,
-                                            JSPROP_ENUMERATE, NULL))
+            } else if (!js_CreateDataProperty(cx, obj, id, roots[3], &accepted))
                 goto out;
         }
     }
@@ -332,7 +363,8 @@ out:
 }
 
 static JSBool
-json_parse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+JSONParse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
+          JSBool modern)
 {
     JSONParser p;
     JSString *text;
@@ -345,6 +377,7 @@ json_parse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     if (!text) return JS_FALSE;
     argv[0] = STRING_TO_JSVAL(text);
     p.cx = cx;
+    p.global = modern ? js_BuiltinGlobal(cx, argv) : NULL;
     p.at = JSSTRING_CHARS(text);
     p.end = p.at + JSSTRING_LENGTH(text);
     if (!ParseValue(&p, rval)) return JS_FALSE;
@@ -354,12 +387,12 @@ json_parse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     roots[0] = *rval;
     roots[1] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
-    holder = js_NewObject(cx, &js_ObjectClass, NULL, NULL);
+    holder = JSONContainer(cx, p.global, JS_FALSE);
     if (!holder) goto out;
     roots[1] = OBJECT_TO_JSVAL(holder);
     if (!JS_DefineProperty(cx, holder, "", roots[0], NULL, NULL, JSPROP_ENUMERATE))
         goto out;
-    ok = Walk(cx, holder, STRING_TO_JSVAL(cx->runtime->emptyString), argv[1], rval);
+    ok = Walk(cx, holder, STRING_TO_JSVAL(cx->runtime->emptyString), argv[1], rval, modern);
 out:
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
@@ -380,6 +413,8 @@ typedef struct JSONWriter {
     jschar gap[10];
     size_t gapLength, depth;
     JSONAncestor *ancestors;
+    JSBool modern;
+    JSObject *global;
 } JSONWriter;
 
 static JSBool
@@ -438,7 +473,9 @@ Container(JSONWriter *w, JSObject *obj, JSBool array)
     jsval roots[2], value;
     JSTempValueRooter root;
     JSString *str;
-    jsuint length, i, count = 0;
+    jsdouble length, i;
+    jsuint count = 0;
+    uint32 iterations = 0;
     size_t mark;
     JSBool present, ok = JS_FALSE;
 
@@ -455,19 +492,21 @@ Container(JSONWriter *w, JSObject *obj, JSBool array)
     roots[0] = roots[1] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
     if (array) {
-        if (!js_GetLengthProperty(cx, obj, &length)) goto out;
+        if (!JSONLength(cx, obj, w->modern, &length)) goto out;
     } else {
         roots[0] = w->keys;
         value = OBJECT_TO_JSVAL(obj);
         if (JSVAL_IS_VOID(roots[0]) &&
             !js_ObjectKeys(cx, NULL, 1, &value, &roots[0])) goto out;
-        if (!js_GetLengthProperty(cx, JSVAL_TO_OBJECT(roots[0]), &length)) goto out;
+        if (!JSONLength(cx, JSVAL_TO_OBJECT(roots[0]), JS_FALSE, &length)) goto out;
     }
     if (!Put(cx, &w->output, array ? '[' : '{')) goto out;
     for (i = 0; i < length; i++) {
+        if (cx->branchCallback && !(iterations++ & 127) &&
+            !cx->branchCallback(cx, NULL)) goto out;
         if (array) {
             if (!JS_NewNumberValue(cx, i, &roots[1])) goto out;
-        } else if (!JS_GetElement(cx, JSVAL_TO_OBJECT(roots[0]), i, &roots[1]))
+        } else if (!JS_GetElement(cx, JSVAL_TO_OBJECT(roots[0]), (jsuint)i, &roots[1]))
             goto out;
         str = js_ValueToString(cx, roots[1]);
         if (!str) goto out;
@@ -508,7 +547,7 @@ Serialize(JSONWriter *w, JSObject *holder, jsval key, JSBool *present)
     JSString *str;
     jsid id;
     jsdouble d;
-    JSBool ok = JS_FALSE;
+    JSBool array, ok = JS_FALSE;
 
     if (!JS_CHECK_STACK_SIZE(cx, roots)) {
         JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED);
@@ -559,7 +598,8 @@ Serialize(JSONWriter *w, JSObject *holder, jsval key, JSBool *present)
         }
     } else if (!JSVAL_IS_PRIMITIVE(roots[0]) && !js_IsCallable(cx, roots[0])) {
         obj = JSVAL_TO_OBJECT(roots[0]);
-        ok = Container(w, obj, OBJ_GET_CLASS(cx, obj) == &js_ArrayClass);
+        if (!js_IsArray(cx, obj, &array)) goto out;
+        ok = Container(w, obj, array);
     } else {
         *present = JS_FALSE;
         ok = JS_TRUE;
@@ -570,7 +610,8 @@ out:
 }
 
 static JSBool
-json_stringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+JSONStringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
+              JSBool modern)
 {
     JSONWriter w;
     jsval roots[4], other;
@@ -578,25 +619,35 @@ json_stringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
     JSObject *holder, *array;
     JSClass *clasp;
     JSString *str;
-    jsuint length, i, j, count = 0;
-    jsdouble d;
-    JSBool duplicate, present, ok = JS_FALSE;
+    jsuint j, count = 0;
+    jsdouble d, length, i;
+    jsid id;
+    uint32 iterations = 0;
+    JSBool duplicate, present, isArray = JS_FALSE, ok = JS_FALSE;
 
     memset(&w, 0, sizeof(w));
     w.cx = cx;
+    w.modern = modern;
+    w.global = modern ? js_BuiltinGlobal(cx, argv) : NULL;
     w.replacer = w.keys = JSVAL_VOID;
     roots[0] = roots[1] = roots[2] = roots[3] = JSVAL_VOID;
     JS_PUSH_TEMP_ROOT(cx, 4, roots, &root);
     if (argc > 1 && js_IsCallable(cx, argv[1])) w.replacer = argv[1];
-    else if (argc > 1 && !JSVAL_IS_PRIMITIVE(argv[1]) &&
-             OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[1])) == &js_ArrayClass) {
+    else if (argc > 1 && !JSVAL_IS_PRIMITIVE(argv[1])) {
+        if (!js_IsArray(cx, JSVAL_TO_OBJECT(argv[1]), &isArray)) goto out;
+    }
+    if (isArray) {
         array = JSVAL_TO_OBJECT(argv[1]);
-        holder = js_NewArrayObject(cx, 0, NULL);
+        holder = JSONContainer(cx, w.global, JS_TRUE);
         if (!holder) goto out;
         roots[0] = w.keys = OBJECT_TO_JSVAL(holder);
-        if (!js_GetLengthProperty(cx, array, &length)) goto out;
+        if (!JSONLength(cx, array, modern, &length)) goto out;
         for (i = 0; i < length; i++) {
-            if (!JS_GetElement(cx, array, i, &roots[1])) goto out;
+            if (cx->branchCallback && !(iterations++ & 127) &&
+                !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, i, &id)) goto out;
+            roots[1] = ID_TO_VALUE(id);
+            if (!OBJ_GET_PROPERTY(cx, array, id, &roots[1])) goto out;
             if (!JSVAL_IS_PRIMITIVE(roots[1])) {
                 clasp = OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(roots[1]));
                 if (clasp != &js_StringClass && clasp != &js_NumberClass) continue;
@@ -632,13 +683,13 @@ json_stringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rva
         if (!JS_ValueToNumber(cx, roots[1], &d)) goto out;
         d = js_DoubleToInteger(d);
         w.gapLength = d <= 0 ? 0 : d >= 10 ? 10 : (size_t)d;
-        for (i = 0; i < w.gapLength; i++) w.gap[i] = ' ';
+        for (i = 0; i < w.gapLength; i++) w.gap[(jsuint)i] = ' ';
     } else if (JSVAL_IS_STRING(roots[1])) {
         str = JSVAL_TO_STRING(roots[1]);
         w.gapLength = JS_MIN(JSSTRING_LENGTH(str), 10);
         memcpy(w.gap, JSSTRING_CHARS(str), w.gapLength * sizeof(jschar));
     }
-    holder = js_NewObject(cx, &js_ObjectClass, NULL, NULL);
+    holder = JSONContainer(cx, w.global, JS_FALSE);
     if (!holder) goto out;
     roots[2] = OBJECT_TO_JSVAL(holder);
     if (!JS_DefineProperty(cx, holder, "", argc ? argv[0] : JSVAL_VOID,
@@ -658,6 +709,30 @@ out:
     return ok;
 }
 
+static JSBool
+json_parse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return JSONParse(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+json_parse_modern(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return JSONParse(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+json_stringify(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return JSONStringify(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+json_stringify_modern(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return JSONStringify(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
 static JSClass json_class = {
     "JSON", 0,
     JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
@@ -672,11 +747,15 @@ js_InitJSONClass(JSContext *cx, JSObject *global)
     JSTempValueRooter root;
     JSBool ok;
 
+    JSBool modern = js_GetCachedClassObject(cx, global, JSProto_Object)
+                    ? js_IsModernGlobal(cx, global) : JS_VERSION_IS_ES2015(cx);
+
     obj = js_NewObject(cx, &json_class, NULL, global);
     if (!obj) return NULL;
     JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &root);
-    ok = JS_DefineFunction(cx, obj, "parse", json_parse, 2, JSFUN_NO_CONSTRUCT) &&
-         JS_DefineFunction(cx, obj, "stringify", json_stringify, 3, JSFUN_NO_CONSTRUCT) &&
+    ok = JS_DefineFunction(cx, obj, "parse", modern ? json_parse_modern : json_parse, 2, JSFUN_NO_CONSTRUCT) &&
+         JS_DefineFunction(cx, obj, "stringify", modern ? json_stringify_modern : json_stringify, 3, JSFUN_NO_CONSTRUCT) &&
+         js_DefineBuiltinTag(cx, obj, "JSON") &&
          JS_DefineProperty(cx, global, "JSON", OBJECT_TO_JSVAL(obj), NULL, NULL, 0);
     JS_POP_TEMP_ROOT(cx, &root);
     return ok ? obj : NULL;

@@ -52,6 +52,32 @@ JS_BEGIN_EXTERN_C
 /*
  * JS operation bytecodes.
  */
+/* Integer selectors for the atom-directed extended opcode. */
+#define JS_EXT_SUPER_CALL_REF 9
+#define JS_EXT_SUPER_CALL 10
+#define JS_EXT_CLASS_START 16
+#define JS_EXT_CLASS_EXTENDS 17
+#define JS_EXT_CLASS_END 18
+#define JS_EXT_CLASS_BIND 19
+#define JS_EXT_CLASS_METHOD 20
+#define JS_EXT_CLASS_GETTER 21
+#define JS_EXT_CLASS_SETTER 22
+#define JS_EXT_CLASS_STATIC 4
+
+#define JS_EXT_PARAMETER_ENTER 32
+#define JS_EXT_PARAMETER_LEAVE 33
+#define JS_EXT_PARAMETER_BIND 34
+#define JS_EXT_ANNEX_BIND 35
+
+#define JS_EXT_SUPER_REF 1
+#define JS_EXT_SUPER_GET 2
+#define JS_EXT_SUPER_SET 3
+#define JS_EXT_SUPER_PREINC 4
+#define JS_EXT_SUPER_POSTINC 5
+#define JS_EXT_SUPER_PREDEC 6
+#define JS_EXT_SUPER_POSTDEC 7
+#define JS_EXT_SUPER_DELETE 8
+
 typedef enum JSOp {
 #define OPDEF(op,val,name,token,length,nuses,ndefs,prec,format) \
     op = val,
@@ -235,6 +261,11 @@ struct JSCodeSpec {
 };
 
 extern const JSCodeSpec js_CodeSpec[];
+
+/* Decode a frame's canonical instruction, including debugger/atom prefixes. */
+extern JSOp
+js_GetEffectiveOpcode(JSContext *cx, JSScript *script, jsbytecode *pc,
+                      jsint *length, jsatomid *atomIndex);
 extern uintN            js_NumCodeSpecs;
 extern const jschar     js_EscapeMap[];
 

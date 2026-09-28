@@ -65,12 +65,16 @@ JS_BEGIN_EXTERN_C
 #define JSVAL_CLRTAG(v)         ((v) & ~(jsval)JSVAL_TAGMASK)
 #define JSVAL_ALIGN             JS_BIT(JSVAL_TAGBITS)
 
+/* Symbol values share the string tag but have a distinct private payload. */
+JS_PUBLIC_API(JSBool) JS_IsSymbolValue(jsval value);
+
 /* Predicates for type testing. */
 #define JSVAL_IS_OBJECT(v)      (JSVAL_TAG(v) == JSVAL_OBJECT)
 #define JSVAL_IS_NUMBER(v)      (JSVAL_IS_INT(v) || JSVAL_IS_DOUBLE(v))
 #define JSVAL_IS_INT(v)         (((v) & JSVAL_INT) && (v) != JSVAL_VOID)
 #define JSVAL_IS_DOUBLE(v)      (JSVAL_TAG(v) == JSVAL_DOUBLE)
-#define JSVAL_IS_STRING(v)      (JSVAL_TAG(v) == JSVAL_STRING)
+#define JSVAL_IS_SYMBOL(v)      JS_IsSymbolValue(v)
+#define JSVAL_IS_STRING(v)      (JSVAL_TAG(v) == JSVAL_STRING && !JSVAL_IS_SYMBOL(v))
 #define JSVAL_IS_BOOLEAN(v)     (JSVAL_TAG(v) == JSVAL_BOOLEAN)
 #define JSVAL_IS_NULL(v)        ((v) == JSVAL_NULL)
 #define JSVAL_IS_VOID(v)        ((v) == JSVAL_VOID)
@@ -1027,10 +1031,12 @@ struct JSExtendedClass {
  * with the following flags.  Failure to use JSCLASS_GLOBAL_FLAGS won't break
  * anything except the ECMA-262 "original prototype value" behavior, which was
  * broken for years in SpiderMonkey.  In other words, without these flags you
- * get backward compatibility.
+ * get backward compatibility for the original standard classes. Keep this
+ * reserved-slot count stable for previously compiled embedding globals; newer
+ * intrinsic keys use the private runtime cache.
  */
 #define JSCLASS_GLOBAL_FLAGS \
-    (JSCLASS_IS_GLOBAL | JSCLASS_HAS_RESERVED_SLOTS(JSProto_LIMIT))
+    (JSCLASS_IS_GLOBAL | JSCLASS_HAS_RESERVED_SLOTS(JSProto_Block + 1))
 
 /* Fast access to the original value of each standard class's prototype. */
 #define JSCLASS_CACHED_PROTO_SHIFT      (JSCLASS_HIGH_FLAGS_SHIFT + 8)
@@ -1638,6 +1644,34 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
                                 const jschar *chars, size_t length,
                                 const char *filename, uintN lineno);
 
+/* Explicit host detachment; existing views observe their detached buffer.
+ * The object must be an ArrayBuffer, including one from another realm. */
+extern JS_PUBLIC_API(JSBool)
+JS_DetachArrayBuffer(JSContext *cx, JSObject *buffer);
+
+
+/* Modules are opt-in Unicode compilation units. The returned record is a
+ * GC object: root it while the host resolves its requested dependencies.
+ * Compilation preserves the context's selected classic-script edition.
+ * The host supplies resolution explicitly; no file/network loader is implied.
+ * Records own their scripts and are not ordinary script/XDR cache objects. */
+
+extern JS_PUBLIC_API(JSObject *)
+JS_CompileUCModule(JSContext *cx, JSObject *global, JSPrincipals *principals,
+                   const jschar *source, size_t length,
+                   const char *filename, uintN lineno);
+extern JS_PUBLIC_API(JSObject *)
+JS_GetModuleRequests(JSContext *cx, JSObject *module);
+extern JS_PUBLIC_API(JSBool)
+JS_SetModuleDependency(JSContext *cx, JSObject *module, JSString *specifier,
+                        JSObject *dependency);
+extern JS_PUBLIC_API(JSBool)
+JS_InstantiateModule(JSContext *cx, JSObject *module);
+extern JS_PUBLIC_API(JSBool)
+JS_EvaluateModule(JSContext *cx, JSObject *module);
+extern JS_PUBLIC_API(JSObject *)
+JS_GetModuleNamespace(JSContext *cx, JSObject *module);
+
 extern JS_PUBLIC_API(JSScript *)
 JS_CompileFile(JSContext *cx, JSObject *obj, const char *filename);
 
@@ -1806,6 +1840,22 @@ JS_CallFunctionName(JSContext *cx, JSObject *obj, const char *name, uintN argc,
 extern JS_PUBLIC_API(JSBool)
 JS_CallFunctionValue(JSContext *cx, JSObject *obj, jsval fval, uintN argc,
                      jsval *argv, jsval *rval);
+
+/* Job queues are FIFO per runtime/thread, shared by its active contexts.
+ * The embedding chooses checkpoints after a complete script/event turn.
+ * A nested drain is a no-op. An abrupt job stops a drain and leaves later jobs
+ * queued; an already pending exception prevents draining. Enqueue/Run require
+ * a request in thread-safe builds. Drain before detaching/destroying the last
+ * context on a thread: that lifecycle boundary cancels its remaining jobs.
+ */
+extern JS_PUBLIC_API(JSBool)
+JS_EnqueueJob(JSContext *cx, JSObject *callback);
+
+extern JS_PUBLIC_API(JSBool)
+JS_HasPendingJobs(JSContext *cx);
+
+extern JS_PUBLIC_API(JSBool)
+JS_RunJobs(JSContext *cx);
 
 extern JS_PUBLIC_API(JSBranchCallback)
 JS_SetBranchCallback(JSContext *cx, JSBranchCallback cb);
@@ -2121,6 +2171,8 @@ JS_SetErrorReporter(JSContext *cx, JSErrorReporter er);
 #define JSREG_FOLD      0x01    /* fold uppercase to lowercase */
 #define JSREG_GLOB      0x02    /* global exec, creates array of matches */
 #define JSREG_MULTILINE 0x04    /* treat ^ and $ as begin and end of line */
+#define JSREG_UNICODE   0x10    /* ES2015 Unicode pattern */
+#define JSREG_STICKY    0x08    /* match only at lastIndex */
 
 extern JS_PUBLIC_API(JSObject *)
 JS_NewRegExpObject(JSContext *cx, char *bytes, size_t length, uintN flags);

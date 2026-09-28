@@ -47,6 +47,8 @@
 JS_BEGIN_EXTERN_C
 
 extern JSClass js_ErrorClass;
+extern JSClass js_ModernErrorClass;
+extern JSBool js_IsErrorObject(JSContext *cx, JSObject *obj);
 
 /*
  * Initialize the exception constructor/prototype hierarchy.
@@ -90,6 +92,8 @@ js_ErrorFromException(JSContext *cx, jsval exn);
 extern const JSErrorFormatString *
 js_GetLocalizedErrorMessage(JSContext* cx, void *userRef, const char *locale,
                             const uintN errorNumber);
+
+extern JSProtoKey js_GetExceptionProtoKey(JSNative native);
 
 JS_END_EXTERN_C
 

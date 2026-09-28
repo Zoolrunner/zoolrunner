@@ -49,6 +49,10 @@
  * ====================================================
  */
 
+#ifdef ZR_ES2015_FDLIBM
+#include "zoolrunner.h"
+#else
+
 /* Modified defines start here.. */
 #undef __LITTLE_ENDIAN
 
@@ -271,3 +275,5 @@ extern double __kernel_sin __P((double,double,int));
 extern double __kernel_cos __P((double,double));
 extern double __kernel_tan __P((double,double,int));
 extern int    __kernel_rem_pio2 __P((double*,double*,int,int,int,const int*));
+
+#endif /* ZR_ES2015_FDLIBM */

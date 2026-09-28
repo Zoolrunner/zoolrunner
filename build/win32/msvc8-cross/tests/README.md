@@ -5,10 +5,23 @@ XULRunner launches the GUI fixture through `toolkit.defaultChromeURI` in its
 disposable profile: its default command-line handler does not implement
 Browser's `-chrome` option. The fixture still opens the unchanged Simple
 application and exercises its XPT, JavaScript and native C++ components.
-Subprocess output is retained even when a runtime check times out.
+Subprocess output is retained even when a runtime check times out. Timeout
+errors also print the application log and any fixture result to the CI log;
+a stalled process remains a failure.
 GUI checks wait for the private Wine session to end before reading results,
 because first-run component registration can relaunch the application after
 the initial process exits. Both the launch and session wait have time limits.
+
+The host-only Calendar packaging regression needs Python, not Wine or MSVC:
+
+```sh
+python3 build/win32/msvc8-cross/tests/test-package.py
+```
+
+It stages the real component loader and its subscripts through the production
+packager, removes the fixture build tree, and verifies all script bytes in both
+the relocated runtime and ZIP. This catches omission of Calendar's `js/`
+directory; it does not replace packaged application runtime checks.
 
 Stage the existing platform tests from a macOS or Linux build host:
 

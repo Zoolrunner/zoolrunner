@@ -1621,7 +1621,12 @@ NS_IMETHODIMP
 nsXPConnect::DidProcessEvents(nsIEventQueue *aQueue)
 {
     NS_ENSURE_STATE(mContextStack);
-    return mContextStack->Pop(nsnull);
+    nsresult rv = mContextStack->Pop(nsnull);
+    XPCPerThreadData* data = XPCPerThreadData::GetData();
+    XPCJSRuntime* runtime = GetRuntime(this);
+    if(NS_SUCCEEDED(rv) && data && runtime)
+        data->GetJSContextStack()->RunJobs(runtime->GetJSRuntime());
+    return rv;
 }
 
 #ifdef DEBUG

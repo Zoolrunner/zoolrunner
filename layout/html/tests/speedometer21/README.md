@@ -56,7 +56,7 @@ CSS layout/painting features. Re-evaluate this list against actual benchmark
 failures as support progresses. Preserve the full pinned ES5.1 run and the
 existing embedding, chrome/content, application lifecycle and layout probes.
 
-Initial native LoongArch Suite results (GCC 15.3.0, 2026-09-28): the first
+Pre-merge native LoongArch Suite results (GCC 15.3.0, 2026-09-28): the first
 selector fixture passed 41 checks and the first window-binding fixture passed
 10 checks. Additional conversion regressions are pending revalidation. The
 unmodified benchmark still fails at startup: `benchmark-report.js` uses a
@@ -70,3 +70,11 @@ context in `nsFrame::Init`, consistent with the frame-arena constructor issue
 already documented for other GCC targets. LoongArch mozconfigs now carry
 `-flifetime-dse=1 -fno-strict-aliasing`; a fresh rebuild and lifecycle rerun are
 required before reporting this fixed. Other applications have not been tested.
+
+The subsequent merge of `origin/master` at `790b4ab7` brings in the upstream
+ES2015 implementation and native DOM selectors, classList, console, dataset,
+optional computed-style and event-capture bindings. The upstream implementations
+replace the overlapping initial local implementations. The local content
+regressions and Suite benchmark harness remain in place; all merged behavior
+requires fresh native LoongArch validation. The pre-merge results above do not
+establish the status of the merged tree.

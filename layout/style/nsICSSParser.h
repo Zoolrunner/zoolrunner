@@ -51,6 +51,7 @@ class nsICSSLoader;
 class nsICSSRule;
 class nsISupportsArray;
 class nsMediaList;
+struct nsCSSSelectorList;
 
 #define NS_ICSS_PARSER_IID    \
 { 0x94d1d921, 0xd6f6, 0x435f, \
@@ -129,6 +130,11 @@ public:
                             nsMediaList* aMediaList,
                             PRBool aHTMLMode) = 0;
 
+  // Parse a complete selector-list string for DOM selector APIs. Unlike
+  // ParseRule(), this rejects trailing tokens and returns the parsed selectors.
+  NS_IMETHOD ParseSelectorString(const nsAString& aSelectors,
+                                 nsCSSSelectorList** aResult) = 0;
+
   /**
    * Parse aBuffer into a nscolor |aColor|.  If aHandleAlphaColors is
    * set, handle rgba()/hsla(). Will return NS_ERROR_FAILURE if
@@ -168,12 +174,5 @@ public:
 
 nsresult
 NS_NewCSSParser(nsICSSParser** aInstancePtrResult);
-
-struct nsCSSSelectorList;
-// Parse a complete selector string without accepting stylesheet recovery or
-// declarations.  The caller owns the returned list.  Kept outside the frozen
-// parser interface so existing binary consumers retain their vtable.
-nsresult NS_ParseDOMSelectors(const nsAString& aSource, PRBool aCaseSensitive,
-                             nsCSSSelectorList** aResult);
 
 #endif /* nsCSS1Parser_h___ */

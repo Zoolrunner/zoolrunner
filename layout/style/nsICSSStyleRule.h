@@ -123,6 +123,8 @@ private:
   nsAttrSelector& operator=(const nsAttrSelector& aCopy); 
 };
 
+struct nsCSSSelectorList;
+
 struct nsCSSSelector {
 public:
   nsCSSSelector(void);
@@ -166,6 +168,9 @@ public:
   nsAttrSelector* mAttrList;
   PRUnichar       mOperator;
   nsCSSSelector*  mNegations;
+  // Selector-list arguments for modern functional pseudo-classes such as
+  // :is() and :where(). Kept separate from legacy single-selector negations.
+  nsCSSSelectorList* mSelectorList;
 
   nsCSSSelector*  mNext;
 private: 

@@ -78,7 +78,8 @@ js_RegExpStatics_clear(JSContext *cx, JSRegExpStatics *res);
 typedef struct RECharSet {
     JSPackedBool    converted;
     JSPackedBool    sense;
-    uint16          length;
+    JSPackedBool    modern; /* grammar policy for lazy bitmap compilation */
+    uint32          length;
     union {
         uint8       *bits;
         struct {
@@ -110,8 +111,12 @@ struct JSRegExp {
     size_t       classCount;    /* count [...] bitmaps */
     RECharSet    *classList;    /* list of [...] bitmaps */
     JSString     *source;       /* locked source string, sans // */
+    JSPackedBool modern;       /* grammar edition, including serialized patterns */
     jsbytecode   program[1];    /* regular expression bytecode */
 };
+
+extern uint32
+js_UnicodeSimpleFold(uint32 point);
 
 extern JSRegExp *
 js_NewRegExp(JSContext *cx, JSTokenStream *ts,
@@ -135,6 +140,15 @@ js_DestroyRegExp(JSContext *cx, JSRegExp *re);
 extern JSBool
 js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
                  JSBool test, jsval *rval);
+extern JSBool
+js_StringReplaceES2015(JSContext *cx, jsval *argv, jsval *rval);
+
+extern JSBool
+js_ModernRegExpConstructor(JSContext *cx, JSObject *obj, uintN argc,
+                           jsval *argv, jsval *rval);
+extern JSBool
+js_RegExpCreate(JSContext *cx, JSObject *global, jsval pattern, jsval flags,
+                 jsval *rval);
 
 /*
  * These two add and remove GC roots, respectively, so their calls must be
@@ -151,6 +165,10 @@ js_FreeRegExpStatics(JSContext *cx, JSRegExpStatics *res);
      OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(v)) == &js_RegExpClass)
 
 extern JSClass js_RegExpClass;
+
+/* ES2015 IsRegExp, including the observable @@match lookup. */
+extern JSBool
+js_IsRegExp(JSContext *cx, jsval value, JSBool *result);
 
 extern JSObject *
 js_InitRegExpClass(JSContext *cx, JSObject *obj);
@@ -183,5 +201,7 @@ js_GetLastIndex(JSContext *cx, JSObject *obj, jsdouble *lastIndex);
 
 extern JSBool
 js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex);
+
+extern JSBool js_IsRegExpStaticPropertyHook(JSPropertyOp getter);
 
 #endif /* jsregexp_h___ */

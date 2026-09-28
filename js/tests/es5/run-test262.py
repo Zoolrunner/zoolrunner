@@ -126,6 +126,7 @@ def main():
               for status in ['pass', 'fail', 'timeout', 'crash', 'harness-error']}
     revision = subprocess.check_output(['git', '-C', str(suite), 'rev-parse', 'HEAD'], universal_newlines=True).strip()
     report = {'timezone': args.timezone, 'harness_layout': 'separate-global-script', 'unmarked_default': args.unmarked_default, 'source_transport': 'unicode-global-script', 'suite_revision': revision, 'shell': str(shell), 'filter': args.filter,
+              'timeout_seconds': args.timeout, 'jobs': args.jobs,
               'seconds': round(time.monotonic() - started, 2), 'counts': counts, 'results': results}
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + '\n')

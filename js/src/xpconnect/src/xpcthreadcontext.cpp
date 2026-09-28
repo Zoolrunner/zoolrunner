@@ -50,7 +50,8 @@
 XPCJSContextStack::XPCJSContextStack()
     : mStack(),
       mSafeJSContext(nsnull),
-      mOwnSafeJSContext(nsnull)
+      mOwnSafeJSContext(nsnull),
+      mRunningJobs(PR_FALSE)
 {
     // empty...
 }
@@ -64,6 +65,64 @@ XPCJSContextStack::~XPCJSContextStack()
         mOwnSafeJSContext = nsnull;
         SyncJSContexts();
     }
+}
+
+static void JS_DLL_CALLBACK
+JobErrorReporter(JSContext* cx, const char* message, JSErrorReport* report)
+{
+    nsCOMPtr<nsIConsoleService> console = do_GetService(NS_CONSOLESERVICE_CONTRACTID);
+    nsCOMPtr<nsIScriptError> error = do_CreateInstance(NS_SCRIPTERROR_CONTRACTID);
+    if(console && error)
+    {
+        NS_ConvertUTF8toUTF16 text(message ? message : "ECMAScript job failed");
+        NS_ConvertUTF8toUTF16 file(report && report->filename ? report->filename : "");
+        error->Init(text.get(), file.get(), nsnull, report ? report->lineno : 0,
+                    0, nsIScriptError::errorFlag, "javascript");
+        console->LogMessage(error);
+    }
+}
+
+// Native component callbacks may enqueue jobs without a DOM ScriptEvaluated
+// notification. Finish them at the outer event-queue boundary, using a context
+// owned by this thread's stack rather than retaining a window context.
+void
+XPCJSContextStack::RunJobs(JSRuntime* runtime)
+{
+    if(mRunningJobs)
+        return;
+    for(PRUint32 i = 0; i < mStack.Length(); ++i)
+        if(mStack[i].cx || mStack[i].frame)
+            return;
+#ifdef JS_THREADSAFE
+    JSThread* thread = NS_STATIC_CAST(JSThread*, PR_GetThreadPrivate(runtime->threadTPIndex));
+    if(!thread || !thread->jobs.head)
+        return;
+    for(JSCList* link = thread->contextList.next;
+        link != &thread->contextList; link = link->next)
+        if(JS_IsRunning(CX_FROM_THREAD_LINKS(link)))
+            return;
+#else
+    if(!runtime->jobs.head)
+        return;
+#endif
+    mRunningJobs = PR_TRUE;
+    JSContext* cx = nsnull;
+    if(NS_SUCCEEDED(GetSafeJSContext(&cx)))
+    {
+        AutoJSRequestWithNoCallContext request(cx);
+        if(!JS_IsExceptionPending(cx) && NS_SUCCEEDED(Push(cx)))
+        {
+            JSErrorReporter oldReporter = JS_SetErrorReporter(cx, JobErrorReporter);
+            while(JS_HasPendingJobs(cx) && !JS_RunJobs(cx))
+            {
+                if(!JS_IsExceptionPending(cx) || !JS_ReportPendingException(cx))
+                    break;
+            }
+            Pop(nsnull);
+            JS_SetErrorReporter(cx, oldReporter);
+        }
+    }
+    mRunningJobs = PR_FALSE;
 }
 
 void
@@ -246,6 +305,10 @@ XPCJSContextStack::GetSafeJSContext(JSContext * *aSafeJSContext)
 NS_IMETHODIMP
 XPCJSContextStack::SetSafeJSContext(JSContext * aSafeJSContext)
 {
+    // A job can call back into XPConnect. Its executing safe context cannot
+    // be replaced/destroyed until the outer checkpoint has returned.
+    if(mRunningJobs && aSafeJSContext != mSafeJSContext)
+        return NS_ERROR_FAILURE;
     if(mOwnSafeJSContext &&
        mOwnSafeJSContext == mSafeJSContext &&
        mOwnSafeJSContext != aSafeJSContext)
@@ -685,4 +748,3 @@ nsXPCJSContextStackIterator::Prev(JSContext **aContext)
     
     return NS_OK;
 }
-

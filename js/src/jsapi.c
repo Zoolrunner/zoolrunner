@@ -69,6 +69,15 @@
 #include "jsmath.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
+#include "jscollection.h"
+#include "jsweakcollection.h"
+#include "jsreflect.h"
+#include "jsproxy.h"
+#include "jsmodule.h"
+#include "jsbinarydata.h"
+#include "jspromise.h"
+#include "jsrealm.h"
 #include "jsopcode.h"
 #include "jsparse.h"
 #include "jsregexp.h"
@@ -485,6 +494,13 @@ JS_ConvertValue(JSContext *cx, jsval v, JSType type, jsval *vp)
         obj = js_ValueToFunctionObject(cx, vp, JSV2F_SEARCH_STACK);
         ok = (obj != NULL);
         break;
+      case JSTYPE_SYMBOL:
+        ok = JSVAL_IS_SYMBOL(v);
+        if (ok)
+            *vp = v;
+        else
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_SYMBOL_REQUIRED);
+        break;
       case JSTYPE_STRING:
         str = js_ValueToString(cx, v);
         ok = (str != NULL);
@@ -617,7 +633,8 @@ JS_TypeOfValue(JSContext *cx, jsval v)
                 if ((ops == &js_ObjectOps)
                     ? (clasp->call
                        ? ((clasp == &js_RegExpClass &&
-                           JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT) ||
+                           JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT &&
+                           !JS_VERSION_IS_ES2015(cx)) ||
                           clasp == &js_ScriptClass)
                        : clasp == &js_FunctionClass)
                     : ops->call != NULL) {
@@ -640,6 +657,8 @@ JS_TypeOfValue(JSContext *cx, jsval v)
         type = JSTYPE_NUMBER;
     } else if (JSVAL_IS_STRING(v)) {
         type = JSTYPE_STRING;
+    } else if (JSVAL_IS_SYMBOL(v)) {
+        type = JSTYPE_SYMBOL;
     } else if (JSVAL_IS_BOOLEAN(v)) {
         type = JSTYPE_BOOLEAN;
     } else {
@@ -1058,6 +1077,7 @@ static struct v2smap {
     {JSVERSION_1_6,     "1.6"},
     {JSVERSION_1_7,     "1.7"},
     {JSVERSION_1_8,     "1.8"},
+    {JSVERSION_ECMA_2015, "ECMAv6"},
     {JSVERSION_DEFAULT, js_default_str},
     {JSVERSION_UNKNOWN, NULL},          /* must be last, NULL is sentinel */
 };
@@ -1273,6 +1293,25 @@ JS_InitStandardClasses(JSContext *cx, JSObject *obj)
            js_InitNumberClass(cx, obj) &&
            js_InitRegExpClass(cx, obj) &&
            js_InitStringClass(cx, obj) &&
+           js_InitSymbolClass(cx, obj) &&
+           js_InitMapClass(cx, obj) &&
+           js_InitSetClass(cx, obj) &&
+           js_InitWeakMapClass(cx, obj) &&
+           js_InitWeakSetClass(cx, obj) &&
+           js_InitReflectClass(cx, obj) &&
+           js_InitProxyClass(cx, obj) &&
+           js_InitArrayBufferClass(cx, obj) &&
+           js_InitDataViewClass(cx, obj) &&
+           js_InitPromiseClass(cx, obj) &&
+           js_InitInt8ArrayClass(cx, obj) &&
+           js_InitUint8ArrayClass(cx, obj) &&
+           js_InitUint8ClampedArrayClass(cx, obj) &&
+           js_InitInt16ArrayClass(cx, obj) &&
+           js_InitUint16ArrayClass(cx, obj) &&
+           js_InitInt32ArrayClass(cx, obj) &&
+           js_InitUint32ArrayClass(cx, obj) &&
+           js_InitFloat32ArrayClass(cx, obj) &&
+           js_InitFloat64ArrayClass(cx, obj) &&
 #if JS_HAS_SCRIPT_OBJECT
            js_InitScriptClass(cx, obj) &&
 #endif
@@ -1343,6 +1382,25 @@ static JSStdName standard_class_atoms[] = {
     {js_InitJSONClass,                  0, "JSON", NULL},
     {js_InitNumberClass,                EAGER_ATOM_AND_CLASP(Number)},
     {js_InitStringClass,                EAGER_ATOM_AND_CLASP(String)},
+    {js_InitSymbolClass,                EAGER_ATOM_AND_CLASP(Symbol)},
+    {js_InitMapClass,                   EAGER_ATOM_AND_CLASP(Map)},
+    {js_InitSetClass,                   EAGER_ATOM_AND_CLASP(Set)},
+    {js_InitWeakMapClass,               EAGER_ATOM_AND_CLASP(WeakMap)},
+    {js_InitWeakSetClass,               EAGER_ATOM_AND_CLASP(WeakSet)},
+    {js_InitReflectClass,               EAGER_ATOM_AND_CLASP(Reflect)},
+    {js_InitProxyClass,                 EAGER_ATOM_AND_CLASP(Proxy)},
+    {js_InitArrayBufferClass,           EAGER_ATOM_AND_CLASP(ArrayBuffer)},
+    {js_InitDataViewClass,              EAGER_ATOM_AND_CLASP(DataView)},
+    {js_InitPromiseClass,               EAGER_ATOM_AND_CLASP(Promise)},
+    {js_InitInt8ArrayClass, EAGER_ATOM_AND_CLASP(Int8Array)},
+    {js_InitUint8ArrayClass, EAGER_ATOM_AND_CLASP(Uint8Array)},
+    {js_InitUint8ClampedArrayClass, EAGER_ATOM_AND_CLASP(Uint8ClampedArray)},
+    {js_InitInt16ArrayClass, EAGER_ATOM_AND_CLASP(Int16Array)},
+    {js_InitUint16ArrayClass, EAGER_ATOM_AND_CLASP(Uint16Array)},
+    {js_InitInt32ArrayClass, EAGER_ATOM_AND_CLASP(Int32Array)},
+    {js_InitUint32ArrayClass, EAGER_ATOM_AND_CLASP(Uint32Array)},
+    {js_InitFloat32ArrayClass, EAGER_ATOM_AND_CLASP(Float32Array)},
+    {js_InitFloat64ArrayClass, EAGER_ATOM_AND_CLASP(Float64Array)},
     {js_InitCallClass,                  EAGER_ATOM_AND_CLASP(Call)},
     {js_InitExceptionClasses,           EAGER_ATOM_AND_CLASP(Error)},
     {js_InitRegExpClass,                EAGER_ATOM_AND_CLASP(RegExp)},
@@ -1528,6 +1586,31 @@ JS_ResolveStandardClass(JSContext *cx, JSObject *obj, jsval id,
             return JS_TRUE;
         }
 
+        /* A deleted configurable collection binding must stay deleted. Its
+         * intrinsic remains available through the private global cache. */
+        if ((stdnm->clasp == &js_MapClass || stdnm->clasp == &js_SetClass ||
+             stdnm->clasp == &js_WeakMapClass || stdnm->clasp == &js_WeakSetClass ||
+             stdnm->clasp == &js_ReflectClass || stdnm->clasp == &js_ProxyClass ||
+             stdnm->clasp == &js_ArrayBufferClass || stdnm->clasp == &js_DataViewClass ||
+             stdnm->clasp == &js_PromiseClass ||
+             stdnm->clasp == &js_Int8ArrayClass ||
+             stdnm->clasp == &js_Uint8ArrayClass ||
+             stdnm->clasp == &js_Uint8ClampedArrayClass ||
+             stdnm->clasp == &js_Int16ArrayClass ||
+             stdnm->clasp == &js_Uint16ArrayClass ||
+             stdnm->clasp == &js_Int32ArrayClass ||
+             stdnm->clasp == &js_Uint32ArrayClass ||
+             stdnm->clasp == &js_Float32ArrayClass ||
+             stdnm->clasp == &js_Float64ArrayClass) &&
+            js_GetCachedClassObject(cx, obj,
+                (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(stdnm->clasp))) {
+            return JS_TRUE;
+        }
+        /* ES2015 global String helpers are configurable. Resolving a deleted
+         * helper must not reinitialize String and silently resurrect it. */
+        if (js_IsModernGlobal(cx, obj) && stdnm->init == js_InitStringClass &&
+            js_GetCachedClassObject(cx, obj, JSProto_String))
+            return JS_TRUE;
         if (!stdnm->init(cx, obj))
             return JS_FALSE;
         *resolved = JS_TRUE;
@@ -1572,6 +1655,31 @@ JS_EnumerateStandardClasses(JSContext *cx, JSObject *obj)
         atom = StdNameToAtom(cx, &standard_class_atoms[i]);
         if (!atom)
             return JS_FALSE;
+        if ((standard_class_atoms[i].clasp == &js_MapClass ||
+             standard_class_atoms[i].clasp == &js_SetClass ||
+             standard_class_atoms[i].clasp == &js_WeakMapClass ||
+             standard_class_atoms[i].clasp == &js_WeakSetClass ||
+             standard_class_atoms[i].clasp == &js_ReflectClass ||
+             standard_class_atoms[i].clasp == &js_ProxyClass ||
+             standard_class_atoms[i].clasp == &js_ArrayBufferClass ||
+             standard_class_atoms[i].clasp == &js_DataViewClass ||
+             standard_class_atoms[i].clasp == &js_PromiseClass ||
+             standard_class_atoms[i].clasp == &js_Int8ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint8ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint8ClampedArrayClass ||
+             standard_class_atoms[i].clasp == &js_Int16ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint16ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Int32ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Uint32ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Float32ArrayClass ||
+             standard_class_atoms[i].clasp == &js_Float64ArrayClass) &&
+            js_GetCachedClassObject(cx, obj,
+                (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(standard_class_atoms[i].clasp)))
+            continue;
+        if (standard_class_atoms[i].clasp == &js_StringClass &&
+            js_IsModernGlobal(cx, obj) &&
+            js_GetCachedClassObject(cx, obj, JSProto_String))
+            continue;
         if (!AlreadyHasOwnProperty(cx, obj, atom) &&
             !standard_class_atoms[i].init(cx, obj)) {
             return JS_FALSE;
@@ -2104,6 +2212,10 @@ JS_ValueToId(JSContext *cx, jsval v, jsid *idp)
     JSAtom *atom;
 
     CHECK_REQUEST(cx);
+    if (JS_VERSION_IS_ES2015(cx) || JSVAL_IS_SYMBOL(v) ||
+        (!JSVAL_IS_PRIMITIVE(v) &&
+         OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(v)) == &js_SymbolClass))
+        return js_ValueToPropertyId(cx, v, idp);
     if (JSVAL_IS_INT(v)) {
         *idp = INT_JSVAL_TO_JSID(v);
     } else {
@@ -2113,7 +2225,8 @@ JS_ValueToId(JSContext *cx, jsval v, jsid *idp)
             return JS_TRUE;
         }
 #endif
-        atom = js_ValueToStringAtom(cx, v);
+        atom = JSVAL_IS_SYMBOL(v) ? js_AtomizeValue(cx, v, 0)
+                                  : js_ValueToStringAtom(cx, v);
         if (!atom)
             return JS_FALSE;
         *idp = ATOM_TO_JSID(atom);
@@ -2279,6 +2392,14 @@ JS_InitClass(JSContext *cx, JSObject *obj, JSObject *parent_proto,
         (static_fs && !JS_DefineFunctions(cx, ctor, static_fs))) {
         goto bad;
     }
+
+    /* Object's standard static methods have no [[Construct]]. The public
+     * JSFunctionSpec flags field is only eight bits; apply the internal flag
+     * here through the constructor reference, before DOM bootstrap exposes
+     * prototype.constructor to security callbacks. */
+    if (clasp == &js_ObjectClass && static_fs &&
+        !js_SetBuiltinMethodFlags(cx, ctor, static_fs, JSFUN_NO_CONSTRUCT))
+        goto bad;
 
     /* If this is a standard class, cache its prototype. */
     if (key != JSProto_Null && !js_SetClassObject(cx, obj, key, ctor))
@@ -3118,7 +3239,8 @@ JS_NewArrayObject(JSContext *cx, jsint length, jsval *vector)
 JS_PUBLIC_API(JSBool)
 JS_IsArrayObject(JSContext *cx, JSObject *obj)
 {
-    return OBJ_GET_CLASS(cx, obj) == &js_ArrayClass;
+    JSBool answer;
+    return js_IsArray(cx, obj, &answer) && answer;
 }
 
 JS_PUBLIC_API(JSBool)
@@ -3253,11 +3375,13 @@ JS_ClearScope(JSContext *cx, JSObject *obj)
     if (obj->map->ops->clear)
         obj->map->ops->clear(cx, obj);
 
+    js_ClearCachedClassObjects(cx, obj);
+
     /* Clear cached class objects on the global object. */
     if (JS_GET_CLASS(cx, obj)->flags & JSCLASS_IS_GLOBAL) {
         JSProtoKey key;
 
-        for (key = JSProto_Null; key < JSProto_LIMIT; key++)
+        for (key = JSProto_Null; key <= JSProto_Block; key++)
             JS_SetReservedSlot(cx, obj, key, JSVAL_VOID);
     }
 }
@@ -3923,6 +4047,58 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
 }
 
 JS_PUBLIC_API(JSBool)
+JS_DetachArrayBuffer(JSContext *cx, JSObject *buffer)
+{
+    CHECK_REQUEST(cx);
+    return js_DetachArrayBuffer(cx, buffer);
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_CompileUCModule(JSContext *cx, JSObject *global, JSPrincipals *principals,
+                   const jschar *source, size_t length,
+                   const char *filename, uintN lineno)
+{
+    CHECK_REQUEST(cx);
+    return js_CompileModule(cx, global, principals, source, length, filename, lineno);
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_GetModuleRequests(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_GetModuleRequests(cx, module);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_SetModuleDependency(JSContext *cx, JSObject *module, JSString *specifier, JSObject *dependency)
+{
+    CHECK_REQUEST(cx);
+    return js_SetModuleDependency(cx, module, specifier, dependency);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_InstantiateModule(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_InstantiateModule(cx, module);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_EvaluateModule(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    return js_EvaluateModule(cx, module);
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_GetModuleNamespace(JSContext *cx, JSObject *module)
+{
+    CHECK_REQUEST(cx);
+    if (!js_InstantiateModule(cx, module)) return NULL;
+    return js_GetModuleNamespace(cx, module);
+}
+
+JS_PUBLIC_API(JSBool)
 JS_BufferIsCompilableUnit(JSContext *cx, JSObject *obj,
                           const char *bytes, size_t length)
 {
@@ -4209,6 +4385,8 @@ JS_DecompileFunction(JSContext *cx, JSFunction *fun, uintN indent)
     JSString *str;
 
     CHECK_REQUEST(cx);
+    if (FUN_IS_CLASS(fun) && fun->classSource)
+        return ATOM_TO_STRING(fun->classSource);
     jp = js_NewPrinter(cx, JS_GetFunctionName(fun),
                        indent & ~JS_DONT_PRETTY_PRINT,
                        !(indent & JS_DONT_PRETTY_PRINT));
@@ -4260,14 +4438,33 @@ JS_ExecuteScriptPart(JSContext *cx, JSObject *obj, JSScript *script,
     JSScript tmp;
     JSRuntime *rt;
     JSBool ok;
+    jsbytecode *prolog = NULL;
+    size_t prologLength;
 
-    /* Make a temporary copy of the JSScript structure and farble it a bit. */
+    /* The threaded interpreter terminates on STOP, not script->length.
+     * Give a separately executed prolog its own terminating bytecode without
+     * modifying a script that another frame may currently be executing. */
     tmp = *script;
     if (part == JSEXEC_PROLOG) {
-        tmp.length = PTRDIFF(tmp.main, tmp.code, jsbytecode);
+        prologLength = (size_t)(tmp.main - tmp.code);
+        if (prologLength > (size_t)-1 - 2) {
+            JS_ReportOutOfMemory(cx);
+            return JS_FALSE;
+        }
+        prolog = (jsbytecode *)JS_malloc(cx, prologLength + 2);
+        if (!prolog) return JS_FALSE;
+        memcpy(prolog, tmp.code, prologLength);
+        prolog[prologLength] = JSOP_STOP;
+        prolog[prologLength + 1] = 0; /* source-note terminator */
+        tmp.code = prolog;
+        tmp.main = prolog + prologLength;
+        tmp.length = prologLength + 1;
+        tmp.trynotes = NULL;
     } else {
         tmp.length -= PTRDIFF(tmp.main, tmp.code, jsbytecode);
         tmp.code = tmp.main;
+        /* The separate prolog already instantiated script lexical bindings. */
+        tmp.globalLexicalIndex = (uint32)-1;
     }
 
     /* Tell the debugger about our temporary copy of the script structure. */
@@ -4281,6 +4478,7 @@ JS_ExecuteScriptPart(JSContext *cx, JSObject *obj, JSScript *script,
     ok = JS_ExecuteScript(cx, obj, &tmp, rval);
     if (rt->destroyScriptHook)
         rt->destroyScriptHook(cx, &tmp, rt->destroyScriptHookData);
+    if (prolog) JS_free(cx, prolog);
     return ok;
 }
 
@@ -4448,7 +4646,8 @@ JS_IsAssigning(JSContext *cx)
         continue;
     if (!fp || !(pc = fp->pc))
         return JS_FALSE;
-    return (js_CodeSpec[*pc].format & JOF_ASSIGNING) != 0;
+    return (js_CodeSpec[js_GetEffectiveOpcode(cx, fp->script, pc, NULL, NULL)].format
+            & JOF_ASSIGNING) != 0;
 }
 
 JS_PUBLIC_API(void)
@@ -4669,8 +4868,31 @@ JS_NewDependentString(JSContext *cx, JSString *str, size_t start,
 JS_PUBLIC_API(JSString *)
 JS_ConcatStrings(JSContext *cx, JSString *left, JSString *right)
 {
+    jsval values[2];
+    JSTempValueRooter root;
+    JSString *result = NULL;
     CHECK_REQUEST(cx);
-    return js_ConcatStrings(cx, left, right);
+    if (!JSSTRING_IS_SYMBOL(left) && !JSSTRING_IS_SYMBOL(right))
+        return js_ConcatStrings(cx, left, right);
+    values[0] = STRING_TO_JSVAL(left);
+    values[1] = STRING_TO_JSVAL(right);
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    if (JSSTRING_IS_SYMBOL(left)) {
+        left = js_SymbolToString(cx, (JSSymbol *)left);
+        if (!left)
+            goto out;
+        values[0] = STRING_TO_JSVAL(left);
+    }
+    if (JSSTRING_IS_SYMBOL(right)) {
+        right = js_SymbolToString(cx, (JSSymbol *)right);
+        if (!right)
+            goto out;
+        values[1] = STRING_TO_JSVAL(right);
+    }
+    result = js_ConcatStrings(cx, left, right);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return result;
 }
 
 JS_PUBLIC_API(const jschar *)

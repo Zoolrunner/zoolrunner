@@ -244,8 +244,24 @@ Calendar disables plugins and uses the plaintext-only editor. Libxul's library
 list and static module table must honor both settings: linking `gkplugin.lib`
 or `composer.lib` unconditionally requires archives that Calendar does not
 build. The matching module entries must also be omitted to avoid unresolved
-entry points. This correction still requires a complete Calendar CI rerun to
-establish build, package and runtime results.
+entry points. Windows plaintext builds name the editor archive `texteditor.lib`;
+libxul must select that name instead of `editor.lib`. The hosted Calendar job
+on `ad9b56f9` passed compilation, packaging and PE audit with this correction.
+
+Calendar also requires the top-level `js/` directory installed by its component
+and import/export makefiles. `calItemModule.js` loads scripts such as
+`js/calItemBase.js` from that directory; shipping only `components/` and chrome
+leaves the application incomplete. The Windows packager includes `js/` and
+resolves its build-tree symlinks. Run the host-only package regression with
+`python3 build/win32/msvc8-cross/tests/test-package.py`; it checks the component
+loader's script dependencies in both relocated staging and the ZIP. This
+package-content check does not establish Windows runtime success.
+
+Browser uses the bundled Platform SDK's `pstore.h` interface declarations and
+Mozilla smart pointers for the IE profile importer. It must not use MSVC's
+`#import` on a build-host `pstorec.dll`: Linux cross-build hosts have no Windows
+system directory or original Protected Storage type library. Runtime loading
+of the optional Windows DLL remains unchanged.
 
 If a build stops immediately after `Building deps for ...`, check the dependency
 scanner diagnostics before investigating the target compiler. Failed scans now
@@ -275,17 +291,35 @@ artifact server uses the upload-v7 compatibility fixes; see the
 [act artifact-server note](../../../mozconfigs/macos/README.md#act-artifact-server-limitation).
 These Wine results do not validate this new package on original Windows releases.
 
-Validation was narrowed to Suite. XULRunner compiled, packaged and passed its
-audit; its isolated packaged runtime rerun passes after correcting the fixture
-launch and waiting for first-run GUI relaunches. Its complete workflow rerun
-and the Browser/Calendar jobs were cancelled, so the four-application matrix
-is not recorded as a complete pass. The production matrix still includes all
-four applications.
+[GitHub run 35222856488](https://github.com/Zoolrunner/zoolrunner/actions/runs/35222856488)
+on commit `0ff9397b` passed the complete Suite and XULRunner jobs. Browser
+failed importing the build-host Protected Storage type library, and Calendar
+failed linking the incorrectly named editor archive. Local validation now
+focuses on Browser and Calendar at the user's request; the full production
+matrix retains all four applications.
+
+Browser subsequently passed its complete local `act` workflow with the fixes
+from `cdd3f800`: compilation, package creation, PE audit, native and JavaScript
+regressions, browser chrome/navigation/error-page checks, all 17 window-bootstrap
+checks, and both artifact uploads. The fixes were applied to its running build
+before the affected directories compiled; a separate production-flags compile
+also checked the complete IE importer. Package SHA-256:
+`78a7c1b30aa3d459c2196eb0cd2e34790ba19a853c26bb31eda8f53a93c26a5f`.
+The package, logs and source-patch provenance are retained in
+`artifacts/windows-all-act-validation`. Calendar's local rerun was stopped at
+the user's request during compilation to use faster GitHub-hosted CI. Its
+Wine/toolchain checks passed, and the generated make configuration selected
+`texteditor` correctly. The complete corrected build, package and runtime
+results were subsequently checked in
+[GitHub run 35246186211](https://github.com/Zoolrunner/zoolrunner/actions/runs/35246186211):
+Suite, Browser and XULRunner passed; Calendar passed build/package/audit but
+failed runtime startup. Its application log reports missing
+`js/calItemBase.js`, followed by a Wine page fault/debugger wait. The corrected
+packager passes the local package-content regression; the complete Calendar
+runtime workflow still needs a hosted rerun.
 
 Windows builds select the host `mkdepend` tool's existing no-X11 mode.
-A GitHub-hosted run failed at Wine prefix creation; the script now
-addresses that ownership mismatch, but a successful hosted rerun remains
-unverified. On this Apple Silicon host, Wine
-failed under container CPU emulation, so local validation uses a full x86
-Linux VM. This is a local testing requirement, not a requirement for native
-x86_64 Linux CI runners.
+The successful hosted Suite/XULRunner jobs also verify the Wine-prefix ownership
+correction. On this Apple Silicon host, Wine failed under container CPU
+emulation, so local validation uses a full x86 Linux VM. This is a local testing
+requirement, not a requirement for native x86_64 Linux CI runners.

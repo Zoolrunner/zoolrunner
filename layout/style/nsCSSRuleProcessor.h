@@ -44,6 +44,9 @@
 
 struct RuleCascadeData;
 class nsICSSStyleSheet;
+class nsIContent;
+struct nsCSSSelector;
+struct nsCSSSelectorList;
 
 /**
  * The CSS style rule processor provides a mechanism for sibling style
@@ -84,5 +87,13 @@ protected:
 
   RuleCascadeData* mRuleCascades;
 };
+
+// Match a parsed selector against one element using the CSS rule engine's
+// selector semantics. aScopeRoot is the DOM query's scoping element and may
+// be null when matching ordinary stylesheet selectors.
+PRBool nsCSSSelectorListMatches(nsPresContext* aPresContext,
+                                nsIContent* aContent,
+                                nsCSSSelectorList* aSelectors,
+                                nsIContent* aScopeRoot);
 
 #endif /* nsCSSRuleProcessor_h_ */

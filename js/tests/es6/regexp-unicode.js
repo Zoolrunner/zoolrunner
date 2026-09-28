@@ -1,0 +1,33 @@
+(function(){var checks=0;function check(x,s){++checks;if(!x)throw Error(s)}
+function rejects(pattern){var e;try{new RegExp(pattern,'u')}catch(x){e=x}check(e instanceof SyntaxError,'reject '+pattern)}
+var astral='\uD83D\uDE00';
+check(/^.$/u.test(astral)&&!/^.$/.test(astral),'dot is one code point');
+check(/\u{1F600}/u.test(astral),'braced code point');
+check(/\uD83D\uDE00/u.test(astral),'paired escapes');
+check(!/\u{D83D}\u{DE00}/u.test(astral),'braced surrogate escapes separate');
+check(/\uD83D/u.test('\uD83D')&&!/\uD83D/u.test(astral),'lone lead');
+check(/\uDE00/u.test('\uDE00')&&!/\uDE00/u.test(astral),'lone trail');
+check(/^[\u{1F600}-\u{1F64F}]$/u.test(astral),'astral range');
+check(!/^[^\u{1F600}]$/u.test(astral)&&/^[^\u{1F600}]$/u.test('x'),'negated astral range');
+check(/^[\0]$/u.test('\0')&&!/[]/u.test('\0'),'NUL and empty classes');
+check(/^[^]$/u.test(astral),'negated empty class');
+check(/^(.)\1$/u.test(astral+astral),'astral backref');
+check(/^\u{10400}$/iu.test('\uD801\uDC28'),'supplementary case fold');
+check(/^(\u{10400})\1$/iu.test('\uD801\uDC00\uD801\uDC28'),'supplementary folded backref');
+check(/[a-z]/iu.test('\u212A')&&/[a-z]/iu.test('\u017F')&&!/[a-z]/i.test('\u212A'),'Unicode-only ASCII folds');
+check(/\w/iu.test('\u212A')&&!/\W/iu.test('\u212A')&&/[\w]/iu.test('\u017F')&&!/[\W]/iu.test('\u017F'),'word folds');
+check(/\b\u212A\b/iu.test('\u212A'),'word boundary folds');
+check(/\u00DF/iu.test('\u1E9E')&&!/\u00DF/iu.test('ss'),'simple, not full folding');
+var r=/./ug,m=r.exec(astral+'x');check(m.index===0&&m[0]===astral&&r.lastIndex===2,'UTF16 indices');
+r.lastIndex=1;m=r.exec(astral+'x');check(m.index===0&&m[0]===astral&&r.lastIndex===2,'middle-surrogate start');
+check('a'+astral+'b'===('a'+astral+'b').replace(/./ug,function(x){return x}),'replace full characters');
+check((astral+'x').match(/(?:)/ug).length===3,'empty match code point advancement');
+check((astral+'x').split(/(?:)/u).join('|')===astral+'|x','split code points');
+var bad=['\\a','\\_','\\-','\\'+String.fromCharCode(0),'[\\'+String.fromCharCode(0)+']','\\u','\\u12','\\u{}','\\u{110000}','\\u{xyz}','\\xF','\\c1','[\\c1]','\\01','[\\1]','\\1','a{','a}','a]','(?=a)+','[z-a]','[\\d-a]'];
+bad.forEach(rejects);
+check(/\-/.test('-')&&/\a/.test('a')&&/a{/.test('a{'),'non-Unicode grammar retained');
+var d=Object.getOwnPropertyDescriptor(RegExp.prototype,'unicode');check(d.get.length===0&&d.get.name==='get unicode'&&d.configurable&&!d.enumerable,'accessor metadata');
+check(/a/gimuy.flags==='gimuy'&&/a/u.unicode===true&&/a/.unicode===false,'flags');
+function f(){return /[\u{1F600}-\u{1F64F}]+/iu}var copy=eval('('+f.toString()+')');check(copy().test(astral),'function source roundtrip');
+print('REGEXP-UNICODE PASS checks='+checks);
+})();

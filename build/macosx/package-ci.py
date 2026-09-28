@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Package built Cocoa apps without links back into the developer checkout."""
 import argparse
+import json
 import os
 import platform
 import plistlib
@@ -8,9 +9,11 @@ import re
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 from legacy_tar import LegacyTarInfo
 import tempfile
+import time
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("arch", choices=("arm64", "x86_64", "i386", "powerpc"))
@@ -172,10 +175,52 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             str(obj / "parser/expat/lib/libexpat_s.a"),
             "-o", str(blocking)], check=True)
         subprocess.run([str(blocking)], env=environment, check=True, timeout=60)
+        # Cold registration loads every native component. Under Rosetta this
+        # can exceed a short fixture's budget before JavaScript even starts.
+        # Require initialization separately; individual test limits stay fixed.
+        started = time.monotonic()
+        print("Initializing packaged runtime", flush=True)
+        try:
+            startup = subprocess.run(
+                [str(runtime / "xpcshell"), "-e", 'print("PACKAGED-RUNTIME READY")'],
+                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=180)
+        except subprocess.TimeoutExpired as error:
+            if error.stdout:
+                print(error.stdout.decode("utf-8", "replace")
+                      if isinstance(error.stdout, bytes) else error.stdout, flush=True)
+            raise
+        print(startup.stdout, flush=True)
+        if startup.returncode or "PACKAGED-RUNTIME READY" not in startup.stdout:
+            raise RuntimeError("Packaged runtime failed initialization")
+        print("Package initialization passed in %.2f seconds" %
+              (time.monotonic() - started), flush=True)
         for test, marker in (
+                ("../es6/discarded-operations.js", "DISCARDED-OPERATIONS checks=63 failures=0"),
+                ("../es6/arguments-exit.js", "ARGUMENTS-EXIT checks=25 failures=0"),
+                ("../es6/setter-result.js", "SETTER-RESULT PASS checks=16"),
                 ("object-reflection.js", "ES5-OBJECT-REFLECTION checks=101 failures=0"),
+                ("arguments-lifetime.js", "ARGUMENTS-LIFETIME checks=12 failures=0"),
                 ("legacy-application.js", "LEGACY-APPLICATION checks=58 failures=0"),
-                ("debugger-lifecycle.js", "DEBUGGER-LIFECYCLE checks=5 failures=0")):
+                ("debugger-lifecycle.js", "DEBUGGER-LIFECYCLE checks=5 failures=0"),
+                ("destructuring-errors.js", "DESTRUCTURING-ERRORS checks=54 failures=0"),
+                ("strict-parameter-history.js", "STRICT-PARAMETER-HISTORY checks=30 failures=0"),
+                ("../es6/number.js", "ES6-NUMBER checks=156 failures=0"),
+                ("../es6/double-rounding.js",
+                 "ES6-DOUBLE-ROUNDING checks=2 failures=0"),
+                ("../es6/math-integer.js", "ES6-MATH-INTEGER checks=169 failures=0"),
+                ("../es6/math-extrema-conversion.js", "ES6-MATH-EXTREMA checks=264 failures=0"),
+                ("../es6/string-additions.js", "ES6-STRING-ADDITIONS checks=175 failures=0"),
+                ("../es6/normalization.js", "ES6-NORMALIZATION checks=50 failures=0"),
+                ("../es6/array-operations.js", "ES6-ARRAY-OPERATIONS checks=89 failures=0"),
+                ("../es6/math-transcendental.js", "ES6-MATH-NUMERIC checks=4206 failures=0"),
+                ("../es6/radix-literals.js", "ES6-RADIX-LITERALS checks=130 failures=0"),
+                ("../es6/editions.js", "ES6-EDITIONS checks=36 failures=0"),
+                ("../es6/contextual-keywords.js",
+                 "ES6-CONTEXTUAL-KEYWORDS checks=84 failures=0"),
+                ("../es6/lexical-parameters.js",
+                 "ES6-LEXICAL-PARAMETERS checks=36 failures=0"),
+                ("../es6/const-writes.js", "ES6-CONST-WRITES checks=104 failures=0")):
             result = subprocess.run(
                 [str(runtime / "xpcshell"), "-f", str(root / "js/tests/es5" / test)],
                 env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -183,26 +228,429 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
             print(result.stdout)
             if result.returncode or marker not in result.stdout:
                 raise RuntimeError("Packaged runtime failed " + test)
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/function-metadata.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-FUNCTION-METADATA checks=82 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed modern function metadata")
+        subprocess.run(
+            [sys.executable, str(root / "js/tests/es6/test-const-large-script.py"),
+             "--shell", str(runtime / "xpcshell")], check=True)
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/inferred-function-names.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-INFERRED-NAMES checks=89 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed inferred function names")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/object-additions.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-OBJECT-ADDITIONS checks=145 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Object additions")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/prototype-mutation.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-PROTOTYPE-MUTATION checks=100 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed prototype mutation")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/realm-intrinsics.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-REALM-INTRINSICS checks=35 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed realm intrinsics")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/array-of.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-ARRAY-OF checks=50 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Array.of")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/symbol-primitives.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-SYMBOL-PRIMITIVES checks=92 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Symbol primitives")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/string-match-classification.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-STRING-MATCH-CLASSIFICATION checks=39 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Symbol.match classification")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/regexp-literals.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-REGEXP-LITERALS checks=33 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed modern RegExp literal identity")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/has-instance.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-HAS-INSTANCE checks=34 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Symbol.hasInstance")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/builtin-tags.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-BUILTIN-TAGS checks=27 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed built-in tags")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/modern-iterators.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-MODERN-ITERATORS checks=62 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed modern iterators")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/array-from.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-ARRAY-FROM checks=36 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Array.from")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/unscopables.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-UNSCOPABLES checks=37 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Symbol.unscopables")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/computed-properties.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-COMPUTED-PROPERTIES checks=58 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed modern object properties")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/collections.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-COLLECTIONS checks=53 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Map and Set")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/weak-collections.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-WEAK-COLLECTIONS checks=60 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed weak collections")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/reflect.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-REFLECT checks=53 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Reflect")
+        result = subprocess.run(
+            [str(runtime / "xpcshell"), "-E", "-f",
+             str(root / "js/tests/es6/proxy.js")],
+            env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, timeout=60)
+        print(result.stdout)
+        if result.returncode or "ES6-PROXY checks=66 failures=0" not in result.stdout:
+            raise RuntimeError("Packaged runtime failed Proxy")
+        for script, marker in (
+                ("annex-prototype.js", "ES6-ANNEX-PROTOTYPE checks=32 failures=0"),
+                ("annex-html.js", "ES6-ANNEX-HTML checks=27 failures=0"),
+                ("annex-globals.js", "ES6-ANNEX-GLOBALS checks=25 failures=0"),
+                ("regexp-fields.js", "ES6-REGEXP-FIELDS checks=66 failures=0"),
+                ("regexp-protocols.js", "ES6-REGEXP-PROTOCOLS checks=58 failures=0"),
+                ("regexp-constructor.js", "ES6-REGEXP-CONSTRUCTOR checks=35 failures=0"),
+                ("regexp-split.js", "ES6-REGEXP-SPLIT checks=33 failures=0"),
+                ("regexp-replace.js", "ES6-REGEXP-REPLACE checks=34 failures=0"),
+                ("date-primitive.js", "ES6-DATE-PRIMITIVE checks=29 failures=0"),
+                ("date-numeric.js", "DATE-NUMERIC checks=164 failures=0"),
+                ("array-concat.js", "ES6-ARRAY-CONCAT checks=29 failures=0"),
+                ("array-iteration.js", "ES6-ARRAY-ITERATION checks=37 failures=0"),
+                ("array-indexed.js", "ES6-ARRAY-INDEXED checks=59 failures=0"),
+                ("array-text.js", "ES6-ARRAY-TEXT checks=36 failures=0"),
+                ("error-modern.js", "ES6-ERROR-MODERN checks=72 failures=0"),
+                ("binary-data.js", "ES6-BINARY-DATA checks=68 failures=0"),
+                ("casing.js", "ES6-CASING checks=23 failures=0"),
+                ("function-invoke.js", "ES6-FUNCTION-INVOKE checks=24 failures=0"),
+                ("reflection-keys.js", "ES6-REFLECTION-KEYS checks=16 failures=0"),
+                ("promise.js", "ES6-PROMISE checks=40 failures=0"),
+                ("new-target.js", "ES6-NEW-TARGET checks=38 failures=0"),
+                ("assignment-reference.js", "ES6-ASSIGNMENT-REFERENCE checks=44 failures=0"),
+                ("assignment-reference-wide.js", "ES6-ASSIGNMENT-REFERENCE-WIDE checks=12 failures=0"),
+                ("identifier-codepoints.js", "ES6-IDENTIFIER-CODEPOINTS checks=55 failures=0"),
+                ("identifier-reference.js", "ES6-IDENTIFIER-REFERENCE checks=33 failures=0"),
+                ("identifier-reference-wide.js", "ES6-IDENTIFIER-REFERENCE-WIDE checks=14 failures=0"),
+                ("function-statement-grammar.js", "ES6-FUNCTION-STATEMENT-GRAMMAR checks=39 failures=0"),
+                ("for-of-boundaries.js", "ES6-FOR-OF-BOUNDARIES checks=7 failures=0"),
+                ("generators.js", "ES6-GENERATORS checks=78 failures=0"),
+                ("typed-arrays.js", "ES6-TYPED-ARRAYS PASS checks=252"),
+                ("object-patterns.js", "ES6-OBJECT-PATTERNS PASS checks=27"),
+                ("computed-patterns.js", "ES6-COMPUTED-PATTERNS PASS checks=25"),
+                ("pattern-defaults.js", "ES6-PATTERN-DEFAULTS PASS checks=28"),
+                ("array-patterns-wide.js", "ES6-ARRAY-PATTERNS-WIDE PASS checks=4"),
+                ("array-rest.js", "ES6-ARRAY-REST PASS checks=20"),
+                ("array-patterns.js", "ES6-ARRAY-PATTERNS PASS checks=18"),
+                ("regexp-unicode.js", "REGEXP-UNICODE PASS checks=48"),
+                ("global-declarations.js", "GLOBAL-DECLARATIONS-EXTENDED PASS checks=22"),
+                ("completion.js", "COMPLETION PASS checks=27"),
+                ("setter-result.js", "SETTER-RESULT PASS checks=16"),
+                ("super-properties.js", "SUPER-PROPERTIES PASS checks=33"),
+                ("classes.js", "CLASS PASS checks=53"),
+                ("contextual-escapes.js", "CONTEXTUAL-ESCAPES checks=88 failures=0"),
+                ("discarded-operations.js", "DISCARDED-OPERATIONS checks=63 failures=0"),
+                ("arguments-exit.js", "ARGUMENTS-EXIT checks=25 failures=0"),
+                ("uri-decoding.js", "URI-DECODING checks=4166 failures=0"),
+                ("../es6/uri-decoding.js", "URI-DECODING checks=4166 failures=0"),
+                ("math-realm-prototype.js", "MATH-REALM-PROTOTYPE checks=19 failures=0"),
+                ("html-close-comments.js", "HTML-CLOSE-COMMENTS checks=79 failures=0"),
+                ("sloppy-block-functions.js", "SLOPPY-BLOCK-SEMANTICS checks=49 failures=0"),
+                ("literal-prototype.js", "LITERAL-PROTOTYPE checks=46 failures=0"),
+                ("regexp-large-quantifiers.js", "REGEXP-LARGE-QUANTIFIERS checks=106 failures=0"),
+                ("assignment-targets.js", "ES6-ASSIGNMENT-TARGETS checks=187 failures=0"),
+                ("method-function-fields.js", "ES6-METHOD-FIELDS checks=121 failures=0"),
+                ("let-statement-newline.js", "ES6-LET-STATEMENT-NEWLINE checks=72 failures=0"),
+                ("number-formatting.js", "NUMBER-FORMATTING checks=146 failures=0"),
+                ("../es6/number-formatting.js", "NUMBER-FORMATTING checks=146 failures=0"),
+                ("frozen-native-properties.js", "FROZEN-NATIVE-PROPERTIES checks=18 failures=0"),
+                ("../es6/frozen-native-properties.js", "FROZEN-NATIVE-PROPERTIES checks=18 failures=0"),
+                ("arguments-property-order.js", "ARGUMENTS-PROPERTY-ORDER checks=28 failures=0"),
+                ("arguments-exit-prototype.js", "ARGUMENTS-EXIT-PROTOTYPE checks=5 failures=0"),
+                ("derived-this-effects.js", "DERIVED-THIS-EFFECTS checks=43 failures=0"),
+                ("catch-declarations.js", "CATCH-DECLARATIONS PASS checks=18"),
+                ("default-parameters.js", "DEFAULT-PARAMETERS checks=60 failures=0"),
+                ("modules-grammar.js", "MODULE-GRAMMAR checks=45 failures=0"),
+                ("modules-link.js", "MODULE-LINK checks=13 failures=0"),
+                ("modules-namespace.js", "MODULE-NAMESPACE checks=13 failures=0"),
+                ("modules-extra.js", "MODULE-EXTRA checks=7 failures=0"),
+                ("modules-edges.js", "MODULE-EDGES checks=7 failures=0"),
+                ("modules-contextual.js", "MODULE-CONTEXTUAL checks=9 failures=0"),
+                ("modules-productions.js", "MODULE-PRODUCTIONS checks=8 failures=0"),
+                ("new-target-context.js", "NEW-TARGET-CONTEXT checks=12 failures=0"),
+                ("later-builtin-edges.js", "LATER-BUILTIN-EDGES checks=21 failures=0"),
+                ("later-pattern-edges.js", "LATER-PATTERN-EDGES checks=21 failures=0"),
+                ("strict-block-functions.js", "STRICT-BLOCK-FUNCTIONS checks=9 failures=0"),
+                ("test262-realms.js", "TEST262-REALM checks=16 failures=0"),
+                ("test262-detachment.js", "DETACH-HOST checks=5 failures=0"),
+                ("regexp-original-ranges.js", "ORIGINAL-REGEXP-RANGES checks=13 failures=0"),
+                ("conversion-builtin-edges.js", "CONVERSION-BUILTIN-EDGES checks=18 failures=0"),
+                ("property-coercion.js", "PROPERTY-COERCION checks=22 failures=0"),
+                ("property-order.js", "PROPERTY-ORDER checks=16 failures=0"),
+                ("function-key-order.js", "FUNCTION-KEY-ORDER checks=20 failures=0"),
+                ("catch-environments.js", "CATCH-ENVIRONMENTS checks=14 failures=0"),
+                ("string-codepoint-escapes.js", "STRING-CODEPOINT-ESCAPES checks=27 failures=0"),
+                ("generator-let-newline.js", "GENERATOR-LET-NEWLINE checks=7 failures=0"),
+                ("generator-method-grammar.js", "GENERATOR-METHOD-GRAMMAR checks=16 failures=0"),
+                ("caller-reflection.js", "CALLER-REFLECTION checks=14 failures=0"),
+                ("switch-environments.js", "SWITCH-SCOPE checks=18 failures=0"),
+                ("with-binding-value.js", "WITH-BINDING-VALUE checks=13 failures=0"),
+                ("json-reviver.js", "JSON-REVIVER checks=93 failures=0"),
+                ("json-realms-length.js", "JSON-REALMS-LENGTH checks=91 failures=0"),
+                ("locale-compare.js", "LOCALE-COMPARE checks=33 failures=0"),
+                ("regexp-incomplete-hex.js", "REGEXP-INCOMPLETE-HEX checks=62 failures=0"),
+                ("typedarray-zero-indices.js", "TYPEDARRAY-ZERO-INDICES checks=207 failures=0"),
+                ("tail-call-self.js", "TAIL-CALL-SELF checks=12 failures=0"),
+                ("tail-call-constructors.js", "TAIL-CONSTRUCTORS checks=15 failures=0"),
+                ("tail-call-control.js", "TAIL-CONTROL checks=14 failures=0"),
+                ("tail-call-debugger.js", "TAIL-CALL-DEBUGGER checks=12 failures=0"),
+                ("tail-call-arrows.js", "TAIL-CALL-ARROWS checks=6 failures=0"),
+                ("tail-call-general.js", "TAIL-CALL-GENERAL checks=11 failures=0"),
+                ("tail-call-bound.js", "TAIL-CALL-BOUND checks=3 failures=0"),
+                ("tail-call-forwarding.js", "TAIL-CALL-FORWARDING checks=11 failures=0"),
+                ("tail-call-realms.js", "TAIL-CALL-REALMS checks=8 failures=0"),
+                ("generator-yield-shorthand.js", "YIELD-SHORTHAND checks=9 failures=0"),
+                ("statement-function-edges.js", "STATEMENT-FUNCTION-EDGES checks=24 failures=0"),
+                ("class-source.js", "CLASS-SOURCE PASS checks=8"),
+                ("global-lexical.js", "GLOBAL-LEXICAL-COMPILER PASS checks=17"),
+                ("array-spread.js", "ARRAY-SPREAD PASS checks=21"),
+                ("call-spread.js", "CALL-SPREAD PASS checks=20"),
+                ("call-spread-wide.js", "CALL-SPREAD-WIDE PASS checks=7"),
+                ("completion-wide.js", "COMPLETION-WIDE PASS checks=4"),
+                ("completion-error-source.js", "COMPLETION-ERROR-SOURCE PASS checks=10"),
+                ("pattern-references-wide.js", "ES6-PATTERN-REFERENCES-WIDE PASS checks=2"),
+                ("pattern-references.js", "ES6-PATTERN-REFERENCES PASS checks=17"),
+                ("update-targets.js", "ES6-UPDATE-TARGETS PASS checks=19"),
+                ("for-of.js", "ES6-FOR-OF checks=66 failures=0"),
+                ("lexical-const.js", "ES6-LEXICAL-CONST checks=40 failures=0"),
+                ("lexical-loops.js", "ES6-LEXICAL-LOOPS checks=26 failures=0"),
+                ("lexical-initialization.js", "ES6-LEXICAL-INITIALIZATION checks=44 failures=0"),
+                ("rest-parameters.js", "ES6-REST-PARAMETERS checks=56 failures=0"),
+                ("arrow.js", "ES6-ARROW checks=37 failures=0"),
+                ("template-literals.js", "ES6-TEMPLATE-LITERALS checks=45 failures=0"),
+                ("template-boundaries.js", "ES6-TEMPLATE-BOUNDARIES checks=5416 failures=0")):
+            result = subprocess.run(
+                [str(runtime / "xpcshell"), "-E", "-f", str(root / "js/tests/es6" / script)],
+                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=60)
+            print(result.stdout)
+            if result.returncode or marker not in result.stdout:
+                raise RuntimeError("Packaged runtime failed " + script)
+        if args.app == "suite":
+            inspector_source = root / "extensions/inspector/resources/content/inspector.js"
+            result = subprocess.run(
+                [str(runtime / "xpcshell"), "-e",
+                 "var inspectorSource=" + json.dumps(str(inspector_source)), "-f",
+                 str(root / "extensions/inspector/tests/load-order.js")],
+                env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, timeout=60)
+            print(result.stdout)
+            if result.returncode or "INSPECTOR-LOAD-ORDER checks=12 failures=0" not in result.stdout:
+                raise RuntimeError("Inspector controller load-order regression")
         # A shell alone cannot exercise embedding object scope chains or
         # security callbacks during lazy Object/Function initialization.
         embedding = Path(temporary) / "embedding-test"
+        embedding_timeout = int(os.environ.get("ZR_MACOS_EMBEDDING_TIMEOUT", "180"))
         sdk = Path(os.environ.get("ZR_MACOS_SDK",
                                   str(Path.home() / "dev/macos-sdk/MacOSX11.3.sdk")))
         with (sdk / "SDKSettings.plist").open("rb") as info:
             if plistlib.load(info).get("Version") != "11.3":
                 raise RuntimeError("Embedding checks require macOS SDK 11.3")
-        subprocess.run([
-            "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk), "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
-            "-I" + str(dist / "include/js"), "-I" + str(dist / "include/nspr"),
-            str(root / "js/tests/es5/TestObjectEmbedding.c"),
-            "-L" + str(runtime), "-lmozjs", "-o", str(embedding)], check=True)
         embedding_env = dict(environment, DYLD_LIBRARY_PATH=str(runtime))
-        result = subprocess.run([str(embedding)], env=embedding_env,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, timeout=60)
-        print(result.stdout)
-        if result.returncode or "failures=0" not in result.stdout:
-            raise RuntimeError("Packaged runtime failed embedding compatibility")
+        for source, marker in (
+                ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
+                ("es6/TestJSONRealms.c", "ES6-JSON-REALMS checks=28 failures=0"),
+                ("es6/TestLocaleCompare.c", "ES6-LOCALE-COMPARE checks=20 failures=0"),
+                ("es6/TestRegExpHex.c", "ES6-REGEXP-HEX checks=15 failures=0"),
+                ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=14 failures=0"),
+                ("es6/TestReferenceEmbedding.c", "ES6-REFERENCE-EMBEDDING checks=38 failures=0"),
+                ("es6/TestGeneratorEmbedding.c", "ES6-GENERATOR-EMBEDDING PASS checks=14"),
+                ("es6/TestTypedArrays.c", "ES6-TYPED-ARRAY-EMBEDDING PASS checks=29"),
+                ("es6/TestObjectPatterns.c", "ES6-OBJECT-PATTERN-EMBEDDING PASS checks=13"),
+                ("es6/TestRegExpUnicode.c", "ES6-REGEXP-UNICODE-EMBEDDING PASS checks=22"),
+                ("es6/TestGlobalDeclarations.c", "GLOBAL-DECLARATIONS-EMBEDDING PASS checks=13"),
+                ("es6/TestCompletion.c", "COMPLETION-EMBEDDING PASS checks=17"),
+                ("es6/TestSetterResult.c", "SETTER-RESULT-NATIVE PASS checks=66"),
+                ("es6/TestMethodHome.c", "METHOD-HOME PASS checks=75"),
+                ("es6/TestSuperReference.c", "SUPER-REFERENCE PASS checks=36"),
+                ("es6/TestSuperWide.c", "SUPER-WIDE PASS checks=16"),
+                ("es6/TestClassRuntime.c", "CLASS-RUNTIME PASS checks=47"),
+                ("es6/TestContextualEscapes.c", "ES6-CONTEXTUAL-ESCAPES checks=25 failures=0"),
+                ("es6/TestURIDecoding.c", "ES6-URI-DECODING checks=15 failures=0"),
+                ("es6/TestMathRealmPrototype.c", "ES6-MATH-REALM checks=29 failures=0"),
+                ("es6/TestFrozenNativeProperties.c", "ES6-FROZEN-NATIVE checks=15 failures=0"),
+                ("es6/TestNumberFormatting.c", "ES6-NUMBER-FORMATTING checks=15 failures=0"),
+                ("es6/TestHTMLCloseComments.c", "ES6-HTML-COMMENTS checks=15 failures=0"),
+                ("es6/TestSloppyBlockFunctions.c", "ES6-SLOPPY-BLOCKS checks=15 failures=0"),
+                ("es6/TestSloppyBlockWide.c", "SLOPPY-BLOCK-WIDE PASS checks=17"),
+                ("es6/TestLiteralPrototype.c", "ES6-LITERAL-PROTOTYPE checks=17 failures=0"),
+                ("es6/TestRegExpLarge.c", "ES6-REGEXP-LARGE checks=24 failures=0"),
+                ("es6/TestAssignmentTargets.c", "ES6-ASSIGNMENT-TARGETS checks=15 failures=0"),
+                ("es6/TestAssignmentTargetsWide.c", "ASSIGNMENT-TARGET-WIDE PASS checks=17"),
+                ("es6/TestMethodFields.c", "ES6-METHOD-FIELDS checks=19 failures=0"),
+                ("es6/TestArgumentsPropertyOrder.c", "ES6-ARGUMENTS-ORDER checks=13 failures=0"),
+                ("es6/TestDiscardedEffects.c", "ES6-DISCARDED-EFFECTS checks=13 failures=0"),
+                ("es6/TestDerivedThisEffects.c", "ES6-DERIVED-THIS-EFFECTS checks=13 failures=0"),
+                ("es6/TestClassWide.c", "CLASS-WIDE PASS checks=16"),
+                ("es6/TestBlockFunctionWide.c", "BLOCK-FUNCTION-WIDE PASS checks=17"),
+                ("es6/TestConversionRealms.c", "CONVERSION-REALMS checks=18 failures=0"),
+                ("es6/TestTailCalls.c", "TAIL-CALL-NATIVE checks=20 failures=0"),
+                ("es6/TestNativeSetterResult.c", "NATIVE-SETTER-RESULT checks=18 failures=0"),
+                ("es6/TestCatchDeclarations.c", "CATCH-DECLARATIONS-NATIVE PASS checks=16"),
+                ("es6/TestParameterWide.c", "PARAMETER-WIDE PASS checks=17 scripts=12"),
+                ("es6/TestModules.c", "MODULE-NATIVE PASS checks=24 scripts=5"),
+                ("es6/TestGlobalLexicalCompiler.c", "GLOBAL-LEXICAL-COMPILER-NATIVE PASS checks=55"),
+                ("es6/TestGlobalLexicalWide.c", "GLOBAL-LEXICAL-WIDE PASS checks=13"),
+                ("es6/TestGlobalLexicalStore.c", "GLOBAL-LEXICAL-STORE PASS checks=49"),
+                ("es6/TestArraySpread.c", "ARRAY-SPREAD-EMBEDDING PASS checks=23"),
+                ("es6/TestCallSpread.c", "CALL-SPREAD-EMBEDDING PASS checks=23"),
+                ("es6/TestLexicalEmbedding.c", "ES6-LEXICAL-EMBEDDING PASS checks=19"),
+                ("es6/TestRestEmbedding.c", "ES6-REST-EMBEDDING PASS checks=24"),
+                ("es6/TestArrowEmbedding.c", "ES6-ARROW-EMBEDDING PASS checks=20"),
+                ("es6/TestTemplateEmbedding.c", "ES6-TEMPLATE-EMBEDDING PASS checks=33"),
+                ("es6/TestFunctionMetadata.c",
+                 "ES6-FUNCTION-METADATA-EMBEDDING checks=20 failures=0"),
+                ("es6/TestPrototypeMutation.c",
+                 "ES6-PROTOTYPE-EMBEDDING checks=15 failures=0"),
+                ("es6/TestRealmIntrinsics.c",
+                 "ES6-REALM-EMBEDDING checks=22 failures=0"),
+                ("es6/TestArrayOf.c", "ES6-ARRAY-OF-EMBEDDING checks=15 failures=0"),
+                ("es6/TestSymbolEmbedding.c", "ES6-SYMBOL-EMBEDDING checks=42 failures=0"),
+                ("es6/TestHasInstanceEmbedding.c", "ES6-HAS-INSTANCE-EMBEDDING checks=13 failures=0"),
+                ("es6/TestBuiltinTags.c", "ES6-BUILTIN-TAGS-EMBEDDING checks=13 failures=0"),
+                ("es6/TestWeakCollectionGC.c", "ES6-WEAK-COLLECTION-GC checks=57 failures=0"),
+                ("es6/TestReflect.c", "ES6-REFLECT-EMBEDDING checks=43 failures=0"),
+                ("es6/TestProxy.c", "ES6-PROXY-EMBEDDING checks=55 failures=0"),
+                ("es6/TestAnnexBuiltins.c", "ES6-ANNEX-EMBEDDING checks=28 failures=0"),
+                ("es6/TestRegExpFields.c", "ES6-REGEXP-FIELDS-EMBEDDING checks=45 failures=0"),
+                ("es6/TestRegExpProtocols.c", "ES6-REGEXP-PROTOCOLS-EMBEDDING checks=28 failures=0"),
+                ("es6/TestRegExpConstructor.c", "ES6-REGEXP-CONSTRUCTOR-EMBEDDING checks=36 failures=0"),
+                ("es6/TestRegExpSplit.c", "ES6-REGEXP-SPLIT-EMBEDDING checks=27 failures=0"),
+                ("es6/TestRegExpReplace.c", "ES6-REGEXP-REPLACE-EMBEDDING checks=27 failures=0"),
+                ("es6/TestDatePrimitive.c", "ES6-DATE-PRIMITIVE-EMBEDDING checks=32 failures=0"),
+                ("es6/TestDateNumeric.c", "ES6-DATE-NUMERIC checks=44 failures=0"),
+                ("es6/TestArrayConcat.c", "ES6-ARRAY-CONCAT-EMBEDDING checks=36 failures=0"),
+                ("es6/TestArrayIteration.c", "ES6-ARRAY-ITERATION-EMBEDDING checks=35 failures=0"),
+                ("es6/TestArrayIndexed.c", "ES6-ARRAY-INDEXED-EMBEDDING checks=48 failures=0"),
+                ("es6/TestArrayText.c", "ES6-ARRAY-TEXT-EMBEDDING checks=44 failures=0"),
+                ("es6/TestErrorModern.c", "ES6-ERROR-MODERN-EMBEDDING checks=32 failures=0"),
+                ("es6/TestBinaryData.c", "ES6-BINARY-DATA-EMBEDDING checks=41 failures=0"),
+                ("es6/TestCasing.c", "ES6-CASING-EMBEDDING checks=26 failures=0"),
+                ("es6/TestFunctionInvoke.c", "ES6-FUNCTION-INVOKE-EMBEDDING checks=29 failures=0"),
+                ("es6/TestReflectionKeys.c", "ES6-REFLECTION-KEYS-EMBEDDING checks=28 failures=0"),
+                ("es6/TestJobQueue.c", "ES6-JOB-QUEUE-EMBEDDING checks=51 failures=0"),
+                ("es6/TestPromise.c", "ES6-PROMISE-EMBEDDING checks=55 failures=0"),
+                ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
+                ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
+                ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),
+                ("es6/TestUnscopables.c", "ES6-UNSCOPABLES-EMBEDDING checks=14 failures=0")):
+            print("Building packaged runtime embedding test " + source, flush=True)
+            subprocess.run([
+                "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),
+                "-DXP_UNIX", "-DJS_THREADSAFE", "-DMOZILLA_1_8_BRANCH",
+                "-I" + str(dist / "include/js"), "-I" + str(dist / "include/nspr"),
+                str(root / "js/tests" / source),
+                "-L" + str(runtime), "-lmozjs",
+                *(["-lnspr4"] if source == "es6/TestJobQueue.c" else []),
+                "-o", str(embedding)], check=True)
+            print("Running packaged runtime embedding test " + source, flush=True)
+            try:
+                result = subprocess.run([str(embedding)], env=embedding_env,
+                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                        text=True, timeout=embedding_timeout)
+            except subprocess.TimeoutExpired as error:
+                print("Timed out running packaged runtime embedding test " + source,
+                      flush=True)
+                if error.stdout:
+                    output = (error.stdout.decode("utf-8", "replace")
+                              if isinstance(error.stdout, bytes) else error.stdout)
+                    print(output, flush=True)
+                raise RuntimeError(
+                    "Packaged runtime embedding test timed out: " + source) from error
+            print(result.stdout)
+            if result.returncode or marker not in result.stdout:
+                raise RuntimeError("Packaged runtime failed embedding compatibility: " + source)
+        subprocess.run([
+            "python3", str(root / "js/tests/es6/test-job-shell.py"),
+            "--shell", str(runtime / "xpcshell")], check=True)
         if args.app == "calendar":
             subprocess.run([
                 "python3", str(root / "calendar/test/run-compatibility.py"),

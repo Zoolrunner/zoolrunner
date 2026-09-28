@@ -448,14 +448,15 @@ XDRAtomMap(JSXDRState *xdr, JSAtomMap *map)
     return JS_FALSE;
 }
 
-JSBool
-js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
+static JSBool
+XDRScriptBody(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
 {
     JSContext *cx;
     JSScript *script, *newscript, *oldscript;
     uint32 length, lineno, depth, magic, nsrcnotes, ntrynotes;
-    uint32 prologLength, version;
+    uint32 prologLength, version, hasParameters;
     JSBool filenameWasSaved;
+    JSTempValueRooter parameterRoot;
     jssrcnote *notes, *sn;
 
     cx = xdr->cx;
@@ -497,6 +498,10 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
     if (hasMagic)
         *hasMagic = JS_TRUE;
 
+    if (xdr->mode == JSXDR_ENCODE && script->isModule) {
+        JS_ReportError(cx, "module records require host linking and cannot use the script cache");
+        return JS_FALSE;
+    }
     if (xdr->mode == JSXDR_ENCODE) {
         length = script->length;
         prologLength = PTRDIFF(script->main, script->code, jsbytecode);
@@ -573,10 +578,29 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
     oldscript = xdr->script;
     xdr->script = script;
     if (!JS_XDRBytes(xdr, (char *)script->code, length * sizeof(jsbytecode)) ||
-        !XDRAtomMap(xdr, &script->atomMap)) {
+        !XDRAtomMap(xdr, &script->atomMap) ||
+        !JS_XDRUint16(xdr, &script->parameterLocalCount) ||
+        !JS_XDRUint16(xdr, &script->expectedArgs) ||
+        !JS_XDRUint32(xdr, &script->parameterSourceIndex) ||
+        !JS_XDRUint32(xdr, &script->globalLexicalIndex)) {
         goto error;
     }
 
+    if (script->parameterSourceIndex != (uint32)-1 &&
+        (script->parameterSourceIndex >= script->atomMap.length ||
+         !ATOM_IS_STRING(script->atomMap.vector[script->parameterSourceIndex]))) {
+        JS_ReportError(cx, "invalid serialized parameter source");
+        goto error;
+    }
+    if (script->globalLexicalIndex != (uint32)-1 &&
+        (script->globalLexicalIndex >= script->atomMap.length ||
+         !ATOM_IS_OBJECT(script->atomMap.vector[script->globalLexicalIndex]) ||
+         !ATOM_TO_OBJECT(script->atomMap.vector[script->globalLexicalIndex]) ||
+         OBJ_GET_CLASS(cx, ATOM_TO_OBJECT(script->atomMap.vector[script->globalLexicalIndex]))
+         != &js_BlockClass)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_SCRIPT_MAGIC);
+        goto error;
+    }
     if (magic < JSXDR_MAGIC_SCRIPT_5) {
         if (xdr->mode == JSXDR_DECODE) {
             /*
@@ -700,6 +724,16 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
         tn->catchStart = (ptrdiff_t) catchStart;
     }
 
+    hasParameters = script->parameterScript != NULL;
+    if (!JS_XDRUint32(xdr, &hasParameters) || hasParameters > 1)
+        goto error;
+    if (hasParameters && !js_XDRScript(xdr, &script->parameterScript, NULL))
+        goto error;
+    if (hasParameters && xdr->mode == JSXDR_DECODE) {
+        JS_PUSH_TEMP_ROOT_SCRIPT(cx, script, &parameterRoot);
+        js_CallNewScriptHook(cx, script->parameterScript, NULL);
+        JS_POP_TEMP_ROOT(cx, &parameterRoot);
+    }
     xdr->script = oldscript;
     return JS_TRUE;
 
@@ -715,6 +749,20 @@ js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
         *scriptp = NULL;
     }
     return JS_FALSE;
+}
+
+JSBool
+js_XDRScript(JSXDRState *xdr, JSScript **scriptp, JSBool *hasMagic)
+{
+    JSBool ok;
+    JSRuntime *rt = xdr->cx->runtime;
+
+    /* Decoded atoms are not yet reachable from a rooted script. Regexp
+     * compilation and embedding callbacks may collect while decoding. */
+    JS_KEEP_ATOMS(rt);
+    ok = XDRScriptBody(xdr, scriptp, hasMagic);
+    JS_UNKEEP_ATOMS(rt);
+    return ok;
 }
 
 #if JS_HAS_XDR_FREEZE_THAW
@@ -1358,6 +1406,7 @@ js_NewScript(JSContext *cx, uint32 length, uint32 nsrcnotes, uint32 ntrynotes)
     if (!script)
         return NULL;
     memset(script, 0, sizeof(JSScript));
+    script->globalLexicalIndex = script->parameterSourceIndex = (uint32)-1;
     script->code = script->main = (jsbytecode *)(script + 1);
     script->length = length;
     script->version = cx->version;
@@ -1376,6 +1425,8 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
     uint32 mainLength, prologLength, nsrcnotes, ntrynotes;
     JSScript *script;
     const char *filename;
+    JSAtomListElement *lexicalEntry;
+    JSTempValueRooter scriptRoot;
 
     mainLength = CG_OFFSET(cg);
     prologLength = CG_PROLOG_OFFSET(cg);
@@ -1385,15 +1436,30 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
     if (!script)
         return NULL;
 
+    script->parameterScript = cg->treeContext.parameterScript;
+    cg->treeContext.parameterScript = NULL;
     /* Now that we have script, error control flow must go to label bad. */
     script->main += prologLength;
     memcpy(script->code, CG_PROLOG_BASE(cg), prologLength * sizeof(jsbytecode));
     memcpy(script->main, CG_BASE(cg), mainLength * sizeof(jsbytecode));
     script->numGlobalVars = cg->treeContext.numGlobalVars;
+    script->isModule = cg->treeContext.module != NULL;
     script->strictMode = (cg->treeContext.flags & TCF_STRICT_MODE) != 0 ||
                          (fun && (fun->flags & JSFUN_STRICT));
     script->needsArguments =
         (cg->treeContext.flags & (TCF_FUN_USES_ARGUMENTS | TCF_FUN_HEAVYWEIGHT)) != 0;
+    script->parameterLocalCount = cg->treeContext.parameterLocalCount;
+    script->expectedArgs = cg->treeContext.expectedArgs;
+    if (cg->treeContext.parameterSource) {
+        lexicalEntry = js_IndexAtom(cx, cg->treeContext.parameterSource, &cg->atomList);
+        if (!lexicalEntry) goto bad;
+        script->parameterSourceIndex = ALE_INDEX(lexicalEntry);
+    }
+    if (cg->treeContext.globalLexicalAtom) {
+        lexicalEntry = js_IndexAtom(cx, cg->treeContext.globalLexicalAtom, &cg->atomList);
+        if (!lexicalEntry) goto bad;
+        script->globalLexicalIndex = ALE_INDEX(lexicalEntry);
+    }
     if (!js_InitAtomMap(cx, &script->atomMap, &cg->atomList))
         goto bad;
 
@@ -1421,13 +1487,21 @@ js_NewScriptFromCG(JSContext *cx, JSCodeGenerator *cg, JSFunction *fun)
      */
     if (fun) {
         JS_ASSERT(FUN_INTERPRETED(fun) && !FUN_SCRIPT(fun));
+        /* Regexp cache slots are counted by code generation. Installing own
+         * function properties earlier would allocate those same slots. */
         fun->u.i.script = script;
+        if (!js_InitFunctionProperties(cx, fun->object)) {
+            fun->u.i.script = NULL;
+            goto bad;
+        }
         if (cg->treeContext.flags & TCF_FUN_HEAVYWEIGHT)
             fun->flags |= JSFUN_HEAVYWEIGHT;
     }
 
-    /* Tell the debugger about this compiled script. */
+    /* The anonymous parameter script also needs a root across hooks. */
+    JS_PUSH_TEMP_ROOT_SCRIPT(cx, script, &scriptRoot);
     js_CallNewScriptHook(cx, script, fun);
+    JS_POP_TEMP_ROOT(cx, &scriptRoot);
     return script;
 
 bad:
@@ -1467,6 +1541,8 @@ void
 js_DestroyScript(JSContext *cx, JSScript *script)
 {
     js_CallDestroyScriptHook(cx, script);
+    if (script->parameterScript)
+        js_DestroyScript(cx, script->parameterScript);
 
     JS_ClearScriptTraps(cx, script);
     js_FreeAtomMap(cx, &script->atomMap);
@@ -1484,6 +1560,8 @@ js_MarkScript(JSContext *cx, JSScript *script)
     uintN i, length;
     JSAtom **vector;
 
+    if (script->parameterScript)
+        js_MarkScript(cx, script->parameterScript);
     map = &script->atomMap;
     length = map->length;
     vector = map->vector;
@@ -1711,7 +1789,8 @@ js_FindFinallyHandler(JSScript *script, jsbytecode *pc)
             JS_ASSERT(*pc == JSOP_SETSP);
             op2 = pc[JSOP_SETSP_LENGTH];
             if (op2 != JSOP_ENTERBLOCK) {
-                JS_ASSERT(op2 == JSOP_GOSUB || op2 == JSOP_EXCEPTION);
+                JS_ASSERT(op2 == JSOP_GOSUB || op2 == JSOP_EXCEPTION ||
+                          op2 == JSOP_THROWOF);
                 return pc;
             }
         }

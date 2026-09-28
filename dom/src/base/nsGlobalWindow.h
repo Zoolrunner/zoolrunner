@@ -62,7 +62,6 @@
 #include "nsIDocShellTreeItem.h"
 #include "nsIDOMClientInformation.h"
 #include "nsIDOMViewCSS.h"
-#include "nsIDOMWindowCSS.h"
 #include "nsIDOMEventReceiver.h"
 #include "nsIDOM3EventTarget.h"
 #include "nsIDOMNSEventTarget.h"
@@ -145,7 +144,6 @@ class nsGlobalWindow : public nsPIDOMWindow_MOZILLA_1_8_BRANCH2,
                        public nsIDOM3EventTarget,
                        public nsIDOMNSEventTarget,
                        public nsIDOMViewCSS,
-                       public nsIDOMWindowCSS,
                        public nsIDOMStorageWindow,
                        public nsSupportsWeakReference,
                        public nsIInterfaceRequestor,
@@ -187,7 +185,6 @@ public:
 
   // nsIDOMWindow
   NS_DECL_NSIDOMWINDOW
-  NS_DECL_NSIDOMWINDOWCSS
 
   // nsIDOMWindow2
   NS_DECL_NSIDOMWINDOW2

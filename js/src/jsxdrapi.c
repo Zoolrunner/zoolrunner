@@ -594,6 +594,10 @@ JS_XDRValue(JSXDRState *xdr, jsval *vp)
 {
     uint32 type;
 
+    if (xdr->mode == JSXDR_ENCODE && JSVAL_IS_SYMBOL(*vp)) {
+        JS_ReportErrorNumber(xdr->cx, js_GetErrorMessage, NULL, JSMSG_SYMBOL_XDR);
+        return JS_FALSE;
+    }
     if (xdr->mode == JSXDR_ENCODE) {
         if (JSVAL_IS_NULL(*vp))
             type = JSVAL_XDRNULL;

@@ -11,3 +11,4 @@ RUN test "$(uname -m)" = aarch64 && dnf -y install \
 RUN pkg-config --cflags --libs gtk+-2.0
 ENV PATH=/opt/rh/gcc-toolset-14/root/usr/bin:$PATH
 WORKDIR /source
+RUN dnf -y install python3-pyyaml && dnf clean all

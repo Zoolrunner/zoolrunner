@@ -53,12 +53,17 @@
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsfun.h"
+#include "jsiteres6.h"
 #include "jsgc.h"
 #include "jsinterp.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jsproxy.h"
+#include "jsrealm.h"
 #include "jsstr.h"
+#include "jsscript.h"
+#include "jssymbol.h"
 
 /* 2^32 - 1 as a number and a string */
 #define MAXINDEX 4294967295u
@@ -401,11 +406,25 @@ static JSBool
 array_length_setter(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
 {
     jsuint newlen, oldlen;
-    JSBool blocked;
+    JSBool blocked, found;
+    uintN attrs;
     if (!ValueIsLength(cx, *vp, &newlen) ||
         !js_GetLengthProperty(cx, obj, &oldlen) ||
         !IndexToValue(cx, newlen, vp))
         return JS_FALSE;
+    if (JS_VERSION_IS_ES2015(cx) && newlen != oldlen) {
+        /* Conversion may have frozen length since the outer Set checked it.
+         * Reject before deleting elements or storing through the old slot. */
+        if (!JS_GetPropertyAttributes(cx, obj, "length", &attrs, &found))
+            return JS_FALSE;
+        if (found && (attrs & JSPROP_READONLY)) {
+            if (cx->fp && cx->fp->script && cx->fp->script->strictMode) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+                return JS_FALSE;
+            }
+            return IndexToValue(cx, oldlen, vp);
+        }
+    }
     /* A failed non-strict assignment stops at the first undeletable index.
      * js_ShrinkArray returns the resulting length in vp for NativeSet. */
     return newlen >= oldlen || js_ShrinkArray(cx, obj, newlen, vp, &blocked);
@@ -1359,13 +1378,131 @@ array_splice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
  * Python-esque sequence operations.
  */
 static JSBool
+ArraySpeciesCreate(JSContext *cx, JSObject *original, JSObject *global,
+                    jsdouble length, jsval *rval)
+{
+    jsval values[3] = {OBJECT_TO_JSVAL(original), OBJECT_TO_JSVAL(global), JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool isArray, ok = JS_FALSE;
+    JSObject *realm, *proto, *array;
+    jsid id;
+    jsval *base, *oldsp;
+    JSStackFrame *frame;
+    void *mark;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!js_IsArray(cx, original, &isArray)) goto out;
+    if (isArray) {
+        if (!JS_GetProperty(cx, original, "constructor", &values[2])) goto out;
+        if (js_IsConstructor(cx, values[2])) {
+            realm = js_ConstructorGlobal(cx, JSVAL_TO_OBJECT(values[2]));
+            if (!realm) goto out;
+            if (realm != global && values[2] == OBJECT_TO_JSVAL(js_GetCachedClassObject(cx, realm, JSProto_Array)))
+                values[2] = JSVAL_VOID;
+        }
+        if (!JSVAL_IS_PRIMITIVE(values[2])) {
+            if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id) ||
+                !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[2]), id, &values[2])) goto out;
+            if (JSVAL_IS_NULL(values[2])) values[2] = JSVAL_VOID;
+        }
+    }
+    if (JSVAL_IS_VOID(values[2])) {
+        if (length > MAXINDEX) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH); goto out;
+        }
+        proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+        if (!proto) goto out;
+        array = js_NewArrayObjectWithProto(cx, (jsuint)length, NULL, proto, global);
+        if (array) { *rval = OBJECT_TO_JSVAL(array); ok = JS_TRUE; }
+        goto out;
+    }
+    if (!js_IsConstructor(cx, values[2])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "Array species"); goto out;
+    }
+    base = js_AllocStack(cx, 3, &mark);
+    if (!base) goto out;
+    base[0] = values[2]; base[1] = JSVAL_NULL; base[2] = JSVAL_VOID;
+    frame = cx->fp; oldsp = frame->sp; frame->sp = base + 3;
+    ok = js_NewNumberValue(cx, length, &base[2]) &&
+         js_InvokeConstructorWithNewTarget(cx, base, 1, JSVAL_TO_OBJECT(values[2]));
+    if (ok) *rval = base[0];
+    frame->sp = oldsp; js_FreeStack(cx, mark);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayModernConcat(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *array, *item, *holder;
+    JSProperty *property;
+    JSBool spread, present, ok = JS_FALSE;
+    jsdouble length = 0, itemLength, k;
+    uintN i;
+    uint32 iterations = 0;
+    jsid symbol, id;
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!ArraySpeciesCreate(cx, obj, global, 0, &values[1]) ||
+        !js_WellKnownSymbolId(cx, JS_WKS_IS_CONCAT_SPREADABLE, &symbol)) goto out;
+    array = JSVAL_TO_OBJECT(values[1]);
+    for (i = 0; i <= argc; ++i) {
+        values[2] = i ? argv[i - 1] : values[0];
+        spread = JS_FALSE;
+        if (!JSVAL_IS_PRIMITIVE(values[2])) {
+            item = JSVAL_TO_OBJECT(values[2]);
+            if (!OBJ_GET_PROPERTY(cx, item, symbol, &values[3])) goto out;
+            if (JSVAL_IS_VOID(values[3])) {
+                if (!js_IsArray(cx, item, &spread)) goto out;
+            } else if (!js_ValueToBoolean(cx, values[3], &spread)) goto out;
+        } else item = NULL;
+        if (spread) {
+            if (!js_ArrayLikeLength(cx, item, &itemLength)) goto out;
+            if (itemLength > 9007199254740991.0 - length) goto tooLong;
+            for (k = 0; k < itemLength; ++k, ++length) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, k, &id)) goto out;
+                values[5] = ID_TO_VALUE(id);
+                if (!OBJ_LOOKUP_PROPERTY(cx, item, id, &holder, &property)) goto out;
+                present = property != NULL;
+                if (present) {
+                    OBJ_DROP_PROPERTY(cx, holder, property);
+                    if (!OBJ_GET_PROPERTY(cx, item, id, &values[4]) ||
+                        !js_ArrayLikeIndex(cx, length, &id)) goto out;
+                    values[5] = ID_TO_VALUE(id);
+                    if (!js_CreateDataPropertyOrThrow(cx, array, id, values[4])) goto out;
+                }
+            }
+        } else {
+            if (length >= 9007199254740991.0) goto tooLong;
+            if (!js_ArrayLikeIndex(cx, length, &id)) goto out;
+            values[5] = ID_TO_VALUE(id);
+            if (!js_CreateDataPropertyOrThrow(cx, array, id, values[2])) goto out;
+            ++length;
+        }
+    }
+    if (!js_NewNumberValue(cx, length, &values[3]) ||
+        !js_SetPropertyOrThrow(cx, array, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[3])) goto out;
+    *rval = values[1]; ok = JS_TRUE; goto out;
+  tooLong:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO, "concat length", "safe integer");
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
 array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsval *vp, v;
     JSObject *nobj, *aobj;
     jsuint length, alength, slot;
     uintN i;
-    JSBool hole;
+    JSBool hole, array;
 
     /* Hoist the explicit local root address computation. */
     vp = argv + argc;
@@ -1386,7 +1523,8 @@ array_concat(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         v = argv[i];
         if (JSVAL_IS_OBJECT(v)) {
             aobj = JSVAL_TO_OBJECT(v);
-            if (aobj && OBJ_GET_CLASS(cx, aobj) == &js_ArrayClass) {
+            if (aobj && !js_IsArray(cx, aobj, &array)) return JS_FALSE;
+            if (aobj && array) {
                 if (!OBJ_GET_PROPERTY(cx, aobj,
                                       ATOM_TO_JSID(cx->runtime->atomState
                                                    .lengthAtom),
@@ -1426,7 +1564,7 @@ array_slice(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     JSObject *nobj;
     jsuint length, begin, end, slot;
     jsdouble d;
-    JSBool hole;
+    JSBool hole, array;
 
     /* Hoist the explicit local root address computation. */
     vp = argv + argc;
@@ -1572,6 +1710,130 @@ typedef enum ArrayExtraMode {
 } ArrayExtraMode;
 
 #define REDUCE_MODE(mode) ((mode) == REDUCE || (mode) == REDUCE_RIGHT)
+
+static JSBool
+ArrayModernExtra(JSContext *cx, uintN argc, jsval *argv, jsval *rval, ArrayExtraMode mode)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval args[4] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root, argumentRoot;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *output = NULL, *holder;
+    JSProperty *property;
+    jsdouble length, index, count = 0;
+    jsint step = mode == REDUCE_RIGHT ? -1 : 1;
+    JSBool reducing = REDUCE_MODE(mode), haveAccumulator = argc > 1;
+    JSBool present, selected, ok = JS_FALSE;
+    uint32 iterations = 0;
+    jsid id;
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    JS_PUSH_TEMP_ROOT(cx, 4, args, &argumentRoot);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (!js_IsCallable(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "Array callback"); goto out;
+    }
+    if (mode == MAP || mode == FILTER) {
+        if (!ArraySpeciesCreate(cx, obj, global, mode == MAP ? length : 0, &values[1])) goto out;
+        output = JSVAL_TO_OBJECT(values[1]);
+    }
+    if (reducing && haveAccumulator) values[2] = argv[1];
+    index = mode == REDUCE_RIGHT ? length - 1 : 0;
+    for (; index >= 0 && index < length; index += step) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[3] = ID_TO_VALUE(id);
+        if (!OBJ_LOOKUP_PROPERTY(cx, obj, id, &holder, &property)) goto out;
+        present = property != NULL;
+        if (!present) continue;
+        OBJ_DROP_PROPERTY(cx, holder, property);
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[4])) goto out;
+        if (reducing && !haveAccumulator) {
+            values[2] = values[4]; haveAccumulator = JS_TRUE; continue;
+        }
+        if (reducing) {
+            args[0] = values[2]; args[1] = values[4]; args[3] = values[0];
+            if (!js_NewNumberValue(cx, index, &args[2])) goto out;
+        } else {
+            args[0] = values[4]; args[2] = values[0];
+            if (!js_NewNumberValue(cx, index, &args[1])) goto out;
+        }
+        if (!js_InternalInvokeValue(cx, reducing || argc < 2 ? JSVAL_VOID : argv[1],
+                                     argv[0], 0, reducing ? 4 : 3, args, &values[5])) goto out;
+        if (reducing) values[2] = values[5];
+        else if (mode == MAP) {
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[3] = ID_TO_VALUE(id);
+            if (!js_CreateDataPropertyOrThrow(cx, output, id, values[5])) goto out;
+        } else if (mode != FOREACH) {
+            if (!js_ValueToBoolean(cx, values[5], &selected)) goto out;
+            if ((mode == SOME && selected) || (mode == EVERY && !selected)) {
+                *rval = BOOLEAN_TO_JSVAL(selected); ok = JS_TRUE; goto out;
+            }
+            if (mode == FILTER && selected) {
+                if (!js_ArrayLikeIndex(cx, count++, &id)) goto out;
+                values[3] = ID_TO_VALUE(id);
+                if (!js_CreateDataPropertyOrThrow(cx, output, id, values[4])) goto out;
+            }
+        }
+    }
+    if (reducing) {
+        if (!haveAccumulator) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_EMPTY_ARRAY_REDUCE); goto out;
+        }
+        *rval = values[2];
+    } else if (mode == MAP || mode == FILTER) *rval = values[1];
+    else if (mode == FOREACH) *rval = JSVAL_VOID;
+    else *rval = BOOLEAN_TO_JSVAL(mode == EVERY);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &argumentRoot);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayModernForEach(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, FOREACH);
+}
+
+static JSBool
+ArrayModernMap(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, MAP);
+}
+
+static JSBool
+ArrayModernFilter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, FILTER);
+}
+
+static JSBool
+ArrayModernSome(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, SOME);
+}
+
+static JSBool
+ArrayModernEvery(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, EVERY);
+}
+
+static JSBool
+ArrayModernReduce(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, REDUCE);
+}
+
+static JSBool
+ArrayModernReduceRight(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernExtra(cx, argc, argv, rval, REDUCE_RIGHT);
+}
 
 static JSBool
 array_extra(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
@@ -1819,6 +2081,714 @@ array_every(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 }
 #endif
 
+/* These new methods use ToLength, not the historical methods' ToUint32.
+ * Doubles represent every integer in the required [0, 2^53-1] range exactly. */
+JSBool
+js_ArrayLikeLength(JSContext *cx, JSObject *obj, jsdouble *length)
+{
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, JSVAL_VOID, &root);
+    ok = OBJ_GET_PROPERTY(cx, obj,
+                         ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                         &root.u.value) &&
+         js_ValueToNumber(cx, root.u.value, length);
+    if (ok) {
+        *length = js_DoubleToInteger(*length);
+        if (*length <= 0)
+            *length = 0;
+        else if (*length > 9007199254740991.0)
+            *length = 9007199254740991.0;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayRelativeIndex(JSContext *cx, jsval value, jsdouble length,
+                   jsdouble *index)
+{
+    if (!js_ValueToNumber(cx, value, index))
+        return JS_FALSE;
+    *index = js_DoubleToInteger(*index);
+    if (*index < 0) {
+        *index += length;
+        if (*index < 0)
+            *index = 0;
+    } else if (*index > length) {
+        *index = length;
+    }
+    return JS_TRUE;
+}
+
+/* The caller roots ID_TO_VALUE(*idp) before any subsequent allocation. */
+JSBool
+js_ArrayLikeIndex(JSContext *cx, jsdouble index, jsid *idp)
+{
+    JSString *str;
+    JSAtom *atom;
+    if (index <= JSVAL_INT_MAX) {
+        *idp = INT_TO_JSID((jsint)index);
+        return JS_TRUE;
+    }
+    str = js_NumberToString(cx, index);
+    if (!str)
+        return JS_FALSE;
+    atom = js_AtomizeString(cx, str, 0);
+    if (!atom)
+        return JS_FALSE;
+    *idp = ATOM_TO_JSID(atom);
+    return JS_TRUE;
+}
+
+/* Modern indexed operations use double indices through the safe-integer range.
+ * Keep the legacy implementations separate, including their ToUint32 policy. */
+static JSBool
+ArrayDeleteOrThrow(JSContext *cx, JSObject *obj, jsid id)
+{
+    jsval deleted;
+    if (!OBJ_DELETE_PROPERTY(cx, obj, id, &deleted)) return JS_FALSE;
+    if (deleted != JSVAL_FALSE) return JS_TRUE;
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR);
+    return JS_FALSE;
+}
+
+static JSBool
+ArrayHas(JSContext *cx, JSObject *obj, jsid id, JSBool *present)
+{
+    JSObject *holder;
+    JSProperty *property;
+    if (!OBJ_LOOKUP_PROPERTY(cx, obj, id, &holder, &property)) return JS_FALSE;
+    *present = property != NULL;
+    if (property) OBJ_DROP_PROPERTY(cx, holder, property);
+    return JS_TRUE;
+}
+
+typedef enum ArrayIndexedMode {
+    ARRAY_PUSH, ARRAY_POP, ARRAY_SHIFT, ARRAY_UNSHIFT, ARRAY_REVERSE,
+    ARRAY_SLICE, ARRAY_SPLICE, ARRAY_INDEX_OF, ARRAY_LAST_INDEX_OF
+} ArrayIndexedMode;
+
+static JSBool
+ArrayModernIndexed(JSContext *cx, uintN argc, jsval *argv, jsval *rval,
+                   ArrayIndexedMode mode)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *output;
+    jsdouble length, index, target, end, count, start;
+    jsid id, to;
+    JSBool present, upper, ok = JS_FALSE;
+    uintN i;
+    uint32 iterations = 0;
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (mode == ARRAY_INDEX_OF || mode == ARRAY_LAST_INDEX_OF) {
+        *rval = INT_TO_JSVAL(-1);
+        if (length == 0) { ok = JS_TRUE; goto out; }
+        start = mode == ARRAY_LAST_INDEX_OF ? length - 1 : 0;
+        if (argc > 1) {
+            if (!js_ValueToNumber(cx, argv[1], &start)) goto out;
+            start = js_DoubleToInteger(start);
+            if (start == 0) start = 0; /* Index results use positive zero. */
+        }
+        if (mode == ARRAY_INDEX_OF) {
+            index = start < 0 ? JS_MAX(length + start, 0) : start;
+        } else {
+            index = start < 0 ? length + start : JS_MIN(start, length - 1);
+        }
+        for (; index >= 0 && index < length; index += mode == ARRAY_INDEX_OF ? 1 : -1) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present) {
+                if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2])) goto out;
+                if (js_StrictlyEqual(values[2], argv[0])) {
+                    ok = js_NewNumberValue(cx, index, rval); goto out;
+                }
+            }
+        }
+        ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_SLICE) {
+        if (!ArrayRelativeIndex(cx, argv[0], length, &index)) goto out;
+        end = length;
+        if (argc > 1 && !JSVAL_IS_VOID(argv[1]) && !ArrayRelativeIndex(cx, argv[1], length, &end)) goto out;
+        count = JS_MAX(end - index, 0);
+        if (!ArraySpeciesCreate(cx, obj, global, count, &values[5])) goto out;
+        output = JSVAL_TO_OBJECT(values[5]);
+        for (target = 0; index < end; ++index, ++target) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present) {
+                if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_ArrayLikeIndex(cx, target, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!js_CreateDataPropertyOrThrow(cx, output, to, values[2])) goto out;
+            }
+        }
+        if (!js_NewNumberValue(cx, count, &values[2]) ||
+            !js_SetPropertyOrThrow(cx, output, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+        *rval = values[5]; ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_SPLICE) {
+        if (!ArrayRelativeIndex(cx, argv[0], length, &start)) goto out;
+        count = 0;
+        i = argc > 2 ? argc - 2 : 0;
+        if (argc == 1) count = length - start;
+        else if (argc > 1) {
+            if (!js_ValueToNumber(cx, argv[1], &count)) goto out;
+            count = JS_MIN(JS_MAX(js_DoubleToInteger(count), 0), length - start);
+        }
+        if ((jsdouble)i > 9007199254740991.0 - (length - count)) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR); goto out;
+        }
+        if (!ArraySpeciesCreate(cx, obj, global, count, &values[5])) goto out;
+        output = JSVAL_TO_OBJECT(values[5]);
+        for (index = 0; index < count; ++index) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, start + index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present) {
+                if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_ArrayLikeIndex(cx, index, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!js_CreateDataPropertyOrThrow(cx, output, to, values[2])) goto out;
+            }
+        }
+        if (!js_NewNumberValue(cx, count, &values[2]) ||
+            !js_SetPropertyOrThrow(cx, output, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+        if ((jsdouble)i < count) {
+            for (index = start; index < length - count; ++index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index + count, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!js_ArrayLikeIndex(cx, index + i, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!ArrayHas(cx, obj, id, &present)) goto out;
+                if (present) {
+                    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+            }
+            for (index = length; index > length - count + i; --index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index - 1, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!ArrayDeleteOrThrow(cx, obj, id)) goto out;
+            }
+        } else if ((jsdouble)i > count) {
+            for (index = length - count; index > start; --index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index + count - 1, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!js_ArrayLikeIndex(cx, index + i - 1, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!ArrayHas(cx, obj, id, &present)) goto out;
+                if (present) {
+                    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+            }
+        }
+        for (index = 0; index < i; ++index) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, start + index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id); values[2] = argv[(uintN)index + 2];
+            if (!js_SetPropertyOrThrow(cx, obj, id, &values[2])) goto out;
+        }
+        if (!js_NewNumberValue(cx, length - count + i, &values[2]) ||
+            !js_SetPropertyOrThrow(cx, obj, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+        *rval = values[5]; ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_PUSH || mode == ARRAY_UNSHIFT) {
+        if ((jsdouble)argc > 9007199254740991.0 - length) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_DESCRIPTOR); goto out;
+        }
+    }
+    if (mode == ARRAY_REVERSE) {
+        for (index = 0; index < js_DoubleToInteger(length / 2); ++index) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!js_ArrayLikeIndex(cx, length - index - 1, &to)) goto out;
+            values[3] = ID_TO_VALUE(to);
+            if (!ArrayHas(cx, obj, id, &present)) goto out;
+            if (present && !OBJ_GET_PROPERTY(cx, obj, id, &values[2])) goto out;
+            if (!ArrayHas(cx, obj, to, &upper)) goto out;
+            if (upper && !OBJ_GET_PROPERTY(cx, obj, to, &values[4])) goto out;
+            if (upper) {
+                if (!js_SetPropertyOrThrow(cx, obj, id, &values[4])) goto out;
+            } else if (present && !ArrayDeleteOrThrow(cx, obj, id)) goto out;
+            if (present) {
+                if (!js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+            } else if (upper && !ArrayDeleteOrThrow(cx, obj, to)) goto out;
+        }
+        *rval = values[0]; ok = JS_TRUE; goto out;
+    }
+    if (mode == ARRAY_POP || mode == ARRAY_SHIFT) {
+        *rval = JSVAL_VOID;
+        if (length > 0) {
+            if (!js_ArrayLikeIndex(cx, mode == ARRAY_POP ? length - 1 : 0, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!OBJ_GET_PROPERTY(cx, obj, id, &values[5])) goto out;
+            if (mode == ARRAY_SHIFT) {
+                for (index = 1; index < length; ++index) {
+                    if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                    if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+                    values[1] = ID_TO_VALUE(id);
+                    if (!js_ArrayLikeIndex(cx, index - 1, &to)) goto out;
+                    values[3] = ID_TO_VALUE(to);
+                    if (!ArrayHas(cx, obj, id, &present)) goto out;
+                    if (present) {
+                        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                    } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+                }
+            }
+            --length;
+            if (!js_ArrayLikeIndex(cx, length, &id)) goto out;
+            values[1] = ID_TO_VALUE(id);
+            if (!ArrayDeleteOrThrow(cx, obj, id)) goto out;
+        }
+    } else {
+        if (mode == ARRAY_UNSHIFT && argc) {
+            for (index = length; index > 0; --index) {
+                if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+                if (!js_ArrayLikeIndex(cx, index - 1, &id)) goto out;
+                values[1] = ID_TO_VALUE(id);
+                if (!js_ArrayLikeIndex(cx, index + argc - 1, &to)) goto out;
+                values[3] = ID_TO_VALUE(to);
+                if (!ArrayHas(cx, obj, id, &present)) goto out;
+                if (present) {
+                    if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2]) || !js_SetPropertyOrThrow(cx, obj, to, &values[2])) goto out;
+                } else if (!ArrayDeleteOrThrow(cx, obj, to)) goto out;
+            }
+        }
+        for (i = 0; i < argc; ++i) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, mode == ARRAY_PUSH ? length + i : i, &id)) goto out;
+            values[1] = ID_TO_VALUE(id); values[2] = argv[i];
+            if (!js_SetPropertyOrThrow(cx, obj, id, &values[2])) goto out;
+        }
+        length += argc;
+    }
+    if (!js_NewNumberValue(cx, length, &values[2])) goto out;
+    values[4] = values[2];
+    if (!js_SetPropertyOrThrow(cx, obj, ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &values[2])) goto out;
+    *rval = mode == ARRAY_POP || mode == ARRAY_SHIFT ? values[5] : values[4];
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+#define ARRAY_MODERN_INDEXED(name, mode) \
+static JSBool name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) \
+{ return ArrayModernIndexed(cx, argc, argv, rval, mode); }
+ARRAY_MODERN_INDEXED(ArrayModernPush, ARRAY_PUSH)
+ARRAY_MODERN_INDEXED(ArrayModernPop, ARRAY_POP)
+ARRAY_MODERN_INDEXED(ArrayModernShift, ARRAY_SHIFT)
+ARRAY_MODERN_INDEXED(ArrayModernUnshift, ARRAY_UNSHIFT)
+ARRAY_MODERN_INDEXED(ArrayModernReverse, ARRAY_REVERSE)
+ARRAY_MODERN_INDEXED(ArrayModernSlice, ARRAY_SLICE)
+ARRAY_MODERN_INDEXED(ArrayModernSplice, ARRAY_SPLICE)
+#if JS_HAS_ARRAY_EXTRAS
+ARRAY_MODERN_INDEXED(ArrayModernIndexOf, ARRAY_INDEX_OF)
+ARRAY_MODERN_INDEXED(ArrayModernLastIndexOf, ARRAY_LAST_INDEX_OF)
+#endif
+#undef ARRAY_MODERN_INDEXED
+
+typedef struct ArraySortArgs {
+    CompareArgs compare;
+    uint32 iterations;
+} ArraySortArgs;
+
+static JSBool
+ArrayModernCompare(void *data, const void *a, const void *b, int *result)
+{
+    ArraySortArgs *args = (ArraySortArgs *)data;
+    JSContext *cx = args->compare.context;
+    JSString *left, *right;
+    if (cx->branchCallback && !(args->iterations++ & 127) &&
+        !cx->branchCallback(cx, NULL)) return JS_FALSE;
+    if (args->compare.fval == JSVAL_NULL) {
+        /* Even identical objects have observable ToString calls. */
+        left = js_ValueToString(cx, *(const jsval *)a);
+        if (!left) return JS_FALSE;
+        *args->compare.localroot = STRING_TO_JSVAL(left);
+        right = js_ValueToString(cx, *(const jsval *)b);
+        if (!right) return JS_FALSE;
+        *result = js_CompareStrings(left, right);
+        return JS_TRUE;
+    }
+    return sort_compare(&args->compare, a, b, result);
+}
+
+static JSBool
+ArrayModernSort(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[5] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval *vector = NULL, *newVector;
+    JSTempValueRooter root, vectorRoot;
+    JSObject *obj;
+    jsdouble length, index, undefinedCount = 0, end;
+    size_t count = 0, capacity = 0, newCapacity;
+    uint32 iterations = 0;
+    jsid id;
+    JSBool present, ok = JS_FALSE;
+    ArraySortArgs args;
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    JS_PUSH_TEMP_ROOT(cx, 0, vector, &vectorRoot);
+    obj = js_BuiltinToObject(cx, js_BuiltinGlobal(cx, argv), argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (!JSVAL_IS_VOID(argv[0]) && !js_IsCallable(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_SORT_ARG); goto out;
+    }
+    for (index = 0; index < length; ++index) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[1] = ID_TO_VALUE(id);
+        if (!ArrayHas(cx, obj, id, &present)) goto out;
+        if (!present) continue;
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[2])) goto out;
+        if (JSVAL_IS_VOID(values[2])) { ++undefinedCount; continue; }
+        if (count == capacity) {
+            newCapacity = capacity ? capacity * 2 : 32;
+            if (newCapacity < capacity || newCapacity > 0x7fffffff ||
+                newCapacity > ((size_t)-1) / sizeof(jsval)) {
+                JS_ReportOutOfMemory(cx); goto out;
+            }
+            newVector = (jsval *)JS_realloc(cx, vector, newCapacity * sizeof(jsval));
+            if (!newVector) goto out;
+            vector = newVector; capacity = newCapacity; vectorRoot.u.array = vector;
+        }
+        vector[count++] = values[2]; vectorRoot.count = (jsint)count;
+    }
+    args.compare.context = cx;
+    args.compare.fval = JSVAL_IS_VOID(argv[0]) ? JSVAL_NULL : argv[0];
+    args.compare.localroot = &values[3]; args.iterations = 0;
+    if (!js_HeapSort(vector, count, &values[4], sizeof(jsval), ArrayModernCompare, &args)) goto out;
+    end = count + undefinedCount;
+    for (index = 0; index < length; ++index) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[1] = ID_TO_VALUE(id);
+        if (index < end) {
+            values[2] = index < count ? vector[(size_t)index] : JSVAL_VOID;
+            if (!js_SetPropertyOrThrow(cx, obj, id, &values[2])) goto out;
+        } else if (!ArrayDeleteOrThrow(cx, obj, id)) goto out;
+    }
+    *rval = values[0]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &vectorRoot);
+    JS_POP_TEMP_ROOT(cx, &root);
+    JS_free(cx, vector);
+    return ok;
+}
+
+/* Active joins are stack-owned and their objects are rooted by the callers.
+ * Unlike the historical sharp map, this cycle guard never enumerates properties. */
+typedef struct JSArrayJoinState {
+    JSObject *object;
+    struct JSArrayJoinState *previous;
+} JSArrayJoinState;
+
+typedef struct ArrayText {
+    jschar *chars;
+    size_t length, capacity;
+} ArrayText;
+
+static JSBool
+ArrayAppendText(JSContext *cx, ArrayText *text, const jschar *chars, size_t length)
+{
+    size_t needed, capacity;
+    jschar *newChars;
+    if (length > JSSTRING_LENGTH_MASK - text->length ||
+        text->length + length >= ((size_t)-1) / sizeof(jschar)) {
+        JS_ReportOutOfMemory(cx); return JS_FALSE;
+    }
+    needed = text->length + length + 1;
+    if (needed > text->capacity) {
+        capacity = text->capacity ? text->capacity : 64;
+        while (capacity < needed) {
+            if (capacity > ((size_t)-1) / sizeof(jschar) / 2) { capacity = needed; break; }
+            capacity *= 2;
+        }
+        newChars = (jschar *)JS_realloc(cx, text->chars, capacity * sizeof(jschar));
+        if (!newChars) return JS_FALSE;
+        text->chars = newChars; text->capacity = capacity;
+    }
+    if (length) memcpy(text->chars + text->length, chars, length * sizeof(jschar));
+    text->length += length; text->chars[text->length] = 0;
+    return JS_TRUE;
+}
+
+static JSBool
+ArrayModernString(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSBool locale)
+{
+    jsval values[6] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj, *element;
+    JSArrayJoinState state, *active;
+    ArrayText text = {NULL, 0, 0};
+    JSString *str;
+    const jschar comma = ',';
+    jsdouble length, index;
+    jsid id;
+    uint32 iterations = 0;
+    JSBool entered = JS_FALSE, ok = JS_FALSE;
+    int stackDummy;
+    if (!JS_CHECK_STACK_SIZE(cx, stackDummy)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OVER_RECURSED); return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 6, values, &root);
+    obj = js_BuiltinToObject(cx, global, argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!js_ArrayLikeLength(cx, obj, &length)) goto out;
+    if (!locale && !JSVAL_IS_VOID(argv[0])) {
+        str = js_ValueToString(cx, argv[0]);
+        if (!str) goto out;
+        values[1] = STRING_TO_JSVAL(str);
+    }
+    for (active = cx->arrayJoinStack; active; active = active->previous) {
+        if (active->object == obj) {
+            *rval = JS_GetEmptyStringValue(cx); ok = JS_TRUE; goto out;
+        }
+    }
+    state.object = obj; state.previous = cx->arrayJoinStack;
+    cx->arrayJoinStack = &state; entered = JS_TRUE;
+    for (index = 0; index < length; ++index) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (index != 0) {
+            if (JSVAL_IS_VOID(values[1])) {
+                if (!ArrayAppendText(cx, &text, &comma, 1)) goto out;
+            } else {
+                str = JSVAL_TO_STRING(values[1]);
+                if (!ArrayAppendText(cx, &text, JSSTRING_CHARS(str), JSSTRING_LENGTH(str))) goto out;
+            }
+        }
+        if (!js_ArrayLikeIndex(cx, index, &id)) goto out;
+        values[2] = ID_TO_VALUE(id);
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[3])) goto out;
+        if (JSVAL_IS_NULL(values[3]) || JSVAL_IS_VOID(values[3])) continue;
+        if (locale) {
+            element = js_BuiltinToObject(cx, global, values[3]);
+            if (!element) goto out;
+            values[4] = OBJECT_TO_JSVAL(element);
+            if (!js_GetPropertyValue(cx, element, values[3], ATOM_TO_JSID(cx->runtime->atomState.toLocaleStringAtom), &values[5])) goto out;
+            if (!js_IsCallable(cx, values[5])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "toLocaleString"); goto out;
+            }
+            if (!js_InternalInvokeValue(cx, values[3], values[5], 0, 0, NULL, &values[4])) goto out;
+        } else values[4] = values[3];
+        str = js_ValueToString(cx, values[4]);
+        if (!str) goto out;
+        values[4] = STRING_TO_JSVAL(str);
+        if (!ArrayAppendText(cx, &text, JSSTRING_CHARS(str), JSSTRING_LENGTH(str))) goto out;
+    }
+    if (!text.chars) { *rval = JS_GetEmptyStringValue(cx); ok = JS_TRUE; goto out; }
+    str = js_NewString(cx, text.chars, text.length, 0);
+    if (!str) goto out;
+    text.chars = NULL; *rval = STRING_TO_JSVAL(str); ok = JS_TRUE;
+  out:
+    if (entered) cx->arrayJoinStack = state.previous;
+    JS_free(cx, text.chars);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayModernJoin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernString(cx, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+ArrayModernLocaleString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ArrayModernString(cx, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+ArrayModernToString(JSContext *cx, JSObject *ignored, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *obj;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    obj = js_BuiltinToObject(cx, js_BuiltinGlobal(cx, argv), argv[-1]);
+    if (!obj) goto out;
+    values[0] = OBJECT_TO_JSVAL(obj);
+    if (!JS_GetProperty(cx, obj, "join", &values[1])) goto out;
+    if (js_IsCallable(cx, values[1]))
+        ok = js_InternalInvokeValue(cx, values[0], values[1], 0, 0, NULL, rval);
+    else
+        ok = js_ObjectToStringES2015(cx, obj, 0, values + 1, rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+array_findHelper(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                 jsval *rval, JSBool returnIndex)
+{
+    jsdouble length, index;
+    jsval values[5], thisv;
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE, selected;
+    uintN i;
+
+    if (!js_ArrayLikeLength(cx, obj, &length))
+        return JS_FALSE;
+    if (!js_IsCallable(cx, argv[0])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "predicate");
+        return JS_FALSE;
+    }
+    thisv = argc > 1 ? argv[1] : JSVAL_VOID;
+    for (i = 0; i < 5; ++i)
+        values[i] = JSVAL_VOID;
+    values[2] = OBJECT_TO_JSVAL(obj);
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    *rval = returnIndex ? INT_TO_JSVAL(-1) : JSVAL_VOID;
+    for (index = 0; index < length; ++index) {
+        if (!js_ArrayLikeIndex(cx, index, &id))
+            goto out;
+        values[4] = ID_TO_VALUE(id);
+        /* Get every index, including holes. Unlike filter/some, find does
+         * not perform HasProperty or skip an absent property. */
+        if (!OBJ_GET_PROPERTY(cx, obj, id, &values[0]) ||
+            !js_NewNumberValue(cx, index, &values[1]) ||
+            !js_InternalInvokeValue(cx, thisv, argv[0], 0, 3, values,
+                                    &values[3]) ||
+            !js_ValueToBoolean(cx, values[3], &selected))
+            goto out;
+        if (selected) {
+            *rval = values[returnIndex ? 1 : 0];
+            break;
+        }
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+array_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return array_findHelper(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+array_findIndex(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return array_findHelper(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+array_fill(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble length, index, end;
+    jsval values[2];
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+
+    if (!js_ArrayLikeLength(cx, obj, &length) ||
+        !ArrayRelativeIndex(cx, argc > 1 ? argv[1] : JSVAL_VOID, length, &index))
+        return JS_FALSE;
+    end = length;
+    if (argc > 2 && !JSVAL_IS_VOID(argv[2]) &&
+        !ArrayRelativeIndex(cx, argv[2], length, &end))
+        return JS_FALSE;
+    values[0] = values[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, values, &root);
+    for (; index < end; ++index) {
+        if (!js_ArrayLikeIndex(cx, index, &id))
+            goto out;
+        values[0] = ID_TO_VALUE(id);
+        /* A native setter can replace its vp without changing fill's value. */
+        values[1] = argv[0];
+        if (!js_SetPropertyOrThrow(cx, obj, id, &values[1]))
+            goto out;
+    }
+    *rval = OBJECT_TO_JSVAL(obj);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+array_copyWithin(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble length, target, start, end, count, direction;
+    jsval values[3], deleted;
+    jsid from, to;
+    JSObject *holder;
+    JSProperty *property;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE, present;
+
+    if (!js_ArrayLikeLength(cx, obj, &length) ||
+        !ArrayRelativeIndex(cx, argv[0], length, &target) ||
+        !ArrayRelativeIndex(cx, argv[1], length, &start))
+        return JS_FALSE;
+    end = length;
+    if (argc > 2 && !JSVAL_IS_VOID(argv[2]) &&
+        !ArrayRelativeIndex(cx, argv[2], length, &end))
+        return JS_FALSE;
+    count = JS_MIN(end - start, length - target);
+    direction = 1;
+    if (start < target && target < start + count) {
+        direction = -1;
+        start += count - 1;
+        target += count - 1;
+    }
+    values[0] = values[1] = values[2] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    for (; count > 0; --count, start += direction, target += direction) {
+        if (!js_ArrayLikeIndex(cx, start, &from))
+            goto out;
+        values[0] = ID_TO_VALUE(from);
+        if (!js_ArrayLikeIndex(cx, target, &to))
+            goto out;
+        values[1] = ID_TO_VALUE(to);
+        if (!OBJ_LOOKUP_PROPERTY(cx, obj, from, &holder, &property))
+            goto out;
+        present = property != NULL;
+        if (present) {
+            OBJ_DROP_PROPERTY(cx, holder, property);
+            if (!OBJ_GET_PROPERTY(cx, obj, from, &values[2]) ||
+                !js_SetPropertyOrThrow(cx, obj, to, &values[2]))
+                goto out;
+        } else {
+            if (!OBJ_DELETE_PROPERTY(cx, obj, to, &deleted))
+                goto out;
+            if (deleted == JSVAL_FALSE) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_BAD_DESCRIPTOR);
+                goto out;
+            }
+        }
+    }
+    *rval = OBJECT_TO_JSVAL(obj);
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
 static JSFunctionSpec array_methods[] = {
 #if JS_HAS_TOSOURCE
     {js_toSource_str,       array_toSource,         0,0,0},
@@ -1835,6 +2805,12 @@ static JSFunctionSpec array_methods[] = {
     {"shift",               array_shift,            0,JSFUN_GENERIC_NATIVE,1},
     {"unshift",             array_unshift,          1,JSFUN_GENERIC_NATIVE,1},
     {"splice",              array_splice,           2,JSFUN_GENERIC_NATIVE,1},
+
+    /* ES2015 array-like operations (no legacy static generic aliases). */
+    {"find",                array_find,             1,0,0},
+    {"findIndex",           array_findIndex,        1,0,0},
+    {"fill",                array_fill,             1,0,0},
+    {"copyWithin",          array_copyWithin,       2,0,0},
 
     /* Python-esque sequence methods. */
     {"concat",              array_concat,           1,JSFUN_GENERIC_NATIVE,1},
@@ -1886,12 +2862,334 @@ Array(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return InitArrayObject(cx, obj, length, vector);
 }
 
+JSBool
+js_IsArray(JSContext *cx, JSObject *obj, JSBool *answer)
+{
+    while (js_IsProxy(cx, obj)) {
+        if (!js_ProxyTarget(cx, obj, &obj)) return JS_FALSE;
+    }
+    *answer = OBJ_GET_CLASS(cx, obj) == &js_ArrayClass;
+    return JS_TRUE;
+}
+
 static JSBool
 array_isArray(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
               jsval *rval)
 {
-    *rval = BOOLEAN_TO_JSVAL(argc != 0 && !JSVAL_IS_PRIMITIVE(argv[0]) &&
-                            OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) == &js_ArrayClass);
+    JSBool answer;
+    *rval = JSVAL_FALSE;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) return JS_TRUE;
+    if (!js_IsArray(cx, JSVAL_TO_OBJECT(argv[0]), &answer)) return JS_FALSE;
+    *rval = BOOLEAN_TO_JSVAL(answer);
+    return JS_TRUE;
+}
+
+/* Array.from uses ES2015 iteration; classic Iterator is deliberately unrelated. */
+typedef struct ArrayFromIdRoot {
+    JSTempValueRooter root;
+    jsid id;
+} ArrayFromIdRoot;
+JS_STATIC_DLL_CALLBACK(void)
+MarkArrayFromId(JSContext *cx, JSTempValueRooter *root)
+{
+    jsid id = ((ArrayFromIdRoot *)root)->id;
+    if (JSID_IS_ATOM(id))
+        js_MarkAtom(cx, JSID_TO_ATOM(id));
+}
+
+static JSBool
+ArrayFromCreate(JSContext *cx, jsval *argv, JSBool iterable,
+                jsdouble length, jsval *rval)
+{
+    JSObject *global, *parent, *ctor, *array;
+    jsval proto, *base, *oldsp;
+    JSStackFrame *fp = cx->fp;
+    void *mark;
+    uintN count = iterable ? 0 : 1;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (js_IsConstructor(cx, argv[-1])) {
+        base = js_AllocStack(cx, 3, &mark);
+        if (!base) return JS_FALSE;
+        base[0] = argv[-1];
+        base[1] = JSVAL_NULL;
+        base[2] = JSVAL_VOID;
+        oldsp = fp->sp;
+        fp->sp = base + 3;
+        ok = js_NewNumberValue(cx, length, &base[2]);
+        fp->sp = base + 2 + count;
+        if (ok) ok = js_InvokeConstructor(cx, base, count);
+        if (ok) *rval = base[0];
+        fp->sp = oldsp;
+        js_FreeStack(cx, mark);
+        return ok;
+    }
+    if (length > MAXINDEX) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_BAD_ARRAY_LENGTH);
+        return JS_FALSE;
+    }
+    global = JSVAL_TO_OBJECT(argv[-2]);
+    while ((parent = OBJ_GET_PARENT(cx, global)) != NULL)
+        global = parent;
+    ctor = js_GetCachedClassObject(cx, global, JSProto_Array);
+    if (!ctor && !js_GetClassObject(cx, global, JSProto_Array, &ctor))
+        return JS_FALSE;
+    if (!ctor || !OBJ_GET_PROPERTY(cx, ctor,
+                   ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom), &proto))
+        return JS_FALSE;
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, proto, &root);
+    array = js_NewArrayObjectWithProto(cx, (jsuint)length, NULL,
+                                      JSVAL_TO_OBJECT(proto), global);
+    if (array)
+        *rval = OBJECT_TO_JSVAL(array);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return array != NULL;
+}
+
+static JSBool
+array_from(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    /* source, method, output, iterator, result, callback value/index, scratch */
+    jsval roots[8], mapfn = argc > 1 ? argv[1] : JSVAL_VOID;
+    jsval thisv = argc > 2 ? argv[2] : JSVAL_VOID;
+    JSTempValueRooter root;
+    ArrayFromIdRoot indexRoot;
+    JSObject *source, *array, *iterator = NULL;
+    jsid methodId;
+    jsdouble length = 0, index = 0;
+    JSBool mapping = !JSVAL_IS_VOID(mapfn), iterable, done, ok = JS_FALSE;
+    uintN i;
+    if (mapping && !js_IsCallable(cx, mapfn)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "mapfn");
+        return JS_FALSE;
+    }
+    for (i = 0; i < 8; ++i) roots[i] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 8, roots, &root);
+    indexRoot.id = INT_TO_JSID(0);
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkArrayFromId, &indexRoot.root);
+    source = js_ValueToNonNullObject(cx, argc ? argv[0] : JSVAL_VOID);
+    if (!source) goto out;
+    roots[0] = OBJECT_TO_JSVAL(source);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_ITERATOR, &methodId) ||
+        !(JSVAL_IS_PRIMITIVE(argv[0])
+          ? js_GetPropertyValue(cx, source, argv[0], methodId, &roots[1])
+          : OBJ_GET_PROPERTY(cx, source, methodId, &roots[1]))) goto out;
+    iterable = !JSVAL_IS_VOID(roots[1]) && !JSVAL_IS_NULL(roots[1]);
+    if (iterable && !js_IsCallable(cx, roots[1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_NOT_FUNCTION, "Symbol.iterator");
+        goto out;
+    }
+    if (!iterable && !js_ArrayLikeLength(cx, source, &length)) goto out;
+    if (!ArrayFromCreate(cx, argv, iterable, length, &roots[2])) goto out;
+    array = JSVAL_TO_OBJECT(roots[2]);
+    if (iterable) {
+        if (!js_InternalInvokeValue(cx, argv[0], roots[1], 0, 0, NULL, &roots[3])) goto out;
+        if (JSVAL_IS_PRIMITIVE(roots[3])) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_BAD_ITERATOR_RETURN, "items", "Symbol.iterator");
+            goto out;
+        }
+        iterator = JSVAL_TO_OBJECT(roots[3]);
+    }
+    for (;;) {
+        if (!iterable && index >= length) break;
+        if (!js_ArrayLikeIndex(cx, index, &indexRoot.id)) goto out;
+        if (iterable) {
+            if (!JS_GetProperty(cx, iterator, "next", &roots[7])) goto out;
+            if (!js_IsCallable(cx, roots[7])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_NOT_FUNCTION, "iterator next");
+                goto out;
+            }
+            if (!js_InternalCall(cx, iterator, roots[7], 0, NULL, &roots[4])) goto out;
+            if (JSVAL_IS_PRIMITIVE(roots[4])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                     JSMSG_BAD_ITERATOR_RETURN, "iterator", "next");
+                goto out;
+            }
+            if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(roots[4]), "done", &roots[7]) ||
+                !js_ValueToBoolean(cx, roots[7], &done)) goto out;
+            if (done) break;
+            if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(roots[4]), "value", &roots[5])) goto out;
+        } else {
+            if (!OBJ_GET_PROPERTY(cx, source, indexRoot.id, &roots[5])) goto out;
+        }
+        if (mapping) {
+            if (!js_NewNumberValue(cx, index, &roots[6])) goto out;
+            if (!js_InternalInvokeValue(cx, thisv, mapfn, 0, 2, &roots[5], &roots[7])) {
+                if (iterable) js_IteratorCloseThrow(cx, iterator);
+                goto out;
+            }
+            roots[5] = roots[7];
+        }
+        if (!js_CreateDataPropertyOrThrow(cx, array, indexRoot.id, roots[5])) {
+            if (iterable) js_IteratorCloseThrow(cx, iterator);
+            goto out;
+        }
+        if (index == 9007199254740991.0) {
+            JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                 JSMSG_CANT_CONVERT_TO, "iteration index", "safe integer");
+            if (iterable) js_IteratorCloseThrow(cx, iterator);
+            goto out;
+        }
+        ++index;
+    }
+    if (!js_NewNumberValue(cx, index, &roots[7]) ||
+        !js_SetPropertyOrThrow(cx, array,
+             ATOM_TO_JSID(cx->runtime->atomState.lengthAtom), &roots[7])) goto out;
+    *rval = roots[2];
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &indexRoot.root);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+array_of(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *array, *global, *parent, *ctor;
+    JSStackFrame *fp = cx->fp;
+    jsval *base, *oldsp, value;
+    JSTempValueRooter root;
+    jsid id;
+    void *mark;
+    uintN i;
+    JSBool ok, initialize = JS_FALSE;
+
+    if (js_IsConstructor(cx, argv[-1])) {
+        base = js_AllocStack(cx, 3, &mark);
+        if (!base)
+            return JS_FALSE;
+        base[0] = argv[-1];
+        base[1] = JSVAL_NULL;
+        base[2] = INT_TO_JSVAL(argc);
+        oldsp = fp->sp;
+        fp->sp = base + 3;
+        ok = js_InvokeConstructor(cx, base, 1);
+        if (ok)
+            *rval = base[0];
+        fp->sp = oldsp;
+        js_FreeStack(cx, mark);
+        if (!ok)
+            return JS_FALSE;
+        array = JSVAL_TO_OBJECT(*rval);
+    } else {
+        /* ArrayCreate uses this built-in's realm even when the caller chose
+         * a legacy language version or replaced the global Array binding. */
+        global = JSVAL_TO_OBJECT(argv[-2]);
+        while ((parent = OBJ_GET_PARENT(cx, global)) != NULL)
+            global = parent;
+        ctor = js_GetCachedClassObject(cx, global, JSProto_Array);
+        if (!ctor) {
+            if (!js_InitArrayClass(cx, global))
+                return JS_FALSE;
+            ctor = js_GetCachedClassObject(cx, global, JSProto_Array);
+        }
+        if (!OBJ_GET_PROPERTY(cx, ctor,
+                              ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom),
+                              &value))
+            return JS_FALSE;
+        JS_PUSH_SINGLE_TEMP_ROOT(cx, value, &root);
+        array = js_NewObject(cx, &js_ArrayClass, JSVAL_TO_OBJECT(value), global);
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!array)
+            return JS_FALSE;
+        *rval = OBJECT_TO_JSVAL(array);
+        initialize = JS_TRUE;
+    }
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, array, &root);
+    ok = JS_FALSE;
+    if (initialize && !InitArrayObject(cx, array, argc, NULL))
+        goto out;
+    for (i = 0; i < argc; ++i) {
+        id = INT_TO_JSID(i);
+        if (!js_CreateDataPropertyOrThrow(cx, array, id, argv[i]))
+            goto out;
+    }
+    value = INT_TO_JSVAL(argc);
+    ok = js_SetPropertyOrThrow(cx, array,
+                              ATOM_TO_JSID(cx->runtime->atomState.lengthAtom),
+                              &value);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArrayUnscopables(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    static const char *names[] = {
+        "copyWithin", "entries", "fill", "find", "findIndex", "keys", "values"
+    };
+    JSObject *table = js_NewObject(cx, &js_ObjectClass, NULL, global);
+    JSTempValueRooter root;
+    jsid id;
+    uintN i;
+    JSBool ok = JS_FALSE;
+    if (!table) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, table, &root);
+    if (!js_GetMutableScope(cx, table)) goto out;
+    OBJ_SET_PROTO(cx, table, NULL);
+    for (i = 0; i < sizeof names / sizeof names[0]; ++i) {
+        if (!JS_DefineProperty(cx, table, names[i], JSVAL_TRUE,
+                               NULL, NULL, JSPROP_ENUMERATE)) goto out;
+    }
+    ok = js_WellKnownSymbolId(cx, JS_WKS_UNSCOPABLES, &id) &&
+         OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(table),
+                             NULL, NULL, JSPROP_READONLY, NULL);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ArraySpecies(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = argv[-1]; return JS_TRUE;
+}
+
+static JSBool
+InitArraySpecies(JSContext *cx, JSObject *global, JSObject *ctor, JSObject *proto)
+{
+    static struct { const char *name; JSNative native; } methods[] = {
+        {"concat", ArrayModernConcat},
+        {"join", ArrayModernJoin}, {"toLocaleString", ArrayModernLocaleString},
+        {"toString", ArrayModernToString}, {"sort", ArrayModernSort},
+        {"push", ArrayModernPush}, {"pop", ArrayModernPop},
+        {"shift", ArrayModernShift}, {"unshift", ArrayModernUnshift},
+        {"reverse", ArrayModernReverse}, {"slice", ArrayModernSlice},
+        {"splice", ArrayModernSplice},
+#if JS_HAS_ARRAY_EXTRAS
+        {"indexOf", ArrayModernIndexOf}, {"lastIndexOf", ArrayModernLastIndexOf},
+        {"forEach", ArrayModernForEach}, {"map", ArrayModernMap},
+        {"filter", ArrayModernFilter}, {"some", ArrayModernSome},
+        {"every", ArrayModernEvery}, {"reduce", ArrayModernReduce},
+        {"reduceRight", ArrayModernReduceRight},
+#endif
+    };
+    uintN i;
+    JSFunction *fun;
+    JSTempValueRooter root;
+    jsid id;
+    jsval value;
+    JSBool ok;
+    if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id)) return JS_FALSE;
+    fun = JS_NewFunction(cx, ArraySpecies, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT, global, "get [Symbol.species]");
+    if (!fun) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = OBJ_DEFINE_PROPERTY(cx, ctor, id, JSVAL_VOID, (JSPropertyOp)fun->object,
+                             NULL, JSPROP_GETTER | JSPROP_SHARED, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    if (!ok) return JS_FALSE;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        if (!JS_GetProperty(cx, proto, methods[i].name, &value)) return JS_FALSE;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+        fun->u.n.native = methods[i].native;
+        fun->flags |= JSFUN_STRICT;
+    }
     return JS_TRUE;
 }
 
@@ -1899,6 +3197,8 @@ JSObject *
 js_InitArrayClass(JSContext *cx, JSObject *obj)
 {
     JSObject *proto, *ctor;
+    JSBool modern = js_GetCachedClassObject(cx, obj, JSProto_Object)
+                    ? js_IsModernGlobal(cx, obj) : JS_VERSION_IS_ES2015(cx);
 
     proto = JS_InitClass(cx, obj, NULL, &js_ArrayClass, Array, 1,
                          NULL, array_methods, NULL, NULL);
@@ -1912,18 +3212,32 @@ js_InitArrayClass(JSContext *cx, JSObject *obj)
     /* JSFunctionSpec keeps its historical 8-bit flags field. */
     ctor = JS_GetConstructor(cx, proto);
     if (!ctor || !JS_DefineFunction(cx, ctor, "isArray", array_isArray, 1,
-                                    JSFUN_NO_CONSTRUCT))
+                                    JSFUN_NO_CONSTRUCT) ||
+        !JS_DefineFunction(cx, ctor, "of", array_of, 0,
+                           JSFUN_NO_CONSTRUCT | JSFUN_STRICT) ||
+        !JS_DefineFunction(cx, ctor, "from", array_from, 1,
+                           JSFUN_NO_CONSTRUCT | JSFUN_STRICT) ||
+        !js_InitArrayIteratorMethods(cx, obj, proto) ||
+        !ArrayUnscopables(cx, obj, proto))
         return NULL;
+    if (modern && !InitArraySpecies(cx, obj, ctor, proto)) return NULL;
     return proto;
 }
 
 JSObject *
 js_NewArrayObject(JSContext *cx, jsuint length, jsval *vector)
 {
+    return js_NewArrayObjectWithProto(cx, length, vector, NULL, NULL);
+}
+
+JSObject *
+js_NewArrayObjectWithProto(JSContext *cx, jsuint length, jsval *vector,
+                           JSObject *proto, JSObject *parent)
+{
     JSTempValueRooter tvr;
     JSObject *obj;
 
-    obj = js_NewObject(cx, &js_ArrayClass, NULL, NULL);
+    obj = js_NewObject(cx, &js_ArrayClass, proto, parent);
     if (!obj)
         return NULL;
 

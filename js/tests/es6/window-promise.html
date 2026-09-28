@@ -1,0 +1,9 @@
+<!doctype html><html><head><title>Promise content</title>
+<script type="application/javascript;version=2015">
+var contentPromiseDone = false, contentRawReceiver = false;
+Promise.all([Promise.resolve(1), 2]).then(function (values) {
+    "use strict";
+    contentRawReceiver = this === undefined;
+    contentPromiseDone = values.join(",") === "1,2";
+});
+</script></head><body>Promise content checkpoint</body></html>

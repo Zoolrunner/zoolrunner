@@ -244,6 +244,93 @@ Evaluate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return ok;
 }
 
+/* Module records are explicit host objects; ordinary load/evaluate keep
+ * their historical script behavior. The caller supplies dependency records. */
+static JSBool
+ModuleArgument(JSContext *cx, uintN argc, jsval *argv, uintN index)
+{
+    if (argc <= index || JSVAL_IS_PRIMITIVE(argv[index])) {
+        JS_ReportError(cx, "expected a module record");
+        return JS_FALSE;
+    }
+    return JS_TRUE;
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+CompileModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *source, *name;
+    JSObject *module;
+    const char *filename = "module";
+    source = JS_ValueToString(cx, argc ? argv[0] : JSVAL_VOID);
+    if (!source) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(source);
+    if (argc > 1) {
+        name = JS_ValueToString(cx, argv[1]);
+        if (!name) return JS_FALSE;
+        argv[1] = STRING_TO_JSVAL(name);
+        filename = JS_GetStringBytes(name);
+        if (!filename) return JS_FALSE;
+    }
+    module = JS_CompileUCModule(cx, obj, gJSPrincipals,
+               JS_GetStringChars(source), JS_GetStringLength(source), filename, 1);
+    if (!module) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(module);
+    return JS_TRUE;
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+ModuleRequests(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *array;
+    if (!ModuleArgument(cx, argc, argv, 0)) return JS_FALSE;
+    array = JS_GetModuleRequests(cx, JSVAL_TO_OBJECT(argv[0]));
+    if (!array) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(array);
+    return JS_TRUE;
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+LinkModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *name;
+    if (!ModuleArgument(cx, argc, argv, 0) || !ModuleArgument(cx, argc, argv, 2))
+        return JS_FALSE;
+    name = JS_ValueToString(cx, argv[1]);
+    if (!name) return JS_FALSE;
+    argv[1] = STRING_TO_JSVAL(name);
+    *rval = JSVAL_VOID;
+    return JS_SetModuleDependency(cx, JSVAL_TO_OBJECT(argv[0]), name,
+                                   JSVAL_TO_OBJECT(argv[2]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+InstantiateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return ModuleArgument(cx, argc, argv, 0) &&
+           JS_InstantiateModule(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+EvaluateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return ModuleArgument(cx, argc, argv, 0) &&
+           JS_EvaluateModule(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+ModuleNamespace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *ns;
+    if (!ModuleArgument(cx, argc, argv, 0)) return JS_FALSE;
+    ns = JS_GetModuleNamespace(cx, JSVAL_TO_OBJECT(argv[0]));
+    if (!ns) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(ns);
+    return JS_TRUE;
+}
+
 #if defined(_MSC_VER) && !defined(_DLL)
 static JSScript*
 CompileLocalFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
@@ -439,10 +526,215 @@ Clear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return JS_TRUE;
 }
 
+static JSBool EnqueueJob(JSContext *, JSObject *, uintN, jsval *, jsval *);
+static JSBool DrainJobQueue(JSContext *, JSObject *, uintN, jsval *, jsval *);
+
+/* Test262 host realms keep tested globals separate from shell bookkeeping. */
+static JSClass test262GlobalClass = {
+    "Test262 global", JSCLASS_GLOBAL_FLAGS,
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+RealmCall(JSContext *cx, uintN argc, jsval *argv, jsval *rval, JSNative native)
+{
+    JSFunction *fun = JS_ValueToFunction(cx, argv[-2]);
+    JSObject *global, *previous = JS_GetGlobalObject(cx);
+    JSVersion version;
+    JSBool ok;
+    if (!fun) return JS_FALSE;
+    global = JS_GetParent(cx, JS_GetFunctionObject(fun));
+    if (!global || !JS_AddNamedRoot(cx, &previous, "previous host realm"))
+        return JS_FALSE;
+    version = JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    JS_SetGlobalObject(cx, global);
+    ok = native(cx, global, argc, argv, rval);
+    JS_SetGlobalObject(cx, previous);
+    JS_SetVersion(cx, version);
+    JS_RemoveRoot(cx, &previous);
+    return ok;
+}
+
+/* Keep compiled scripts opaque and tied to their compilation realm. */
+static JSClass test262ScriptClass = {
+    "Test262 script", JSCLASS_HAS_RESERVED_SLOTS(1),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+CompileRealmScript(JSContext *cx, JSObject *global, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *source;
+    JSScript *script;
+    JSObject *record, *owner;
+    source = JS_ValueToString(cx, argc ? argv[0] : JSVAL_VOID);
+    if (!source) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(source);
+    record = JS_NewObject(cx, &test262ScriptClass, NULL, global);
+    if (!record) return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(record);
+    if (!JS_SetPrototype(cx, record, NULL)) return JS_FALSE;
+    script = JS_CompileUCScriptForPrincipals(cx, global, gJSPrincipals,
+        JS_GetStringChars(source), JS_GetStringLength(source), "test262-script", 1);
+    if (!script) return JS_FALSE;
+    owner = JS_NewScriptObject(cx, script);
+    if (!owner) {
+        JS_DestroyScript(cx, script);
+        return JS_FALSE;
+    }
+    return JS_SetReservedSlot(cx, record, 0, OBJECT_TO_JSVAL(owner));
+}
+
+static JSBool
+ExecuteRealmScript(JSContext *cx, JSObject *global, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *record;
+    jsval owner;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0]) ||
+        JS_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) != &test262ScriptClass) {
+        JS_ReportError(cx, "expected a Test262 compiled script");
+        return JS_FALSE;
+    }
+    record = JSVAL_TO_OBJECT(argv[0]);
+    if (JS_GetParent(cx, record) != global) {
+        JS_ReportError(cx, "compiled script belongs to another realm");
+        return JS_FALSE;
+    }
+    if (!JS_GetReservedSlot(cx, record, 0, &owner)) return JS_FALSE;
+    return JS_ExecuteScript(cx, global,
+        (JSScript *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(owner)), rval);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmCompileScript(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, CompileRealmScript);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmExecuteScript(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, ExecuteRealmScript);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmEvaluate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, Evaluate);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmCompileModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, CompileModule);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmEvaluateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, EvaluateModule);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmInstantiateModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, InstantiateModule);
+}
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmLinkModule(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, LinkModule);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+DetachArrayBuffer(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) {
+        /* Let the engine supply the standard TypeError for a wrong object. */
+        return JS_DetachArrayBuffer(cx, NULL);
+    }
+    *rval = JSVAL_VOID;
+    return JS_DetachArrayBuffer(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+RealmDetachArrayBuffer(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return RealmCall(cx, argc, argv, rval, DetachArrayBuffer);
+}
+
+JS_STATIC_DLL_CALLBACK(JSBool)
+CreateTest262Realm(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSObject *global = NULL, *host = NULL, *previous = JS_GetGlobalObject(cx);
+    jsval value = JSVAL_VOID;
+    JSVersion version = JS_GetVersion(cx);
+    JSFunction *fun;
+    JSBool ok = JS_FALSE;
+    unsigned rooted = 0, i;
+    void *addresses[] = { &global, &host, &previous, &value };
+    const char *names[] = { "test realm global", "test realm host", "prior realm", "host method" };
+    static const struct {
+        const char *name;
+        JSNative native;
+        uintN nargs;
+    } methods[] = {
+        { "evalScript", RealmEvaluate, 1 },
+        { "compileScript", RealmCompileScript, 1 },
+        { "executeScript", RealmExecuteScript, 1 },
+        { "createRealm", CreateTest262Realm, 0 },
+        { "gc", GC, 0 },
+        { "detachArrayBuffer", RealmDetachArrayBuffer, 1 },
+        { "compileModule", RealmCompileModule, 1 },
+        { "instantiateModule", RealmInstantiateModule, 1 },
+        { "evaluateModule", RealmEvaluateModule, 1 },
+        { "linkModule", RealmLinkModule, 3 }
+    };
+    for (i = 0; i < 4; ++i) {
+        if (!JS_AddNamedRoot(cx, addresses[i], names[i])) goto out;
+        ++rooted;
+    }
+    JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    global = JS_NewObject(cx, &test262GlobalClass, NULL, NULL);
+    if (!global || !JS_SetParent(cx, global, NULL) || !JS_SetPrototype(cx, global, NULL))
+        goto out;
+    JS_SetGlobalObject(cx, global);
+    if (!JS_InitStandardClasses(cx, global)) goto out;
+    host = JS_NewObject(cx, NULL, NULL, global);
+    if (!host ||
+        !JS_DefineProperty(cx, host, "global", OBJECT_TO_JSVAL(global), NULL, NULL, JSPROP_ENUMERATE) ||
+        !JS_DefineProperty(cx, global, "$262", OBJECT_TO_JSVAL(host), NULL, NULL, 0) ||
+        !JS_DefineFunction(cx, global, "print", Print, 0, 0)) goto out;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        fun = JS_NewFunction(cx, methods[i].native, methods[i].nargs, 0, global, methods[i].name);
+        if (!fun) goto out;
+        value = OBJECT_TO_JSVAL(JS_GetFunctionObject(fun));
+        if (!JS_DefineProperty(cx, host, methods[i].name, value, NULL, NULL, JSPROP_ENUMERATE))
+            goto out;
+    }
+    *rval = OBJECT_TO_JSVAL(host);
+    ok = JS_TRUE;
+ out:
+    JS_SetGlobalObject(cx, previous);
+    JS_SetVersion(cx, version);
+    while (rooted) JS_RemoveRoot(cx, addresses[--rooted]);
+    return ok;
+}
+
+
 static JSFunctionSpec glob_functions[] = {
+    {"createTest262Realm", CreateTest262Realm, 0, 0, 0},
+    {"enqueueJob",      EnqueueJob,     1},
+    {"drainJobQueue",   DrainJobQueue,  0},
     {"print",           Print,          0},
     {"load",            Load,           1},
     {"evaluate",        Evaluate,       1},
+    {"compileModule",   CompileModule,  1},
+    {"moduleRequests",  ModuleRequests, 1},
+    {"linkModule",      LinkModule,     3},
+    {"instantiateModule", InstantiateModule, 1},
+    {"evaluateModule",  EvaluateModule, 1},
+    {"namespaceModule", ModuleNamespace, 1},
     {"quit",            Quit,           0},
     {"version",         Version,        1},
     {"build",           BuildDate,      0},
@@ -643,6 +935,41 @@ GetLine(JSContext *cx, char *bufp, FILE *file, const char *prompt) {
     return JS_TRUE;
 }
 
+/* Shell hooks expose the engine queue without making them web globals. */
+static JSBool
+EnqueueJob(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    if (!argc || JSVAL_IS_PRIMITIVE(argv[0])) {
+        JS_ReportError(cx, "enqueueJob requires a callable object");
+        return JS_FALSE;
+    }
+    return JS_EnqueueJob(cx, JSVAL_TO_OBJECT(argv[0]));
+}
+
+static JSBool
+DrainJobQueue(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = JSVAL_VOID;
+    return JS_RunJobs(cx);
+}
+
+/* Only command-line turns checkpoint automatically. Nested load/evaluate calls
+ * must finish the surrounding script before its pending jobs can execute. */
+static JSBool
+RunShellJobs(JSContext *cx)
+{
+    if (gQuitting || !JS_HasPendingJobs(cx))
+        return JS_TRUE;
+    if (JS_RunJobs(cx))
+        return JS_TRUE;
+    if (JS_IsExceptionPending(cx))
+        JS_ReportPendingException(cx);
+    if (!gQuitting && !gExitCode)
+        gExitCode = EXITCODE_RUNTIME_ERROR;
+    return JS_FALSE;
+}
+
 static void
 ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
 {
@@ -680,8 +1007,10 @@ ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
 #endif
 
         if (script) {
-            if (!compileOnly)
+            if (!compileOnly) {
                 (void)JS_ExecuteScript(cx, obj, script, &result);
+                (void)RunShellJobs(cx);
+            }
             JS_DestroyScript(cx, script);
         }
         DoEndRequest(cx);
@@ -732,6 +1061,8 @@ ProcessFile(JSContext *cx, JSObject *obj, const char *filename, FILE *file)
                     else
                         ok = JS_FALSE;
                 }
+                if (!RunShellJobs(cx))
+                    ok = JS_FALSE;
 #if 0
 #if JS_HAS_ERROR_EXCEPTIONS
                 /*
@@ -781,7 +1112,7 @@ static int
 usage(void)
 {
     fprintf(gErrFile, "%s\n", JS_GetImplementationVersion());
-    fprintf(gErrFile, "usage: xpcshell [-PswWxC] [-v version] [-f scriptfile] [-e script] [scriptfile] [scriptarg...]\n");
+    fprintf(gErrFile, "usage: xpcshell [-EPswWxC] [-v version] [-f scriptfile] [-e script] [scriptfile] [scriptarg...]\n");
     return 2;
 }
 
@@ -854,6 +1185,9 @@ ProcessArgs(JSContext *cx, JSObject *obj, char **argv, int argc)
             break;
         }
         switch (argv[i][1]) {
+        case 'E':
+            JS_SetVersion(cx, JSVERSION_ECMA_2015);
+            break;
         case 'v':
             if (++i == argc) {
                 return usage();
@@ -912,6 +1246,8 @@ ProcessArgs(JSContext *cx, JSObject *obj, char **argv, int argc)
             DoBeginRequest(cx);
             JSBool evaluated = JS_EvaluateScriptForPrincipals(
                 cx, obj, gJSPrincipals, argv[i], strlen(argv[i]), "-e", 1, &rval);
+            if (!RunShellJobs(cx))
+                evaluated = JS_FALSE;
             DoEndRequest(cx);
             if (!evaluated && !gQuitting && !gExitCode)
                 gExitCode = EXITCODE_RUNTIME_ERROR;
@@ -1190,6 +1526,18 @@ main(int argc, char **argv, char **envp)
             fprintf(gErrFile, "+++ Failed to get backstage pass from rtsvc: %8x\n",
                     rv);
             return 1;
+        }
+
+        /* -E selects a modern global before its built-ins are initialized.
+         * -v retains its historical role of switching subsequent scripts. */
+        for (int arg = 1; arg < argc; ++arg) {
+            if (argv[arg][0] != '-' || argv[arg][1] == '\0')
+                break;
+            if (strcmp(argv[arg], "-E") == 0)
+                JS_SetVersion(cx, JSVERSION_ECMA_2015);
+            else if (argv[arg][1] == 'v' || argv[arg][1] == 'f' ||
+                     argv[arg][1] == 'e')
+                ++arg;
         }
 
         nsCOMPtr<nsIXPConnectJSObjectHolder> holder;

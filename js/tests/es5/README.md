@@ -464,3 +464,39 @@ commits, full-report hashes, package hashes and accompanying ABI/application
 checks. The [Linux guide](../../../build/linux/README.md#aarch64-bring-up)
 separates workflow checks from supplemental NSS/SQLite probes. These are local
 container results, not GitHub-hosted execution or exhaustive specification proof.
+
+The `destructuring-errors.js` regression checks exception propagation through
+nested array/object destructuring in default, JS 1.7 and ES2015 code (54 checks).
+Diagnostic decompilation must fall back to the value when a temporary group
+assignment slot cannot be described as a complete expression; it must not
+silently stop execution instead of throwing the original TypeError. The test
+also exercises `finally`, getter exceptions, successful assignments, and
+function decompilation/recompilation. The macOS package gate includes it.
+
+`strict-parameter-history.js` adds 30 checks across the three script editions.
+Strict duplicate-parameter checks must inspect the current function's parameter
+chain: `SPROP_IS_DUPLICATE` is mutable on shared property-tree nodes and can
+reflect an unrelated function. The regression compiles valid strict functions
+after both successful duplicate-parameter functions and failed compilations,
+and checks Function construction, decompilation and garbage collection.
+
+The destructuring-error diagnostic keeps its indexed object in legacy editions.
+ES2015 now uses an array with the same throwing element getter, because modern
+array patterns require an iterable. Both paths must preserve the original
+RangeError and message; all 54 checks remain required.
+
+The shared `../es6/discarded-operations.js` and `../es6/arguments-exit.js`
+fixtures also run in the default ES5 shell. They cover unused expressions whose
+conversions/getters still have effects, and arguments-object detachment that
+must not invoke user accessors on function return. Explicit non-strict legacy
+editions retain their historical optimizer/detachment behavior. The initial
+isolated correction passes the complete pinned ES5.1 gate; integrated platform
+and application results are tracked in the
+[ES6 work log](../es6/README.md#discarded-conversions-and-arguments-detachment).
+
+Linux aarch64's workflow supplies `--timeout 60` for every required-mode case.
+The exhaustive four-byte URI decoding tests each took about nine seconds alone
+and timed out at ten seconds during a concurrent XULRunner run. Both original
+failures and full retry results remain recorded; filtered diagnostic passes are
+not a replacement for the complete 11,540-case gate. JSON reports include
+`timeout_seconds` and `jobs`; the standalone runner's default remains ten seconds.

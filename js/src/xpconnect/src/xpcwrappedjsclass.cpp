@@ -48,6 +48,24 @@ NS_IMPL_THREADSAFE_ISUPPORTS1(nsXPCWrappedJSClass, nsIXPCWrappedJSClass)
 // the value of this variable is never used - we use its address as a sentinel
 static uint32 zero_methods_descriptor;
 
+// A native event queue may dispatch several component callbacks in one batch.
+// Checkpoint after each completed call, once its script evaluator and call
+// context have unwound. RunJobs still suppresses suspended/nested JS callers.
+class AutoWrappedJSJobCheckpoint
+{
+public:
+    AutoWrappedJSJobCheckpoint() : mXPC(nsXPConnect::GetXPConnect()) {}
+    ~AutoWrappedJSJobCheckpoint()
+    {
+        XPCPerThreadData* data = XPCPerThreadData::GetData();
+        XPCJSRuntime* runtime = mXPC ? nsXPConnect::GetRuntime(mXPC) : nsnull;
+        if(data && runtime && data->GetJSContextStack())
+            data->GetJSContextStack()->RunJobs(runtime->GetJSRuntime());
+    }
+private:
+    nsRefPtr<nsXPConnect> mXPC;
+};
+
 void AutoScriptEvaluate::StartEvaluating(JSErrorReporter errorReporter)
 {
     NS_PRECONDITION(!mEvaluated, "AutoScriptEvaluate::Evaluate should only be called once");
@@ -97,9 +115,10 @@ AutoScriptEvaluate::~AutoScriptEvaluate()
     // private data that points to an nsISupports subclass, it has also set
     // the JSOPTION_PRIVATE_IS_NSISUPPORTS option.
 
+    nsCOMPtr<nsIXPCScriptNotify> scriptNotify;
     if (JS_GetOptions(mJSContext) & JSOPTION_PRIVATE_IS_NSISUPPORTS)
     {
-        nsCOMPtr<nsIXPCScriptNotify> scriptNotify = 
+        scriptNotify =
             do_QueryInterface(NS_STATIC_CAST(nsISupports*,
                                              JS_GetContextPrivate(mJSContext)));
         if(scriptNotify)
@@ -1068,6 +1087,7 @@ nsXPCWrappedJSClass::CallMethod(nsXPCWrappedJS* wrapper, uint16 methodIndex,
     // the whole nsIXPCFunctionThisTranslator bit.  That code uses ccx to
     // convert natives to JSObjects, but we do NOT plan to pass those JSObjects
     // to our real callee.
+    AutoWrappedJSJobCheckpoint checkpoint;
     XPCCallContext ccx(NATIVE_CALLER);
     if(ccx.IsValid())
     {

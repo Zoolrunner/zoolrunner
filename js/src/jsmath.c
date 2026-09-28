@@ -53,8 +53,10 @@
 #include "jsconfig.h"
 #include "jslock.h"
 #include "jsmath.h"
+#include "jsmathfd.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
 
 #ifndef M_E
 #define M_E             2.7182818284590452354
@@ -245,6 +247,9 @@ math_max(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsdouble x, z = *cx->runtime->jsNegativeInfinity;
     uintN i;
+    JSBool sawNaN = JS_FALSE;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
     if (argc == 0) {
         *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNegativeInfinity);
@@ -254,13 +259,23 @@ math_max(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (!js_ValueToNumber(cx, argv[i], &x))
             return JS_FALSE;
         if (JSDOUBLE_IS_NaN(x)) {
-            *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
-            return JS_TRUE;
+            /* Standard editions still convert subsequent arguments. Preserve
+             * explicit legacy callers' historical early return. */
+            if (!standard) {
+                *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+                return JS_TRUE;
+            }
+            sawNaN = JS_TRUE;
+            continue;
         }
         if (x == 0 && x == z && fd_copysign(1.0, z) == -1)
             z = x;
         else
             z = (x > z) ? x : z;
+    }
+    if (sawNaN) {
+        *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+        return JS_TRUE;
     }
     return js_NewNumberValue(cx, z, rval);
 }
@@ -270,6 +285,9 @@ math_min(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsdouble x, z = *cx->runtime->jsPositiveInfinity;
     uintN i;
+    JSBool sawNaN = JS_FALSE;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
     if (argc == 0) {
         *rval = DOUBLE_TO_JSVAL(cx->runtime->jsPositiveInfinity);
@@ -279,13 +297,23 @@ math_min(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         if (!js_ValueToNumber(cx, argv[i], &x))
             return JS_FALSE;
         if (JSDOUBLE_IS_NaN(x)) {
-            *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
-            return JS_TRUE;
+            /* Standard editions still convert subsequent arguments. Preserve
+             * explicit legacy callers' historical early return. */
+            if (!standard) {
+                *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+                return JS_TRUE;
+            }
+            sawNaN = JS_TRUE;
+            continue;
         }
         if (x == 0 && x == z && fd_copysign(1.0,x) == -1)
             z = x;
         else
             z = (x < z) ? x : z;
+    }
+    if (sawNaN) {
+        *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
+        return JS_TRUE;
     }
     return js_NewNumberValue(cx, z, rval);
 }
@@ -427,8 +455,204 @@ math_round(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
     if (!js_ValueToNumber(cx, argv[0], &x))
         return JS_FALSE;
-    z = fd_copysign(fd_floor(x + 0.5), x);
+    /* Adding 0.5 first can round across a boundary before floor sees it.
+     * Values at least 2^52 are already integral. Preserve NaN and signed zero. */
+    if (!JSDOUBLE_IS_FINITE(x) || x == 0 || fd_fabs(x) >= 4503599627370496.0) {
+        z = x;
+    } else {
+        z = fd_floor(x);
+        if (x - z >= 0.5)
+            z += 1.0;
+        z = fd_copysign(z, x);
+    }
     return js_NewNumberValue(cx, z, rval);
+}
+
+static JSBool
+math_sign(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    if (x != 0 && !JSDOUBLE_IS_NaN(x))
+        x = x < 0 ? -1 : 1;
+    return js_NewNumberValue(cx, x, rval);
+}
+
+static JSBool
+math_trunc(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    return js_NewNumberValue(cx, fd_copysign(fd_floor(fd_fabs(x)), x), rval);
+}
+
+static JSBool
+math_clz32(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    uint32 x, bit;
+    jsint count;
+
+    if (!js_ValueToECMAUint32(cx, argv[0], &x))
+        return JS_FALSE;
+    count = 0;
+    for (bit = (uint32)0x80000000; bit && !(x & bit); bit >>= 1)
+        ++count;
+    *rval = INT_TO_JSVAL(count);
+    return JS_TRUE;
+}
+
+static JSBool
+math_imul(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    uint32 x, y, product;
+    jsdouble result;
+
+    if (!js_ValueToECMAUint32(cx, argv[0], &x) ||
+        !js_ValueToECMAUint32(cx, argv[1], &y))
+        return JS_FALSE;
+    /* Unsigned multiplication supplies the required modulo 2^32 result.
+     * Convert the sign without an implementation-defined unsigned cast. */
+    product = x * y;
+    result = (jsdouble)product;
+    if (product & (uint32)0x80000000)
+        result -= 4294967296.0;
+    return js_NewNumberValue(cx, result, rval);
+}
+
+/* The new transcendental kernels use the bundled fdlibm algorithms. */
+#define MATH_KERNEL_WRAPPER(name)                                             \
+static JSBool                                                                \
+math_##name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)  \
+{                                                                            \
+    jsdouble x;                                                              \
+    if (!js_ValueToNumber(cx, argv[0], &x))                                    \
+        return JS_FALSE;                                                     \
+    return js_NewNumberValue(cx, js_math_##name(x), rval);                     \
+}
+
+MATH_KERNEL_WRAPPER(expm1)
+MATH_KERNEL_WRAPPER(log1p)
+MATH_KERNEL_WRAPPER(cbrt)
+MATH_KERNEL_WRAPPER(asinh)
+MATH_KERNEL_WRAPPER(tanh)
+MATH_KERNEL_WRAPPER(acosh)
+MATH_KERNEL_WRAPPER(atanh)
+MATH_KERNEL_WRAPPER(cosh)
+MATH_KERNEL_WRAPPER(sinh)
+MATH_KERNEL_WRAPPER(log10)
+#undef MATH_KERNEL_WRAPPER
+
+static JSBool
+math_log2(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x, fraction, result;
+    int exponent;
+
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    if (x > 0 && JSDOUBLE_IS_FINITE(x)) {
+        fraction = frexp(x, &exponent);
+        /* Powers of two, including subnormals, have exact integer results. */
+        result = fraction == 0.5 ? (jsdouble)(exponent - 1)
+                                : fd_log(x) * M_LOG2E;
+    } else {
+        result = fd_log(x);
+    }
+    return js_NewNumberValue(cx, result, rval);
+}
+
+jsdouble
+js_RoundToFloat32(JSContext *cx, jsdouble x)
+{
+    jsdouble magnitude, fraction, scaled, integral, result;
+    int exponent, shift;
+
+    if (!JSDOUBLE_IS_FINITE(x) || x == 0)
+        return x;
+    magnitude = fd_fabs(x);
+    fraction = frexp(magnitude, &exponent);
+    if (exponent > 128) {
+        result = *cx->runtime->jsPositiveInfinity;
+    } else {
+        /* Round the binary32 significand explicitly. This avoids dependence
+         * on a host float cast's overflow behavior or x87 excess precision. */
+        if (exponent < -125) {
+            scaled = ldexp(magnitude, 149);
+            shift = -149;
+        } else {
+            scaled = ldexp(fraction, 24);
+            shift = exponent - 24;
+        }
+        integral = fd_floor(scaled);
+        fraction = scaled - integral;
+        if (fraction > 0.5 || (fraction == 0.5 && ((uint32)integral & 1)))
+            integral += 1.0;
+        result = ldexp(integral, shift);
+        if (result >= 340282366920938463463374607431768211456.0) /* 2^128 */
+            result = *cx->runtime->jsPositiveInfinity;
+    }
+    return fd_copysign(result, x);
+}
+
+static JSBool
+math_fround(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x;
+    if (!js_ValueToNumber(cx, argv[0], &x))
+        return JS_FALSE;
+    return js_NewNumberValue(cx, js_RoundToFloat32(cx, x), rval);
+}
+
+static JSBool
+math_hypot(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble x, maximum, sum, correction, ratio, term, adjusted, next, result;
+    JSBool infinite, nan;
+    uintN i;
+
+    maximum = sum = correction = 0;
+    infinite = nan = JS_FALSE;
+    for (i = 0; i < argc; ++i) {
+        /* Every conversion is observable, even after infinity or NaN. */
+        if (!js_ValueToNumber(cx, argv[i], &x))
+            return JS_FALSE;
+        if (JSDOUBLE_IS_NaN(x)) {
+            nan = JS_TRUE;
+            continue;
+        }
+        if (!JSDOUBLE_IS_FINITE(x)) {
+            infinite = JS_TRUE;
+            continue;
+        }
+        x = fd_fabs(x);
+        if (x == 0)
+            continue;
+        if (x > maximum) {
+            ratio = maximum / x;
+            sum *= ratio * ratio;
+            correction *= ratio * ratio;
+            maximum = x;
+            term = 1;
+        } else {
+            ratio = x / maximum;
+            term = ratio * ratio;
+        }
+        adjusted = term - correction;
+        next = sum + adjusted;
+        correction = (next - sum) - adjusted;
+        sum = next;
+    }
+    if (infinite)
+        result = *cx->runtime->jsPositiveInfinity;
+    else if (nan)
+        result = *cx->runtime->jsNaN;
+    else
+        result = maximum * fd_sqrt(sum);
+    return js_NewNumberValue(cx, result, rval);
 }
 
 static JSBool
@@ -484,33 +708,60 @@ static JSFunctionSpec math_static_methods[] = {
     {"atan",            math_atan,              1, 0, 0},
     {"atan2",           math_atan2,             2, 0, 0},
     {"ceil",            math_ceil,              1, 0, 0},
+    {"clz32",           math_clz32,             1, 0, 0},
     {"cos",             math_cos,               1, 0, 0},
     {"exp",             math_exp,               1, 0, 0},
     {"floor",           math_floor,             1, 0, 0},
+    {"imul",            math_imul,              2, 0, 0},
     {"log",             math_log,               1, 0, 0},
     {"max",             math_max,               2, 0, 0},
     {"min",             math_min,               2, 0, 0},
     {"pow",             math_pow,               2, 0, 0},
     {"random",          math_random,            0, 0, 0},
     {"round",           math_round,             1, 0, 0},
+    {"sign",            math_sign,              1, 0, 0},
     {"sin",             math_sin,               1, 0, 0},
     {"sqrt",            math_sqrt,              1, 0, 0},
     {"tan",             math_tan,               1, 0, 0},
+    {"trunc",           math_trunc,             1, 0, 0},
+    {"expm1",            math_expm1,             1, 0, 0},
+    {"log1p",            math_log1p,             1, 0, 0},
+    {"cbrt",             math_cbrt,              1, 0, 0},
+    {"asinh",            math_asinh,             1, 0, 0},
+    {"tanh",             math_tanh,              1, 0, 0},
+    {"acosh",            math_acosh,             1, 0, 0},
+    {"atanh",            math_atanh,             1, 0, 0},
+    {"cosh",             math_cosh,              1, 0, 0},
+    {"sinh",             math_sinh,              1, 0, 0},
+    {"log10",            math_log10,             1, 0, 0},
+    {"log2",             math_log2,              1, 0, 0},
+    {"fround",           math_fround,            1, 0, 0},
+    {"hypot",            math_hypot,             2, 0, 0},
     {0,0,0,0,0}
 };
 
 JSObject *
 js_InitMathClass(JSContext *cx, JSObject *obj)
 {
-    JSObject *Math;
+    JSObject *Math, *proto = NULL;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
-    Math = JS_DefineObject(cx, obj, js_Math_str, &js_MathClass, NULL, 0);
+    /* A non-constructor intrinsic must not resolve its own class as its
+     * prototype. Eager initialization otherwise recursively creates Math. */
+    if (standard &&
+        (!js_GetClassPrototype(cx, obj, INT_TO_JSID(JSProto_Object), &proto) ||
+         !proto))
+        return NULL;
+    Math = JS_DefineObject(cx, obj, js_Math_str, &js_MathClass, proto, 0);
     if (!Math)
         return NULL;
     if (!JS_DefineFunctions(cx, Math, math_static_methods) ||
         !js_SetBuiltinMethodFlags(cx, Math, math_static_methods, JSFUN_NO_CONSTRUCT))
         return NULL;
-    if (!JS_DefineConstDoubles(cx, Math, math_constants))
+    if (!JS_DefineConstDoubles(cx, Math, math_constants) ||
+        !js_DefineBuiltinTag(cx, Math, "Math") ||
+        (standard && !js_SetClassObject(cx, obj, JSProto_Math, Math)))
         return NULL;
     return Math;
 }

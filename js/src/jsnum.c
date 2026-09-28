@@ -64,6 +64,7 @@
 #include "jsobj.h"
 #include "jsopcode.h"
 #include "jsprf.h"
+#include "jsrealm.h"
 #include "jsstr.h"
 
 static JSBool
@@ -86,6 +87,57 @@ num_isFinite(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return JS_FALSE;
     *rval = BOOLEAN_TO_JSVAL(JSDOUBLE_IS_FINITE(x));
     return JS_TRUE;
+}
+
+/* ES2015 Number predicates never coerce their argument (including wrappers). */
+static JSBool
+num_numberIsNaN(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                jsval *rval)
+{
+    *rval = BOOLEAN_TO_JSVAL(argc && JSVAL_IS_DOUBLE(argv[0]) &&
+                            JSDOUBLE_IS_NaN(*JSVAL_TO_DOUBLE(argv[0])));
+    return JS_TRUE;
+}
+
+static JSBool
+num_numberIsFinite(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                   jsval *rval)
+{
+    *rval = BOOLEAN_TO_JSVAL(argc &&
+        (JSVAL_IS_INT(argv[0]) ||
+         (JSVAL_IS_DOUBLE(argv[0]) &&
+          JSDOUBLE_IS_FINITE(*JSVAL_TO_DOUBLE(argv[0])))));
+    return JS_TRUE;
+}
+
+static JSBool
+num_integerPredicate(uintN argc, jsval *argv, jsval *rval, JSBool safe)
+{
+    jsdouble d;
+
+    *rval = JSVAL_FALSE;
+    if (!argc || !JSVAL_IS_NUMBER(argv[0]))
+        return JS_TRUE;
+    d = JSVAL_IS_INT(argv[0]) ? (jsdouble) JSVAL_TO_INT(argv[0])
+                             : *JSVAL_TO_DOUBLE(argv[0]);
+    if (JSDOUBLE_IS_FINITE(d) && floor(d) == d &&
+        (!safe || (d >= -9007199254740991.0 && d <= 9007199254740991.0))) {
+        *rval = JSVAL_TRUE;
+    }
+    return JS_TRUE;
+}
+
+static JSBool
+num_isInteger(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return num_integerPredicate(argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+num_isSafeInteger(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                  jsval *rval)
+{
+    return num_integerPredicate(argc, argv, rval, JS_TRUE);
 }
 
 static JSBool
@@ -264,9 +316,11 @@ static JSBool
 num_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
     jsval v;
-    jsdouble d;
+    jsdouble d, radix;
     jsint base;
     JSString *str;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
 
     if (JSVAL_IS_NUMBER((jsval)obj)) {
         v = (jsval)obj;
@@ -279,8 +333,25 @@ num_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     d = JSVAL_IS_INT(v) ? (jsdouble)JSVAL_TO_INT(v) : *JSVAL_TO_DOUBLE(v);
     base = 10;
     if (argc != 0 && !JSVAL_IS_VOID(argv[0])) {
-        if (!js_ValueToECMAInt32(cx, argv[0], &base))
+        if (standard) {
+            if (!js_ValueToNumber(cx, argv[0], &radix))
+                return JS_FALSE;
+            radix = js_DoubleToInteger(radix);
+            if (!(radix >= 2 && radix <= 36)) {
+                char radixBuf[DTOSTR_STANDARD_BUFFER_SIZE];
+                char *radixStr = JS_dtostr(radixBuf, sizeof radixBuf,
+                                          DTOSTR_STANDARD, 0, radix);
+                if (!radixStr)
+                    JS_ReportOutOfMemory(cx);
+                else
+                    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                                         JSMSG_BAD_RADIX_RANGE, radixStr);
+                return JS_FALSE;
+            }
+            base = (jsint)radix;
+        } else if (!js_ValueToECMAInt32(cx, argv[0], &base)) {
             return JS_FALSE;
+        }
         if (base < 2 || base > 36) {
             char numBuf[12];
             char *numStr = IntToString(base, numBuf, sizeof numBuf);
@@ -435,6 +506,11 @@ num_to(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSDTo
     jsval v;
     jsdouble d, precision;
     JSString *str;
+    JSBool standard = JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                      JS_VERSION_IS_ES2015(cx);
+    JSBool shortest = standard && JSVAL_IS_VOID(argv[0]) &&
+                      zeroArgMode == DTOSTR_STANDARD_EXPONENTIAL;
+    char *exponent, *dot, *end;
     char buf[DTOSTR_VARIABLE_BUFFER_SIZE(MAX_PRECISION+1)], *numStr; /* Use MAX_PRECISION+1 because precisionOffset can be 1 */
 
     if (JSVAL_IS_NUMBER((jsval)obj)) {
@@ -454,7 +530,13 @@ num_to(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSDTo
         if (!js_ValueToNumber(cx, argv[0], &precision))
             return JS_FALSE;
         precision = js_DoubleToInteger(precision);
-        if (precision < precisionMin || precision > precisionMax) {
+        if (standard && zeroArgMode != DTOSTR_FIXED &&
+            !JSDOUBLE_IS_FINITE(d)) {
+            /* Precision conversion is observable, but its range is irrelevant
+             * for non-finite exponential/precision receivers. */
+            precision = 0;
+            oneArgMode = DTOSTR_STANDARD;
+        } else if (precision < precisionMin || precision > precisionMax) {
             numStr = JS_dtostr(buf, sizeof buf, DTOSTR_STANDARD, 0, precision);
             if (!numStr)
                 JS_ReportOutOfMemory(cx);
@@ -468,6 +550,17 @@ num_to(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval, JSDTo
     if (!numStr) {
         JS_ReportOutOfMemory(cx);
         return JS_FALSE;
+    }
+    if (shortest && (exponent = strchr(numStr, 'e')) != NULL &&
+        (dot = strchr(numStr, '.')) != NULL && dot < exponent) {
+        /* The legacy dtoa integer fast path may retain trailing zeros. Only
+         * undefined-precision standard calls require their shortest spelling. */
+        end = exponent;
+        while (end > dot + 1 && end[-1] == '0')
+            --end;
+        if (end == dot + 1)
+            --end;
+        memmove(end, exponent, strlen(exponent) + 1);
     }
     str = JS_NewStringCopyZ(cx, numStr);
     if (!str)
@@ -510,6 +603,15 @@ static JSFunctionSpec number_methods[] = {
     {0,0,0,0,0}
 };
 
+static JSFunctionSpec number_static_methods[] = {
+    /* The branch's spec flags are only uint8; set internal flags below. */
+    {"isNaN",         num_numberIsNaN,    1, 0, 0},
+    {"isFinite",      num_numberIsFinite, 1, 0, 0},
+    {"isInteger",     num_isInteger,     1, 0, 0},
+    {"isSafeInteger", num_isSafeInteger, 1, 0, 0},
+    {0,0,0,0,0}
+};
+
 /* NB: Keep this in synch with number_constants[]. */
 enum nc_slot {
     NC_NaN,
@@ -517,13 +619,16 @@ enum nc_slot {
     NC_NEGATIVE_INFINITY,
     NC_MAX_VALUE,
     NC_MIN_VALUE,
+    NC_EPSILON,
+    NC_MAX_SAFE_INTEGER,
+    NC_MIN_SAFE_INTEGER,
     NC_LIMIT
 };
 
 /*
  * Some to most C compilers forbid spelling these at compile time, or barf
- * if you try, so all but MAX_VALUE are set up by js_InitRuntimeNumberState
- * using union jsdpun.
+ * if you try, so NaN, infinities and MIN_VALUE are set up by
+ * js_InitRuntimeNumberState using union jsdpun.
  */
 static JSConstDoubleSpec number_constants[] = {
     {0,                         js_NaN_str,          0,{0,0,0}},
@@ -531,6 +636,9 @@ static JSConstDoubleSpec number_constants[] = {
     {0,                         "NEGATIVE_INFINITY", 0,{0,0,0}},
     {1.7976931348623157E+308,   "MAX_VALUE",         0,{0,0,0}},
     {0,                         "MIN_VALUE",         0,{0,0,0}},
+    {2.2204460492503130808472633361816E-16, "EPSILON", 0,{0,0,0}},
+    {9007199254740991.0,         "MAX_SAFE_INTEGER",  0,{0,0,0}},
+    {-9007199254740991.0,        "MIN_SAFE_INTEGER",  0,{0,0,0}},
     {0,0,0,{0,0,0}}
 };
 
@@ -636,12 +744,29 @@ js_InitNumberClass(JSContext *cx, JSObject *obj)
         return NULL;
 
     proto = JS_InitClass(cx, obj, NULL, &js_NumberClass, Number, 1,
-                         NULL, number_methods, NULL, NULL);
+                         NULL, number_methods, NULL, number_static_methods);
     if (!proto || !(ctor = JS_GetConstructor(cx, proto)))
         return NULL;
     if (!js_SetBuiltinMethodFlags(cx, proto, number_methods,
-                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+                                  JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS) ||
+        !js_SetBuiltinMethodFlags(cx, ctor, number_static_methods,
+                                  JSFUN_NO_CONSTRUCT))
         return NULL;
+    if (js_IsModernGlobal(cx, obj) &&
+        !JS_DefineFunction(cx, proto, js_toString_str, num_toString, 1,
+                           JSFUN_THISP_NUMBER | JSFUN_NO_CONSTRUCT |
+                           JSFUN_REQUIRE_THIS))
+        return NULL;
+    if (js_IsModernGlobal(cx, obj)) {
+        jsval parser;
+        const char *names[2] = {js_parseInt_str, js_parseFloat_str};
+        uintN i;
+        for (i = 0; i < 2; ++i) {
+            if (!JS_GetProperty(cx, obj, names[i], &parser) ||
+                !JS_DefineProperty(cx, ctor, names[i], parser, NULL, NULL, 0))
+                return NULL;
+        }
+    }
     OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_ZERO);
     if (!JS_DefineConstDoubles(cx, ctor, number_constants))
         return NULL;
@@ -758,6 +883,11 @@ js_ValueToNumber(JSContext *cx, jsval v, jsdouble *dp)
         if (!OBJ_DEFAULT_VALUE(cx, obj, JSTYPE_NUMBER, &v))
             return JS_FALSE;
     }
+    if (JSVAL_IS_SYMBOL(v)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_SYMBOL_CONVERSION, "number");
+        return JS_FALSE;
+    }
     if (JSVAL_IS_INT(v)) {
         *dp = (jsdouble)JSVAL_TO_INT(v);
     } else if (JSVAL_IS_DOUBLE(v)) {
@@ -774,6 +904,35 @@ js_ValueToNumber(JSContext *cx, jsval v, jsdouble *dp)
         bp = js_UndependString(cx, str);
         if (!bp)
             return JS_FALSE;
+        if (JS_VERSION_IS_ES2015(cx)) {
+            const jschar *digits = js_SkipWhiteSpace(bp);
+            jsint radix = 0;
+
+            /* A sign is allowed for decimal strings, never radix prefixes. */
+            if ((digits[0] == '+' || digits[0] == '-') && digits[1] == '0' &&
+                (digits[2] == 'x' || digits[2] == 'X' ||
+                 digits[2] == 'b' || digits[2] == 'B' ||
+                 digits[2] == 'o' || digits[2] == 'O'))
+                goto badstr;
+            if (digits[0] == '0') {
+                if (digits[1] == 'b' || digits[1] == 'B')
+                    radix = 2;
+                else if (digits[1] == 'o' || digits[1] == 'O')
+                    radix = 8;
+            }
+            if (radix) {
+                digits += 2;
+                /* The prefix must be immediately followed by a radix digit.
+                 * strtointeger alone also accepts signs and whitespace. */
+                if (*digits < '0' || *digits >= '0' + radix)
+                    goto badstr;
+                if (!js_strtointeger(cx, digits, &ep, radix, dp))
+                    return JS_FALSE;
+                if (js_SkipWhiteSpace(ep) != bp + str->length)
+                    goto badstr;
+                return JS_TRUE;
+            }
+        }
         if ((!js_strtod(cx, bp, &ep, dp) ||
              js_SkipWhiteSpace(ep) != bp + str->length) &&
             (!js_strtointeger(cx, bp, &ep, 0, dp) ||

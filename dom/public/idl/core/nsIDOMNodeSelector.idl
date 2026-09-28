@@ -1,9 +1,0 @@
-#include "domstubs.idl"
-
-// An additive interface: preserve the historical Document/Element vtables.
-[scriptable, uuid(442a31c2-fd6b-4a50-a3a3-0527692a79f0)]
-interface nsIDOMNodeSelector : nsISupports
-{
-  nsIDOMElement querySelector(in DOMString selectors);
-  nsIDOMNodeList querySelectorAll(in DOMString selectors);
-};

@@ -69,6 +69,9 @@
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jssymbol.h"
+#include "jsweakcollection.h"
+#include "jsrealm.h"
 #include "jsscope.h"
 #include "jsscript.h"
 #include "jsstr.h"
@@ -726,6 +729,9 @@ js_FinishGC(JSRuntime *rt)
     js_DumpGCStats(rt, stdout);
 #endif
 
+    js_FinishWeakCollections(rt);
+    js_FinishSymbolState(rt);
+    js_FinishCachedClassObjects(rt);
     FreePtrTable(&rt->gcIteratorTable, &iteratorTableInfo);
 #if JS_HAS_GENERATORS
     rt->gcCloseState.reachableList = NULL;
@@ -2061,6 +2067,8 @@ MarkGCThingChildren(JSContext *cx, void *thing, uint8 *flagp,
         if (!vp)
             break;
 
+        js_MarkCachedClassObjects(cx, obj);
+
         /* Mark slots if they are small enough to be GC-allocated. */
         if ((vp[-1] + 1) * sizeof(jsval) <= GC_NBYTES_MAX)
             GC_MARK(cx, vp - 1, "slots");
@@ -2434,6 +2442,15 @@ ScanDelayedChildren(JSContext *cx)
     JS_ASSERT(rt->gcUnscannedBagSize == 0);
 }
 
+/* Ephemeron values can expose more keys or owners. Drain deferred traversal
+ * before testing the next pass, including the classic callback return path. */
+static void
+MarkWeakCollectionsToClosure(JSContext *cx)
+{
+    while (js_MarkWeakCollections(cx))
+        ScanDelayedChildren(cx);
+}
+
 void
 js_MarkGCThing(JSContext *cx, void *thing)
 {
@@ -2470,6 +2487,7 @@ js_MarkGCThing(JSContext *cx, void *thing)
         cx->insideGCMarkCallback = JS_FALSE;
         MarkGCThingChildren(cx, thing, flagp, JS_FALSE);
         ScanDelayedChildren(cx);
+        MarkWeakCollectionsToClosure(cx);
         cx->insideGCMarkCallback = JS_TRUE;
     }
 }
@@ -2575,6 +2593,8 @@ js_MarkStackFrame(JSContext *cx, JSStackFrame *fp)
 
     if (fp->callee)
         GC_MARK(cx, fp->callee, "callee object");
+    if (fp->flags & JSFRAME_NEW_TARGET)
+        GC_MARK(cx, fp->newTarget, "constructor newTarget");
 
     /*
      * Mark fp->argv, even though in the common case it will be marked via our
@@ -2866,6 +2886,8 @@ restart:
     if (rt->gcLocksHash)
         JS_DHashTableEnumerate(rt->gcLocksHash, gc_lock_marker, cx);
     js_MarkAtomState(&rt->atomState, keepAtoms, gc_mark_atom_key_thing, cx);
+    js_MarkSymbolState(cx);
+    js_MarkJobs(cx);
     js_MarkWatchPoints(cx);
     js_MarkScriptFilenames(rt, keepAtoms);
     js_MarkNativeIteratorStates(cx);
@@ -2964,6 +2986,7 @@ restart:
      * marking phase.
      */
     ScanDelayedChildren(cx);
+    MarkWeakCollectionsToClosure(cx);
 
 #if JS_HAS_GENERATORS
     /*
@@ -2977,6 +3000,7 @@ restart:
      * just-completed marking part of the close phase.
      */
     ScanDelayedChildren(cx);
+    MarkWeakCollectionsToClosure(cx);
 #endif
 
     JS_ASSERT(!cx->insideGCMarkCallback);
@@ -2987,6 +3011,12 @@ restart:
         cx->insideGCMarkCallback = JS_FALSE;
     }
     JS_ASSERT(rt->gcUnscannedBagSize == 0);
+
+    MarkWeakCollectionsToClosure(cx);
+    js_SweepWeakCollections(cx);
+
+    /* Inspect weak global keys before sweep clears mark bits/finalizes them. */
+    js_SweepCachedClassObjects(rt);
 
     /* Finalize iterator states before the objects they iterate over. */
     CloseIteratorStates(cx);

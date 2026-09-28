@@ -55,6 +55,10 @@ js_IdIsIndex(jsval id, jsuint *indexp);
 
 extern JSClass js_ArrayClass;
 
+/* ES2015 IsArray: revoked proxies throw instead of returning false. */
+extern JSBool
+js_IsArray(JSContext *cx, JSObject *obj, JSBool *answer);
+
 extern JSBool
 js_ShrinkArray(JSContext *cx, JSObject *target, jsuint length,
                jsval *value, JSBool *blocked);
@@ -64,6 +68,12 @@ js_InitArrayClass(JSContext *cx, JSObject *obj);
 
 extern JSObject *
 js_NewArrayObject(JSContext *cx, jsuint length, jsval *vector);
+
+extern JSObject *
+js_NewArrayObjectWithProto(JSContext *cx, jsuint length, jsval *vector,
+                           JSObject *proto, JSObject *parent);
+extern JSBool js_ArrayLikeLength(JSContext *cx, JSObject *obj, jsdouble *length);
+extern JSBool js_ArrayLikeIndex(JSContext *cx, jsdouble index, jsid *idp);
 
 extern JSBool
 js_GetLengthProperty(JSContext *cx, JSObject *obj, jsuint *lengthp);

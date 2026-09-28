@@ -56,6 +56,7 @@
 #include "jspubtd.h"
 #include "jsregexp.h"
 #include "jsutil.h"
+#include "jsjobs.h"
 
 JS_BEGIN_EXTERN_C
 
@@ -126,6 +127,7 @@ struct JSThread {
      * among two or more contexts running script in one thread.
      */
     JSGSNCache          gsnCache;
+    JSJobQueue          jobs;
 };
 
 #define JS_GSN_CACHE(cx) ((cx)->thread->gsnCache)
@@ -449,6 +451,13 @@ struct JSRuntime {
     double              strdepLengthSum;
     double              strdepLengthSquaredSum;
 #endif
+    /* Weak global keys; constructors are traced from each live global. */
+    JSDHashTable        *classObjectCache;
+    struct JSSymbolState *symbolState;
+    struct JSWeakCollection *weakCollections;
+#ifndef JS_THREADSAFE
+    JSJobQueue          jobs;
+#endif
 };
 
 #ifdef DEBUG
@@ -743,6 +752,9 @@ struct JSContext {
     /* Top of the GC mark stack. */
     void                *gcCurrentMarkNode;
 #endif
+
+    /* Active native join guards; their objects have independent stack roots. */
+    struct JSArrayJoinState *arrayJoinStack;
 };
 
 #ifdef JS_THREADSAFE
@@ -813,8 +825,10 @@ class JSAutoTempValueRooter
 #define JSVERSION_HAS_XML               0x1000  /* flag induced by XML option */
 
 #define JSVERSION_NUMBER(cx)            ((cx)->version & JSVERSION_MASK)
-#define JS_HAS_XML_OPTION(cx)           ((cx)->version & JSVERSION_HAS_XML || \
-                                         JSVERSION_NUMBER(cx) >= JSVERSION_1_6)
+#define JS_VERSION_IS_ES2015(cx)        (JSVERSION_NUMBER(cx) >= JSVERSION_ECMA_2015)
+#define JS_HAS_XML_OPTION(cx)           (!JS_VERSION_IS_ES2015(cx) && \
+                                        ((cx)->version & JSVERSION_HAS_XML || \
+                                         JSVERSION_NUMBER(cx) >= JSVERSION_1_6))
 
 #define JS_HAS_NATIVE_BRANCH_CALLBACK_OPTION(cx)                              \
     JS_HAS_OPTION(cx, JSOPTION_NATIVE_BRANCH_CALLBACK)

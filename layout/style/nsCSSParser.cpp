@@ -78,7 +78,6 @@
 #include "nsILookAndFeel.h"
 
 #include "prprf.h"
-#include "nsDOMError.h"
 #include "math.h"
 
 //----------------------------------------------------------------------
@@ -149,6 +148,9 @@ public:
                             nsMediaList* aMediaList,
                             PRBool aHTMLMode);
 
+  NS_IMETHOD ParseSelectorString(const nsAString& aSelectors,
+                                 nsCSSSelectorList** aResult);
+
   NS_IMETHOD ParseColorString(const nsSubstring& aBuffer,
                               nsIURI* aURL, // for error reporting
                               PRUint32 aLineNumber, // for error reporting
@@ -156,9 +158,6 @@ public:
                               nscolor* aColor);
 
   void AppendRule(nsICSSRule* aRule);
-
-  nsresult ParseDOMSelectors(const nsAString& aSource,
-                             nsCSSSelectorList** aResult);
 
 protected:
   nsresult InitScanner(nsIUnicharInputStream* aInput, nsIURI* aSheetURI,
@@ -414,6 +413,10 @@ protected:
   // True if unsafe rules should be allowed
   PRPackedBool mUnsafeRulesEnabled : 1;
 
+  // The DOM selector API uses the Selectors functional-list grammar. Keep
+  // stylesheet parsing on its historical grammar and specificity rules.
+  PRPackedBool mParsingDOMSelector : 1;
+
 #ifdef MOZ_SVG
   // True if we are in SVG mode; false in "normal" CSS
   PRPackedBool  mSVGMode : 1;
@@ -518,6 +521,7 @@ CSSParserImpl::CSSParserImpl()
     mHavePushBack(PR_FALSE),
     mNavQuirkMode(PR_FALSE),
     mUnsafeRulesEnabled(PR_FALSE),
+    mParsingDOMSelector(PR_FALSE),
 #ifdef MOZ_SVG
     mSVGMode(PR_FALSE),
 #endif
@@ -882,6 +886,56 @@ CSSParserImpl::ParseRule(const nsAString& aRule,
   }
   OUTPUT_ERROR();
   ReleaseScanner();
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+CSSParserImpl::ParseSelectorString(const nsAString& aSelectors,
+                                   nsCSSSelectorList** aResult)
+{
+  NS_ENSURE_ARG_POINTER(aResult);
+  *aResult = nsnull;
+
+  nsresult rv = InitScanner(aSelectors, nsnull, 0, nsnull);
+  NS_ENSURE_SUCCESS(rv, rv);
+
+  nsresult errorCode = NS_OK;
+  mParsingDOMSelector = PR_TRUE;
+  nsCSSSelectorList* head = nsnull;
+  nsCSSSelectorList** tail = &head;
+  PRBool valid = PR_FALSE;
+
+  for (;;) {
+    nsCSSSelectorList* group = nsnull;
+    if (!ParseSelectorGroup(errorCode, group))
+      break;
+
+    *tail = group;
+    while (*tail)
+      tail = &(*tail)->mNext;
+
+    // ParseSelectorGroup leaves its terminating token unread. A selector
+    // string consists only of comma-separated groups and optional whitespace.
+    if (!GetToken(errorCode, PR_TRUE)) {
+      valid = PR_TRUE;
+      break;
+    }
+    if (mToken.mType != eCSSToken_Symbol || mToken.mSymbol != ',')
+      break;
+  }
+
+  mParsingDOMSelector = PR_FALSE;
+  ReleaseScanner();
+  if (NS_FAILED(errorCode)) {
+    delete head;
+    return errorCode;
+  }
+  if (!valid || !head) {
+    delete head;
+    return NS_ERROR_FAILURE;
+  }
+
+  *aResult = head;
   return NS_OK;
 }
 
@@ -1742,48 +1796,6 @@ PRBool CSSParserImpl::ParseRuleSet(nsresult& aErrorCode, RuleAppendFunc aAppendF
   return PR_TRUE;
 }
 
-nsresult
-CSSParserImpl::ParseDOMSelectors(const nsAString& aSource,
-                                nsCSSSelectorList** aResult)
-{
-  *aResult = nsnull;
-  nsresult rv = InitScanner(aSource, nsnull, 0, nsnull);
-  NS_ENSURE_SUCCESS(rv, rv);
-  nsCSSSelectorList* head = nsnull;
-  nsCSSSelectorList** tail = &head;
-  for (;;) {
-    if (!ParseSelectorGroup(rv, *tail)) {
-      if (NS_SUCCEEDED(rv))
-        rv = NS_ERROR_DOM_SYNTAX_ERR;
-      break;
-    }
-    if (!GetToken(rv, PR_TRUE))
-      break;
-    if (mToken.mType != eCSSToken_Symbol || mToken.mSymbol != ',') {
-      rv = NS_ERROR_DOM_SYNTAX_ERR;
-      break;
-    }
-    tail = &(*tail)->mNext;
-  }
-  CLEAR_ERROR();
-  ReleaseScanner();
-  if (NS_FAILED(rv)) {
-    delete head;
-    return rv;
-  }
-  *aResult = head;
-  return NS_OK;
-}
-
-nsresult
-NS_ParseDOMSelectors(const nsAString& aSource, PRBool aCaseSensitive,
-                     nsCSSSelectorList** aResult)
-{
-  CSSParserImpl parser;
-  parser.SetCaseSensitive(aCaseSensitive);
-  return parser.ParseDOMSelectors(aSource, aResult);
-}
-
 PRBool CSSParserImpl::ParseSelectorList(nsresult& aErrorCode,
                                         nsCSSSelectorList*& aListHead)
 {
@@ -2456,6 +2468,9 @@ CSSParserImpl::ParsePseudoSelector(PRInt32&       aDataMask,
        isTree ||
 #endif
        nsCSSPseudoClasses::notPseudo == pseudo ||
+       (mParsingDOMSelector &&
+        (nsCSSPseudoClasses::is == pseudo ||
+         nsCSSPseudoClasses::where == pseudo)) ||
        nsCSSPseudoClasses::lang == pseudo)) { // There are no other function pseudos
     REPORT_UNEXPECTED_TOKEN(PEPseudoSelNonFunc);
     UngetToken();
@@ -2471,21 +2486,62 @@ CSSParserImpl::ParsePseudoSelector(PRInt32&       aDataMask,
     return eSelectorParsingStatus_Error;
   }
 
-  if (nsCSSPseudoClasses::notPseudo == pseudo) {
-    if (aIsNegated) { // :not() can't be itself negated
+  if (nsCSSPseudoClasses::notPseudo == pseudo && !mParsingDOMSelector) {
+    if (aIsNegated) {
       REPORT_UNEXPECTED_TOKEN(PEPseudoSelDoubleNot);
       UngetToken();
       return eSelectorParsingStatus_Error;
     }
-    // CSS 3 Negation pseudo-class takes one simple selector as argument
     nsSelectorParsingStatus parsingStatus =
       ParseNegatedSimpleSelector(aDataMask, aSelector, aErrorCode);
-    if (eSelectorParsingStatus_Continue != parsingStatus) {
+    if (eSelectorParsingStatus_Continue != parsingStatus)
       return parsingStatus;
+  }
+  else if (nsCSSPseudoClasses::notPseudo == pseudo ||
+           (mParsingDOMSelector &&
+            (nsCSSPseudoClasses::is == pseudo ||
+             nsCSSPseudoClasses::where == pseudo))) {
+    nsCSSSelectorList* argument = nsnull;
+    if (!ExpectSymbol(aErrorCode, '(', PR_FALSE)) {
+      REPORT_UNEXPECTED_TOKEN(PENegationBadArg);
+      return eSelectorParsingStatus_Error;
     }
+    for (;;) {
+      nsCSSSelectorList* group = nsnull;
+      nsresult groupError = NS_OK;
+      if (!ParseSelectorGroup(groupError, group)) {
+        aErrorCode = NS_FAILED(groupError) ? groupError : NS_ERROR_FAILURE;
+        delete argument;
+        return eSelectorParsingStatus_Error;
+      }
+      if (!argument)
+        argument = group;
+      else {
+        nsCSSSelectorList* tail = argument;
+        while (tail->mNext)
+          tail = tail->mNext;
+        tail->mNext = group;
+      }
+      if (!GetToken(aErrorCode, PR_TRUE)) {
+        delete argument;
+        return eSelectorParsingStatus_Error;
+      }
+      if (mToken.IsSymbol(')'))
+        break;
+      if (!mToken.IsSymbol(',')) {
+        UngetToken();
+        delete argument;
+        return eSelectorParsingStatus_Error;
+      }
+    }
+    aSelector.mSelectorList = argument;
+    aSelector.AddPseudoClass(pseudo);
   }    
   else if (!parsingPseudoElement &&
-           nsCSSPseudoClasses::IsPseudoClass(pseudo)) {
+           nsCSSPseudoClasses::IsPseudoClass(pseudo) &&
+           (!mParsingDOMSelector ||
+            (nsCSSPseudoClasses::is != pseudo &&
+             nsCSSPseudoClasses::where != pseudo))) {
     aDataMask |= SEL_MASK_PCLASS;
     if (nsCSSPseudoClasses::lang == pseudo) {
       nsSelectorParsingStatus parsingStatus = ParseLangSelector(aSelector, aErrorCode);
@@ -2497,6 +2553,78 @@ CSSParserImpl::ParsePseudoSelector(PRInt32&       aDataMask,
     else {
       aSelector.AddPseudoClass(pseudo);
     }
+  }
+  else if (nsCSSPseudoClasses::is == pseudo ||
+           nsCSSPseudoClasses::where == pseudo) {
+    nsCSSSelectorList* argument = nsnull;
+    // :is() and :where() take a forgiving selector list. The legacy parser
+    // rejects a malformed group as a whole, so parse each comma-separated
+    // group independently and discard groups which fail.
+    if (!ExpectSymbol(aErrorCode, '(', PR_FALSE)) {
+      REPORT_UNEXPECTED_TOKEN(PEPseudoSelNonFunc);
+      return eSelectorParsingStatus_Error;
+    }
+    for (;;) {
+      nsCSSSelectorList* group = nsnull;
+      nsresult groupError = NS_OK;
+      if (!ParseSelectorGroup(groupError, group)) {
+        if (NS_FAILED(groupError) && groupError == NS_ERROR_OUT_OF_MEMORY) {
+          aErrorCode = groupError;
+          delete argument;
+          return eSelectorParsingStatus_Error;
+        }
+        // Discard the malformed selector through the next top-level comma or
+        // the function's closing parenthesis. Function and attribute nesting
+        // keeps delimiters inside :lang(), attribute values, etc. local.
+        PRInt32 nesting = 0;
+        PRInt32 brackets = 0;
+        PRBool separatorFound = PR_FALSE;
+        PRBool functionClosed = PR_FALSE;
+        while (GetToken(aErrorCode, PR_TRUE)) {
+          if (mToken.mType == eCSSToken_Function) {
+            ++nesting;
+          } else if (mToken.IsSymbol('[')) {
+            ++brackets;
+          } else if (mToken.IsSymbol(']') && brackets) {
+            --brackets;
+          } else if (!brackets && mToken.IsSymbol('(')) {
+            ++nesting;
+          } else if (!brackets && mToken.IsSymbol(')')) {
+            if (!nesting) {
+              functionClosed = PR_TRUE;
+              break;
+            }
+            --nesting;
+          } else if (!nesting && !brackets && mToken.IsSymbol(',')) {
+            separatorFound = PR_TRUE;
+            break;
+          }
+        }
+        if (functionClosed || !separatorFound)
+          break;
+        continue;
+      }
+      if (!argument)
+        argument = group;
+      else {
+        nsCSSSelectorList* tail = argument;
+        while (tail->mNext)
+          tail = tail->mNext;
+        tail->mNext = group;
+      }
+      if (!GetToken(aErrorCode, PR_TRUE))
+        break;
+      if (mToken.IsSymbol(')'))
+        break;
+      if (!mToken.IsSymbol(','))
+        break;
+    }
+    if (!argument) {
+      REPORT_UNEXPECTED_TOKEN(PEPseudoSelNonFunc);
+      return eSelectorParsingStatus_Error;
+    }
+    aSelector.mSelectorList = argument;
+    aSelector.AddPseudoClass(pseudo);
   }
   else if (isPseudoElement || isAnonBox) {
     // Pseudo-element.  Make some more sanity checks.

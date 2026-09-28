@@ -78,11 +78,21 @@ js_ThreadDestructorCB(void *ptr)
 
     if (!thread)
         return;
+    if (thread->jobs.registered) {
+        JSContext *owner = CX_FROM_THREAD_LINKS(thread->contextList.next);
+        JS_RemoveRootRT(owner->runtime, &thread->jobs.head);
+        thread->jobs.head = thread->jobs.tail = NULL;
+        thread->jobs.registered = JS_FALSE;
+    }
     while (!JS_CLIST_IS_EMPTY(&thread->contextList)) {
         /* NB: use a temporary, as the macro evaluates its args many times. */
         JSCList *link = thread->contextList.next;
+        JSContext *cx = CX_FROM_THREAD_LINKS(link);
 
         JS_REMOVE_AND_INIT_LINK(link);
+        /* Another TLS destructor may reattach and destroy this context after
+         * this thread record has gone away. Do not leave a dangling owner. */
+        cx->thread = NULL;
     }
     GSN_CACHE_CLEAR(&thread->gsnCache);
     free(thread);
@@ -146,9 +156,24 @@ js_SetContextThread(JSContext *cx)
      * Clear gcFreeLists on each transition from 0 to 1 context active on the
      * current thread. See bug 351602.
      */
-    if (JS_CLIST_IS_EMPTY(&thread->contextList))
+    if (JS_CLIST_IS_EMPTY(&thread->contextList)) {
         memset(thread->gcFreeLists, 0, sizeof(thread->gcFreeLists));
+        memset(&thread->jobs, 0, sizeof(thread->jobs));
+        /* Runtime roots also cover the destruction interval after a context
+         * leaves runtime->contextList but before its thread detaches. */
+        if (!JS_AddNamedRootRT(cx->runtime, &thread->jobs.head, "ECMAScript job queue")) {
+            JS_ReportOutOfMemory(cx);
+            return JS_FALSE;
+        }
+        thread->jobs.registered = JS_TRUE;
+    }
 
+    /* XPConnect may reattach its safe context from a TLS destructor, after
+     * NSPR has cleared this thread's TLS slot. That creates a new JSThread on
+     * the same OS thread. Detach the old record through the normal lifecycle
+     * path, including removal of its queue root when its last context moves. */
+    if (cx->thread && cx->thread != thread)
+        js_ClearContextThread(cx);
     cx->thread = thread;
     JS_REMOVE_LINK(&cx->threadLinks);
     JS_APPEND_LINK(&cx->threadLinks, &thread->contextList);
@@ -160,6 +185,12 @@ void
 js_ClearContextThread(JSContext *cx)
 {
     JS_REMOVE_AND_INIT_LINK(&cx->threadLinks);
+    if (JS_CLIST_IS_EMPTY(&cx->thread->contextList) && cx->thread->jobs.registered) {
+        JS_RemoveRootRT(cx->runtime, &cx->thread->jobs.head);
+        js_ClearJobs(cx);
+        cx->thread->jobs.registered = JS_FALSE;
+        cx->thread->jobs.draining = JS_FALSE;
+    }
 #ifdef DEBUG
     if (JS_CLIST_IS_EMPTY(&cx->thread->contextList)) {
         memset(cx->thread->gcFreeLists, JS_FREE_PATTERN,
@@ -206,7 +237,10 @@ js_NewContext(JSRuntime *rt, size_t stackChunkSize)
 #endif
 #ifdef JS_THREADSAFE
     JS_INIT_CLIST(&cx->threadLinks);
-    js_SetContextThread(cx);
+    if (!js_SetContextThread(cx)) {
+        free(cx);
+        return NULL;
+    }
 #endif
 
     JS_LOCK_GC(rt);
@@ -345,6 +379,9 @@ js_DestroyContext(JSContext *cx, JSDestroyContextMode mode)
         if (cx->requestDepth == 0)
             JS_BeginRequest(cx);
 #endif
+
+        /* Cancel this agent's queued work while still inside its request. */
+        js_ClearJobs(cx);
 
         /* Unpin all pinned atoms before final GC. */
         js_UnpinPinnedAtoms(&rt->atomState);

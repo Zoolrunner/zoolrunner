@@ -25,6 +25,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check Calendar package contents
+        if: matrix.app == 'calendar'
+        run: python3 build/win32/msvc8-cross/tests/test-package.py
       - name: Build Linux Wine and MSVC2005 environment
         run: |
           docker build --platform linux/amd64 \

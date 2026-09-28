@@ -61,26 +61,29 @@ struct RuleProcessorData {
   RuleProcessorData(nsPresContext* aPresContext,
                     nsIContent* aContent, 
                     nsRuleWalker* aRuleWalker,
-                    nsCompatibility* aCompat = nsnull,
-                    PRBool aForDOMQuery = PR_FALSE);
+                    nsCompatibility* aCompat = nsnull);
   
   // NOTE: not |virtual|
   ~RuleProcessorData();
 
   void* operator new(size_t sz, nsPresContext* aContext) CPP_THROW_NEW {
-    return aContext ? aContext->AllocateFromShell(sz) : ::operator new(sz);
+    return aContext->AllocateFromShell(sz);
   }
+  void* operator new(size_t sz) CPP_THROW_NEW { return ::operator new(sz); }
+  void operator delete(void* aPtr) { ::operator delete(aPtr); }
   void Destroy(nsPresContext* aContext) {
-    this->~RuleProcessorData();
-    if (aContext)
+    if (aContext) {
+      this->~RuleProcessorData();
       aContext->FreeToShell(sizeof(RuleProcessorData), this);
-    else
-      ::operator delete(this);
+    } else {
+      delete this;
+    }
   };
 
   const nsString* GetLang();
 
   nsPresContext*   mPresContext;
+  PRPackedBool     mUseShellArena;
   nsIContent*       mContent;       // weak ref
   nsIContent*       mParentContent; // if content, content->GetParent(); weak ref
   nsRuleWalker*     mRuleWalker; // Used to add rules to our results.
@@ -94,7 +97,6 @@ struct RuleProcessorData {
   PRPackedBool      mIsSimpleXLink; // if content, calls nsStyleUtil::IsSimpleXLink
   nsCompatibility   mCompatMode;    // Possibly remove use of this in SelectorMatches?
   PRPackedBool      mHasAttributes; // if content, content->GetAttrCount() > 0
-  PRPackedBool      mForDOMQuery; // Never expose visited history to scripts.
   nsLinkState       mLinkState;     // if a link, this is the state, otherwise unknown
   PRInt32           mEventState;    // if content, eventStateMgr->GetContentState()
   PRInt32           mNameSpaceID;   // if content, content->GetNameSapce()

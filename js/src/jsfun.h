@@ -51,10 +51,12 @@ struct JSFunction {
     JSObject     *object;       /* back-pointer to GC'ed object header */
     uint16       nargs;         /* minimum number of actual arguments */
     uint16       flags;         /* bound method and other flags, see jsapi.h */
+    uint16       edition;       /* creation edition, including native functions */
+    uint16       kind;          /* private interpreted function kind */
     union {
         struct {
             uint16   extra;     /* number of arg slots for local GC roots */
-            uint16   spare;     /* reserved for future use */
+            uint16   spare;     /* additional private native reserved slots */
             JSNative native;    /* native method pointer or null */
         } n;
         struct {
@@ -65,7 +67,48 @@ struct JSFunction {
     } u;
     JSAtom       *atom;         /* name for diagnostics and decompiling */
     JSClass      *clasp;        /* if non-null, constructor for this class */
+    JSAtom       *classSource;  /* complete class expression, traced and XDR */
+    JSAtom       *inferredName; /* modern metadata, never a lexical binding */
 };
+
+#define JSFUN_KIND_ORDINARY 0
+#define JSFUN_KIND_ARROW    1
+#define JSFUN_KIND_REST     2
+#define JSFUN_KIND_GENERATOR 4
+#define JSFUN_KIND_HOME_OBJECT 8
+#define JSFUN_KIND_NON_SIMPLE 128
+#define FUN_HAS_NON_SIMPLE(fun) (((fun)->kind & JSFUN_KIND_NON_SIMPLE) != 0)
+#define JSFUN_KIND_CLASS 16
+#define JSFUN_KIND_DERIVED 32
+#define JSFUN_KIND_SUPER_CALL 64
+#define FUN_HAS_SUPER_CALL(fun) (FUN_IS_DERIVED(fun) || ((fun)->kind & JSFUN_KIND_SUPER_CALL))
+#define FUN_IS_DERIVED(fun) (((fun)->kind & JSFUN_KIND_DERIVED) != 0)
+#define FUN_IS_CLASS(fun) (((fun)->kind & JSFUN_KIND_CLASS) != 0)
+#define FUN_HAS_HOME_OBJECT(fun) (((fun)->kind & JSFUN_KIND_HOME_OBJECT) != 0)
+#define JSFUN_HOME_SLOT(fun) (2 + (fun)->u.i.nregexps + \
+    (((fun)->flags & JSFUN_NO_CONSTRUCT) ? 1 : 0) + (FUN_IS_ARROW(fun) ? 1 : 0))
+extern JSBool js_InitDerivedBindings(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_GetSuperCallEnvironment(JSContext *cx, JSStackFrame *fp, JSObject **constructor, JSObject **target, JSObject **cell);
+extern JSBool js_BindDerivedThis(JSContext *cx, JSObject *cell, JSObject *receiver);
+extern JSBool js_InitClassConstructor(JSContext *cx, JSObject *function, jsval heritage, JSBool hasHeritage);
+extern JSBool js_SetFunctionHomeObject(JSContext *, JSObject *, JSObject *);
+extern JSBool js_GetFunctionHomeObject(JSContext *, JSObject *, JSObject **);
+extern JSBool js_GetFunctionSuperBase(JSContext *, JSObject *, JSObject **);
+extern JSBool js_IsSuperReference(JSContext *, JSObject *);
+extern JSObject *js_NewSuperReference(JSContext *, JSObject *, jsval, jsval, JSBool);
+extern JSBool js_GetSuperReference(JSContext *, JSObject *, jsval *);
+extern JSBool js_SetSuperReference(JSContext *, JSObject *, jsval);
+extern JSBool js_UpdateSuperReference(JSContext *, JSObject *, JSBool, JSBool, jsval *);
+#define FUN_IS_GENERATOR(fun) (((fun)->kind & JSFUN_KIND_GENERATOR) != 0)
+#define FUN_IS_ARROW(fun) (((fun)->kind & JSFUN_KIND_ARROW) != 0)
+#define FUN_HAS_REST(fun) (((fun)->kind & JSFUN_KIND_REST) != 0)
+#define JSFUN_ARROW_SLOT(fun) (3 + (fun)->u.i.nregexps)
+
+extern JSBool js_GeneratorFunction(JSContext *, JSObject *, uintN, jsval *, jsval *);
+
+extern JSBool js_CaptureArrowBindings(JSContext *, JSObject *, JSStackFrame *);
+extern JSBool js_HasNewTargetEnvironment(JSContext *, JSStackFrame *, JSBool *);
+extern JSBool js_GetArrowBindings(JSContext *, JSObject *, jsval *, JSObject **);
 
 /* Internal function flag; it is not a property attribute or a public API flag. */
 #define JSFUN_NO_CONSTRUCT   0x4000 /* no [[Construct]] or implicit prototype */
@@ -75,12 +118,29 @@ struct JSFunction {
 #define JSFUN_INTERNAL_FLAGS_MASK \
     (JSFUN_FLAGS_MASK | JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS | JSFUN_BOUND_FUNCTION | JSFUN_STRICT)
 
+/* Install edition-specific own metadata after compilation has reserved regexp cache slots. */
+extern JSBool
+js_InitFunctionProperties(JSContext *cx, JSObject *obj);
+
+extern JSBool
+js_IsModernFunction(JSContext *cx, JSObject *obj);
+
 extern JSBool
 js_IsCallable(JSContext *cx, jsval v);
 
 extern JSBool
+js_InstanceOf(JSContext *cx, jsval constructor, jsval value, JSBool *result);
+
+extern JSBool
+js_IsConstructor(JSContext *cx, jsval v);
+
+extern JSBool
 js_InvokeBound(JSContext *cx, JSObject *bound, uintN argc, jsval *argv,
                 JSBool construct, jsval *rval);
+extern JSBool
+js_InvokeBoundWithNewTarget(JSContext *cx, JSObject *bound, uintN argc,
+                            jsval *argv, JSBool construct, jsval *rval,
+                            JSObject *newTarget);
 
 /* Mark built-in methods without widening the public JSFunctionSpec flags. */
 extern JSBool
@@ -188,6 +248,14 @@ js_PutArgsObject(JSContext *cx, JSStackFrame *fp);
 
 extern JSBool
 js_XDRFunction(JSXDRState *xdr, JSObject **objp);
+
+extern JSBool js_BeginParameterBindings(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_EnterParameterInitializer(JSContext *cx, JSStackFrame *fp);
+extern void js_LeaveParameterInitializer(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_FinishParameterBindings(JSContext *cx, JSStackFrame *fp);
+extern JSBool js_IsParameterProperty(JSFunction *fun, JSScopeProperty *property);
+
+extern JSBool js_IsFunctionPropertyHook(JSPropertyOp getter);
 
 JS_END_EXTERN_C
 

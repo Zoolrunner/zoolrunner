@@ -192,6 +192,10 @@ JS_GetFramePrincipalArray(JSContext *cx, JSStackFrame *fp);
 extern JS_PUBLIC_API(JSBool)
 JS_IsNativeFrame(JSContext *cx, JSStackFrame *fp);
 
+/* Job entry frames carry their owning global in JS_GetFrameScopeChain. */
+extern JS_PUBLIC_API(JSBool)
+JS_IsJobFrame(JSContext *cx, JSStackFrame *fp);
+
 /* this is deprecated, use JS_GetFrameScopeChain instead */
 extern JS_PUBLIC_API(JSObject *)
 JS_GetFrameObject(JSContext *cx, JSStackFrame *fp);

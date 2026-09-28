@@ -429,6 +429,32 @@ public:
   }
 };
 
+// XMLHttpRequest's send body is optional to script, although its historical
+// XPIDL method requires an nsIVariant argument from native callers.
+class nsXMLHttpRequestSH : public nsDOMGCParticipantSH
+{
+protected:
+  nsXMLHttpRequestSH(nsDOMClassInfoData* aData) : nsDOMGCParticipantSH(aData)
+  {
+  }
+
+  virtual ~nsXMLHttpRequestSH()
+  {
+  }
+
+public:
+  static JSBool JS_DLL_CALLBACK Send(JSContext *cx, JSObject *obj, uintN argc,
+                                     jsval *argv, jsval *rval);
+  NS_IMETHOD NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
+                        JSObject *obj, jsval id, PRUint32 flags,
+                        JSObject **objp, PRBool *_retval);
+
+  static nsIClassInfo *doCreate(nsDOMClassInfoData* aData)
+  {
+    return new nsXMLHttpRequestSH(aData);
+  }
+};
+
 // EventProp scriptable helper, this class should be the base class of
 // all objects that should support things like
 // obj.onclick=function{...}
@@ -499,6 +525,9 @@ protected:
                                 PRBool *did_resolve);
 
 public:
+  static JSBool JS_DLL_CALLBACK GetComputedStyle(JSContext *cx, JSObject *obj,
+                                                  uintN argc, jsval *argv,
+                                                  jsval *rval);
   NS_IMETHOD PreCreate(nsISupports *nativeObj, JSContext *cx,
                        JSObject *globalObj, JSObject **parentObj);
   NS_IMETHOD GetProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
@@ -641,6 +670,17 @@ protected:
   }
 
 public:
+  static JSBool JS_DLL_CALLBACK QuerySelector(JSContext *cx, JSObject *obj,
+                                               uintN argc, jsval *argv,
+                                               jsval *rval);
+  static JSBool JS_DLL_CALLBACK QuerySelectorAll(JSContext *cx, JSObject *obj,
+                                                  uintN argc, jsval *argv,
+                                                  jsval *rval);
+  static JSBool QuerySelectorHelper(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval, PRBool all);
+  NS_IMETHOD NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
+                        JSObject *obj, jsval id, PRUint32 flags,
+                        JSObject **objp, PRBool *_retval);
   NS_IMETHOD PostCreate(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                         JSObject *obj);
 

@@ -61,6 +61,7 @@
 #include "prmjtime.h"
 #include "jsutil.h" /* Added by JSIFY */
 #include "jsapi.h"
+#include "jsiteres6.h"
 #include "jsconfig.h"
 #include "jscntxt.h"
 #include "jsdate.h"
@@ -69,6 +70,8 @@
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsstr.h"
+#include "jsrealm.h"
+#include "jssymbol.h"
 
 /*
  * The JS 'Date' object is patterned after the Java 'Date' object.
@@ -596,6 +599,84 @@ date_UTC(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     return js_NewNumberValue(cx, d, rval);
 }
 
+/* Modern arithmetic is separate from the historical application methods. */
+static jsdouble
+ModernTimeClip(JSContext *cx, jsdouble time)
+{
+    if (!JSDOUBLE_IS_FINITE(time) || fabs(time) > HalfTimeDomain)
+        return *cx->runtime->jsNaN;
+    return js_DoubleToInteger(time) + 0.0;
+}
+
+static jsdouble
+ModernMakeDay(JSContext *cx, jsdouble year, jsdouble month, jsdouble date)
+{
+    JSBool leap;
+    if (!JSDOUBLE_IS_FINITE(year) || !JSDOUBLE_IS_FINITE(month) ||
+        !JSDOUBLE_IS_FINITE(date)) return *cx->runtime->jsNaN;
+    year = js_DoubleToInteger(year);
+    month = js_DoubleToInteger(month);
+    date = js_DoubleToInteger(date);
+    year += floor(month / 12);
+    if (!JSDOUBLE_IS_FINITE(year)) return *cx->runtime->jsNaN;
+    month = fmod(month, 12.0);
+    if (month < 0) month += 12;
+    leap = fmod(year, 4.0) == 0 &&
+           (fmod(year, 100.0) != 0 || fmod(year, 400.0) == 0);
+    return DayFromYear(year) + firstDayOfMonth[leap][(intN)month] + date - 1;
+}
+
+static jsdouble
+ModernMakeTime(JSContext *cx, jsdouble hour, jsdouble min, jsdouble sec, jsdouble ms)
+{
+    volatile jsdouble h, m, s, sum;
+    if (!JSDOUBLE_IS_FINITE(hour) || !JSDOUBLE_IS_FINITE(min) ||
+        !JSDOUBLE_IS_FINITE(sec) || !JSDOUBLE_IS_FINITE(ms))
+        return *cx->runtime->jsNaN;
+    /* Separate products and sums avoid changing rounding through contraction. */
+    h = js_DoubleToInteger(hour) * msPerHour;
+    m = js_DoubleToInteger(min) * msPerMinute;
+    s = js_DoubleToInteger(sec) * msPerSecond;
+    sum = h + m;
+    sum = sum + s;
+    return sum + js_DoubleToInteger(ms);
+}
+
+static jsdouble
+ModernMakeDate(jsdouble day, jsdouble time)
+{
+    volatile jsdouble days = day * msPerDay;
+    return days + time;
+}
+
+static jsdouble
+ModernUTC(JSContext *cx, jsdouble local)
+{
+    /* Outside this band no timezone adjustment can enter TimeClip's range.
+     * Do not feed unbounded values into the historical DST year conversion. */
+    if (!JSDOUBLE_IS_FINITE(local) || fabs(local) > HalfTimeDomain + msPerDay)
+        return *cx->runtime->jsNaN;
+    return UTC(local);
+}
+
+static JSBool
+ModernDateUTC(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble args[MAXARGS], year, value;
+    uintN i;
+    /* Fewer than two arguments are implementation-dependent in ES2015.
+     * Retain the historical defaults, without changing the defined 2-7 path. */
+    for (i = 0; i < MAXARGS; ++i) {
+        args[i] = i == 2 ? 1 : 0;
+        if (i < argc && !js_ValueToNumber(cx, argv[i], &args[i])) return JS_FALSE;
+    }
+    year = js_DoubleToInteger(args[0]);
+    if (JSDOUBLE_IS_FINITE(args[0]) && year >= 0 && year <= 99) args[0] = year + 1900;
+    value = ModernMakeDate(ModernMakeDay(cx, args[0], args[1], args[2]),
+                           ModernMakeTime(cx, args[3], args[4], args[5], args[6]));
+    return js_NewNumberValue(cx, ModernTimeClip(cx, value), rval);
+}
+
 /* ES5.1 simplified ISO format. Read fixed-width fields within the string. */
 static JSBool
 ReadISOField(const jschar *s, size_t length, size_t *offset,
@@ -615,12 +696,13 @@ ReadISOField(const jschar *s, size_t length, size_t *offset,
 }
 
 static JSBool
-ParseISODate(const jschar *s, size_t length, jsdouble *result)
+ParseISODate(const jschar *s, size_t length, jsdouble *result, JSBool modern)
 {
     size_t pos = 0;
     int year, month = 1, day = 1, hour = 0, minute = 0, second = 0, ms = 0;
     int sign = 1, zoneSign = 0, zoneHour = 0, zoneMinute = 0, monthDays;
     JSBool extended = length && (s[0] == '+' || s[0] == '-');
+    JSBool hasTime = JS_FALSE, hasZone = JS_FALSE;
     static const int days[] = {31,28,31,30,31,30,31,31,30,31,30,31};
 
     if (extended)
@@ -645,6 +727,7 @@ ParseISODate(const jschar *s, size_t length, jsdouble *result)
     if (day > monthDays)
         return JS_FALSE;
     if (pos < length) {
+        hasTime = JS_TRUE;
         if (s[pos++] != 'T' ||
             !ReadISOField(s, length, &pos, 2, &hour) ||
             pos == length || s[pos++] != ':' ||
@@ -664,6 +747,7 @@ ParseISODate(const jschar *s, size_t length, jsdouble *result)
             (hour == 24 && (minute || second || ms)))
             return JS_FALSE;
         if (pos < length) {
+            hasZone = JS_TRUE;
             if (s[pos] == 'Z') {
                 ++pos;
             } else {
@@ -682,11 +766,17 @@ ParseISODate(const jschar *s, size_t length, jsdouble *result)
         return JS_FALSE;
     *result = date_msecFromDate(year, month - 1, day, hour, minute, second, ms) -
               zoneSign * (zoneHour * 60 + zoneMinute) * msPerMinute;
-    return fabs(*result) <= 8.64e15;
+    if (modern && hasTime && !hasZone) {
+        /* Offsetless ISO date-times use local time in ES2015. Preserve the
+         * historical UTC date-only policy also retained by later editions. */
+        if (fabs(*result) > HalfTimeDomain + msPerDay) return JS_FALSE;
+        *result = UTC(*result);
+    }
+    return fabs(*result) <= HalfTimeDomain;
 }
 
 static JSBool
-date_parseString(JSString *str, jsdouble *result)
+date_parseString(JSString *str, jsdouble *result, JSBool modern)
 {
     jsdouble msec;
 
@@ -714,7 +804,7 @@ date_parseString(JSString *str, jsdouble *result)
          (limit == 4 || s[4] == 'T' ||
           (limit > 5 && s[4] == '-' && JS7_ISDEC(s[5])))) ||
         (limit >= 7 && (s[0] == '+' || s[0] == '-') && JS7_ISDEC(s[1])))
-        return ParseISODate(s, limit, result);
+        return ParseISODate(s, limit, result, modern);
 
     if (limit == 0)
         goto syntax;
@@ -971,13 +1061,24 @@ date_parse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
     str = js_ValueToString(cx, argv[0]);
     if (!str)
         return JS_FALSE;
-    if (!date_parseString(str, &result)) {
+    if (!date_parseString(str, &result, JS_FALSE)) {
         *rval = DOUBLE_TO_JSVAL(cx->runtime->jsNaN);
         return JS_TRUE;
     }
 
     result = TIMECLIP(result);
     return js_NewNumberValue(cx, result, rval);
+}
+
+static JSBool
+ModernDateParse(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str = js_ValueToString(cx, argv[0]);
+    jsdouble value;
+    if (!str) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(str);
+    if (!date_parseString(str, &value, JS_TRUE)) value = *cx->runtime->jsNaN;
+    return js_NewNumberValue(cx, ModernTimeClip(cx, value), rval);
 }
 
 static JSBool
@@ -1001,9 +1102,15 @@ date_now(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 static jsdouble *
 date_getProlog(JSContext *cx, JSObject *obj, jsval *argv)
 {
-    if (!JS_InstanceOf(cx, obj, &js_DateClass, argv))
+    jsval value;
+    if (!JS_InstanceOf(cx, obj, &js_DateClass, argv)) return NULL;
+    value = OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE);
+    if (!JSVAL_IS_DOUBLE(value)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO,
+                             "Date without a date value", "Date value");
         return NULL;
-    return JSVAL_TO_DOUBLE(OBJ_GET_SLOT(cx, obj, JSSLOT_PRIVATE));
+    }
+    return JSVAL_TO_DOUBLE(value);
 }
 
 /*
@@ -1458,6 +1565,178 @@ date_setUTCHours(JSContext *cx, JSObject *obj, uintN argc,
                  jsval *argv, jsval *rval)
 {
     return date_makeTime(cx, obj, argc, argv, 4, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetTime(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsdouble value, *date = date_getProlog(cx, obj, argv);
+    if (!date || !js_ValueToNumber(cx, argv[0], &value)) return JS_FALSE;
+    *date = ModernTimeClip(cx, value);
+    return js_NewNumberValue(cx, *date, rval);
+}
+
+static JSBool
+ModernDateMakeTime(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                   uintN maxargs, JSBool local, jsval *rval)
+{
+    jsdouble args[4], fields[4], time, value;
+    jsdouble *date = date_getProlog(cx, obj, argv);
+    JSBool finite;
+    uintN i;
+    if (!date) return JS_FALSE;
+    time = *date;
+    finite = JSDOUBLE_IS_FINITE(time);
+    if (finite && local) time = LocalTime(time);
+    if (!argc) argc = 1;
+    if (argc > maxargs) argc = maxargs;
+    for (i = 0; i < argc; ++i) {
+        if (!js_ValueToNumber(cx, argv[i], &args[i])) return JS_FALSE;
+        if (!JSDOUBLE_IS_FINITE(args[i])) finite = JS_FALSE;
+    }
+    if (!finite) {
+        /* Original ES2015 stores the invalid result after coercion. Later
+         * editions may retain a callback's replacement of an invalid date. */
+        *date = *cx->runtime->jsNaN;
+        return js_NewNumberValue(cx, *date, rval);
+    }
+    fields[0] = HourFromTime(time); fields[1] = MinFromTime(time);
+    fields[2] = SecFromTime(time); fields[3] = msFromTime(time);
+    for (i = 0; i < argc; ++i) fields[4 - maxargs + i] = args[i];
+    value = ModernMakeDate(Day(time), ModernMakeTime(cx, fields[0], fields[1], fields[2], fields[3]));
+    if (local) value = ModernUTC(cx, value);
+    *date = ModernTimeClip(cx, value);
+    return js_NewNumberValue(cx, *date, rval);
+}
+
+static JSBool
+ModernDateSetMilliseconds(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 1, JS_TRUE, rval);
+}
+
+static JSBool
+ModernDateSetSeconds(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 2, JS_TRUE, rval);
+}
+
+static JSBool
+ModernDateSetMinutes(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 3, JS_TRUE, rval);
+}
+
+static JSBool
+ModernDateSetHours(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 4, JS_TRUE, rval);
+}
+
+static JSBool
+ModernDateSetUTCMilliseconds(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 1, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetUTCSeconds(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 2, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetUTCMinutes(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 3, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetUTCHours(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeTime(cx, obj, argc, argv, 4, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateMakeDate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                   uintN maxargs, JSBool local, JSBool shortYear, jsval *rval)
+{
+    jsdouble args[3], fields[3], time, value, year;
+    jsdouble *date = date_getProlog(cx, obj, argv);
+    JSBool finite;
+    uintN i;
+    if (!date) return JS_FALSE;
+    time = *date;
+    if (!JSDOUBLE_IS_FINITE(time) && maxargs == 3)
+        time = 0;
+    else if (JSDOUBLE_IS_FINITE(time) && local)
+        time = LocalTime(time);
+    finite = JSDOUBLE_IS_FINITE(time);
+    if (!argc) argc = 1;
+    if (argc > maxargs) argc = maxargs;
+    for (i = 0; i < argc; ++i) {
+        if (!js_ValueToNumber(cx, argv[i], &args[i])) return JS_FALSE;
+        if (!JSDOUBLE_IS_FINITE(args[i])) finite = JS_FALSE;
+    }
+    if (!finite) {
+        *date = *cx->runtime->jsNaN;
+        return js_NewNumberValue(cx, *date, rval);
+    }
+    fields[0] = YearFromTime(time); fields[1] = MonthFromTime(time);
+    fields[2] = DateFromTime(time);
+    for (i = 0; i < argc; ++i) fields[3 - maxargs + i] = args[i];
+    if (shortYear) {
+        year = js_DoubleToInteger(fields[0]);
+        if (year >= 0 && year <= 99) fields[0] = year + 1900;
+    }
+    value = ModernMakeDate(ModernMakeDay(cx, fields[0], fields[1], fields[2]),
+                           TimeWithinDay(time));
+    if (local) value = ModernUTC(cx, value);
+    *date = ModernTimeClip(cx, value);
+    return js_NewNumberValue(cx, *date, rval);
+}
+
+static JSBool
+ModernDateSetDate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeDate(cx, obj, argc, argv, 1, JS_TRUE, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetMonth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeDate(cx, obj, argc, argv, 2, JS_TRUE, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetFullYear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeDate(cx, obj, argc, argv, 3, JS_TRUE, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetUTCDate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeDate(cx, obj, argc, argv, 1, JS_FALSE, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetUTCMonth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeDate(cx, obj, argc, argv, 2, JS_FALSE, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetUTCFullYear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return ModernDateMakeDate(cx, obj, argc, argv, 3, JS_FALSE, JS_FALSE, rval);
+}
+
+static JSBool
+ModernDateSetYear(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    if (argc > 1) argc = 1;
+    return ModernDateMakeDate(cx, obj, argc, argv, 3, JS_TRUE, JS_TRUE, rval);
 }
 
 static JSBool
@@ -2072,7 +2351,7 @@ date_valueOf(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
      */
 
     /* If called directly with no arguments, convert to a time number. */
-    if (argc == 0)
+    if (argc == 0 || js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
         return date_getTime(cx, obj, argc, argv, rval);
 
     /* Convert to number only if the hint was given, otherwise favor string. */
@@ -2165,7 +2444,8 @@ date_constructor(JSContext *cx, JSObject* obj)
 }
 
 static JSBool
-Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+DateInternal(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval,
+             JSBool modern)
 {
     jsdouble *date;
     JSString *str;
@@ -2203,6 +2483,20 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
         *date = msec_time;
     } else if (argc == 1) {
+        if (modern &&
+            !JSVAL_IS_PRIMITIVE(argv[0])) {
+            JSObject *input = JSVAL_TO_OBJECT(argv[0]);
+            jsval value;
+            if (OBJ_GET_CLASS(cx, input) == &js_DateClass &&
+                JSVAL_IS_DOUBLE(value = OBJ_GET_SLOT(cx, input, JSSLOT_PRIVATE))) {
+                d = *JSVAL_TO_DOUBLE(value);
+                date = date_constructor(cx, obj);
+                if (!date) return JS_FALSE;
+                *date = ModernTimeClip(cx, d);
+                return JS_TRUE;
+            }
+            if (!OBJ_DEFAULT_VALUE(cx, input, JSTYPE_VOID, &argv[0])) return JS_FALSE;
+        }
         if (!JSVAL_IS_STRING(argv[0])) {
             /* the argument is a millisecond number */
             if (!js_ValueToNumber(cx, argv[0], &d))
@@ -2210,7 +2504,7 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             date = date_constructor(cx, obj);
             if (!date)
                 return JS_FALSE;
-            *date = TIMECLIP(d);
+            *date = modern ? ModernTimeClip(cx, d) : TIMECLIP(d);
         } else {
             /* the argument is a string; parse it. */
             date = date_constructor(cx, obj);
@@ -2221,9 +2515,9 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             if (!str)
                 return JS_FALSE;
 
-            if (!date_parseString(str, date))
+            if (!date_parseString(str, date, modern))
                 *date = *cx->runtime->jsNaN;
-            *date = TIMECLIP(*date);
+            *date = modern ? ModernTimeClip(cx, *date) : TIMECLIP(*date);
         }
     } else {
         jsdouble array[MAXARGS];
@@ -2238,14 +2532,14 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
                     return JS_FALSE;
                 /* if any arg is NaN, make a NaN date object
                    and return */
-                if (!JSDOUBLE_IS_FINITE(double_arg)) {
+                if (!modern && !JSDOUBLE_IS_FINITE(double_arg)) {
                     date = date_constructor(cx, obj);
                     if (!date)
                         return JS_FALSE;
                     *date = *cx->runtime->jsNaN;
                     return JS_TRUE;
                 }
-                array[loop] = js_DoubleToInteger(double_arg);
+                array[loop] = modern ? double_arg : js_DoubleToInteger(double_arg);
             } else {
                 if (loop == 2) {
                     array[loop] = 1; /* Default the date argument to 1. */
@@ -2260,14 +2554,115 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
             return JS_FALSE;
 
         /* adjust 2-digit years into the 20th century */
-        if (array[0] >= 0 && array[0] <= 99)
+        if (modern) {
+            d = js_DoubleToInteger(array[0]);
+            if (JSDOUBLE_IS_FINITE(array[0]) && d >= 0 && d <= 99)
+                array[0] = d + 1900;
+        } else if (array[0] >= 0 && array[0] <= 99) {
             array[0] += 1900;
+        }
 
-        day = MakeDay(array[0], array[1], array[2]);
-        msec_time = MakeTime(array[3], array[4], array[5], array[6]);
-        msec_time = MakeDate(day, msec_time);
-        msec_time = UTC(msec_time);
-        *date = TIMECLIP(msec_time);
+        day = modern ? ModernMakeDay(cx, array[0], array[1], array[2]) :
+                       MakeDay(array[0], array[1], array[2]);
+        msec_time = modern ? ModernMakeTime(cx, array[3], array[4], array[5], array[6]) :
+                             MakeTime(array[3], array[4], array[5], array[6]);
+        msec_time = modern ? ModernMakeDate(day, msec_time) : MakeDate(day, msec_time);
+        msec_time = modern ? ModernUTC(cx, msec_time) : UTC(msec_time);
+        *date = modern ? ModernTimeClip(cx, msec_time) : TIMECLIP(msec_time);
+    }
+    return JS_TRUE;
+}
+
+static JSBool
+Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return DateInternal(cx, obj, argc, argv, rval, JS_FALSE);
+}
+
+static JSBool
+ModernDate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    return DateInternal(cx, obj, argc, argv, rval, JS_TRUE);
+}
+
+static JSBool
+date_toPrimitive(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *hint;
+    JSBool stringFirst;
+    if (JSVAL_IS_PRIMITIVE(argv[-1]) || !JSVAL_IS_STRING(argv[0])) goto bad;
+    hint = JSVAL_TO_STRING(argv[0]);
+    if (JSSTRING_LENGTH(hint) == 6 &&
+        js_EqualStrings(hint, ATOM_TO_STRING(cx->runtime->atomState.typeAtoms[JSTYPE_STRING]))) {
+        stringFirst = JS_TRUE;
+    } else {
+        static const jschar defaultHint[] = {'d','e','f','a','u','l','t'};
+        static const jschar numberHint[] = {'n','u','m','b','e','r'};
+        if (JSSTRING_LENGTH(hint) == 7 && !memcmp(JSSTRING_CHARS(hint), defaultHint, sizeof(defaultHint)))
+            stringFirst = JS_TRUE;
+        else if (JSSTRING_LENGTH(hint) == 6 && !memcmp(JSSTRING_CHARS(hint), numberHint, sizeof(numberHint)))
+            stringFirst = JS_FALSE;
+        else goto bad;
+    }
+    return js_OrdinaryToPrimitive(cx, JSVAL_TO_OBJECT(argv[-1]), stringFirst, rval);
+  bad:
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_CANT_CONVERT_TO,
+                         "Date @@toPrimitive receiver or hint", "primitive type");
+    return JS_FALSE;
+}
+
+static JSBool
+InitDatePrimitive(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    JSFunction *fun;
+    jsid id;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!js_WellKnownSymbolId(cx, JS_WKS_TO_PRIMITIVE, &id)) return JS_FALSE;
+    fun = JS_NewFunction(cx, date_toPrimitive, 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                         global, "[Symbol.toPrimitive]");
+    if (!fun) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(fun->object),
+                             JS_PropertyStub, JS_PropertyStub, JSPROP_READONLY, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+InitModernDateMethods(JSContext *cx, JSObject *ctor, JSObject *proto)
+{
+    static const struct { const char *name; JSNative native; } methods[] = {
+        {"setDate", ModernDateSetDate},
+        {"setMonth", ModernDateSetMonth},
+        {"setFullYear", ModernDateSetFullYear},
+        {"setUTCDate", ModernDateSetUTCDate},
+        {"setUTCMonth", ModernDateSetUTCMonth},
+        {"setUTCFullYear", ModernDateSetUTCFullYear},
+        {"setYear", ModernDateSetYear},
+        {"setTime", ModernDateSetTime},
+        {"setMilliseconds", ModernDateSetMilliseconds},
+        {"setSeconds", ModernDateSetSeconds},
+        {"setMinutes", ModernDateSetMinutes},
+        {"setHours", ModernDateSetHours},
+        {"setUTCMilliseconds", ModernDateSetUTCMilliseconds},
+        {"setUTCSeconds", ModernDateSetUTCSeconds},
+        {"setUTCMinutes", ModernDateSetUTCMinutes},
+        {"setUTCHours", ModernDateSetUTCHours}
+    };
+    jsval value;
+    JSFunction *fun;
+    uintN i;
+    if (!JS_GetProperty(cx, ctor, "UTC", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = ModernDateUTC;
+    if (!JS_GetProperty(cx, ctor, "parse", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = ModernDateParse;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        if (!JS_GetProperty(cx, proto, methods[i].name, &value)) return JS_FALSE;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+        fun->u.n.native = methods[i].native;
     }
     return JS_TRUE;
 }
@@ -2275,14 +2670,20 @@ Date(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 JSObject *
 js_InitDateClass(JSContext *cx, JSObject *obj)
 {
-    JSObject *proto;
+    JSObject *proto, *ctor;
     jsdouble *proto_date;
+    JSBool modern = js_GetCachedClassObject(cx, obj, JSProto_Object)
+                    ? js_IsModernGlobal(cx, obj) : JS_VERSION_IS_ES2015(cx);
 
     /* set static LocalTZA */
     LocalTZA = -(PRMJ_LocalGMTDifference() * msPerSecond);
-    proto = JS_InitClass(cx, obj, NULL, &js_DateClass, Date, MAXARGS,
+    proto = JS_InitClass(cx, obj, NULL, &js_DateClass, modern ? ModernDate : Date, MAXARGS,
                          NULL, date_methods, NULL, date_static_methods);
     if (!proto)
+        return NULL;
+
+    ctor = JS_GetConstructor(cx, proto);
+    if (!ctor || !js_SetBuiltinMethodFlags(cx, ctor, date_static_methods, JSFUN_NO_CONSTRUCT))
         return NULL;
 
     /* Internal function flags do not fit the legacy JSFunctionSpec table. */
@@ -2298,11 +2699,17 @@ js_InitDateClass(JSContext *cx, JSObject *obj)
     if (!JS_AliasProperty(cx, proto, "toUTCString", "toGMTString"))
         return NULL;
 
-    /* Set the value of the Date.prototype date to NaN */
-    proto_date = date_constructor(cx, proto);
-    if (!proto_date)
-        return NULL;
-    *proto_date = *cx->runtime->jsNaN;
+    if (modern) {
+        /* Preserve the native class layout without giving the ordinary
+         * ES2015 prototype a date value. Instance methods validate the slot. */
+        OBJ_SET_SLOT(cx, proto, JSSLOT_PRIVATE, JSVAL_VOID);
+        if (!InitDatePrimitive(cx, obj, proto) ||
+            !InitModernDateMethods(cx, ctor, proto)) return NULL;
+    } else {
+        proto_date = date_constructor(cx, proto);
+        if (!proto_date) return NULL;
+        *proto_date = *cx->runtime->jsNaN;
+    }
 
     return proto;
 }

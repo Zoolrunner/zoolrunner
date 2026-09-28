@@ -196,12 +196,8 @@ nsDocumentFragment::~nsDocumentFragment()
 }
 
 
-#include "nsNodeSelector.h"
-
 // QueryInterface implementation for nsDocumentFragment
 NS_INTERFACE_MAP_BEGIN(nsDocumentFragment)
-  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMNodeSelector,
-    new nsNodeSelector(NS_STATIC_CAST(nsIContent*, this)))
   NS_INTERFACE_MAP_ENTRY(nsIDOMDocumentFragment)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNode)
   NS_INTERFACE_MAP_ENTRY(nsIDOM3Node)
@@ -421,3 +417,4 @@ nsDocumentFragment::SetTextContent(const nsAString& aTextContent)
 {
   return nsNode3Tearoff::SetTextContent(this, aTextContent);
 }
+

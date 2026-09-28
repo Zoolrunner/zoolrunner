@@ -29,7 +29,7 @@ else:
     runtime.mkdir()
     # The old Browser/Calendar installer manifests require a monolithic static
     # executable. These builds use libxul; preserve its complete runtime tree.
-    directories = {'chrome', 'components', 'defaults', 'extensions', 'greprefs',
+    directories = {'chrome', 'components', 'defaults', 'extensions', 'greprefs', 'js',
                    'plugins', 'res', 'dictionaries', 'searchplugins'}
     suffixes = {'.exe', '.dll', '.ini', '.manifest', '.list', '.txt'}
     for source in (obj / 'dist/bin').iterdir():

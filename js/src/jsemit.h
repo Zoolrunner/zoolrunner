@@ -77,6 +77,7 @@ typedef enum JSStmtType {
     STMT_DO_LOOP,               /* do/while loop statement */
     STMT_FOR_LOOP,              /* for loop statement */
     STMT_FOR_IN_LOOP,           /* for/in loop statement */
+    STMT_FOR_OF_LOOP,           /* modern iterator loop */
     STMT_WHILE_LOOP             /* while loop statement */
 } JSStmtType;
 
@@ -121,6 +122,11 @@ typedef enum JSStmtType {
 
 typedef struct JSStmtInfo JSStmtInfo;
 
+typedef struct JSForOfHole {
+    ptrdiff_t start, end;
+    struct JSForOfHole *next;
+} JSForOfHole;
+
 struct JSStmtInfo {
     uint16          type;           /* statement type */
     uint16          flags;          /* flags, see below */
@@ -130,6 +136,9 @@ struct JSStmtInfo {
     JSAtom          *atom;          /* name of LABEL, or block scope object */
     JSStmtInfo      *down;          /* info for enclosing statement */
     JSStmtInfo      *downScope;     /* next enclosing lexical scope */
+    JSAtomList      lexicalDecls;  /* ES2015 declarations in this scope */
+    JSAtomList      varDecls;      /* var names crossing this scope */
+    JSForOfHole     *forOfHoles, *forOfLastHole; /* exited-loop cleanup ranges */
 };
 
 #define SIF_SCOPE        0x0001     /* statement has its own lexical scope */
@@ -156,6 +165,13 @@ struct JSStmtInfo {
 struct JSTreeContext {              /* tree context for semantic checks */
     uint16          flags;          /* statement state flags, see below */
     uint16          numGlobalVars;  /* max. no. of global variables/regexps */
+    JSObject        *module; /* current top-level module record, or NULL */
+    JSParseNode     *parameters;
+    JSAtom          *parameterSource;
+    JSScript        *parameterScript;
+    JSBool          initializingParameters;
+    uint16          parameterLocalCount, expectedArgs;
+    intN            restSlot;       /* rest formal local, or -1 */
     uint32          tryCount;       /* total count of try statements parsed */
     uint32          globalUses;     /* optimizable global var uses in total */
     uint32          loopyGlobalUses;/* optimizable global var uses in loops */
@@ -167,6 +183,9 @@ struct JSTreeContext {              /* tree context for semantic checks */
     JSParseNode     *blockNode;     /* parse node for a lexical scope.
                                        XXX combine with blockChain? */
     JSAtomList      decls;          /* function, const, and var declarations */
+    JSAtom        *globalLexicalAtom; /* script/eval binding template */
+    JSAtomList      lexicalDecls;  /* ES2015 script-level declarations */
+    JSAtomList      varDecls;      /* script-level var declarations */
     JSParseNode     *nodeList;      /* list of recyclable parse-node structs */
 };
 
@@ -188,9 +207,16 @@ struct JSTreeContext {              /* tree context for semantic checks */
 
 #define TREE_CONTEXT_INIT(tc)                                                 \
     ((tc)->flags = (tc)->numGlobalVars = 0,                                   \
+     (tc)->module = NULL, (tc)->parameters = NULL, (tc)->parameterSource = NULL, (tc)->parameterScript = NULL,                  \
+     (tc)->initializingParameters = JS_FALSE,                                \
+     (tc)->parameterLocalCount = (tc)->expectedArgs = 0,                     \
+     (tc)->restSlot = -1,                                                  \
      (tc)->tryCount = (tc)->globalUses = (tc)->loopyGlobalUses = 0,           \
      (tc)->topStmt = (tc)->topScopeStmt = NULL,                               \
+     (tc)->globalLexicalAtom = NULL,                                         \
      (tc)->blockChain = NULL,                                                 \
+     ATOM_LIST_INIT(&(tc)->lexicalDecls),                                     \
+     ATOM_LIST_INIT(&(tc)->varDecls),                                         \
      ATOM_LIST_INIT(&(tc)->decls),                                            \
      (tc)->nodeList = NULL, (tc)->blockNode = NULL)
 
@@ -530,8 +556,10 @@ typedef enum JSSrcNoteType {
     SRC_INITPROP    = 1,        /* disjoint meaning applied to JSOP_INITELEM or
                                    to an index label in a regular (structuring)
                                    or a destructuring object initialiser */
+    SRC_PARENLEFT   = 1,        /* parenthesized identifier assignment target */
     SRC_IF_ELSE     = 2,        /* JSOP_IFEQ bytecode is from an if-then-else */
     SRC_WHILE       = 3,        /* JSOP_IFEQ is from a while loop */
+    SRC_PATTERNREF  = 4,        /* NOP: key end, reference end, final store */
     SRC_FOR         = 4,        /* JSOP_NOP or JSOP_POP in for loop head */
     SRC_CONTINUE    = 5,        /* JSOP_GOTO is a continue, not a break;
                                    also used on JSOP_ENDINIT if extra comma
@@ -543,6 +571,10 @@ typedef enum JSSrcNoteType {
                                    next POP, or from CONDSWITCH to first CASE
                                    opcode, etc. -- always a forward delta */
     SRC_GROUPASSIGN = 7,        /* SRC_DESTRUCT variant for [a, b] = [c, d] */
+    SRC_PATTERNARRAY = 7,      /* ITERSTART: distance past cleanup handler */
+    SRC_PATTERNDEFAULT = 7,    /* JSOP_DUP; distance to default target */
+    SRC_PATTERNKEY  = 7,        /* JSOP_NOP before a computed pattern key;
+                                   forward distance to its JSOP_GETELEM */
     SRC_ASSIGNOP    = 8,        /* += or another assign-op follows */
     SRC_COND        = 9,        /* JSOP_IFEQ is from conditional ?: operator */
     SRC_BRACE       = 10,       /* mandatory brace, for scope or to avoid

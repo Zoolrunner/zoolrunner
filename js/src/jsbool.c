@@ -214,6 +214,8 @@ js_ValueToBoolean(JSContext *cx, jsval v, JSBool *bp)
         } else {
             b = JS_TRUE;
         }
+    } else if (JSVAL_IS_SYMBOL(v)) {
+        b = JS_TRUE;
     } else if (JSVAL_IS_STRING(v)) {
         b = JSSTRING_LENGTH(JSVAL_TO_STRING(v)) ? JS_TRUE : JS_FALSE;
     } else if (JSVAL_IS_INT(v)) {

@@ -53,6 +53,9 @@
 #include "jspubtd.h"
 
 JS_BEGIN_EXTERN_C
+extern JSBool js_IsBuiltinEval(JSContext *, jsval);
+
+extern JSBool js_FreezeObject(JSContext *cx, JSObject *obj);
 
 struct JSObjectMap {
     jsrefcount  nrefs;          /* count of all referencing objects */
@@ -288,6 +291,9 @@ extern JSObject *
 js_CloneBlockObject(JSContext *cx, JSObject *proto, JSObject *parent,
                     JSStackFrame *fp);
 
+extern void
+js_InitBlockSlots(JSContext *cx, JSObject *obj, JSStackFrame *fp);
+
 extern JSBool
 js_PutBlockObject(JSContext *cx, JSObject *obj);
 
@@ -325,8 +331,19 @@ js_obj_toSource(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 jsval *rval);
 
 extern JSBool
+js_ObjectToStringES2015(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                       jsval *rval);
+
+extern JSBool
 js_obj_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                 jsval *rval);
+
+extern JSBool
+js_LookupOwnProperty(JSContext *cx, JSObject *obj, jsid id,
+                     JSObject **owner, JSProperty **property);
+extern JSBool
+js_CheckOwnAccess(JSContext *cx, JSObject *obj, jsid id, JSAccessMode mode,
+                   jsval *vp, uintN *attrs);
 
 extern JSBool
 js_HasOwnPropertyHelper(JSContext *cx, JSObject *obj, JSLookupPropOp lookup,
@@ -518,6 +535,20 @@ extern JSBool
 js_SetProperty(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
 
 extern JSBool
+js_SetPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval *vp);
+
+extern JSBool
+js_ValueToPropertyId(JSContext *cx, jsval value, jsid *idp);
+
+/* With accepted, report rejection separately from exceptions; NULL throws. */
+extern JSBool
+js_CreateDataProperty(JSContext *cx, JSObject *obj, jsid id, jsval value,
+                      JSBool *accepted);
+
+extern JSBool
+js_CreateDataPropertyOrThrow(JSContext *cx, JSObject *obj, jsid id, jsval value);
+
+extern JSBool
 js_GetAttributes(JSContext *cx, JSObject *obj, jsid id, JSProperty *prop,
                  uintN *attrsp);
 
@@ -580,6 +611,9 @@ js_ValueToObject(JSContext *cx, jsval v, JSObject **objp);
 
 extern JSObject *
 js_ValueToNonNullObject(JSContext *cx, jsval v);
+
+extern JSBool
+js_OrdinaryToPrimitive(JSContext *cx, JSObject *obj, JSBool stringFirst, jsval *rval);
 
 extern JSBool
 js_TryValueOf(JSContext *cx, JSObject *obj, JSType type, jsval *rval);

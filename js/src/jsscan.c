@@ -227,6 +227,9 @@ js_NewBufferTokenStream(JSContext *cx, const jschar *base, size_t length)
     ts->userbuf.base = (jschar *)base;
     ts->userbuf.limit = (jschar *)base + length;
     ts->userbuf.ptr = (jschar *)base;
+    ts->retainSource = JS_VERSION_IS_ES2015(cx);
+    ts->sourcebuf.grow = GrowTokenBuf;
+    ts->sourcebuf.data = cx;
     ts->tokenbuf.grow = GrowTokenBuf;
     ts->tokenbuf.data = cx;
     ts->listener = cx->runtime->sourceHandler;
@@ -303,7 +306,7 @@ js_fgets(char *buf, int size, FILE *file)
 }
 
 static int32
-GetChar(JSTokenStream *ts)
+GetCharUnrecorded(JSTokenStream *ts)
 {
     int32 c;
     ptrdiff_t i, j, len, olen;
@@ -384,6 +387,12 @@ GetChar(JSTokenStream *ts)
                 len = PTRDIFF(nl, ts->userbuf.ptr, jschar) + 1;
             if (len >= JS_LINE_LIMIT) {
                 len = JS_LINE_LIMIT - 1;
+                /* Keep a CRLF pair together when splitting a long line. */
+                if (ts->userbuf.ptr[len - 1] == '\r' &&
+                    ts->userbuf.ptr + len < ts->userbuf.limit &&
+                    ts->userbuf.ptr[len] == '\n') {
+                    --len;
+                }
                 ts->saveEOL = nl;
             } else {
                 ts->saveEOL = NULL;
@@ -391,12 +400,13 @@ GetChar(JSTokenStream *ts)
             js_strncpy(ts->linebuf.base, ts->userbuf.ptr, len);
             ts->userbuf.ptr += len;
             olen = len;
+            ts->lineTerminator = len ? ts->linebuf.base[len - 1] : 0;
 
             /*
              * Make sure linebuf contains \n for EOL (don't do this in
              * userbuf because the user's string might be readonly).
              */
-            if (nl < ts->userbuf.limit) {
+            if (nl < ts->userbuf.ptr) {
                 if (*nl == '\r') {
                     if (ts->linebuf.base[len-1] == '\r') {
                         /*
@@ -415,7 +425,7 @@ GetChar(JSTokenStream *ts)
                                  * case, so we'll fall into buffer-filling
                                  * code.
                                  */
-                                return GetChar(ts);
+                                return GetCharUnrecorded(ts);
                             }
                         } else {
                             ts->linebuf.base[len-1] = '\n';
@@ -458,11 +468,41 @@ GetChar(JSTokenStream *ts)
     return c;
 }
 
+static void FastAppendChar(JSStringBuffer *sb, jschar c);
+
+/* Record each logical character once, including file-backed compilations.
+ * The cursor follows character lookahead independently of token lookahead. */
+static int32
+GetChar(JSTokenStream *ts)
+{
+    int32 c = GetCharUnrecorded(ts);
+    if (c != EOF && ts->retainSource) {
+        size_t length;
+        if (!STRING_BUFFER_OK(&ts->sourcebuf)) return EOF;
+        length = ts->sourcebuf.base
+                 ? (size_t)(ts->sourcebuf.ptr - ts->sourcebuf.base) : 0;
+        if (ts->sourceCursor == length) {
+            jschar sourceChar = (jschar)c;
+            if (c == '\n' && (ts->lineTerminator == LINE_SEPARATOR ||
+                               ts->lineTerminator == PARA_SEPARATOR))
+                sourceChar = ts->lineTerminator;
+            FastAppendChar(&ts->sourcebuf, sourceChar);
+            if (!STRING_BUFFER_OK(&ts->sourcebuf)) {
+                ts->flags |= TSF_ERROR;
+                return EOF;
+            }
+        }
+        ++ts->sourceCursor;
+    }
+    return c;
+}
+
 static void
 UngetChar(JSTokenStream *ts, int32 c)
 {
     if (c == EOF)
         return;
+    if (ts->retainSource && ts->sourceCursor) --ts->sourceCursor;
     JS_ASSERT(ts->ungetpos < sizeof ts->ungetbuf / sizeof ts->ungetbuf[0]);
     if (c == '\n')
         ts->lineno--;
@@ -1027,17 +1067,75 @@ js_PeekTokenSameLine(JSContext *cx, JSTokenStream *ts)
     return tt;
 }
 
-/*
- * We have encountered a '\': check for a Unicode escape sequence after it,
- * returning the character code value if we found a Unicode escape sequence.
- * Otherwise, non-destructively return the original '\'.
- */
+/* Modern identifier properties are independent of the legacy BMP tables. */
+typedef struct IdentifierRange { uint32 first, last; } IdentifierRange;
+#include "jsidentifier-data.h"
+
+static JSBool
+IdentifierChar(JSContext *cx, int32 c, JSBool start)
+{
+    const IdentifierRange *ranges;
+    size_t lo = 0, hi, mid;
+    if (c < 0 || c > 0x10ffff)
+        return JS_FALSE;
+    if (!JS_VERSION_IS_ES2015(cx))
+        return c <= 0xffff && (start ? JS_ISIDSTART(c) : JS_ISIDENT(c));
+    if (c < 128)
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+               c == '$' || c == '_' || (!start && c >= '0' && c <= '9');
+    if (!start && (c == 0x200c || c == 0x200d))
+        return JS_TRUE;
+    ranges = start ? identifierID_Start : identifierID_Continue;
+    hi = start ? JS_ARRAY_LENGTH(identifierID_Start)
+               : JS_ARRAY_LENGTH(identifierID_Continue);
+    while (lo < hi) {
+        mid = lo + (hi - lo) / 2;
+        if ((uint32)c < ranges[mid].first) hi = mid;
+        else if ((uint32)c > ranges[mid].last) lo = mid + 1;
+        else return JS_TRUE;
+    }
+    return JS_FALSE;
+}
+
+/* Consume a raw surrogate pair only when it belongs to this identifier. */
 static int32
-GetUnicodeEscape(JSTokenStream *ts)
+IdentifierCodePoint(JSContext *cx, JSTokenStream *ts, int32 c, JSBool start)
+{
+    int32 low, point;
+    if (JS_VERSION_IS_ES2015(cx) && c >= 0xd800 && c <= 0xdbff) {
+        low = PeekChar(ts);
+        if (low >= 0xdc00 && low <= 0xdfff) {
+            point = 0x10000 + ((c - 0xd800) << 10) + low - 0xdc00;
+            if (IdentifierChar(cx, point, start)) {
+                GetChar(ts);
+                return point;
+            }
+        }
+    }
+    return c;
+}
+
+/* Decode after a backslash; malformed escapes are rejected by the caller.
+ * The modern brace form may consume input on failure. */
+static int32
+GetUnicodeEscape(JSContext *cx, JSTokenStream *ts)
 {
     jschar cp[5];
-    int32 c;
+    int32 c, digit;
+    JSBool any = JS_FALSE;
 
+    if (JS_VERSION_IS_ES2015(cx) && PeekChars(ts, 2, cp) &&
+        cp[0] == 'u' && cp[1] == '{') {
+        SkipChars(ts, 2);
+        c = 0;
+        while ((digit = GetChar(ts)) != '}') {
+            if (!JS7_ISHEX(digit) || c > (0x10ffff - JS7_UNHEX(digit)) / 16)
+                return '\\';
+            c = c * 16 + JS7_UNHEX(digit);
+            any = JS_TRUE;
+        }
+        return any ? c : '\\';
+    }
     if (PeekChars(ts, 5, cp) && cp[0] == 'u' &&
         JS7_ISHEX(cp[1]) && JS7_ISHEX(cp[2]) &&
         JS7_ISHEX(cp[3]) && JS7_ISHEX(cp[4]))
@@ -1060,6 +1158,8 @@ NewToken(JSTokenStream *ts, ptrdiff_t adjust)
     ts->cursor = (ts->cursor + 1) & NTOKENS_MASK;
     tp = &CURRENT_TOKEN(ts);
     tp->flags = 0;
+    tp->sourceBegin = ts->sourceCursor + adjust;
+    tp->sourceEnd = ts->sourceCursor;
     tp->ptr = ts->linebuf.ptr + adjust;
     tp->pos.begin.index = ts->linepos +
                           PTRDIFF(tp->ptr, ts->linebuf.base, jschar) -
@@ -1075,6 +1175,151 @@ ScanAsSpace(jschar c)
     if (JS_ISSPACE(c) || c == 0xfffe || c == 0xfeff)
         return JS_TRUE;
     return JS_FALSE;
+}
+
+/* GetChar preserves historical scanner normalization. Templates additionally
+ * need the original Unicode line/paragraph separator, even when the current
+ * line buffer was filled before the opening backtick was encountered. */
+static int32
+GetTemplateChar(JSTokenStream *ts)
+{
+    int32 c = GetChar(ts);
+    if (c == '\n' && (ts->lineTerminator == LINE_SEPARATOR ||
+                      ts->lineTerminator == PARA_SEPARATOR))
+        return ts->lineTerminator;
+    return c;
+}
+
+static JSTokenType
+ScanTemplateSegment(JSContext *cx, JSTokenStream *ts, JSToken *tp)
+{
+    JSStringBuffer cooked, raw;
+    JSTokenType tt = TOK_ERROR;
+    int32 c, digit;
+    uint32 value;
+    uintN count, limit;
+    JSBool braced;
+
+    js_InitStringBuffer(&cooked);
+    js_InitStringBuffer(&raw);
+    for (;;) {
+        c = GetTemplateChar(ts);
+        if (c == EOF)
+            goto syntax;
+        if (c == '`') {
+            tt = TOK_TEMPLATE_TAIL;
+            break;
+        }
+        if (c == '$' && PeekChar(ts) == '{') {
+            GetChar(ts);
+            tt = TOK_TEMPLATE_HEAD;
+            break;
+        }
+        js_AppendChar(&raw, (jschar)c);
+        if (c == '\\') {
+            c = GetTemplateChar(ts);
+            if (c == EOF)
+                goto syntax;
+            js_AppendChar(&raw, (jschar)c);
+            switch (c) {
+              case '\n': case LINE_SEPARATOR: case PARA_SEPARATOR:
+                continue;
+              case 'b': c = '\b'; break;
+              case 'f': c = '\f'; break;
+              case 'n': c = '\n'; break;
+              case 'r': c = '\r'; break;
+              case 't': c = '\t'; break;
+              case 'v': c = '\v'; break;
+              case '0':
+                if (JS7_ISDEC(PeekChar(ts)))
+                    goto syntax;
+                c = 0;
+                break;
+              case 'x': case 'u':
+                limit = c == 'x' ? 2 : 4;
+                braced = c == 'u' && PeekChar(ts) == '{';
+                if (braced) {
+                    GetChar(ts);
+                    js_AppendChar(&raw, '{');
+                }
+                value = count = 0;
+                for (;;) {
+                    digit = GetTemplateChar(ts);
+                    if (digit == EOF)
+                        goto syntax;
+                    js_AppendChar(&raw, (jschar)digit);
+                    if (braced && digit == '}') {
+                        if (!count)
+                            goto syntax;
+                        break;
+                    }
+                    if (!JS7_ISHEX(digit))
+                        goto syntax;
+                    if (value > 0x10ffffU / 16)
+                        goto syntax;
+                    value = value * 16 + JS7_UNHEX(digit);
+                    if (value > 0x10ffffU)
+                        goto syntax;
+                    ++count;
+                    if (!braced && count == limit)
+                        break;
+                }
+                if (value > 0xffffU) {
+                    value -= 0x10000U;
+                    js_AppendChar(&cooked, (jschar)(0xd800U + (value >> 10)));
+                    value = 0xdc00U + (value & 0x3ffU);
+                }
+                c = (int32)value;
+                break;
+              default:
+                if (c >= '1' && c <= '9')
+                    goto syntax;
+                break;
+            }
+        }
+        js_AppendChar(&cooked, (jschar)c);
+        if (!STRING_BUFFER_OK(&cooked) || !STRING_BUFFER_OK(&raw))
+            goto oom;
+    }
+    if (!STRING_BUFFER_OK(&cooked) || !STRING_BUFFER_OK(&raw))
+        goto oom;
+    tp->t_atom = js_AtomizeChars(cx, cooked.base,
+                                 cooked.base ? STRING_BUFFER_OFFSET(&cooked) : 0, 0);
+    if (!tp->t_atom) {
+        tt = TOK_ERROR;
+        goto done;
+    }
+    tp->t_atom2 = js_AtomizeChars(cx, raw.base,
+                                  raw.base ? STRING_BUFFER_OFFSET(&raw) : 0, 0);
+    if (!tp->t_atom2)
+        tt = TOK_ERROR;
+    goto done;
+
+syntax:
+    js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                JSMSG_SYNTAX_ERROR);
+    tt = TOK_ERROR;
+    goto done;
+oom:
+    JS_ReportOutOfMemory(cx);
+    tt = TOK_ERROR;
+done:
+    js_FinishStringBuffer(&cooked);
+    js_FinishStringBuffer(&raw);
+    tp->type = tt;
+    tp->pos.end.lineno = (uint16)ts->lineno;
+    tp->pos.end.index = ts->linepos +
+                        PTRDIFF(ts->linebuf.ptr, ts->linebuf.base, jschar) -
+                        ts->ungetpos;
+    ts->flags |= tt == TOK_ERROR ? TSF_ERROR : TSF_DIRTYLINE;
+    return tt;
+}
+
+JSTokenType
+js_GetTemplateContinuation(JSContext *cx, JSTokenStream *ts)
+{
+    JS_ASSERT(ts->lookahead == 0);
+    return ScanTemplateSegment(cx, ts, NewToken(ts, 0));
 }
 
 JSTokenType
@@ -1301,34 +1546,51 @@ retry:
 
     hadUnicodeEscape = JS_FALSE;
     if (c == '\\') {
-        c = GetUnicodeEscape(ts);
-        if (!JS_ISIDSTART(c)) {
+        c = GetUnicodeEscape(cx, ts);
+        if (!IdentifierChar(cx, c, JS_TRUE)) {
             js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                          JSMSG_ILLEGAL_CHARACTER);
             goto error;
         }
         hadUnicodeEscape = JS_TRUE;
     }
-    if (JS_ISIDSTART(c)) {
+    if (!hadUnicodeEscape)
+        c = IdentifierCodePoint(cx, ts, c, JS_TRUE);
+    if (IdentifierChar(cx, c, JS_TRUE)) {
         INIT_TOKENBUF();
         for (;;) {
-            ADD_TO_TOKENBUF(c);
+            if (c > 0xffff) {
+                ADD_TO_TOKENBUF(0xd800 + ((c - 0x10000) >> 10));
+                ADD_TO_TOKENBUF(0xdc00 + ((c - 0x10000) & 0x3ff));
+            } else {
+                ADD_TO_TOKENBUF(c);
+            }
             c = GetChar(ts);
             if (c == '\\') {
-                c = GetUnicodeEscape(ts);
-                if (!JS_ISIDENT(c)) {
+                c = GetUnicodeEscape(cx, ts);
+                if (!IdentifierChar(cx, c, JS_FALSE)) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                  JSMSG_ILLEGAL_CHARACTER);
                     goto error;
                 }
                 hadUnicodeEscape = JS_TRUE;
             } else {
-                if (!JS_ISIDENT(c))
+                c = IdentifierCodePoint(cx, ts, c, JS_FALSE);
+                if (!IdentifierChar(cx, c, JS_FALSE))
                     break;
             }
         }
         UngetChar(ts, c);
 
+        if ((ts->flags & TSF_MODULE) && !(ts->flags & TSF_KEYWORD_IS_NAME) &&
+            TOKENBUF_OK() && TOKENBUF_LENGTH() == 5 &&
+            TOKENBUF_BASE()[0] == 'a' && TOKENBUF_BASE()[1] == 'w' &&
+            TOKENBUF_BASE()[2] == 'a' && TOKENBUF_BASE()[3] == 'i' &&
+            TOKENBUF_BASE()[4] == 't') {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                         JSMSG_RESERVED_ID, "await");
+            goto error;
+        }
         /*
          * Check for keywords unless we saw Unicode escape or parser asks
          * to ignore keywords.
@@ -1337,13 +1599,28 @@ retry:
             TOKENBUF_OK() &&
             (kw = FindKeyword(TOKENBUF_BASE(), TOKENBUF_LENGTH()))) {
             if (kw->tokentype == TOK_RESERVED) {
+                if (JS_VERSION_IS_ES2015(cx) && !hadUnicodeEscape &&
+                    (!strcmp(kw->chars, "class") || !strcmp(kw->chars, "extends"))) {
+                    tt = !strcmp(kw->chars, "class") ? TOK_CLASS : TOK_EXTENDS;
+                    tp->t_op = JSOP_NOP;
+                    goto out;
+                }
+                if (JS_VERSION_IS_ES2015(cx) && !hadUnicodeEscape &&
+                    !strcmp(kw->chars, "super")) {
+                    tt = TOK_SUPER;
+                    tp->t_op = JSOP_NOP;
+                    goto out;
+                }
                 if (!strcmp(kw->chars, "class") || !strcmp(kw->chars, "enum") ||
                     !strcmp(kw->chars, "extends") || !strcmp(kw->chars, "super")) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                  JSMSG_RESERVED_ID, kw->chars);
                     goto error;
                 }
-            } else if (kw->version <= JSVERSION_NUMBER(cx)) {
+            } else if (kw->version <= JSVERSION_NUMBER(cx) &&
+                       !(JS_VERSION_IS_ES2015(cx) &&
+                         (kw->tokentype == TOK_LET ||
+                          (kw->tokentype == TOK_YIELD && !(ts->flags & TSF_GENERATOR))))) {
                 if (hadUnicodeEscape) {
                     js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
                                                  JSMSG_RESERVED_ID, kw->chars);
@@ -1358,6 +1635,8 @@ retry:
         atom = TOKENBUF_TO_ATOM();
         if (!atom)
             goto error;
+        if (hadUnicodeEscape)
+            tp->flags |= TOKF_ESCAPE;
         tp->t_op = JSOP_NAME;
         tp->t_atom = atom;
         tt = TOK_NAME;
@@ -1368,7 +1647,9 @@ retry:
         jsint radix;
         const jschar *endptr;
         jsdouble dval;
+        JSBool explicitRadix;
 
+        explicitRadix = JS_FALSE;
         radix = 10;
         INIT_TOKENBUF();
 
@@ -1384,6 +1665,18 @@ retry:
                     goto error;
                 }
                 radix = 16;
+            } else if (JS_VERSION_IS_ES2015(cx) &&
+                       (JS_TOLOWER(c) == 'b' || JS_TOLOWER(c) == 'o')) {
+                radix = JS_TOLOWER(c) == 'b' ? 2 : 8;
+                explicitRadix = JS_TRUE;
+                ADD_TO_TOKENBUF(c);
+                c = GetChar(ts);
+                if (c < '0' || c >= '0' + radix) {
+                    js_ReportCompileErrorNumber(cx, ts,
+                                                JSREPORT_TS | JSREPORT_ERROR,
+                                                JSMSG_ILLEGAL_CHARACTER);
+                    goto error;
+                }
             } else if (JS7_ISDEC(c)) {
                 tp->flags |= TOKF_OCTAL;
                 radix = 8;
@@ -1391,6 +1684,8 @@ retry:
         }
 
         while (JS7_ISHEX(c)) {
+            if (explicitRadix && (c < '0' || c >= '0' + radix))
+                break;
             if (radix < 16) {
                 if (JS7_ISLET(c))
                     break;
@@ -1413,6 +1708,12 @@ retry:
             }
             ADD_TO_TOKENBUF(c);
             c = GetChar(ts);
+        }
+
+        if (explicitRadix && c != EOF && (JS_ISIDENT(c) || c == '\\')) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_ILLEGAL_CHARACTER);
+            goto error;
         }
 
         if (radix == 10 && (c == '.' || JS_TOLOWER(c) == 'e')) {
@@ -1456,7 +1757,8 @@ retry:
                 goto error;
             }
         } else {
-            if (!js_strtointeger(cx, TOKENBUF_BASE(), &endptr, radix, &dval)) {
+            if (!js_strtointeger(cx, TOKENBUF_BASE() + (explicitRadix ? 2 : 0),
+                                 &endptr, radix, &dval)) {
                 js_ReportCompileErrorNumber(cx, ts,
                                             JSREPORT_TS | JSREPORT_ERROR,
                                             JSMSG_OUT_OF_MEMORY);
@@ -1465,6 +1767,11 @@ retry:
         }
         tp->t_dval = dval;
         tt = TOK_NUMBER;
+        goto out;
+    }
+
+    if (c == '`' && JS_VERSION_IS_ES2015(cx)) {
+        tt = ScanTemplateSegment(cx, ts, tp);
         goto out;
     }
 
@@ -1514,7 +1821,34 @@ retry:
                         c = (jschar)val;
                     } else if (c == 'u') {
                         jschar cp[4];
-                        if (PeekChars(ts, 4, cp) &&
+                        if (JS_VERSION_IS_ES2015(cx) && PeekChar(ts) == '{') {
+                            int32 value = 0, digit;
+                            JSBool any = JS_FALSE;
+                            GetChar(ts);
+                            while ((digit = GetChar(ts)) != '}') {
+                                if (!JS7_ISHEX(digit) ||
+                                    value > (0x10ffff - JS7_UNHEX(digit)) / 16) {
+                                    js_ReportCompileErrorNumber(cx, ts,
+                                        JSREPORT_TS | JSREPORT_ERROR,
+                                        JSMSG_SYNTAX_ERROR);
+                                    goto error;
+                                }
+                                value = value * 16 + JS7_UNHEX(digit);
+                                any = JS_TRUE;
+                            }
+                            if (!any) {
+                                js_ReportCompileErrorNumber(cx, ts,
+                                    JSREPORT_TS | JSREPORT_ERROR,
+                                    JSMSG_SYNTAX_ERROR);
+                                goto error;
+                            }
+                            if (value > 0xffff) {
+                                value -= 0x10000;
+                                ADD_TO_TOKENBUF(0xd800 + (value >> 10));
+                                value = 0xdc00 + (value & 0x3ff);
+                            }
+                            c = value;
+                        } else if (PeekChars(ts, 4, cp) &&
                             JS7_ISHEX(cp[0]) && JS7_ISHEX(cp[1]) &&
                             JS7_ISHEX(cp[2]) && JS7_ISHEX(cp[3])) {
                             c = (((((JS7_UNHEX(cp[0]) << 4)
@@ -1570,8 +1904,17 @@ retry:
       case '?':  tt = TOK_HOOK; break;
 
       case '.':
+        if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, '.')) {
+            if (!MatchChar(ts, '.')) {
+                js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                            JSMSG_SYNTAX_ERROR);
+                return TOK_ERROR;
+            }
+            tt = TOK_ELLIPSIS;
+            break;
+        }
 #if JS_HAS_XML_SUPPORT
-        if (MatchChar(ts, c))
+        if (!JS_VERSION_IS_ES2015(cx) && MatchChar(ts, c))
             tt = TOK_DBLDOT;
         else
 #endif
@@ -1580,7 +1923,7 @@ retry:
 
       case ':':
 #if JS_HAS_XML_SUPPORT
-        if (MatchChar(ts, c)) {
+        if (!JS_VERSION_IS_ES2015(cx) && MatchChar(ts, c)) {
             tt = TOK_DBLCOLON;
             break;
         }
@@ -1628,6 +1971,10 @@ retry:
         if (MatchChar(ts, c)) {
             tp->t_op = MatchChar(ts, c) ? JSOP_NEW_EQ : (JSOp)cx->jsop_eq;
             tt = TOK_EQOP;
+        } else if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, '>')) {
+            /* Keep this punctuator distinct even before arrow parsing exists. */
+            tp->t_op = JSOP_NOP;
+            tt = TOK_ARROW;
         } else {
             tp->t_op = JSOP_NOP;
             tt = TOK_ASSIGN;
@@ -1646,6 +1993,11 @@ retry:
 
 #if JS_HAS_XML_SUPPORT
       case '@':
+        if (JS_VERSION_IS_ES2015(cx)) {
+            js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                         JSMSG_ILLEGAL_CHARACTER);
+            goto error;
+        }
         tt = TOK_AT;
         break;
 #endif
@@ -1672,7 +2024,7 @@ retry:
          * to end of line, used since Netscape 2 to hide script tag content
          * from script-unaware browsers.
          */
-        if ((ts->flags & TSF_OPERAND) &&
+        if (!JS_VERSION_IS_ES2015(cx) && (ts->flags & TSF_OPERAND) &&
             (JS_HAS_XML_OPTION(cx) || PeekChar(ts) != '!')) {
             /* Check for XML comment or CDATA section. */
             if (MatchChar(ts, '!')) {
@@ -1793,6 +2145,11 @@ retry:
         if (MatchChar(ts, '!')) {
             if (MatchChar(ts, '-')) {
                 if (MatchChar(ts, '-')) {
+                    if (ts->flags & TSF_MODULE) {
+                        js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
+                                                     JSMSG_STRICT_SYNTAX);
+                        goto error;
+                    }
                     ts->flags |= TSF_IN_HTML_COMMENT;
                     goto skipline;
                 }
@@ -1911,7 +2268,10 @@ skipline:
         if (MatchChar(ts, '*')) {
             while ((c = GetChar(ts)) != EOF &&
                    !(c == '*' && MatchChar(ts, '/'))) {
-                /* Ignore all characters until comment close. */
+                /* A line terminator inside a block comment also permits
+                 * the following Annex B HTML close comment in ES2015. */
+                if (c == '\n' && JS_VERSION_IS_ES2015(cx))
+                    ts->flags &= ~TSF_DIRTYLINE;
             }
             if (c == EOF) {
                 js_ReportCompileErrorNumber(cx, ts,
@@ -1943,12 +2303,13 @@ skipline:
                     ADD_TO_TOKENBUF(c);
                     c = GetChar(ts);
                     /* Classic application scripts allow escaped line breaks
-                     * in regexp literals. ES5 default/strict code does not.
+                     * in regexp literals. Default, ES2015 and strict code do not.
                      * EOF must remain an error in every language version.
                      */
                     if (c == EOF ||
                         (c == '\n' &&
                          (JSVERSION_NUMBER(cx) == JSVERSION_DEFAULT ||
+                          JS_VERSION_IS_ES2015(cx) ||
                           (ts->flags & TSF_STRICT_MODE)))) {
                         UngetChar(ts, c);
                         js_ReportCompileErrorNumber(cx, ts, JSREPORT_TS | JSREPORT_ERROR,
@@ -1972,6 +2333,10 @@ skipline:
                     flag = JSREG_FOLD;
                 else if (MatchChar(ts, 'm'))
                     flag = JSREG_MULTILINE;
+                else if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, 'u'))
+                    flag = JSREG_UNICODE;
+                else if (JS_VERSION_IS_ES2015(cx) && MatchChar(ts, 'y'))
+                    flag = JSREG_STICKY;
                 else
                     break;
                 if (flags & flag) {
@@ -2005,13 +2370,16 @@ skipline:
                 goto error;
 
             /*
-             * If the regexp's script is one-shot, we can avoid the extra
+             * Modern literals always create a fresh object at evaluation.
+             * Legacy versions retain their historical literal identity.
+             * If the legacy script is one-shot, we can avoid the extra
              * fork-on-exec costs of JSOP_REGEXP by selecting JSOP_OBJECT.
              * Otherwise, to avoid incorrect proto, parent, and lastIndex
              * sharing among threads and sequentially across re-execution,
              * select JSOP_REGEXP.
              */
-            tp->t_op = (cx->fp->flags & (JSFRAME_EVAL | JSFRAME_COMPILE_N_GO))
+            tp->t_op = JS_VERSION_IS_ES2015(cx) ? JSOP_NEWREGEXP :
+                       (cx->fp->flags & (JSFRAME_EVAL | JSFRAME_COMPILE_N_GO))
                        ? JSOP_OBJECT
                        : JSOP_REGEXP;
             tp->t_atom = atom;
@@ -2050,7 +2418,7 @@ skipline:
             tp->t_op = JSOP_SUB;
             tt = TOK_ASSIGN;
         } else if (MatchChar(ts, c)) {
-            if (PeekChar(ts) == '>' && !(ts->flags & TSF_DIRTYLINE)) {
+            if (PeekChar(ts) == '>' && !(ts->flags & (TSF_DIRTYLINE | TSF_MODULE))) {
                 ts->flags &= ~TSF_IN_HTML_COMMENT;
                 goto skipline;
             }
@@ -2135,6 +2503,7 @@ eol_out:
     tp->pos.end.index = ts->linepos +
                         PTRDIFF(ts->linebuf.ptr, ts->linebuf.base, jschar) -
                         ts->ungetpos;
+    tp->sourceEnd = ts->sourceCursor;
     tp->type = tt;
     return tt;
 

@@ -50,18 +50,49 @@
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
+#include "jsbool.h"
 #include "jscntxt.h"
 #include "jsconfig.h"
 #include "jsfun.h"
 #include "jsgc.h"
 #include "jsinterp.h"
+#include "jsiteres6.h"
 #include "jslock.h"
 #include "jsnum.h"
 #include "jsobj.h"
 #include "jsopcode.h"
+#include "jsprf.h"
 #include "jsregexp.h"
+#include "jsrealm.h"
 #include "jsscan.h"
 #include "jsstr.h"
+#include "jssymbol.h"
+
+JSBool
+js_IsRegExp(JSContext *cx, jsval value, JSBool *result)
+{
+    jsval roots[2];
+    JSTempValueRooter root;
+    jsid id;
+    JSBool ok;
+
+    *result = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(value))
+        return JS_TRUE;
+    roots[0] = value;
+    roots[1] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    ok = js_WellKnownSymbolId(cx, JS_WKS_MATCH, &id) &&
+         OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(value), id, &roots[1]);
+    if (ok) {
+        if (JSVAL_IS_VOID(roots[1]))
+            *result = JSVAL_IS_REGEXP(cx, value);
+        else
+            ok = js_ValueToBoolean(cx, roots[1], result);
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
 
 /* Note : contiguity of 'simple opcodes' is important for SimpleMatch() */
 typedef enum REOp {
@@ -90,7 +121,8 @@ typedef enum REOp {
     REOP_UCFLATi       = 21, /* case-independent REOP_UCFLAT */
     REOP_CLASS         = 22, /* character class with index */
     REOP_NCLASS        = 23, /* negated character class with index */
-    REOP_SIMPLE_END    = 23, /* end of 'simple opcodes' */
+    REOP_UCFLAT32      = 24, /* Unicode code point, four-byte operand */
+    REOP_SIMPLE_END    = 24, /* end of 'simple opcodes' */
     REOP_QUANT         = 25, /* quantified atom: atom{1,2} */
     REOP_STAR          = 26, /* zero or more occurrences of kid */
     REOP_PLUS          = 27, /* one or more occurrences of kid */
@@ -119,11 +151,80 @@ typedef enum REOp {
     REOP_ENDALT        = 56, /* end of final alternate */
     REOP_CONCAT        = 57, /* concatenation of terms (parse time only) */
 
-    REOP_END
+    REOP_END,
+    REOP_BIGQUANT,
+    REOP_BIGMINIMALQUANT
 } REOp;
 
-#define REOP_IS_SIMPLE(op)  ((unsigned)((op) - REOP_SIMPLE_START) <           \
-                             (unsigned)REOP_SIMPLE_END)
+#define REOP_IS_SIMPLE(op) ((unsigned)((op)-REOP_SIMPLE_START) <= \
+                            (unsigned)(REOP_SIMPLE_END-REOP_SIMPLE_START))
+
+/* Two explicit limbs keep quantifier arithmetic independent of host word
+ * size. A larger decimal bound remains positive throughout the matcher's
+ * finite repetition budget; it is never rounded down to a smaller count. */
+typedef struct RECount {
+    uint32 low, high;
+    JSPackedBool huge;
+} RECount;
+
+static RECount
+MakeCount(uint32 value, JSBool huge)
+{
+    RECount count;
+    count.low = value;
+    count.high = 0;
+    count.huge = huge;
+    return count;
+}
+
+static JSBool
+CountIsZero(const RECount *count)
+{
+    return !count->huge && !count->low && !count->high;
+}
+
+static JSBool
+CountLessEqual(const RECount *left, const RECount *right)
+{
+    return right->huge || (!left->huge &&
+           (left->high < right->high ||
+            (left->high == right->high && left->low <= right->low)));
+}
+
+static void
+DecrementCount(RECount *count)
+{
+    if (count->huge) return;
+    JS_ASSERT(!CountIsZero(count));
+    if (!count->low) --count->high;
+    --count->low;
+}
+
+static jsbytecode *
+WriteCount(jsbytecode *pc, const RECount *count)
+{
+    pc[0] = (jsbytecode)(count->high >> 24);
+    pc[1] = (jsbytecode)(count->high >> 16);
+    pc[2] = (jsbytecode)(count->high >> 8);
+    pc[3] = (jsbytecode)count->high;
+    pc[4] = (jsbytecode)(count->low >> 24);
+    pc[5] = (jsbytecode)(count->low >> 16);
+    pc[6] = (jsbytecode)(count->low >> 8);
+    pc[7] = (jsbytecode)count->low;
+    pc[8] = count->huge;
+    return pc + 9;
+}
+
+static jsbytecode *
+ReadCount(jsbytecode *pc, RECount *count)
+{
+    count->high = ((uint32)pc[0] << 24) | ((uint32)pc[1] << 16) |
+                  ((uint32)pc[2] << 8) | pc[3];
+    count->low = ((uint32)pc[4] << 24) | ((uint32)pc[5] << 16) |
+                 ((uint32)pc[6] << 8) | pc[7];
+    count->huge = pc[8];
+    return pc + 9;
+}
 
 struct RENode {
     REOp            op;         /* r.e. op bytecode */
@@ -136,17 +237,18 @@ struct RENode {
         struct {                /* or a quantifier range */
             uintN  min;
             uintN  max;
-            JSPackedBool greedy;
+            JSPackedBool greedy, wide;
+            RECount bigMin, bigMax;
         } range;
         struct {                /* or a character class */
             size_t  startIndex;
             size_t  kidlen;     /* length of string at kid, in jschars */
             size_t  index;      /* index into class list */
-            uint16  bmsize;     /* bitmap size, based on max char code */
+            uint32  bmsize;     /* bitmap size, based on max char code */
             JSPackedBool sense;
         } ucclass;
         struct {                /* or a literal sequence */
-            jschar  chr;        /* of one character */
+            uint32  chr;        /* of one character */
             size_t  length;     /* or many (via the kid) */
         } flat;
         struct {
@@ -165,6 +267,7 @@ struct RENode {
 #define CLASS_CACHE_SIZE    4
 
 typedef struct CompilerState {
+    JSBool modern;                 /* grammar edition, independent of caller */
     JSContext       *context;
     JSTokenStream   *tokenStream; /* For reporting errors */
     const jschar    *cpbegin;
@@ -293,8 +396,8 @@ typedef struct REProgState {
     size_t parenSoFar;              /* highest indexed paren started */
     union {
         struct {
-            uintN min;             /* current quantifier limits */
-            uintN max;
+            RECount min;           /* current quantifier limits */
+            RECount max;
         } quantifier;
         struct {
             size_t top;             /* backtrack stack state */
@@ -322,6 +425,8 @@ typedef struct REGlobalData {
     JSContext *cx;
     JSRegExp *regexp;               /* the RE in execution */
     JSBool ok;                      /* runtime error (out_of_memory only?) */
+    JSBool sticky;                  /* match only at the requested offset */
+    uint32 repeatLow, repeatHigh;   /* checked per-match repetition budget */
     size_t start;                   /* offset to start at */
     ptrdiff_t skipped;              /* chars skipped anchoring this r.e. */
     const jschar    *cpbegin;       /* text base address */
@@ -385,6 +490,7 @@ NewRENode(CompilerState *state, REOp op)
     ren->op = op;
     ren->next = NULL;
     ren->kid = NULL;
+    if (op == REOP_QUANT) ren->u.range.wide = JS_FALSE;
     return ren;
 }
 
@@ -408,6 +514,23 @@ isASCIIHexDigit(jschar c, uintN *digit)
         return JS_TRUE;
     }
     return JS_FALSE;
+}
+
+
+/* Leave the cursor unchanged when Annex B must use IdentityEscape. */
+static JSBool
+CompleteHexEscape(const jschar **position, const jschar *end, uintN digits,
+                  uintN *value)
+{
+    const jschar *cp = *position;
+    uintN i, digit, n = 0;
+    for (i = 0; i < digits; ++i) {
+        if (cp == end || !isASCIIHexDigit(*cp++, &digit)) return JS_FALSE;
+        n = (n << 4) | digit;
+    }
+    *position = cp;
+    *value = n;
+    return JS_TRUE;
 }
 
 
@@ -451,7 +574,7 @@ ProcessOp(CompilerState *state, REOpData *opData, RENode **operandStack,
          */
         if (((RENode *) result->kid)->op == REOP_FLAT &&
             ((RENode *) result->u.kid2)->op == REOP_FLAT &&
-            (state->flags & JSREG_FOLD) == 0) {
+            (state->flags & (JSREG_FOLD | JSREG_UNICODE)) == 0) {
             result->op = REOP_ALTPREREQ;
             result->u.altprereq.ch1 = ((RENode *) result->kid)->u.flat.chr;
             result->u.altprereq.ch2 = ((RENode *) result->u.kid2)->u.flat.chr;
@@ -463,7 +586,7 @@ ProcessOp(CompilerState *state, REOpData *opData, RENode **operandStack,
         if (((RENode *) result->kid)->op == REOP_CLASS &&
             ((RENode *) result->kid)->u.ucclass.index < 256 &&
             ((RENode *) result->u.kid2)->op == REOP_FLAT &&
-            (state->flags & JSREG_FOLD) == 0) {
+            (state->flags & (JSREG_FOLD | JSREG_UNICODE)) == 0) {
             result->op = REOP_ALTPREREQ2;
             result->u.altprereq.ch1 = ((RENode *) result->u.kid2)->u.flat.chr;
             result->u.altprereq.ch2 = ((RENode *) result->kid)->u.ucclass.index;
@@ -475,7 +598,7 @@ ProcessOp(CompilerState *state, REOpData *opData, RENode **operandStack,
         if (((RENode *) result->kid)->op == REOP_FLAT &&
             ((RENode *) result->u.kid2)->op == REOP_CLASS &&
             ((RENode *) result->u.kid2)->u.ucclass.index < 256 &&
-            (state->flags & JSREG_FOLD) == 0) {
+            (state->flags & (JSREG_FOLD | JSREG_UNICODE)) == 0) {
             result->op = REOP_ALTPREREQ2;
             result->u.altprereq.ch1 = ((RENode *) result->kid)->u.flat.chr;
             result->u.altprereq.ch2 =
@@ -882,6 +1005,176 @@ GetDecimalValue(jschar c, uintN max, uintN (*findMax)(CompilerState *state),
     return overflow ? OVERFLOW_VALUE : value;
 }
 
+#include "jsregexp-casefold.h"
+
+uint32
+js_UnicodeSimpleFold(uint32 point)
+{
+    size_t low = 0, high = sizeof(regexpCaseFolds) / sizeof(regexpCaseFolds[0]), mid;
+    while (low < high) {
+        mid = low + (high-low)/2;
+        if (point < regexpCaseFolds[mid].from) high = mid;
+        else if (point > regexpCaseFolds[mid].from) low = mid+1;
+        else return regexpCaseFolds[mid].to;
+    }
+    return point;
+}
+
+static uint32
+RegExpPoint(const jschar *cp, const jschar *end, JSBool unicode, uintN *width)
+{
+    uint32 c;
+    *width = 1;
+    if (cp >= end) return 0;
+    c = *cp;
+    if (unicode && c >= 0xD800 && c <= 0xDBFF && cp+1 < end &&
+        cp[1] >= 0xDC00 && cp[1] <= 0xDFFF) {
+        *width = 2;
+        c = 0x10000 + ((c-0xD800)<<10) + cp[1]-0xDC00;
+    }
+    return c;
+}
+
+static JSBool
+UnicodeRegExpError(CompilerState *state)
+{
+    js_ReportCompileErrorNumber(state->context, state->tokenStream,
+                               JSREPORT_TS | JSREPORT_ERROR, JSMSG_SYNTAX_ERROR);
+    return JS_FALSE;
+}
+
+static JSBool
+UnicodeRegExpEscape(CompilerState *state, const jschar **position,
+                    const jschar *end, uint32 escape, uint32 *value)
+{
+    const jschar *cp = *position, *saved;
+    uint32 n = 0, low;
+    uintN count, i, digit;
+    switch (escape) {
+      case 'f': *value = 12; return JS_TRUE;
+      case 'n': *value = 10; return JS_TRUE;
+      case 'r': *value = 13; return JS_TRUE;
+      case 't': *value = 9; return JS_TRUE;
+      case 'v': *value = 11; return JS_TRUE;
+      case 'c':
+        if (cp == end || !RE_IS_LETTER(*cp)) return UnicodeRegExpError(state);
+        *value = *cp++ & 31; break;
+      case '0':
+        if (cp < end && JS7_ISDEC(*cp)) return UnicodeRegExpError(state);
+        *value = 0; break;
+      case 'x':
+      case 'u':
+        if (escape == 'u' && cp < end && *cp == '{') {
+            ++cp; count = 0;
+            while (cp < end && *cp != '}') {
+                if (!isASCIIHexDigit(*cp++, &digit) || n > (0x10FFFF-digit)/16)
+                    return UnicodeRegExpError(state);
+                n = n*16 + digit; ++count;
+            }
+            if (!count || cp == end) return UnicodeRegExpError(state);
+            ++cp;
+        } else {
+            count = escape == 'u' ? 4 : 2;
+            for (i=0; i<count; ++i) {
+                if (cp == end || !isASCIIHexDigit(*cp++, &digit))
+                    return UnicodeRegExpError(state);
+                n = n*16 + digit;
+            }
+            if (escape == 'u' && n >= 0xD800 && n <= 0xDBFF && end-cp >= 6 &&
+                cp[0] == '\\' && cp[1] == 'u') {
+                saved = cp; cp += 2; low = 0;
+                for (i=0; i<4; ++i) {
+                    if (!isASCIIHexDigit(cp[i], &digit)) break;
+                    low = low*16 + digit;
+                }
+                if (i == 4 && low >= 0xDC00 && low <= 0xDFFF) {
+                    n = 0x10000 + ((n-0xD800)<<10) + low-0xDC00;
+                    cp += 4;
+                } else cp = saved;
+            }
+        }
+        *value = n; break;
+      default:
+        if (!escape || escape > 127 || !strchr("^$\\.*+?()[]{}|/", (int)escape))
+            return UnicodeRegExpError(state);
+        *value = escape; break;
+    }
+    *position = cp;
+    return JS_TRUE;
+}
+
+static JSBool
+UnicodeClassAtom(CompilerState *state, const jschar **position, const jschar *end,
+                  uint32 *point, uintN *kind)
+{
+    const jschar *cp = *position;
+    uintN width;
+    uint32 escape;
+    *kind = 0;
+    if (cp == end) return UnicodeRegExpError(state);
+    if (*cp != '\\') {
+        *point = RegExpPoint(cp, end, JS_TRUE, &width);
+        cp += width;
+    } else {
+        if (++cp == end) return UnicodeRegExpError(state);
+        escape = *cp++;
+        if (escape && escape < 128 && strchr("dDsSwW", (int)escape)) {
+            *kind = escape; *point = 0;
+        } else if (escape == 'b') *point = 8;
+        else if (escape == '-') *point = '-';
+        else if (!UnicodeRegExpEscape(state, &cp, end, escape, point)) return JS_FALSE;
+    }
+    *position = cp;
+    return JS_TRUE;
+}
+
+static JSBool
+UnicodeWord(uint32 point, JSBool fold)
+{
+    if (fold) point = js_UnicodeSimpleFold(point);
+    return point < 128 && JS_ISWORD(point);
+}
+
+/* Sizing and filling use the same parser and canonicalization. */
+static JSBool
+UnicodeClass(CompilerState *state, const jschar *src, const jschar *end,
+             uint8 *bits, uint32 *maximum, JSBool *sense)
+{
+    uint32 first, last, point, mapped;
+    uintN kind, lastKind, work = 0;
+    JSBool include, fold = (state->flags & JSREG_FOLD) != 0;
+    *maximum = 0; *sense = JS_TRUE;
+    if (src < end && *src == '^') { ++src; *sense = JS_FALSE; }
+    while (src < end) {
+        if (!UnicodeClassAtom(state, &src, end, &first, &kind)) return JS_FALSE;
+        last = first;
+        if (src+1 < end && *src == '-') {
+            ++src;
+            if (!UnicodeClassAtom(state, &src, end, &last, &lastKind)) return JS_FALSE;
+            if (kind || lastKind || first > last) return UnicodeRegExpError(state);
+        }
+        if (kind) { first = 0; last = 0x10FFFF; }
+        for (point=first; point<=last; ++point) {
+            if (!(work++ & 4095) && state->context->branchCallback &&
+                !state->context->branchCallback(state->context, NULL)) return JS_FALSE;
+            include = JS_TRUE;
+            switch (kind) {
+              case 'd': case 'D': include = point >= '0' && point <= '9'; break;
+              case 'w': case 'W': include = UnicodeWord(point, fold); break;
+              case 's': case 'S': include = point <= 0xFFFF && JS_ISSPACE((jschar)point); break;
+            }
+            if (kind == 'D' || kind == 'W' || kind == 'S') include = !include;
+            if (!include) continue;
+            mapped = fold ? js_UnicodeSimpleFold(point) : point;
+            if (mapped > *maximum) *maximum = mapped;
+            if (bits) bits[mapped >> 3] |= 1 << (mapped & 7);
+        }
+        /* Distinguish a NUL-only class from the empty class. */
+        if (*maximum == 0) *maximum = 1;
+    }
+    return JS_TRUE;
+}
+
 /*
  * Calculate the total size of the bitmap required for a class expression.
  */
@@ -894,6 +1187,14 @@ CalculateBitmapSize(CompilerState *state, RENode *target, const jschar *src,
     jschar c, rangeStart = 0;
     uintN n, digit, nDigits, i;
 
+    if (state->flags & JSREG_UNICODE) {
+        uint32 maximum;
+        JSBool sense;
+        if (!UnicodeClass(state, src, end, NULL, &maximum, &sense)) return JS_FALSE;
+        target->u.ucclass.bmsize = maximum;
+        target->u.ucclass.sense = sense;
+        return JS_TRUE;
+    }
     target->u.ucclass.bmsize = 0;
     target->u.ucclass.sense = JS_TRUE;
 
@@ -944,6 +1245,12 @@ CalculateBitmapSize(CompilerState *state, RENode *target, const jschar *src,
             case 'u':
                 nDigits = 4;
 lexHex:
+                if (state->modern) {
+                    if (!CompleteHexEscape(&src, end, nDigits, &n))
+                        n = c;
+                    localMax = n;
+                    break;
+                }
                 n = 0;
                 for (i = 0; (i < nDigits) && (src < end); i++) {
                     c = *src++;
@@ -961,7 +1268,23 @@ lexHex:
                 localMax = n;
                 break;
             case 'd':
+                if (state->modern && (inRange || (src < end - 1 && *src == '-'))) {
+                    if (inRange) {
+                        localMax = JS_MAX(localMax, (uintN)rangeStart);
+                        inRange = JS_FALSE;
+                    } else {
+                        ++src;
+                    }
+                    localMax = JS_MAX(JS_MAX(localMax, (uintN)'9'), (uintN)'-');
+                    break;
+                }
                 if (inRange || (src < end - 1 && *src == '-')) {
+                    if (state->modern) {
+                        /* Original ES2015 Annex B ClassAtomInRange falls
+                         * back to IdentityEscape for a non-singleton set. */
+                        localMax = c;
+                        break;
+                    }
                     JS_ReportErrorNumber(state->context,
                                          js_GetErrorMessage, NULL,
                                          JSMSG_BAD_CLASS_RANGE);
@@ -974,7 +1297,23 @@ lexHex:
             case 'S':
             case 'w':
             case 'W':
+                if (state->modern && (inRange || (src < end - 1 && *src == '-'))) {
+                    if (inRange) {
+                        localMax = JS_MAX(localMax, (uintN)rangeStart);
+                        inRange = JS_FALSE;
+                    } else {
+                        ++src;
+                    }
+                    localMax = 65535;
+                    break;
+                }
                 if (inRange || (src < end - 1 && *src == '-')) {
+                    if (state->modern) {
+                        /* Original ES2015 Annex B ClassAtomInRange falls
+                         * back to IdentityEscape for a non-singleton set. */
+                        localMax = c;
+                        break;
+                    }
                     JS_ReportErrorNumber(state->context,
                                          js_GetErrorMessage, NULL,
                                          JSMSG_BAD_CLASS_RANGE);
@@ -1110,7 +1449,8 @@ lexHex:
 static JSBool
 ParseTerm(CompilerState *state)
 {
-    jschar c = *state->cp++;
+    uint32 c = *state->cp++;
+    uintN width;
     uintN nDigits;
     uintN num, tmp, n, i;
     const jschar *termStart;
@@ -1154,6 +1494,11 @@ ParseTerm(CompilerState *state)
             return JS_TRUE;
         /* Decimal escape */
         case '0':
+            if (state->flags & JSREG_UNICODE) {
+                if (!UnicodeRegExpEscape(state, &state->cp, state->cpend, c, &c))
+                    return JS_FALSE;
+                goto doFlat;
+            }
             /* Give a strict warning. See also the note below. */
             if (!js_ReportCompileErrorNumber(state->context,
                                              state->tokenStream,
@@ -1182,7 +1527,7 @@ ParseTerm(CompilerState *state)
                 return JS_FALSE;
             state->result->u.flat.chr = c;
             state->result->u.flat.length = 1;
-            state->progLength += 3;
+            state->progLength += (state->flags & JSREG_UNICODE) ? 5 : 3;
             break;
         case '1':
         case '2':
@@ -1198,6 +1543,7 @@ ParseTerm(CompilerState *state)
             if (state->flags & JSREG_FIND_PAREN_ERROR)
                 return JS_FALSE;
             if (num == OVERFLOW_VALUE) {
+                if (state->flags & JSREG_UNICODE) return UnicodeRegExpError(state);
                 /* Give a strict mode warning. */
                 if (!js_ReportCompileErrorNumber(state->context,
                                                  state->tokenStream,
@@ -1218,6 +1564,12 @@ ParseTerm(CompilerState *state)
                  */
                 state->cp = termStart;
                 if (c >= '8') {
+                    if (state->modern) {
+                        /* Annex B IdentityEscape consumes the digit, not
+                         * the backslash; following decimal digits remain. */
+                        state->cp = termStart + 1;
+                        goto doFlat;
+                    }
                     /* Treat this as flat. termStart - 1 is the \. */
                     c = '\\';
                     goto asFlat;
@@ -1252,6 +1604,11 @@ ParseTerm(CompilerState *state)
             goto doFlat;
         /* Control letter */
         case 'c':
+            if (state->flags & JSREG_UNICODE) {
+                if (!UnicodeRegExpEscape(state, &state->cp, state->cpend, c, &c))
+                    return JS_FALSE;
+                goto doFlat;
+            }
             if (state->cp < state->cpend && RE_IS_LETTER(*state->cp)) {
                 c = (jschar) (*state->cp++ & 0x1F);
             } else {
@@ -1268,6 +1625,18 @@ ParseTerm(CompilerState *state)
         case 'u':
             nDigits = 4;
 lexHex:
+            if (state->flags & JSREG_UNICODE) {
+                if (!UnicodeRegExpEscape(state, &state->cp, state->cpend,
+                                          nDigits == 4 ? 'u' : 'x', &c))
+                    return JS_FALSE;
+                goto doFlat;
+            }
+            if (state->modern) {
+                if (!CompleteHexEscape(&state->cp, state->cpend, nDigits, &n))
+                    n = nDigits == 4 ? 'u' : 'x';
+                c = (jschar)n;
+                goto doFlat;
+            }
             n = 0;
             for (i = 0; i < nDigits && state->cp < state->cpend; i++) {
                 uintN digit;
@@ -1310,13 +1679,18 @@ doSimple:
             goto doSimple;
         /* IdentityEscape */
         default:
+            if (state->flags & JSREG_UNICODE) {
+                if (!UnicodeRegExpEscape(state, &state->cp, state->cpend, c, &c))
+                    return JS_FALSE;
+                goto doFlat;
+            }
             state->result = NewRENode(state, REOP_FLAT);
             if (!state->result)
                 return JS_FALSE;
             state->result->u.flat.chr = c;
             state->result->u.flat.length = 1;
             state->result->kid = (void *) (state->cp - 1);
-            state->progLength += 3;
+            state->progLength += (state->flags & JSREG_UNICODE) ? 5 : 3;
             break;
         }
         break;
@@ -1405,8 +1779,10 @@ doSimple:
         err = ParseMinMaxQuantifier(state, JS_TRUE);
         state->cp = errp;
 
-        if (err < 0)
+        if (err < 0) {
+            if (state->flags & JSREG_UNICODE) return UnicodeRegExpError(state);
             goto asFlat;
+        }
 
         /* FALL THROUGH */
     }
@@ -1419,13 +1795,18 @@ doSimple:
         return JS_FALSE;
     default:
 asFlat:
+        if (state->flags & JSREG_UNICODE) {
+            if (c == '}' || c == ']') return UnicodeRegExpError(state);
+            c = RegExpPoint(state->cp-1, state->cpend, JS_TRUE, &width);
+            state->cp += width-1;
+        }
         state->result = NewRENode(state, REOP_FLAT);
         if (!state->result)
             return JS_FALSE;
         state->result->u.flat.chr = c;
         state->result->u.flat.length = 1;
         state->result->kid = (void *) (state->cp - 1);
-        state->progLength += 3;
+        state->progLength += (state->flags & JSREG_UNICODE) ? 5 : 3;
         break;
     }
     return ParseQuantifier(state);
@@ -1471,10 +1852,14 @@ ParseQuantifier(CompilerState *state)
             const jschar *errp = state->cp;
 
             err = ParseMinMaxQuantifier(state, JS_FALSE);
-            if (err == 0)
+            if (err == 0) {
+                if (!state->result) return JS_FALSE;
                 goto quantifier;
-            if (err == -1)
+            }
+            if (err == -1) {
+                if (state->flags & JSREG_UNICODE) return UnicodeRegExpError(state);
                 return JS_TRUE;
+            }
 
             js_ReportCompileErrorNumberUC(state->context,
                                           state->tokenStream,
@@ -1488,6 +1873,9 @@ ParseQuantifier(CompilerState *state)
     return JS_TRUE;
 
 quantifier:
+    if ((state->flags & JSREG_UNICODE) &&
+        (term->op == REOP_ASSERT || term->op == REOP_ASSERT_NOT))
+        return UnicodeRegExpError(state);
     if (state->treeDepth == TREE_DEPTH_MAX) {
         js_ReportCompileErrorNumber(state->context, state->tokenStream,
                                     JSREPORT_TS | JSREPORT_ERROR,
@@ -1507,13 +1895,103 @@ quantifier:
     return JS_TRUE;
 }
 
+static RECount
+ParseCountDigits(CompilerState *state)
+{
+    RECount count = MakeCount(0, JS_FALSE);
+    uint32 low, middle, carry;
+    while (state->cp < state->cpend && JS7_ISDEC(*state->cp)) {
+        if (!count.huge) {
+            low = (count.low & 0xffff) * 10 + (*state->cp - '0');
+            middle = (count.low >> 16) * 10 + (low >> 16);
+            carry = middle >> 16;
+            if (count.high > (((uint32)-1) - carry) / 10)
+                count.huge = JS_TRUE;
+            else {
+                count.high = count.high * 10 + carry;
+                count.low = (middle << 16) | (low & 0xffff);
+            }
+        }
+        ++state->cp;
+    }
+    return count;
+}
+
+static JSBool
+DecimalGreater(const jschar *left, const jschar *leftEnd,
+               const jschar *right, const jschar *rightEnd)
+{
+    while (left < leftEnd && *left == '0') ++left;
+    while (right < rightEnd && *right == '0') ++right;
+    if (leftEnd - left != rightEnd - right)
+        return leftEnd - left > rightEnd - right;
+    while (left < leftEnd) {
+        if (*left != *right) return *left > *right;
+        ++left; ++right;
+    }
+    return JS_FALSE;
+}
+
+static intN
+ParseModernMinMaxQuantifier(CompilerState *state, JSBool ignoreValues)
+{
+    const jschar *start = state->cp++, *minStart, *minEnd, *maxStart, *maxEnd;
+    RECount min, max;
+    JSBool unbounded = JS_FALSE, wide;
+    uintN smallMin, smallMax;
+    size_t extra;
+    if (state->cp == state->cpend || !JS7_ISDEC(*state->cp)) goto not_quantifier;
+    minStart = state->cp;
+    min = ParseCountDigits(state);
+    minEnd = state->cp;
+    maxStart = minStart; maxEnd = minEnd; max = min;
+    if (state->cp < state->cpend && *state->cp == ',') {
+        ++state->cp;
+        if (state->cp < state->cpend && JS7_ISDEC(*state->cp)) {
+            maxStart = state->cp;
+            max = ParseCountDigits(state);
+            maxEnd = state->cp;
+        } else {
+            max = MakeCount(0, JS_TRUE);
+            unbounded = JS_TRUE;
+        }
+    }
+    if (state->cp == state->cpend || *state->cp != '}') goto not_quantifier;
+    if (!ignoreValues && !unbounded &&
+        DecimalGreater(minStart, minEnd, maxStart, maxEnd))
+        return JSMSG_OUT_OF_ORDER;
+    state->result = NewRENode(state, REOP_QUANT);
+    if (!state->result) return JS_FALSE;
+    wide = min.huge || min.high || min.low > 0xffff ||
+           (!unbounded && (max.huge || max.high || max.low > 0xffff));
+    smallMin = min.low;
+    smallMax = unbounded ? (uintN)-1 : max.low;
+    state->result->u.range.min = smallMin;
+    state->result->u.range.max = smallMax;
+    state->result->u.range.wide = wide;
+    state->result->u.range.bigMin = min;
+    state->result->u.range.bigMax = max;
+    extra = 1 + (wide ? 18 : GetCompactIndexWidth(smallMin) +
+                            GetCompactIndexWidth(smallMax + 1)) + 3;
+    if (state->progLength > (size_t)-1 - extra)
+        return JSMSG_REGEXP_TOO_COMPLEX;
+    state->progLength += extra;
+    return 0;
+not_quantifier:
+    state->cp = start;
+    return -1;
+}
+
 static intN
 ParseMinMaxQuantifier(CompilerState *state, JSBool ignoreValues)
 {
     uintN min, max;
     jschar c;
-    const jschar *errp = state->cp++;
+    const jschar *errp;
 
+    if (state->modern)
+        return ParseModernMinMaxQuantifier(state, ignoreValues);
+    errp = state->cp++;
     c = *state->cp;
     if (JS7_ISDEC(c)) {
         ++state->cp;
@@ -1758,7 +2236,7 @@ EmitREBytecode(CompilerState *state, JSRegExp *re, size_t treeDepth,
              * nodes strictly decreases bytecode size, the check has to be
              * done only for the first coalescing.
              */
-            if (t->kid &&
+            if (!(state->flags & JSREG_UNICODE) && t->kid &&
                 GetCompactIndexWidth((jschar *)t->kid - state->cpbegin) <= 4)
             {
                 while (t->next &&
@@ -1773,6 +2251,10 @@ EmitREBytecode(CompilerState *state, JSRegExp *re, size_t treeDepth,
                 pc[-1] = (state->flags & JSREG_FOLD) ? REOP_FLATi : REOP_FLAT;
                 pc = WriteCompactIndex(pc, (jschar *)t->kid - state->cpbegin);
                 pc = WriteCompactIndex(pc, t->u.flat.length);
+            } else if (state->flags & JSREG_UNICODE) {
+                pc[-1] = REOP_UCFLAT32;
+                SET_ARG(pc, t->u.flat.chr >> 16); pc += ARG_LEN;
+                SET_ARG(pc, t->u.flat.chr & 0xFFFF); pc += ARG_LEN;
             } else if (t->u.flat.chr < 256) {
                 pc[-1] = (state->flags & JSREG_FOLD) ? REOP_FLAT1i : REOP_FLAT1;
                 *pc++ = (jsbytecode) t->u.flat.chr;
@@ -1836,7 +2318,11 @@ EmitREBytecode(CompilerState *state, JSRegExp *re, size_t treeDepth,
 
         case REOP_QUANT:
             JS_ASSERT(emitStateSP);
-            if (t->u.range.min == 0 && t->u.range.max == (uintN)-1) {
+            if (t->u.range.wide) {
+                pc[-1] = t->u.range.greedy ? REOP_BIGQUANT : REOP_BIGMINIMALQUANT;
+                pc = WriteCount(pc, &t->u.range.bigMin);
+                pc = WriteCount(pc, &t->u.range.bigMax);
+            } else if (t->u.range.min == 0 && t->u.range.max == (uintN)-1) {
                 pc[-1] = (t->u.range.greedy) ? REOP_STAR : REOP_MINIMALSTAR;
             } else if (t->u.range.min == 0 && t->u.range.max == 1) {
                 pc[-1] = (t->u.range.greedy) ? REOP_OPT : REOP_MINIMALOPT;
@@ -1909,9 +2395,9 @@ EmitREBytecode(CompilerState *state, JSRegExp *re, size_t treeDepth,
 }
 
 
-JSRegExp *
-js_NewRegExp(JSContext *cx, JSTokenStream *ts,
-             JSString *str, uintN flags, JSBool flat)
+static JSRegExp *
+NewRegExpWithEdition(JSContext *cx, JSTokenStream *ts,
+                      JSString *str, uintN flags, JSBool flat, JSBool modern)
 {
     JSRegExp *re;
     void *mark;
@@ -1920,11 +2406,14 @@ js_NewRegExp(JSContext *cx, JSTokenStream *ts,
     jsbytecode *endPC;
     uintN i;
     size_t len;
+    JSTempValueRooter sourceRoot;
 
+    JS_PUSH_TEMP_ROOT_STRING(cx, str, &sourceRoot);
     re = NULL;
     mark = JS_ARENA_MARK(&cx->tempPool);
     len = JSSTRING_LENGTH(str);
 
+    state.modern = modern;
     state.context = cx;
     state.tokenStream = ts;
     state.cp = js_UndependString(cx, str);
@@ -1947,11 +2436,16 @@ js_NewRegExp(JSContext *cx, JSTokenStream *ts,
         state.result->u.flat.length = len;
         state.result->kid = (void *) state.cpbegin;
         /* Flat bytecode: REOP_FLAT compact(string_offset) compact(len). */
-        state.progLength += 1 + GetCompactIndexWidth(0)
-                          + GetCompactIndexWidth(len);
+        state.progLength += (flags & JSREG_UNICODE) && len == 1 ? 5 :
+                            1 + GetCompactIndexWidth(0) + GetCompactIndexWidth(len);
     } else {
         if (!ParseRegExp(&state))
             goto out;
+    }
+    if (state.progLength > (size_t)-1 - offsetof(JSRegExp, program) - 1) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_REGEXP_TOO_COMPLEX);
+        re = NULL;
+        goto out;
     }
     resize = offsetof(JSRegExp, program) + state.progLength + 1;
     re = (JSRegExp *) JS_malloc(cx, resize);
@@ -1969,8 +2463,10 @@ js_NewRegExp(JSContext *cx, JSTokenStream *ts,
             re = NULL;
             goto out;
         }
-        for (i = 0; i < re->classCount; i++)
+        for (i = 0; i < re->classCount; i++) {
             re->classList[i].converted = JS_FALSE;
+            re->classList[i].modern = modern;
+        }
     } else {
         re->classList = NULL;
     }
@@ -1996,18 +2492,46 @@ js_NewRegExp(JSContext *cx, JSTokenStream *ts,
     }
 
     re->flags = flags;
+    re->modern = modern;
     re->cloneIndex = 0;
     re->parenCount = state.parenCount;
     re->source = str;
+    if (flags & JSREG_UNICODE) {
+        for (i=0; i<re->classCount; ++i) {
+            RECharSet *set = &re->classList[i];
+            const jschar *src = state.cpbegin + set->u.src.startIndex;
+            const jschar *end = src + set->u.src.length;
+            uint32 maximum;
+            JSBool sense;
+            size_t size = (set->length >> 3) + 1;
+            uint8 *bits = (uint8 *)JS_malloc(cx, size);
+            if (!bits) { js_DestroyRegExp(cx, re); re = NULL; goto out; }
+            memset(bits, 0, size);
+            if (!UnicodeClass(&state, src, end, bits, &maximum, &sense)) {
+                JS_free(cx, bits); js_DestroyRegExp(cx, re); re = NULL; goto out;
+            }
+            set->u.bits = bits;
+            set->converted = JS_TRUE;
+        }
+    }
 
 out:
+    JS_POP_TEMP_ROOT(cx, &sourceRoot);
     JS_ARENA_RELEASE(&cx->tempPool, mark);
     return re;
 }
 
 JSRegExp *
-js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
-                JSString *str, JSString *opt, JSBool flat)
+js_NewRegExp(JSContext *cx, JSTokenStream *ts,
+             JSString *str, uintN flags, JSBool flat)
+{
+    return NewRegExpWithEdition(cx, ts, str, flags, flat,
+                                JS_VERSION_IS_ES2015(cx));
+}
+
+static JSRegExp *
+NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
+              JSString *str, JSString *opt, JSBool flat, JSBool modern)
 {
     uintN flags, flag;
     jschar *s;
@@ -2028,7 +2552,14 @@ js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
             case 'm':
                 flag = JSREG_MULTILINE;
                 break;
+            case 'u':
+                if (modern) { flag = JSREG_UNICODE; break; }
+                goto badFlag;
+            case 'y':
+                if (modern) { flag = JSREG_STICKY; break; }
+                /* Fall through for legacy source. */
             default:
+              badFlag:
                 charBuf[0] = (char)s[i];
                 charBuf[1] = '\0';
                 js_ReportCompileErrorNumber(cx, ts,
@@ -2046,7 +2577,14 @@ js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
             flags |= flag;
         }
     }
-    return js_NewRegExp(cx, ts, str, flags, flat);
+    return NewRegExpWithEdition(cx, ts, str, flags, flat, modern);
+}
+
+JSRegExp *
+js_NewRegExpOpt(JSContext *cx, JSTokenStream *ts,
+                JSString *str, JSString *opt, JSBool flat)
+{
+    return NewRegExpOpt(cx, ts, str, opt, flat, JS_VERSION_IS_ES2015(cx));
 }
 
 /*
@@ -2135,11 +2673,34 @@ FlatNMatcher(REGlobalData *gData, REMatchState *x, jschar *matchChars,
 #endif
 
 static REMatchState *
+UnicodeSequenceMatcher(REGlobalData *gData, REMatchState *x,
+                       const jschar *source, size_t length)
+{
+    const jschar *left = source, *end = source+length, *right = x->cp;
+    uint32 a, b;
+    uintN aw, bw;
+    while (left < end) {
+        if (right >= gData->cpend) return NULL;
+        a = RegExpPoint(left, end, JS_TRUE, &aw);
+        b = RegExpPoint(right, gData->cpend, JS_TRUE, &bw);
+        if (gData->regexp->flags & JSREG_FOLD) {
+            a = js_UnicodeSimpleFold(a); b = js_UnicodeSimpleFold(b);
+        }
+        if (a != b) return NULL;
+        left += aw; right += bw;
+    }
+    x->cp = right;
+    return x;
+}
+
+static REMatchState *
 FlatNIMatcher(REGlobalData *gData, REMatchState *x, jschar *matchChars,
               size_t length)
 {
     size_t i;
     JS_ASSERT(gData->cpend >= x->cp);
+    if (gData->regexp->flags & JSREG_UNICODE)
+        return UnicodeSequenceMatcher(gData, x, matchChars, length);
     if (length > (size_t)(gData->cpend - x->cp))
         return NULL;
     for (i = 0; i != length; i++) {
@@ -2184,6 +2745,8 @@ BackrefMatcher(REGlobalData *gData, REMatchState *x, size_t parenIndex)
         return x;
 
     len = cap->length;
+    if (gData->regexp->flags & JSREG_UNICODE)
+        return UnicodeSequenceMatcher(gData, x, gData->cpbegin+cap->index, len);
     if (x->cp + len > gData->cpend)
         return NULL;
 
@@ -2323,6 +2886,12 @@ ProcessCharSet(REGlobalData *gData, RECharSet *charSet)
             case 'u':
                 nDigits = 4;
             lexHex:
+                if (charSet->modern) {
+                    if (!CompleteHexEscape(&src, end, nDigits, &n))
+                        n = c;
+                    thisCh = (jschar)n;
+                    break;
+                }
                 n = 0;
                 for (i = 0; (i < nDigits) && (src < end); i++) {
                     uintN digit;
@@ -2372,30 +2941,55 @@ ProcessCharSet(REGlobalData *gData, RECharSet *charSet)
                 break;
 
             case 'd':
+            case 'D':
+            case 's':
+            case 'S':
+            case 'w':
+            case 'W':
+                if (charSet->modern && (inRange || (src < end - 1 && *src == '-'))) {
+                    AddCharacterToCharSet(charSet, '-');
+                    if (inRange) {
+                        AddCharacterToCharSet(charSet, rangeStart);
+                        inRange = JS_FALSE;
+                    }
+                    else ++src;
+                }
+                /* Such endpoints are accepted only by the ES2015 parser;
+                 * retain that decision when lazily building the bitmap from
+                 * a different caller edition. Unicode uses UnicodeClass. */
+                if (inRange || (src < end - 1 && *src == '-')) {
+                    thisCh = c;
+                    break;
+                }
+                if (c == 'D') goto class_non_digit;
+                if (c == 's') goto class_space;
+                if (c == 'S') goto class_non_space;
+                if (c == 'w') goto class_word;
+                if (c == 'W') goto class_non_word;
                 AddCharacterRangeToCharSet(charSet, '0', '9');
                 continue;   /* don't need range processing */
-            case 'D':
+            class_non_digit:
                 AddCharacterRangeToCharSet(charSet, 0, '0' - 1);
                 AddCharacterRangeToCharSet(charSet,
                                            (jschar)('9' + 1),
                                            (jschar)charSet->length);
                 continue;
-            case 's':
+            class_space:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (JS_ISSPACE(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
                 continue;
-            case 'S':
+            class_non_space:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (!JS_ISSPACE(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
                 continue;
-            case 'w':
+            class_word:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (JS_ISWORD(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
                 continue;
-            case 'W':
+            class_non_word:
                 for (i = (intN)charSet->length; i >= 0; i--)
                     if (!JS_ISWORD(i))
                         AddCharacterToCharSet(charSet, (jschar)i);
@@ -2493,15 +3087,18 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
             jsbytecode **startpc, JSBool updatecp)
 {
     REMatchState *result = NULL;
-    jschar matchCh;
+    uint32 matchCh;
     size_t parenIndex;
     size_t offset, length, index;
     jsbytecode *pc = *startpc;  /* pc has already been incremented past op */
     jschar *source;
     const jschar *startcp = x->cp;
-    jschar ch;
+    uint32 ch, point;
+    uintN width;
+    JSBool unicode = (gData->regexp->flags & JSREG_UNICODE) != 0;
     RECharSet *charSet;
 
+    point = RegExpPoint(x->cp, gData->cpend, unicode, &width);
     switch (op) {
     case REOP_BOL:
         if (x->cp != gData->cpbegin) {
@@ -2526,57 +3123,57 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         result = x;
         break;
     case REOP_WBDRY:
-        if ((x->cp == gData->cpbegin || !JS_ISWORD(x->cp[-1])) ^
-            !(x->cp != gData->cpend && JS_ISWORD(*x->cp))) {
+        if ((x->cp == gData->cpbegin || !(unicode ? UnicodeWord(x->cp[-1], (gData->regexp->flags & JSREG_FOLD) != 0) : JS_ISWORD(x->cp[-1]))) ^
+            !(x->cp != gData->cpend && (unicode ? UnicodeWord(point, (gData->regexp->flags & JSREG_FOLD) != 0) : JS_ISWORD(*x->cp)))) {
             result = x;
         }
         break;
     case REOP_WNONBDRY:
-        if ((x->cp == gData->cpbegin || !JS_ISWORD(x->cp[-1])) ^
-            (x->cp != gData->cpend && JS_ISWORD(*x->cp))) {
+        if ((x->cp == gData->cpbegin || !(unicode ? UnicodeWord(x->cp[-1], (gData->regexp->flags & JSREG_FOLD) != 0) : JS_ISWORD(x->cp[-1]))) ^
+            (x->cp != gData->cpend && (unicode ? UnicodeWord(point, (gData->regexp->flags & JSREG_FOLD) != 0) : JS_ISWORD(*x->cp)))) {
             result = x;
         }
         break;
     case REOP_DOT:
         if (x->cp != gData->cpend && !RE_IS_LINE_TERM(*x->cp)) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_DIGIT:
         if (x->cp != gData->cpend && JS7_ISDEC(*x->cp)) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_NONDIGIT:
         if (x->cp != gData->cpend && !JS7_ISDEC(*x->cp)) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_ALNUM:
-        if (x->cp != gData->cpend && JS_ISWORD(*x->cp)) {
+        if (x->cp != gData->cpend && (unicode ? UnicodeWord(point, (gData->regexp->flags & JSREG_FOLD) != 0) : JS_ISWORD(*x->cp))) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_NONALNUM:
-        if (x->cp != gData->cpend && !JS_ISWORD(*x->cp)) {
+        if (x->cp != gData->cpend && !(unicode ? UnicodeWord(point, (gData->regexp->flags & JSREG_FOLD) != 0) : JS_ISWORD(*x->cp))) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_SPACE:
-        if (x->cp != gData->cpend && JS_ISSPACE(*x->cp)) {
+        if (x->cp != gData->cpend && (point <= 0xFFFF && JS_ISSPACE((jschar)point))) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_NONSPACE:
-        if (x->cp != gData->cpend && !JS_ISSPACE(*x->cp)) {
+        if (x->cp != gData->cpend && !(point <= 0xFFFF && JS_ISSPACE((jschar)point))) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_BACKREF:
@@ -2602,9 +3199,9 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         break;
     case REOP_FLAT1:
         matchCh = *pc++;
-        if (x->cp != gData->cpend && *x->cp == matchCh) {
+        if (x->cp != gData->cpend && point == matchCh) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_FLATi:
@@ -2620,15 +3217,15 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         matchCh = *pc++;
         if (x->cp != gData->cpend && upcase(*x->cp) == upcase(matchCh)) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_UCFLAT1:
         matchCh = GET_ARG(pc);
         pc += ARG_LEN;
-        if (x->cp != gData->cpend && *x->cp == matchCh) {
+        if (x->cp != gData->cpend && point == matchCh) {
             result = x;
-            result->cp++;
+            result->cp += width;
         }
         break;
     case REOP_UCFLAT1i:
@@ -2636,7 +3233,18 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         pc += ARG_LEN;
         if (x->cp != gData->cpend && upcase(*x->cp) == upcase(matchCh)) {
             result = x;
-            result->cp++;
+            result->cp += width;
+        }
+        break;
+    case REOP_UCFLAT32:
+        matchCh = ((uint32)GET_ARG(pc) << 16) | GET_ARG(pc+ARG_LEN);
+        pc += 2*ARG_LEN;
+        if (x->cp != gData->cpend &&
+            ((gData->regexp->flags & JSREG_FOLD)
+             ? js_UnicodeSimpleFold(point) == js_UnicodeSimpleFold(matchCh)
+             : point == matchCh)) {
+            result = x;
+            result->cp += width;
         }
         break;
     case REOP_CLASS:
@@ -2645,13 +3253,14 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         if (x->cp != gData->cpend) {
             charSet = &gData->regexp->classList[index];
             JS_ASSERT(charSet->converted);
-            ch = *x->cp;
+            ch = unicode && (gData->regexp->flags & JSREG_FOLD)
+                 ? js_UnicodeSimpleFold(point) : point;
             index = ch >> 3;
             if (charSet->length != 0 &&
                 ch <= charSet->length &&
                 (charSet->u.bits[index] & (1 << (ch & 0x7)))) {
                 result = x;
-                result->cp++;
+                result->cp += width;
             }
         }
         break;
@@ -2661,13 +3270,14 @@ SimpleMatch(REGlobalData *gData, REMatchState *x, REOp op,
         if (x->cp != gData->cpend) {
             charSet = &gData->regexp->classList[index];
             JS_ASSERT(charSet->converted);
-            ch = *x->cp;
+            ch = unicode && (gData->regexp->flags & JSREG_FOLD)
+                 ? js_UnicodeSimpleFold(point) : point;
             index = ch >> 3;
             if (charSet->length == 0 ||
                 ch > charSet->length ||
                 !(charSet->u.bits[index] & (1 << (ch & 0x7)))) {
                 result = x;
-                result->cp++;
+                result->cp += width;
             }
         }
         break;
@@ -2702,6 +3312,15 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
 
     JSBranchCallback onbranch = gData->cx->branchCallback;
     uintN onbranchCalls = 0;
+#define CHECK_REPEAT_BUDGET()                                                  \
+    JS_BEGIN_MACRO                                                            \
+        if (++gData->repeatLow == 0 && ++gData->repeatHigh == 0) {              \
+            JS_ReportErrorNumber(gData->cx, js_GetErrorMessage, NULL,          \
+                                 JSMSG_REGEXP_TOO_COMPLEX);                    \
+            gData->ok = JS_FALSE;                                             \
+            return NULL;                                                      \
+        }                                                                     \
+    JS_END_MACRO
 #define ONBRANCH_CALLS_MASK             127
 #define CHECK_BRANCH()                                                         \
     JS_BEGIN_MACRO                                                             \
@@ -2733,8 +3352,15 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 op = (REOp) *pc++;
                 break;
             }
-            gData->skipped++;
-            x->cp++;
+            if (gData->sticky)
+                break;
+            {
+                uintN width;
+                RegExpPoint(x->cp, gData->cpend,
+                             (gData->regexp->flags & JSREG_UNICODE) != 0, &width);
+                gData->skipped += width;
+                x->cp += width;
+            }
         }
         if (!anchor)
             return NULL;
@@ -2935,27 +3561,37 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 break;
 
             case REOP_STAR:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto quantcommon;
             case REOP_PLUS:
-                curState->u.quantifier.min = 1;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(1, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto quantcommon;
             case REOP_OPT:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = 1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(1, JS_FALSE);
+                goto quantcommon;
+            case REOP_BIGQUANT:
+                pc = ReadCount(pc, &curState->u.quantifier.min);
+                pc = ReadCount(pc, &curState->u.quantifier.max);
                 goto quantcommon;
             case REOP_QUANT:
                 pc = ReadCompactIndex(pc, &k);
-                curState->u.quantifier.min = k;
+                curState->u.quantifier.min = MakeCount((uint32)k, JS_FALSE);
                 pc = ReadCompactIndex(pc, &k);
                 /* max is k - 1 to use one byte for (uintN)-1 sentinel. */
-                curState->u.quantifier.max = k - 1;
-                JS_ASSERT(curState->u.quantifier.min
-                          <= curState->u.quantifier.max);
+                curState->u.quantifier.max = MakeCount((uint32)(k - 1), k == 0);
+                JS_ASSERT(CountLessEqual(&curState->u.quantifier.min,
+                                         &curState->u.quantifier.max));
             quantcommon:
-                if (curState->u.quantifier.max == 0) {
+                if (gData->regexp->modern && pc[ARG_LEN] == REOP_ENDCHILD) {
+                    pc += GET_OFFSET(pc);
+                    op = (REOp)*pc++;
+                    result = x;
+                    continue;
+                }
+                if (CountIsZero(&curState->u.quantifier.max)) {
                     pc = pc + GET_OFFSET(pc);
                     op = (REOp) *pc++;
                     result = x;
@@ -2967,7 +3603,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 startcp = x->cp;
                 if (REOP_IS_SIMPLE(op)) {
                     if (!SimpleMatch(gData, x, op, &nextpc, JS_TRUE)) {
-                        if (curState->u.quantifier.min == 0)
+                        if (CountIsZero(&curState->u.quantifier.min))
                             result = x;
                         else
                             result = NULL;
@@ -2982,7 +3618,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 curState->continue_pc = pc;
                 curState->parenSoFar = parenSoFar;
                 PUSH_STATE_STACK(gData);
-                if (curState->u.quantifier.min == 0 &&
+                if (CountIsZero(&curState->u.quantifier.min) &&
                     !PushBackTrackState(gData, REOP_REPEAT, pc, x, startcp,
                                         0, 0)) {
                     return NULL;
@@ -2996,28 +3632,30 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 continue;
 
             case REOP_REPEAT:
-                CHECK_BRANCH();
+                if (!gData->regexp->modern) CHECK_BRANCH();
                 --curState;
                 do {
+                    CHECK_REPEAT_BUDGET();
+                    if (gData->regexp->modern) CHECK_BRANCH();
                     if(gData->stateStackTop)
                         --gData->stateStackTop;
                     if (!result) {
                         /* Failed, see if we have enough children. */
-                        if (curState->u.quantifier.min == 0)
+                        if (CountIsZero(&curState->u.quantifier.min))
                             goto repeatDone;
                         goto break_switch;
                     }
-                    if (curState->u.quantifier.min == 0 &&
+                    if (CountIsZero(&curState->u.quantifier.min) &&
                         x->cp == gData->cpbegin + curState->index) {
                         /* matched an empty string, that'll get us nowhere */
                         result = NULL;
                         goto break_switch;
                     }
-                    if (curState->u.quantifier.min != 0)
-                        curState->u.quantifier.min--;
-                    if (curState->u.quantifier.max != (uintN) -1)
-                        curState->u.quantifier.max--;
-                    if (curState->u.quantifier.max == 0)
+                    if (!CountIsZero(&curState->u.quantifier.min))
+                        DecrementCount(&curState->u.quantifier.min);
+                    if (!curState->u.quantifier.max.huge)
+                        DecrementCount(&curState->u.quantifier.max);
+                    if (CountIsZero(&curState->u.quantifier.max))
                         goto repeatDone;
                     nextpc = pc + ARG_LEN;
                     nextop = (REOp) *nextpc;
@@ -3025,7 +3663,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     if (REOP_IS_SIMPLE(nextop)) {
                         nextpc++;
                         if (!SimpleMatch(gData, x, nextop, &nextpc, JS_TRUE)) {
-                            if (curState->u.quantifier.min == 0)
+                            if (CountIsZero(&curState->u.quantifier.min))
                                 goto repeatDone;
                             result = NULL;
                             goto break_switch;
@@ -3034,7 +3672,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     }
                     curState->index = startcp - gData->cpbegin;
                     PUSH_STATE_STACK(gData);
-                    if (curState->u.quantifier.min == 0 &&
+                    if (CountIsZero(&curState->u.quantifier.min) &&
                         !PushBackTrackState(gData, REOP_REPEAT,
                                             pc, x, startcp,
                                             curState->parenSoFar,
@@ -3054,30 +3692,40 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 goto break_switch;
 
             case REOP_MINIMALSTAR:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto minimalquantcommon;
             case REOP_MINIMALPLUS:
-                curState->u.quantifier.min = 1;
-                curState->u.quantifier.max = (uintN)-1;
+                curState->u.quantifier.min = MakeCount(1, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(0, JS_TRUE);
                 goto minimalquantcommon;
             case REOP_MINIMALOPT:
-                curState->u.quantifier.min = 0;
-                curState->u.quantifier.max = 1;
+                curState->u.quantifier.min = MakeCount(0, JS_FALSE);
+                curState->u.quantifier.max = MakeCount(1, JS_FALSE);
+                goto minimalquantcommon;
+            case REOP_BIGMINIMALQUANT:
+                pc = ReadCount(pc, &curState->u.quantifier.min);
+                pc = ReadCount(pc, &curState->u.quantifier.max);
                 goto minimalquantcommon;
             case REOP_MINIMALQUANT:
                 pc = ReadCompactIndex(pc, &k);
-                curState->u.quantifier.min = k;
+                curState->u.quantifier.min = MakeCount((uint32)k, JS_FALSE);
                 pc = ReadCompactIndex(pc, &k);
                 /* See REOP_QUANT comments about k - 1. */
-                curState->u.quantifier.max = k - 1;
-                JS_ASSERT(curState->u.quantifier.min
-                          <= curState->u.quantifier.max);
+                curState->u.quantifier.max = MakeCount((uint32)(k - 1), k == 0);
+                JS_ASSERT(CountLessEqual(&curState->u.quantifier.min,
+                                         &curState->u.quantifier.max));
             minimalquantcommon:
+                if (gData->regexp->modern && pc[ARG_LEN] == REOP_ENDCHILD) {
+                    pc += GET_OFFSET(pc);
+                    op = (REOp)*pc++;
+                    result = x;
+                    continue;
+                }
                 curState->index = x->cp - gData->cpbegin;
                 curState->parenSoFar = parenSoFar;
                 PUSH_STATE_STACK(gData);
-                if (curState->u.quantifier.min != 0) {
+                if (!CountIsZero(&curState->u.quantifier.min)) {
                     curState->continue_op = REOP_MINIMALREPEAT;
                     curState->continue_pc = pc;
                     /* step over <next> */
@@ -3096,6 +3744,7 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                 continue;
 
             case REOP_MINIMALREPEAT:
+                CHECK_REPEAT_BUDGET();
                 CHECK_BRANCH();
                 if(gData->stateStackTop)
                   --gData->stateStackTop;
@@ -3105,8 +3754,8 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     /*
                      * Non-greedy failure - try to consume another child.
                      */
-                    if (curState->u.quantifier.max == (uintN) -1 ||
-                        curState->u.quantifier.max > 0) {
+                    if (curState->u.quantifier.max.huge ||
+                        !CountIsZero(&curState->u.quantifier.max)) {
                         curState->index = x->cp - gData->cpbegin;
                         curState->continue_op = REOP_MINIMALREPEAT;
                         curState->continue_pc = pc;
@@ -3120,17 +3769,17 @@ ExecuteREBytecode(REGlobalData *gData, REMatchState *x)
                     /* Don't need to adjust pc since we're going to pop. */
                     break;
                 }
-                if (curState->u.quantifier.min == 0 &&
+                if (CountIsZero(&curState->u.quantifier.min) &&
                     x->cp == gData->cpbegin + curState->index) {
                     /* Matched an empty string, that'll get us nowhere. */
                     result = NULL;
                     break;
                 }
-                if (curState->u.quantifier.min != 0)
-                    curState->u.quantifier.min--;
-                if (curState->u.quantifier.max != (uintN) -1)
-                    curState->u.quantifier.max--;
-                if (curState->u.quantifier.min != 0) {
+                if (!CountIsZero(&curState->u.quantifier.min))
+                    DecrementCount(&curState->u.quantifier.min);
+                if (!curState->u.quantifier.max.huge)
+                    DecrementCount(&curState->u.quantifier.max);
+                if (!CountIsZero(&curState->u.quantifier.min)) {
                     curState->continue_op = REOP_MINIMALREPEAT;
                     curState->continue_pc = pc;
                     pc += ARG_LEN;
@@ -3220,18 +3869,24 @@ MatchRegExp(REGlobalData *gData, REMatchState *x)
      * Have to include the position beyond the last character
      * in order to detect end-of-input/line condition.
      */
-    for (cp2 = cp; cp2 <= gData->cpend; cp2++) {
+    for (cp2 = cp; cp2 <= gData->cpend;) {
         gData->skipped = cp2 - cp;
         x->cp = cp2;
         for (j = 0; j < gData->regexp->parenCount; j++)
             x->parens[j].index = -1;
         result = ExecuteREBytecode(gData, x);
-        if (!gData->ok || result)
+        if (!gData->ok || result || gData->sticky)
             return result;
         gData->backTrackSP = gData->backTrackStack;
         gData->cursz = 0;
         gData->stateStackTop = 0;
         cp2 = cp + gData->skipped;
+        {
+            uintN width;
+            RegExpPoint(cp2, gData->cpend,
+                         (gData->regexp->flags & JSREG_UNICODE) != 0, &width);
+            cp2 += width;
+        }
     }
     return NULL;
 }
@@ -3264,6 +3919,7 @@ InitMatch(JSContext *cx, REGlobalData *gData, JSRegExp *re)
     gData->cx = cx;
     gData->regexp = re;
     gData->ok = JS_TRUE;
+    gData->repeatLow = gData->repeatHigh = 0;
 
     JS_ARENA_ALLOCATE_CAST(result, REMatchState *,
                            &gData->pool,
@@ -3302,9 +3958,9 @@ js_RegExpStatics_clear(JSContext *cx, JSRegExpStatics *res)
     }
 }
 
-JSBool
-js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
-                 JSBool test, jsval *rval)
+static JSBool
+ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
+              JSBool test, JSBool sticky, JSObject *global, jsval *rval)
 {
     REGlobalData gData;
     REMatchState *x, *result;
@@ -3317,7 +3973,7 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
     ptrdiff_t matchlen;
     uintN num, morenum;
     JSString *parstr, *matchstr;
-    JSObject *obj;
+    JSObject *obj, *proto;
 
     RECapture *parsub = NULL;
 
@@ -3330,11 +3986,15 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
     if (start > length)
         start = length;
     cp = JSSTRING_CHARS(str);
+    if ((re->flags & JSREG_UNICODE) && start && start < length &&
+        cp[start] >= 0xDC00 && cp[start] <= 0xDFFF &&
+        cp[start-1] >= 0xD800 && cp[start-1] <= 0xDBFF) --start;
     gData.cpbegin = cp;
     gData.cpend = cp + length;
     cp += start;
     gData.start = start;
     gData.skipped = 0;
+    gData.sticky = sticky;
 
     JS_InitArenaPool(&gData.pool, "RegExpPool", 8096, 4);
     x = InitMatch(cx, &gData, re);
@@ -3379,7 +4039,11 @@ js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
          * matches, an index property telling the length of the left context,
          * and an input property referring to the input string.
          */
-        obj = js_NewArrayObject(cx, 0, NULL);
+        if (global) {
+            proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+            if (!proto) { ok = JS_FALSE; goto out; }
+            obj = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+        } else obj = js_NewArrayObject(cx, 0, NULL);
         if (!obj) {
             ok = JS_FALSE;
             goto out;
@@ -3515,6 +4179,13 @@ out:
     return ok;
 }
 
+JSBool
+js_ExecuteRegExp(JSContext *cx, JSRegExp *re, JSString *str, size_t *indexp,
+                 JSBool test, jsval *rval)
+{
+    return ExecuteRegExp(cx, re, str, indexp, test, (re->flags & JSREG_STICKY) != 0, NULL, rval);
+}
+
 /************************************************************************/
 
 enum regexp_tinyid {
@@ -3522,7 +4193,9 @@ enum regexp_tinyid {
     REGEXP_GLOBAL       = -2,
     REGEXP_IGNORE_CASE  = -3,
     REGEXP_LAST_INDEX   = -4,
-    REGEXP_MULTILINE    = -5
+    REGEXP_MULTILINE    = -5,
+    REGEXP_STICKY       = -6,
+    REGEXP_UNICODE      = -7
 };
 
 #define REGEXP_PROP_ATTRS (JSPROP_PERMANENT|JSPROP_SHARED)
@@ -3533,6 +4206,7 @@ static JSPropertySpec regexp_props[] = {
     {"ignoreCase", REGEXP_IGNORE_CASE, REGEXP_PROP_ATTRS | JSPROP_READONLY,0,0},
     {"lastIndex",  REGEXP_LAST_INDEX,  REGEXP_PROP_ATTRS,0,0},
     {"multiline",  REGEXP_MULTILINE,   REGEXP_PROP_ATTRS | JSPROP_READONLY,0,0},
+    {"unicode",    REGEXP_UNICODE,     REGEXP_PROP_ATTRS | JSPROP_READONLY,0,0},
     {0,0,0,0,0}
 };
 
@@ -3564,6 +4238,9 @@ regexp_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
           case REGEXP_MULTILINE:
             *vp = BOOLEAN_TO_JSVAL((re->flags & JSREG_MULTILINE) != 0);
             break;
+          case REGEXP_UNICODE:
+            *vp = BOOLEAN_TO_JSVAL((re->flags & JSREG_UNICODE) != 0);
+            break;
         }
     }
     JS_UNLOCK_OBJ(cx, obj);
@@ -3576,6 +4253,221 @@ regexp_setProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
     /* ES5 stores lastIndex verbatim; exec performs ToInteger when using it. */
     return !JSVAL_IS_INT(id) || JSVAL_TO_INT(id) != REGEXP_LAST_INDEX ||
            JS_SetReservedSlot(cx, obj, 0, *vp);
+}
+
+/* An ES2015 RegExp prototype is an ordinary object, without a matcher. Its
+ * private class keeps the RegExp intrinsic cache key without giving it the
+ * legacy RegExp instance hooks or private-data layout. */
+static JSClass regexpPrototypeClass = {
+    "RegExp", JSCLASS_HAS_CACHED_PROTO(JSProto_RegExp),
+    JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+    JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+    JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+RegExpReceiverError(JSContext *cx, const char *name)
+{
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_INCOMPATIBLE_PROTO,
+                         "RegExp", name, "receiver");
+    return JS_FALSE;
+}
+
+static JSBool
+EscapeRegExpSource(JSContext *cx, JSString *source, jsval *rval)
+{
+    size_t i, j, amount, length = JSSTRING_LENGTH(source);
+    uintN pass;
+    JSBool escaped;
+    const char *replacement, *p;
+    jschar ch, *chars = NULL;
+    JSString *str;
+    if (!length) {
+        str = JS_NewStringCopyZ(cx, "(?:)");
+        if (!str) return JS_FALSE;
+        *rval = STRING_TO_JSVAL(str);
+        return JS_TRUE;
+    }
+    for (pass = 0; pass < 2; ++pass) {
+        j = 0; escaped = JS_FALSE;
+        for (i = 0; i < length; ++i) {
+            ch = JSSTRING_CHARS(source)[i];
+            replacement = ch == '\n' ? "\\n" : ch == '\r' ? "\\r" :
+                          ch == 0x2028 ? "\\u2028" : ch == 0x2029 ? "\\u2029" :
+                          ch == '/' && !escaped ? "\\/" : NULL;
+            if (replacement && escaped) ++replacement;
+            amount = replacement ? strlen(replacement) : 1;
+            if (amount > JSSTRING_LENGTH_MASK - j) {
+                JS_ReportOutOfMemory(cx); return JS_FALSE;
+            }
+            if (!pass) j += amount;
+            else if (replacement) {
+                for (p = replacement; *p; ++p) chars[j++] = (jschar)*p;
+            } else chars[j++] = ch;
+            escaped = ch == '\\' ? !escaped : JS_FALSE;
+        }
+        if (!pass) {
+            if (j >= ((size_t)-1) / sizeof(jschar)) {
+                JS_ReportOutOfMemory(cx); return JS_FALSE;
+            }
+            chars = (jschar *)JS_malloc(cx, (j + 1) * sizeof(jschar));
+            if (!chars) return JS_FALSE;
+        }
+    }
+    chars[j] = 0;
+    str = js_NewString(cx, chars, j, 0);
+    if (!str) { JS_free(cx, chars); return JS_FALSE; }
+    *rval = STRING_TO_JSVAL(str);
+    return JS_TRUE;
+}
+
+static JSBool
+ModernRegExpField(JSContext *cx, jsval *argv, jsint field, jsval *rval)
+{
+    JSObject *receiver;
+    JSRegExp *re;
+    uintN flags;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "accessor");
+    receiver = JSVAL_TO_OBJECT(argv[-1]);
+    /* ES2015 has no special case for the ordinary RegExp prototype.
+     * Its missing matcher slots must throw, unlike later editions. */
+    if (OBJ_GET_CLASS(cx, receiver) != &js_RegExpClass)
+        return RegExpReceiverError(cx, "accessor");
+    JS_LOCK_OBJ(cx, receiver);
+    re = (JSRegExp *)JS_GetPrivate(cx, receiver);
+    if (!re) {
+        JS_UNLOCK_OBJ(cx, receiver);
+        return RegExpReceiverError(cx, "accessor");
+    }
+    flags = re->flags;
+    if (field == REGEXP_SOURCE) *rval = STRING_TO_JSVAL(re->source);
+    JS_UNLOCK_OBJ(cx, receiver);
+    if (field == REGEXP_SOURCE)
+        return EscapeRegExpSource(cx, JSVAL_TO_STRING(*rval), rval);
+    *rval = BOOLEAN_TO_JSVAL((flags & (field == REGEXP_GLOBAL ? JSREG_GLOB :
+                         field == REGEXP_IGNORE_CASE ? JSREG_FOLD :
+                         field == REGEXP_UNICODE ? JSREG_UNICODE :
+                         field == REGEXP_STICKY ? JSREG_STICKY : JSREG_MULTILINE)) != 0);
+    return JS_TRUE;
+}
+#define REGEXP_FIELD_GETTER(name, field) \
+static JSBool name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) \
+{ return ModernRegExpField(cx, argv, field, rval); }
+REGEXP_FIELD_GETTER(regexp_sourceGetter, REGEXP_SOURCE)
+REGEXP_FIELD_GETTER(regexp_globalGetter, REGEXP_GLOBAL)
+REGEXP_FIELD_GETTER(regexp_ignoreCaseGetter, REGEXP_IGNORE_CASE)
+REGEXP_FIELD_GETTER(regexp_multilineGetter, REGEXP_MULTILINE)
+REGEXP_FIELD_GETTER(regexp_stickyGetter, REGEXP_STICKY)
+REGEXP_FIELD_GETTER(regexp_unicodeGetter, REGEXP_UNICODE)
+#undef REGEXP_FIELD_GETTER
+
+static JSBool
+regexp_flagsGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    static const char *names[] = {"global", "ignoreCase", "multiline", "unicode", "sticky"};
+    static const char letters[] = "gimuy";
+    jschar flags[5];
+    uintN i, length = 0;
+    JSBool boolean, ok = JS_FALSE;
+    JSTempValueRooter root;
+    JSString *str;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "flags");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_SINGLE_TEMP_ROOT(cx, JSVAL_VOID, &root);
+    for (i = 0; i < 5; ++i) {
+        if (!JS_GetProperty(cx, obj, names[i], &root.u.value) ||
+            !JS_ValueToBoolean(cx, root.u.value, &boolean)) goto out;
+        if (boolean) flags[length++] = letters[i];
+    }
+    str = JS_NewUCStringCopyN(cx, flags, length);
+    if (!str) goto out;
+    *rval = STRING_TO_JSVAL(str); ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+ModernRegExpString(JSContext *cx, jsval *argv, jsval *rval)
+{
+    JSObject *obj;
+    jsval roots[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *source, *flags, *str;
+    jschar *chars;
+    size_t sourceLength, flagsLength, length;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "toString");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    if (!JS_GetProperty(cx, obj, "source", &roots[0])) goto out;
+    source = js_ValueToString(cx, roots[0]);
+    if (!source) goto out;
+    roots[0] = STRING_TO_JSVAL(source);
+    if (!JS_GetProperty(cx, obj, "flags", &roots[1])) goto out;
+    flags = js_ValueToString(cx, roots[1]);
+    if (!flags) goto out;
+    roots[1] = STRING_TO_JSVAL(flags);
+    sourceLength = JSSTRING_LENGTH(source); flagsLength = JSSTRING_LENGTH(flags);
+    if (sourceLength > JSSTRING_LENGTH_MASK - 2 ||
+        flagsLength > JSSTRING_LENGTH_MASK - 2 - sourceLength) {
+        JS_ReportOutOfMemory(cx); goto out;
+    }
+    length = sourceLength + flagsLength + 2;
+    chars = (jschar *)JS_malloc(cx, (length + 1) * sizeof(jschar));
+    if (!chars) goto out;
+    chars[0] = '/';
+    js_strncpy(chars + 1, JSSTRING_CHARS(source), sourceLength);
+    chars[sourceLength + 1] = '/';
+    js_strncpy(chars + sourceLength + 2, JSSTRING_CHARS(flags), flagsLength);
+    chars[length] = 0;
+    str = js_NewString(cx, chars, length, 0);
+    if (!str) { JS_free(cx, chars); goto out; }
+    *rval = STRING_TO_JSVAL(str); ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+InitRegExpAccessors(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    static struct { const char *name; JSNative native; } getters[] = {
+        {"source", regexp_sourceGetter}, {"global", regexp_globalGetter},
+        {"ignoreCase", regexp_ignoreCaseGetter}, {"multiline", regexp_multilineGetter},
+        {"sticky", regexp_stickyGetter}, {"flags", regexp_flagsGetter},
+        {"unicode", regexp_unicodeGetter}
+    };
+    uintN i;
+    char name[32];
+    JSFunction *fun;
+    JSTempValueRooter root;
+    JSBool ok;
+    for (i = 0; i < sizeof(getters) / sizeof(getters[0]); ++i) {
+        JS_snprintf(name, sizeof(name), "get %s", getters[i].name);
+        fun = JS_NewFunction(cx, getters[i].native, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                             global, name);
+        if (!fun) return JS_FALSE;
+        JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+        ok = JS_DefineProperty(cx, proto, getters[i].name, JSVAL_VOID,
+                               (JSPropertyOp)fun->object, NULL, JSPROP_GETTER | JSPROP_SHARED);
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!ok) return JS_FALSE;
+    }
+    return JS_TRUE;
+}
+
+/* Different private-slot layouts prevent map sharing with the modern
+ * prototype, so provide its parent explicitly for native-created instances. */
+static JSObject *
+NewRegExpInstance(JSContext *cx, JSObject *parent)
+{
+    JSObject *proto;
+    if (!js_GetClassPrototype(cx, parent, INT_TO_JSID(JSProto_RegExp), &proto))
+        return NULL;
+    if (!parent && proto && OBJ_GET_CLASS(cx, proto) == &regexpPrototypeClass)
+        parent = OBJ_GET_PARENT(cx, proto);
+    return js_NewObject(cx, &js_RegExpClass, proto, parent);
 }
 
 /*
@@ -3659,6 +4551,12 @@ regexp_static_getProperty(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
         return JS_FALSE;
     *vp = STRING_TO_JSVAL(str);
     return JS_TRUE;
+}
+
+JSBool
+js_IsRegExpStaticPropertyHook(JSPropertyOp getter)
+{
+    return getter == regexp_static_getProperty;
 }
 
 static JSBool
@@ -3766,8 +4664,11 @@ regexp_xdrObject(JSXDRState *xdr, JSObject **objp)
 {
     JSRegExp *re;
     JSString *source;
-    uint32 flagsword;
+    uint32 flagsword, modernword;
     JSObject *obj;
+    jsval roots[2];
+    JSTempValueRooter tvr;
+    JSBool ok;
 
     if (xdr->mode == JSXDR_ENCODE) {
         re = (JSRegExp *) JS_GetPrivate(xdr->cx, *objp);
@@ -3775,25 +4676,45 @@ regexp_xdrObject(JSXDRState *xdr, JSObject **objp)
             return JS_FALSE;
         source = re->source;
         flagsword = ((uint32)re->cloneIndex << 16) | re->flags;
+        modernword = re->modern;
     }
     if (!JS_XDRString(xdr, &source) ||
-        !JS_XDRUint32(xdr, &flagsword)) {
+        !JS_XDRUint32(xdr, &flagsword) ||
+        !JS_XDRUint32(xdr, &modernword)) {
         return JS_FALSE;
     }
     if (xdr->mode == JSXDR_DECODE) {
-        obj = js_NewObject(xdr->cx, &js_RegExpClass, NULL, NULL);
-        if (!obj)
-            return JS_FALSE;
-        re = js_NewRegExp(xdr->cx, NULL, source, (uint16)flagsword, JS_FALSE);
-        if (!re)
-            return JS_FALSE;
-        if (!JS_SetPrivate(xdr->cx, obj, re) ||
-            !js_SetLastIndex(xdr->cx, obj, 0)) {
-            js_DestroyRegExp(xdr->cx, re);
+        if (modernword > 1) {
+            JS_ReportErrorNumber(xdr->cx, js_GetErrorMessage, NULL, JSMSG_BAD_SCRIPT_MAGIC);
             return JS_FALSE;
         }
+        /* Compilation can invoke the embedding's branch callback. Keep both
+         * the decoded source and the new instance live across that callback. */
+        roots[0] = STRING_TO_JSVAL(source);
+        roots[1] = JSVAL_NULL;
+        JS_PUSH_TEMP_ROOT(xdr->cx, 2, roots, &tvr);
+        ok = JS_FALSE;
+        obj = NewRegExpInstance(xdr->cx, NULL);
+        if (!obj)
+            goto done;
+        roots[1] = OBJECT_TO_JSVAL(obj);
+        re = NewRegExpWithEdition(xdr->cx, NULL, source, (uint16)flagsword,
+                                  JS_FALSE, modernword != 0);
+        if (!re)
+            goto done;
+        if (!JS_SetPrivate(xdr->cx, obj, re)) {
+            js_DestroyRegExp(xdr->cx, re);
+            goto done;
+        }
+        /* The object owns re once installed, including on failure below. */
+        if (!js_SetLastIndex(xdr->cx, obj, 0))
+            goto done;
         re->cloneIndex = (uint16)(flagsword >> 16);
         *objp = obj;
+        ok = JS_TRUE;
+      done:
+        JS_POP_TEMP_ROOT(xdr->cx, &tvr);
+        return ok;
     }
     return JS_TRUE;
 }
@@ -3840,6 +4761,8 @@ js_regexp_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     uintN flags;
     JSString *str;
 
+    if (argv && js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv)))
+        return ModernRegExpString(cx, argv, rval);
     if (!JS_InstanceOf(cx, obj, &js_RegExpClass, argv))
         return JS_FALSE;
     JS_LOCK_OBJ(cx, obj);
@@ -3876,6 +4799,9 @@ js_regexp_toString(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
             chars[length++] = 'i';
         if (re->flags & JSREG_MULTILINE)
             chars[length++] = 'm';
+        if (re->flags & JSREG_UNICODE) chars[length++] = 'u';
+        if (re->flags & JSREG_STICKY)
+            chars[length++] = 'y';
     }
     JS_UNLOCK_OBJ(cx, obj);
     chars[length] = 0;
@@ -3991,7 +4917,9 @@ regexp_compile(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         }
     }
 
-    re = js_NewRegExpOpt(cx, NULL, str, opt, JS_FALSE);
+    re = NewRegExpOpt(cx, NULL, str, opt, JS_FALSE,
+                      JS_VERSION_IS_ES2015(cx) ||
+                      (argv && js_IsModernGlobal(cx, js_BuiltinGlobal(cx, argv))));
 created:
     if (!re)
         return JS_FALSE;
@@ -4032,7 +4960,7 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
 
     /* NB: we must reach out: after this paragraph, in order to drop re. */
     HOLD_REGEXP(cx, re);
-    if (re->flags & JSREG_GLOB) {
+    if (re->flags & (JSREG_GLOB | JSREG_STICKY)) {
         ok = js_GetLastIndex(cx, obj, &lastIndex);
     } else {
         lastIndex = 0;
@@ -4042,7 +4970,8 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
         goto out;
 
     /* Now that obj is unlocked, it's safe to (potentially) grab the GC lock. */
-    if (argc == 0 && JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT) {
+    if (argc == 0 && JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT &&
+        !JS_VERSION_IS_ES2015(cx)) {
         str = cx->regExpStatics.pendingInput;
         if (!str) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -4069,7 +4998,7 @@ regexp_exec_sub(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     } else {
         i = (size_t) lastIndex;
         ok = js_ExecuteRegExp(cx, re, str, &i, test, rval);
-        if (ok && (re->flags & JSREG_GLOB))
+        if (ok && (re->flags & (JSREG_GLOB | JSREG_STICKY)))
             ok = js_SetLastIndex(cx, obj, (*rval == JSVAL_NULL) ? 0 : i);
     }
 
@@ -4091,6 +5020,697 @@ regexp_test(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         return JS_FALSE;
     if (*rval != JSVAL_TRUE)
         *rval = JSVAL_FALSE;
+    return JS_TRUE;
+}
+
+static JSBool SetRegExpIndexValue(JSContext *cx, JSObject *obj, jsval value);
+
+static JSBool
+RegExpBuiltinExec(JSContext *cx, JSObject *obj, JSString *str, JSObject *globalObject, jsval *rval)
+{
+    jsval values[3] = {STRING_TO_JSVAL(str), JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    jsdouble lastIndex;
+    JSBool global, sticky, ok = JS_FALSE;
+    JSRegExp *re = NULL;
+    size_t index;
+    if (OBJ_GET_CLASS(cx, obj) != &js_RegExpClass || !JS_GetPrivate(cx, obj))
+        return RegExpReceiverError(cx, "exec");
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!JS_GetProperty(cx, obj, "lastIndex", &values[1]) ||
+        !js_ValueToNumber(cx, values[1], &lastIndex)) goto out;
+    lastIndex = js_DoubleToInteger(lastIndex);
+    if (lastIndex < 0) lastIndex = 0;
+    else if (lastIndex > 9007199254740991.0) lastIndex = 9007199254740991.0;
+    if (!JS_GetProperty(cx, obj, "global", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &global) ||
+        !JS_GetProperty(cx, obj, "sticky", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &sticky)) goto out;
+    if (!global && !sticky) lastIndex = 0;
+    if (lastIndex > JSSTRING_LENGTH(str)) {
+        *rval = JSVAL_NULL;
+        ok = SetRegExpIndexValue(cx, obj, JSVAL_ZERO); goto out;
+    }
+    /* Snapshot the matcher only after user-visible conversions and gets. */
+    JS_LOCK_OBJ(cx, obj);
+    re = (JSRegExp *)JS_GetPrivate(cx, obj);
+    if (re) {
+        HOLD_REGEXP(cx, re);
+        values[2] = STRING_TO_JSVAL(re->source);
+    }
+    JS_UNLOCK_OBJ(cx, obj);
+    if (!re) { RegExpReceiverError(cx, "exec"); goto out; }
+    index = (size_t)lastIndex;
+    if (!ExecuteRegExp(cx, re, str, &index, JS_FALSE, sticky, globalObject, rval)) goto out;
+    if (*rval == JSVAL_NULL)
+        ok = SetRegExpIndexValue(cx, obj, JSVAL_ZERO);
+    else if (global || sticky)
+        ok = js_NewNumberValue(cx, index, &values[1]) &&
+             SetRegExpIndexValue(cx, obj, values[1]);
+    else ok = JS_TRUE;
+  out:
+    if (re) DROP_REGEXP(cx, re);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpModernExec(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "exec");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    if (OBJ_GET_CLASS(cx, obj) != &js_RegExpClass || !JS_GetPrivate(cx, obj))
+        return RegExpReceiverError(cx, "exec");
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(str);
+    return RegExpBuiltinExec(cx, obj, str, js_BuiltinGlobal(cx, argv), rval);
+}
+
+/* ES2015 RegExpExec preserves overridden exec methods and their receivers. */
+static JSBool
+RegExpExecMethod(JSContext *cx, JSObject *obj, JSString *str, jsval callee,
+                  jsval *rval)
+{
+    jsval values[4] = {callee, OBJECT_TO_JSVAL(obj), STRING_TO_JSVAL(str), JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    if (!JS_GetProperty(cx, obj, "exec", &values[3])) goto out;
+    if (js_IsCallable(cx, values[3])) {
+        if (!js_InternalCall(cx, obj, values[3], 1, &values[2], rval)) goto out;
+        if (!JSVAL_IS_OBJECT(*rval)) {
+            RegExpReceiverError(cx, "exec result"); goto out;
+        }
+        ok = JS_TRUE;
+    } else {
+        ok = RegExpBuiltinExec(cx, obj, str, js_BuiltinGlobal(cx, &values[2]), rval);
+    }
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+SetRegExpIndexValue(JSContext *cx, JSObject *obj, jsval value)
+{
+    JSAtom *atom;
+    JSTempValueRooter root;
+    JSBool ok;
+    JS_PUSH_TEMP_ROOT(cx, 1, &value, &root);
+    atom = js_Atomize(cx, "lastIndex", 9, 0);
+    ok = atom && js_SetPropertyOrThrow(cx, obj, ATOM_TO_JSID(atom), &value);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpModernTest(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    JSString *str;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "test");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_STRING(cx, str, &root);
+    ok = RegExpExecMethod(cx, obj, str, argv[-2], rval);
+    if (ok) *rval = BOOLEAN_TO_JSVAL(*rval != JSVAL_NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSymbolSearch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[3] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *str;
+    JSBool ok = JS_FALSE;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.search]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    if (!JS_GetProperty(cx, obj, "lastIndex", &values[1])) goto out;
+    if (!SetRegExpIndexValue(cx, obj, JSVAL_ZERO)) goto out;
+    if (!RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+    /* ES2015 restores the saved value after a successful RegExpExec call. */
+    if (!SetRegExpIndexValue(cx, obj, values[1])) goto out;
+    if (values[2] == JSVAL_NULL) {
+        *rval = INT_TO_JSVAL(-1); ok = JS_TRUE;
+    } else ok = JS_GetProperty(cx, JSVAL_TO_OBJECT(values[2]), "index", rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSymbolMatch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[5] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *str, *matched;
+    JSObject *global, *proto, *array;
+    JSBool isGlobal, unicode, ok = JS_FALSE;
+    jsdouble index;
+    jsuint n = 0;
+    jsid id;
+    const jschar *chars;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.match]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    if (!JS_GetProperty(cx, obj, "global", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &isGlobal)) goto out;
+    if (!isGlobal) {
+        ok = RegExpExecMethod(cx, obj, str, argv[-2], rval); goto out;
+    }
+    if (!JS_GetProperty(cx, obj, "unicode", &values[1]) ||
+        !js_ValueToBoolean(cx, values[1], &unicode) ||
+        !SetRegExpIndexValue(cx, obj, JSVAL_ZERO)) goto out;
+    global = js_BuiltinGlobal(cx, argv);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!proto) goto out;
+    array = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+    if (!array) goto out;
+    values[4] = OBJECT_TO_JSVAL(array);
+    for (;;) {
+        if (cx->branchCallback && (n & 127) == 0 && !cx->branchCallback(cx, NULL)) goto out;
+        if (!RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+        if (values[2] == JSVAL_NULL) {
+            *rval = n ? values[4] : JSVAL_NULL; ok = JS_TRUE; goto out;
+        }
+        if (!JS_GetElement(cx, JSVAL_TO_OBJECT(values[2]), 0, &values[3])) goto out;
+        matched = js_ValueToString(cx, values[3]);
+        if (!matched) goto out;
+        values[3] = STRING_TO_JSVAL(matched);
+        if (n == (jsuint)-1) { JS_ReportOutOfMemory(cx); goto out; }
+        if (!js_ArrayLikeIndex(cx, n, &id) ||
+            !OBJ_DEFINE_PROPERTY(cx, array, id, values[3], JS_PropertyStub,
+                                  JS_PropertyStub, JSPROP_ENUMERATE, NULL)) goto out;
+        ++n;
+        if (!JSSTRING_LENGTH(matched)) {
+            if (!JS_GetProperty(cx, obj, "lastIndex", &values[1]) ||
+                !js_ValueToNumber(cx, values[1], &index)) goto out;
+            index = js_DoubleToInteger(index);
+            if (index < 0) index = 0;
+            else if (index > 9007199254740991.0) index = 9007199254740991.0;
+            chars = JSSTRING_CHARS(str);
+            if (unicode && index + 1 < JSSTRING_LENGTH(str) &&
+                chars[(size_t)index] >= 0xd800 && chars[(size_t)index] <= 0xdbff &&
+                chars[(size_t)index + 1] >= 0xdc00 && chars[(size_t)index + 1] <= 0xdfff)
+                index += 2;
+            else index += 1;
+            if (!js_NewNumberValue(cx, index, &values[1]) ||
+                !SetRegExpIndexValue(cx, obj, values[1])) goto out;
+        }
+    }
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* RegExp index and capture counts use ToLength. */
+static JSBool
+RegExpToLength(JSContext *cx, jsval value, jsdouble *length)
+{
+    if (!js_ValueToNumber(cx, value, length)) return JS_FALSE;
+    *length = js_DoubleToInteger(*length);
+    if (*length < 0) *length = 0;
+    else if (*length > 9007199254740991.0) *length = 9007199254740991.0;
+    return JS_TRUE;
+}
+
+static jsdouble
+RegExpAdvanceIndex(JSString *str, jsdouble index, JSBool unicode)
+{
+    const jschar *chars = JSSTRING_CHARS(str);
+    if (unicode && index + 1 < JSSTRING_LENGTH(str) &&
+        chars[(size_t)index] >= 0xd800 && chars[(size_t)index] <= 0xdbff &&
+        chars[(size_t)index + 1] >= 0xdc00 && chars[(size_t)index + 1] <= 0xdfff)
+        return index + 2;
+    return index + 1;
+}
+
+static JSBool
+RegExpAppendElement(JSContext *cx, JSObject *array, jsdouble index, jsval value)
+{
+    jsid id;
+    if (index >= 4294967295.0) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
+    return js_ArrayLikeIndex(cx, index, &id) &&
+           OBJ_DEFINE_PROPERTY(cx, array, id, value, JS_PropertyStub,
+                               JS_PropertyStub, JSPROP_ENUMERATE, NULL);
+}
+
+static JSBool
+RegExpSymbolSplit(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[7] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID,
+                      JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global, *ctor, *proto, *splitter, *array;
+    JSString *str, *flags, *suffix, *sub;
+    JSBool unicode = JS_FALSE, sticky = JS_FALSE, ok = JS_FALSE;
+    jsdouble limit = 9007199254740991.0, p = 0, q = 0, e, count = 0, captures, i;
+    size_t size, j;
+    uint32 iterations = 0, limit32 = (uint32)-1;
+    jsid id;
+    jsval *base, *oldsp;
+    JSStackFrame *frame;
+    void *mark;
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.split]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 7, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    global = js_BuiltinGlobal(cx, argv);
+    if (!JS_GetProperty(cx, obj, "constructor", &values[1])) goto out;
+    if (!JSVAL_IS_VOID(values[1])) {
+        if (JSVAL_IS_PRIMITIVE(values[1])) { RegExpReceiverError(cx, "constructor"); goto out; }
+        if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id) ||
+            !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[1]), id, &values[1])) goto out;
+    }
+    if (JSVAL_IS_VOID(values[1]) || JSVAL_IS_NULL(values[1])) {
+        ctor = js_GetCachedClassObject(cx, global, JSProto_RegExp);
+        if (!ctor) {
+            if (!js_BuiltinPrototype(cx, global, JSProto_RegExp)) goto out;
+            ctor = js_GetCachedClassObject(cx, global, JSProto_RegExp);
+        }
+        if (!ctor) goto out;
+        values[1] = OBJECT_TO_JSVAL(ctor);
+    } else if (!js_IsConstructor(cx, values[1])) {
+        RegExpReceiverError(cx, "species constructor"); goto out;
+    }
+    if (!JS_GetProperty(cx, obj, "flags", &values[2])) goto out;
+    flags = js_ValueToString(cx, values[2]);
+    if (!flags) goto out;
+    values[2] = STRING_TO_JSVAL(flags);
+    for (j = 0; j < JSSTRING_LENGTH(flags); ++j) {
+        if (JSSTRING_CHARS(flags)[j] == 'u') unicode = JS_TRUE;
+        if (JSSTRING_CHARS(flags)[j] == 'y') sticky = JS_TRUE;
+    }
+    if (!sticky) {
+        suffix = JS_NewStringCopyZ(cx, "y");
+        if (!suffix) goto out;
+        values[3] = STRING_TO_JSVAL(suffix);
+        flags = js_ConcatStrings(cx, flags, suffix);
+        if (!flags) goto out;
+        values[2] = STRING_TO_JSVAL(flags);
+    }
+    base = js_AllocStack(cx, 4, &mark);
+    if (!base) goto out;
+    base[0] = values[1]; base[1] = JSVAL_NULL;
+    base[2] = argv[-1]; base[3] = values[2];
+    frame = cx->fp; oldsp = frame->sp; frame->sp = base + 4;
+    ok = js_InvokeConstructorWithNewTarget(cx, base, 2, JSVAL_TO_OBJECT(values[1]));
+    if (ok) values[3] = base[0];
+    frame->sp = oldsp; js_FreeStack(cx, mark);
+    if (!ok) goto out;
+    ok = JS_FALSE;
+    splitter = JSVAL_TO_OBJECT(values[3]);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!proto) goto out;
+    array = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+    if (!array) goto out;
+    values[4] = OBJECT_TO_JSVAL(array);
+    /* The pinned ES2015 corpus includes the corrected ToUint32 limit. */
+    if (!JSVAL_IS_VOID(argv[1])) {
+        if (!js_ValueToNumber(cx, argv[1], &limit) ||
+            !js_DoubleToECMAUint32(cx, limit, &limit32)) goto out;
+    }
+    limit = limit32;
+    size = JSSTRING_LENGTH(str);
+    if (!limit) goto done;
+    if (!size) {
+        if (!RegExpExecMethod(cx, splitter, str, argv[-2], &values[5])) goto out;
+        if (values[5] == JSVAL_NULL && !RegExpAppendElement(cx, array, 0, values[0])) goto out;
+        goto done;
+    }
+    while (q < size) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_NewNumberValue(cx, q, &values[6]) ||
+            !SetRegExpIndexValue(cx, splitter, values[6]) ||
+            !RegExpExecMethod(cx, splitter, str, argv[-2], &values[5])) goto out;
+        if (values[5] == JSVAL_NULL) { q = RegExpAdvanceIndex(str, q, unicode); continue; }
+        if (!JS_GetProperty(cx, splitter, "lastIndex", &values[6]) ||
+            !RegExpToLength(cx, values[6], &e)) goto out;
+        if (e == p) { q = RegExpAdvanceIndex(str, q, unicode); continue; }
+        sub = js_NewDependentString(cx, str, (size_t)p, (size_t)(q - p), 0);
+        if (!sub) goto out;
+        values[6] = STRING_TO_JSVAL(sub);
+        if (!RegExpAppendElement(cx, array, count++, values[6])) goto out;
+        if (count == limit) goto done;
+        p = e;
+        if (!js_ArrayLikeLength(cx, JSVAL_TO_OBJECT(values[5]), &captures)) goto out;
+        for (i = 1; i < captures; ++i) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, i, &id) ||
+                !OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(values[5]), id, &values[6]) ||
+                !RegExpAppendElement(cx, array, count++, values[6])) goto out;
+            if (count == limit) goto done;
+        }
+        q = p;
+    }
+    /* A custom exec may set an index beyond the string. Never form an
+     * out-of-bounds dependent string for the final empty suffix. */
+    if (p > size) p = size;
+    sub = js_NewDependentString(cx, str, (size_t)p, size - (size_t)p, 0);
+    if (!sub) goto out;
+    values[6] = STRING_TO_JSVAL(sub);
+    if (!RegExpAppendElement(cx, array, count, values[6])) goto out;
+  done:
+    *rval = values[4]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* A checked native buffer avoids quadratic concatenation of replacement parts. */
+typedef struct RegExpText {
+    jschar *chars;
+    size_t length, capacity;
+} RegExpText;
+
+static JSBool
+AppendRegExpText(JSContext *cx, RegExpText *text, const jschar *chars, size_t length)
+{
+    size_t needed, capacity;
+    jschar *newChars;
+    if (length > JSSTRING_LENGTH_MASK - text->length ||
+        text->length + length >= ((size_t)-1) / sizeof(jschar)) {
+        JS_ReportOutOfMemory(cx); return JS_FALSE;
+    }
+    needed = text->length + length + 1;
+    if (needed > text->capacity) {
+        capacity = text->capacity ? text->capacity : 64;
+        while (capacity < needed) {
+            if (capacity > ((size_t)-1) / sizeof(jschar) / 2) { capacity = needed; break; }
+            capacity *= 2;
+        }
+        newChars = (jschar *)JS_realloc(cx, text->chars, capacity * sizeof(jschar));
+        if (!newChars) return JS_FALSE;
+        text->chars = newChars; text->capacity = capacity;
+    }
+    if (length) memcpy(text->chars + text->length, chars, length * sizeof(jschar));
+    text->length += length; text->chars[text->length] = 0;
+    return JS_TRUE;
+}
+
+/* captures contains already-converted strings or undefined, starting at 0. */
+static JSBool
+RegExpSubstitution(JSContext *cx, RegExpText *text, JSString *matched, JSString *str,
+                    size_t position, JSObject *captures, jsdouble count, JSString *replacement)
+{
+    size_t i, length = JSSTRING_LENGTH(replacement), end, n, skip;
+    const jschar *chars = JSSTRING_CHARS(replacement), *piece;
+    JSString *capture;
+    jsval value = JSVAL_VOID;
+    JSTempValueRooter root;
+    JSBool ok = JS_FALSE;
+    uintN number, second;
+    JS_PUSH_TEMP_ROOT(cx, 1, &value, &root);
+    for (i = 0; i < length; i += skip) {
+        piece = chars + i; n = 1; skip = 1;
+        if (chars[i] == '$' && i + 1 < length) {
+            switch (chars[i + 1]) {
+              case '$': skip = 2; break;
+              case '&': piece = JSSTRING_CHARS(matched); n = JSSTRING_LENGTH(matched); skip = 2; break;
+              case '`': piece = JSSTRING_CHARS(str); n = position; skip = 2; break;
+              case '\'':
+                end = position + JSSTRING_LENGTH(matched);
+                if (end > JSSTRING_LENGTH(str)) end = JSSTRING_LENGTH(str);
+                piece = JSSTRING_CHARS(str) + end; n = JSSTRING_LENGTH(str) - end; skip = 2; break;
+              default:
+                if (chars[i + 1] >= '0' && chars[i + 1] <= '9') {
+                    number = chars[i + 1] - '0';
+                    if (i + 2 < length && chars[i + 2] >= '0' && chars[i + 2] <= '9') {
+                        second = number * 10 + chars[i + 2] - '0';
+                        if (second && second <= count) { number = second; skip = 3; }
+                    }
+                    if (number && number <= count) {
+                        if (skip == 1) skip = 2;
+                        if (!JS_GetElement(cx, captures, number - 1, &value)) goto out;
+                        if (JSVAL_IS_VOID(value)) n = 0;
+                        else {
+                            capture = JSVAL_TO_STRING(value);
+                            piece = JSSTRING_CHARS(capture); n = JSSTRING_LENGTH(capture);
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        if (!AppendRegExpText(cx, text, piece, n)) goto out;
+    }
+    ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSymbolReplace(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    jsval values[9] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID,
+                      JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *str, *replacement = NULL, *matched, *converted, *output;
+    JSObject *global, *proto, *results, *captures, *result;
+    JSBool functional, isGlobal, unicode = JS_FALSE, ok = JS_FALSE;
+    jsdouble index, length, count = 0, r, c;
+    size_t position, next = 0, size, matchLength;
+    uint32 iterations = 0;
+    jsid id;
+    jsval *args;
+    void *mark;
+    RegExpText text = {NULL, 0, 0}, substitution = {NULL, 0, 0};
+    if (JSVAL_IS_PRIMITIVE(argv[-1])) return RegExpReceiverError(cx, "[Symbol.replace]");
+    obj = JSVAL_TO_OBJECT(argv[-1]);
+    JS_PUSH_TEMP_ROOT(cx, 9, values, &root);
+    str = js_ValueToString(cx, argv[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str); size = JSSTRING_LENGTH(str);
+    functional = js_IsCallable(cx, argv[1]);
+    values[1] = argv[1];
+    if (!functional) {
+        replacement = js_ValueToString(cx, values[1]);
+        if (!replacement) goto out;
+        values[1] = STRING_TO_JSVAL(replacement);
+    }
+    if (!JS_GetProperty(cx, obj, "global", &values[2]) ||
+        !js_ValueToBoolean(cx, values[2], &isGlobal)) goto out;
+    if (isGlobal && (!JS_GetProperty(cx, obj, "unicode", &values[2]) ||
+        !js_ValueToBoolean(cx, values[2], &unicode) ||
+        !SetRegExpIndexValue(cx, obj, JSVAL_ZERO))) goto out;
+    global = js_BuiltinGlobal(cx, argv);
+    proto = js_BuiltinPrototype(cx, global, JSProto_Array);
+    if (!proto) goto out;
+    results = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+    if (!results) goto out;
+    values[3] = OBJECT_TO_JSVAL(results);
+    for (;;) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!RegExpExecMethod(cx, obj, str, argv[-2], &values[2])) goto out;
+        if (values[2] == JSVAL_NULL) break;
+        if (!RegExpAppendElement(cx, results, count++, values[2])) goto out;
+        if (!isGlobal) break;
+        if (!JS_GetElement(cx, JSVAL_TO_OBJECT(values[2]), 0, &values[4])) goto out;
+        matched = js_ValueToString(cx, values[4]);
+        if (!matched) goto out;
+        values[4] = STRING_TO_JSVAL(matched);
+        if (!JSSTRING_LENGTH(matched)) {
+            if (!JS_GetProperty(cx, obj, "lastIndex", &values[5]) ||
+                !RegExpToLength(cx, values[5], &index) ||
+                !js_NewNumberValue(cx, RegExpAdvanceIndex(str, index, unicode), &values[5]) ||
+                !SetRegExpIndexValue(cx, obj, values[5])) goto out;
+        }
+    }
+    for (r = 0; r < count; ++r) {
+        if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!js_ArrayLikeIndex(cx, r, &id) || !OBJ_GET_PROPERTY(cx, results, id, &values[2])) goto out;
+        result = JSVAL_TO_OBJECT(values[2]);
+        if (!js_ArrayLikeLength(cx, result, &length)) goto out;
+        if (length) --length;
+        if (!JS_GetElement(cx, result, 0, &values[4])) goto out;
+        matched = js_ValueToString(cx, values[4]);
+        if (!matched) goto out;
+        values[4] = STRING_TO_JSVAL(matched); matchLength = JSSTRING_LENGTH(matched);
+        if (!JS_GetProperty(cx, result, "index", &values[5]) ||
+            !js_ValueToNumber(cx, values[5], &index)) goto out;
+        index = js_DoubleToInteger(index);
+        if (index < 0) index = 0;
+        else if (index > size) index = (jsdouble)size;
+        position = (size_t)index;
+        captures = js_NewArrayObjectWithProto(cx, 0, NULL, proto, global);
+        if (!captures) goto out;
+        values[6] = OBJECT_TO_JSVAL(captures);
+        for (c = 0; c < length; ++c) {
+            if (cx->branchCallback && !(iterations++ & 127) && !cx->branchCallback(cx, NULL)) goto out;
+            if (!js_ArrayLikeIndex(cx, c + 1, &id) || !OBJ_GET_PROPERTY(cx, result, id, &values[7])) goto out;
+            if (!JSVAL_IS_VOID(values[7])) {
+                converted = js_ValueToString(cx, values[7]);
+                if (!converted) goto out;
+                values[7] = STRING_TO_JSVAL(converted);
+            }
+            if (!RegExpAppendElement(cx, captures, c, values[7])) goto out;
+        }
+        substitution.length = 0;
+        if (functional) {
+            if (length >= ARRAY_INIT_LIMIT - 3) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TOO_MANY_FUN_ARGS); goto out;
+            }
+            args = js_AllocStack(cx, (uintN)length + 3, &mark);
+            if (!args) goto out;
+            for (c = 0; c < length + 3; ++c) args[(uintN)c] = JSVAL_VOID;
+            args[0] = values[4];
+            for (c = 0; c < length; ++c) {
+                if (!JS_GetElement(cx, captures, (jsuint)c, &args[(uintN)c + 1])) break;
+            }
+            if (c == length && js_NewNumberValue(cx, position, &args[(uintN)length + 1])) {
+                args[(uintN)length + 2] = values[0];
+                ok = js_InternalInvokeValue(cx, JSVAL_VOID, values[1], 0, (uintN)length + 3, args, &values[8]);
+            }
+            js_FreeStack(cx, mark);
+            if (!ok) goto out;
+            ok = JS_FALSE;
+            converted = js_ValueToString(cx, values[8]);
+            if (!converted) goto out;
+            values[8] = STRING_TO_JSVAL(converted);
+            if (!AppendRegExpText(cx, &substitution, JSSTRING_CHARS(converted), JSSTRING_LENGTH(converted))) goto out;
+        } else if (!RegExpSubstitution(cx, &substitution, matched, str, position, captures, length, replacement)) goto out;
+        if (position >= next) {
+            if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(str) + next, position - next) ||
+                !AppendRegExpText(cx, &text, substitution.chars, substitution.length)) goto out;
+            next = position + matchLength;
+        }
+    }
+    if (next < size && !AppendRegExpText(cx, &text, JSSTRING_CHARS(str) + next, size - next)) goto out;
+    output = JS_NewUCStringCopyN(cx, text.chars ? text.chars : JSSTRING_CHARS(cx->runtime->emptyString), text.length);
+    if (!output) goto out;
+    *rval = STRING_TO_JSVAL(output); ok = JS_TRUE;
+  out:
+    JS_free(cx, text.chars); JS_free(cx, substitution.chars);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_StringReplaceES2015(JSContext *cx, jsval *argv, jsval *rval)
+{
+    jsval values[5] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    jsval args[3] = {argv[-1], argv[1], JSVAL_VOID};
+    JSTempValueRooter root;
+    JSObject *global = js_BuiltinGlobal(cx, argv), *obj;
+    JSProtoKey key;
+    JSString *str, *search, *replacement = NULL, *output;
+    jsid id;
+    size_t size, searchLength, position;
+    JSBool functional, ok = JS_FALSE;
+    RegExpText text = {NULL, 0, 0};
+    if (JSVAL_IS_NULL(argv[-1]) || JSVAL_IS_VOID(argv[-1])) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_OBJECT_REQUIRED);
+        return JS_FALSE;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 5, values, &root);
+    if (!js_WellKnownSymbolId(cx, JS_WKS_REPLACE, &id)) goto out;
+    if (!JSVAL_IS_NULL(argv[0]) && !JSVAL_IS_VOID(argv[0])) {
+        if (JSVAL_IS_PRIMITIVE(argv[0])) {
+            key = JSVAL_IS_SYMBOL(argv[0]) ? JSProto_Symbol :
+                  JSVAL_IS_STRING(argv[0]) ? JSProto_String :
+                  JSVAL_IS_BOOLEAN(argv[0]) ? JSProto_Boolean : JSProto_Number;
+            obj = js_BuiltinPrototype(cx, global, key);
+            if (!obj || !js_GetPropertyValue(cx, obj, argv[0], id, &values[3])) goto out;
+        } else if (!OBJ_GET_PROPERTY(cx, JSVAL_TO_OBJECT(argv[0]), id, &values[3])) goto out;
+        if (!JSVAL_IS_VOID(values[3]) && !JSVAL_IS_NULL(values[3])) {
+            if (!js_IsCallable(cx, values[3])) {
+                JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_NOT_FUNCTION, "replace symbol method");
+                goto out;
+            }
+            ok = js_InternalInvokeValue(cx, argv[0], values[3], 0, 2, args, rval);
+            goto out;
+        }
+    }
+    str = js_ValueToString(cx, argv[-1]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    search = js_ValueToString(cx, argv[0]);
+    if (!search) goto out;
+    values[1] = STRING_TO_JSVAL(search);
+    functional = js_IsCallable(cx, argv[1]); values[2] = argv[1];
+    if (!functional) {
+        replacement = js_ValueToString(cx, argv[1]);
+        if (!replacement) goto out;
+        values[2] = STRING_TO_JSVAL(replacement);
+    }
+    size = JSSTRING_LENGTH(str); searchLength = JSSTRING_LENGTH(search);
+    if (searchLength > size) { *rval = values[0]; ok = JS_TRUE; goto out; }
+    for (position = 0; position <= size - searchLength; ++position) {
+        if (cx->branchCallback && !(position & 127) && !cx->branchCallback(cx, NULL)) goto out;
+        if (!memcmp(JSSTRING_CHARS(str) + position, JSSTRING_CHARS(search), searchLength * sizeof(jschar))) break;
+    }
+    if (position > size - searchLength) { *rval = values[0]; ok = JS_TRUE; goto out; }
+    if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(str), position)) goto out;
+    if (functional) {
+        args[0] = values[1]; args[2] = values[0];
+        if (!js_NewNumberValue(cx, position, &values[4])) goto out;
+        args[1] = values[4];
+        if (!js_InternalInvokeValue(cx, JSVAL_VOID, values[2], 0, 3, args, &values[3])) goto out;
+        replacement = js_ValueToString(cx, values[3]);
+        if (!replacement) goto out;
+        values[3] = STRING_TO_JSVAL(replacement);
+        if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(replacement), JSSTRING_LENGTH(replacement))) goto out;
+    } else if (!RegExpSubstitution(cx, &text, search, str, position, NULL, 0, replacement)) goto out;
+    if (!AppendRegExpText(cx, &text, JSSTRING_CHARS(str) + position + searchLength,
+                          size - position - searchLength)) goto out;
+    output = JS_NewUCStringCopyN(cx, text.chars, text.length);
+    if (!output) goto out;
+    *rval = STRING_TO_JSVAL(output); ok = JS_TRUE;
+  out:
+    JS_free(cx, text.chars); JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+InitRegExpProtocols(JSContext *cx, JSObject *global, JSObject *proto)
+{
+    static struct { JSWellKnownSymbol symbol; const char *name; JSNative native; } methods[] = {
+        {JS_WKS_MATCH, "[Symbol.match]", RegExpSymbolMatch},
+        {JS_WKS_SEARCH, "[Symbol.search]", RegExpSymbolSearch},
+        {JS_WKS_SPLIT, "[Symbol.split]", RegExpSymbolSplit},
+        {JS_WKS_REPLACE, "[Symbol.replace]", RegExpSymbolReplace}
+    };
+    JSFunction *fun;
+    jsval value;
+    jsid id;
+    uintN i;
+    JSTempValueRooter root;
+    JSBool ok;
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); ++i) {
+        if (!js_WellKnownSymbolId(cx, methods[i].symbol, &id)) return JS_FALSE;
+        fun = JS_NewFunction(cx, methods[i].native, (methods[i].symbol == JS_WKS_SPLIT || methods[i].symbol == JS_WKS_REPLACE) ? 2 : 1, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                             global, methods[i].name);
+        if (!fun) return JS_FALSE;
+        JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+        ok = OBJ_DEFINE_PROPERTY(cx, proto, id, OBJECT_TO_JSVAL(fun->object),
+                                  JS_PropertyStub, JS_PropertyStub, 0, NULL);
+        JS_POP_TEMP_ROOT(cx, &root);
+        if (!ok) return JS_FALSE;
+    }
+    if (!JS_GetProperty(cx, proto, "test", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = RegExpModernTest;
+    fun->flags |= JSFUN_STRICT;
+    if (!JS_GetProperty(cx, proto, "exec", &value)) return JS_FALSE;
+    fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(value));
+    fun->u.n.native = RegExpModernExec;
+    fun->flags |= JSFUN_STRICT;
     return JS_TRUE;
 }
 
@@ -4122,7 +5742,7 @@ RegExp(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
         }
 
         /* Otherwise, replace obj with a new RegExp object. */
-        obj = js_NewObject(cx, &js_RegExpClass, NULL, NULL);
+        obj = NewRegExpInstance(cx, NULL);
         if (!obj)
             return JS_FALSE;
 
@@ -4132,7 +5752,160 @@ RegExp(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
          */
         *rval = OBJECT_TO_JSVAL(obj);
     }
-    return regexp_compile(cx, obj, argc, argv, rval);
+    if (!regexp_compile(cx, obj, argc, argv, rval)) return JS_FALSE;
+    if ((cx->fp->flags & JSFRAME_NEW_TARGET) && cx->fp->newTarget != cx->fp->callee)
+        return JS_DefinePropertyWithTinyId(cx, obj, "lastIndex", REGEXP_LAST_INDEX,
+                    JSVAL_ZERO, regexp_getProperty, regexp_setProperty, JSPROP_PERMANENT);
+    return JS_TRUE;
+}
+
+static JSString *
+RegExpFlagsString(JSContext *cx, uintN flags)
+{
+    jschar chars[5];
+    uintN length = 0;
+    if (flags & JSREG_GLOB) chars[length++] = 'g';
+    if (flags & JSREG_FOLD) chars[length++] = 'i';
+    if (flags & JSREG_MULTILINE) chars[length++] = 'm';
+    if (flags & JSREG_UNICODE) chars[length++] = 'u';
+    if (flags & JSREG_STICKY) chars[length++] = 'y';
+    return JS_NewUCStringCopyN(cx, chars, length);
+}
+
+static JSBool
+InitializeModernRegExp(JSContext *cx, JSObject *obj, jsval pattern, jsval flags,
+                       jsval *rval)
+{
+    jsval values[3] = {pattern, flags, OBJECT_TO_JSVAL(obj)};
+    JSTempValueRooter root;
+    JSString *str, *flagsString;
+    JSRegExp *re;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    if (!JS_DefinePropertyWithTinyId(cx, obj, "lastIndex", REGEXP_LAST_INDEX,
+                                     JSVAL_VOID, regexp_getProperty,
+                                     regexp_setProperty, JSPROP_PERMANENT)) goto out;
+    str = JSVAL_IS_VOID(values[0]) ? cx->runtime->emptyString : js_ValueToString(cx, values[0]);
+    if (!str) goto out;
+    values[0] = STRING_TO_JSVAL(str);
+    flagsString = JSVAL_IS_VOID(values[1]) ? cx->runtime->emptyString : js_ValueToString(cx, values[1]);
+    if (!flagsString) goto out;
+    values[1] = STRING_TO_JSVAL(flagsString);
+    re = NewRegExpOpt(cx, NULL, str, flagsString, JS_FALSE, JS_TRUE);
+    if (!re) goto out;
+    if (!JS_SetPrivate(cx, obj, re)) { js_DestroyRegExp(cx, re); goto out; }
+    if (!SetRegExpIndexValue(cx, obj, JSVAL_ZERO)) goto out;
+    *rval = values[2]; ok = JS_TRUE;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+/* RegExpCreate initializes a pattern directly; it does not perform the
+ * constructor's IsRegExp/identity/slot-copying steps. */
+JSBool
+js_RegExpCreate(JSContext *cx, JSObject *global, jsval pattern, jsval flags,
+                 jsval *rval)
+{
+    jsval values[3] = {pattern, flags, OBJECT_TO_JSVAL(global)};
+    JSTempValueRooter root;
+    JSObject *proto, *obj;
+    JSBool ok = JS_FALSE;
+    JS_PUSH_TEMP_ROOT(cx, 3, values, &root);
+    proto = js_BuiltinPrototype(cx, global, JSProto_RegExp);
+    if (!proto) goto out;
+    obj = js_NewObject(cx, &js_RegExpClass, proto, global);
+    if (obj) ok = InitializeModernRegExp(cx, obj, values[0], values[1], rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+JSBool
+js_ModernRegExpConstructor(JSContext *cx, JSObject *obj, uintN argc,
+                           jsval *argv, jsval *rval)
+{
+    jsval values[4] = {JSVAL_VOID, JSVAL_VOID, JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSBool isRegExp, constructing = (cx->fp->flags & JSFRAME_CONSTRUCTING) != 0;
+    JSBool ok = JS_FALSE;
+    JSObject *newTarget, *pattern, *global, *proto;
+    JSRegExp *re;
+    JSString *flagsString;
+    uintN flags;
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    if (!js_IsRegExp(cx, argv[0], &isRegExp)) goto out;
+    newTarget = constructing && cx->fp->newTarget
+                ? cx->fp->newTarget : JSVAL_TO_OBJECT(argv[-2]);
+    if (!constructing && isRegExp && JSVAL_IS_VOID(argv[1])) {
+        if (!JS_GetProperty(cx, JSVAL_TO_OBJECT(argv[0]), "constructor", &values[2])) goto out;
+        if (values[2] == OBJECT_TO_JSVAL(newTarget)) {
+            *rval = argv[0]; ok = JS_TRUE; goto out;
+        }
+    }
+    values[1] = argv[1];
+    if (!JSVAL_IS_PRIMITIVE(argv[0]) &&
+        OBJ_GET_CLASS(cx, JSVAL_TO_OBJECT(argv[0])) == &js_RegExpClass) {
+        pattern = JSVAL_TO_OBJECT(argv[0]);
+        JS_LOCK_OBJ(cx, pattern);
+        re = (JSRegExp *)JS_GetPrivate(cx, pattern);
+        if (!re) {
+            JS_UNLOCK_OBJ(cx, pattern);
+            RegExpReceiverError(cx, "constructor"); goto out;
+        }
+        values[0] = STRING_TO_JSVAL(re->source); flags = re->flags;
+        JS_UNLOCK_OBJ(cx, pattern);
+        if (JSVAL_IS_VOID(argv[1])) {
+            flagsString = RegExpFlagsString(cx, flags);
+            if (!flagsString) goto out;
+            values[1] = STRING_TO_JSVAL(flagsString);
+        }
+    } else if (isRegExp) {
+        pattern = JSVAL_TO_OBJECT(argv[0]);
+        if (!JS_GetProperty(cx, pattern, "source", &values[0])) goto out;
+        if (JSVAL_IS_VOID(argv[1]) && !JS_GetProperty(cx, pattern, "flags", &values[1])) goto out;
+    } else values[0] = argv[0];
+    if (!OBJ_GET_PROPERTY(cx, newTarget,
+                          ATOM_TO_JSID(cx->runtime->atomState.classPrototypeAtom), &values[2])) goto out;
+    global = js_BuiltinGlobal(cx, argv);
+    if (JSVAL_IS_PRIMITIVE(values[2])) {
+        global = js_ConstructorGlobal(cx, newTarget);
+        if (!global) goto out;
+        proto = js_BuiltinPrototype(cx, global, JSProto_RegExp);
+        if (!proto) goto out;
+        values[2] = OBJECT_TO_JSVAL(proto);
+    } else proto = JSVAL_TO_OBJECT(values[2]);
+    obj = js_NewObject(cx, &js_RegExpClass, proto, global);
+    if (!obj) goto out;
+    values[3] = OBJECT_TO_JSVAL(obj);
+    ok = InitializeModernRegExp(cx, obj, values[0], values[1], rval);
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
+}
+
+static JSBool
+RegExpSpecies(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+{
+    *rval = argv[-1]; return JS_TRUE;
+}
+
+static JSBool
+InitRegExpSpecies(JSContext *cx, JSObject *global, JSObject *ctor)
+{
+    jsid id;
+    JSFunction *fun;
+    JSTempValueRooter root;
+    JSBool ok;
+    if (!js_WellKnownSymbolId(cx, JS_WKS_SPECIES, &id)) return JS_FALSE;
+    fun = JS_NewFunction(cx, RegExpSpecies, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                         global, "get [Symbol.species]");
+    if (!fun) return JS_FALSE;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, fun->object, &root);
+    ok = OBJ_DEFINE_PROPERTY(cx, ctor, id, JSVAL_VOID, (JSPropertyOp)fun->object,
+                             NULL, JSPROP_GETTER | JSPROP_SHARED, NULL);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok;
 }
 
 JSObject *
@@ -4140,9 +5913,16 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
 {
     JSObject *proto, *ctor;
     jsval rval;
+    /* Lazy initialization can be triggered by a script of another edition.
+     * Follow the global's established policy, not that script's caller. */
+    JSBool modern = js_GetCachedClassObject(cx, obj, JSProto_Object)
+                    ? js_IsModernGlobal(cx, obj) : JS_VERSION_IS_ES2015(cx);
+    JSFunction *fun;
 
-    proto = JS_InitClass(cx, obj, NULL, &js_RegExpClass, RegExp, 2,
-                         regexp_props, regexp_methods,
+    proto = JS_InitClass(cx, obj, NULL,
+                         modern ? &regexpPrototypeClass : &js_RegExpClass,
+                         modern ? js_ModernRegExpConstructor : RegExp, 2,
+                         modern ? NULL : regexp_props, regexp_methods,
                          regexp_static_props, NULL);
 
     if (!proto || !(ctor = JS_GetConstructor(cx, proto)))
@@ -4159,7 +5939,20 @@ js_InitRegExpClass(JSContext *cx, JSObject *obj)
         goto bad;
     }
 
-    /* Give RegExp.prototype private data so it matches the empty string. */
+    if (modern) {
+        if (!JS_DefineFunction(cx, proto, "compile", regexp_compile, 2,
+                               JSFUN_NO_CONSTRUCT | JSFUN_REQUIRE_THIS))
+            goto bad;
+        fun = (JSFunction *)JS_GetPrivate(cx, ctor);
+        fun->clasp = &js_RegExpClass;
+        if (!InitRegExpAccessors(cx, obj, proto) ||
+            !JS_GetProperty(cx, proto, js_toString_str, &rval)) goto bad;
+        fun = (JSFunction *)JS_GetPrivate(cx, JSVAL_TO_OBJECT(rval));
+        fun->flags |= JSFUN_STRICT;
+        if (!InitRegExpProtocols(cx, obj, proto) || !InitRegExpSpecies(cx, obj, ctor)) goto bad;
+        return proto;
+    }
+    /* Give legacy RegExp.prototype private data so it matches the empty string. */
     if (!regexp_compile(cx, proto, 0, NULL, &rval))
         goto bad;
     return proto;
@@ -4187,7 +5980,7 @@ js_NewRegExpObject(JSContext *cx, JSTokenStream *ts,
         JS_POP_TEMP_ROOT(cx, &tvr);
         return NULL;
     }
-    obj = js_NewObject(cx, &js_RegExpClass, NULL, NULL);
+    obj = NewRegExpInstance(cx, NULL);
     if (!obj || !JS_SetPrivate(cx, obj, re)) {
         js_DestroyRegExp(cx, re);
         obj = NULL;
@@ -4203,17 +5996,24 @@ js_CloneRegExpObject(JSContext *cx, JSObject *obj, JSObject *parent)
 {
     JSObject *clone;
     JSRegExp *re;
+    JSTempValueRooter root;
 
     JS_ASSERT(OBJ_GET_CLASS(cx, obj) == &js_RegExpClass);
-    clone = js_NewObject(cx, &js_RegExpClass, NULL, parent);
+    clone = NewRegExpInstance(cx, parent);
     if (!clone)
         return NULL;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, clone, &root);
     re = JS_GetPrivate(cx, obj);
-    if (!JS_SetPrivate(cx, clone, re) || !js_SetLastIndex(cx, clone, 0)) {
-        cx->weakRoots.newborn[GCX_OBJECT] = NULL;
-        return NULL;
-    }
+    /* Once installed, the clone owns this reference even if subsequent
+     * initialization fails and the clone is later finalized. */
     HOLD_REGEXP(cx, re);
+    if (!JS_SetPrivate(cx, clone, re)) {
+        DROP_REGEXP(cx, re);
+        clone = NULL;
+    } else if (!js_SetLastIndex(cx, clone, 0)) {
+        clone = NULL;
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
     return clone;
 }
 
@@ -4238,7 +6038,23 @@ js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex)
 {
     jsval v;
     uintN attrs;
-    JSBool found;
+    JSBool found, own;
+    JSObject *global = obj, *parent;
+    JSObject *owner;
+    JSProperty *prop;
+    JSAtom *atom;
+    while ((parent = OBJ_GET_PARENT(cx, global)) != NULL) global = parent;
+    if (js_IsModernGlobal(cx, global)) {
+        atom = js_Atomize(cx, "lastIndex", 9, 0);
+        if (!atom || !js_LookupOwnProperty(cx, obj, ATOM_TO_JSID(atom), &owner, &prop))
+            return JS_FALSE;
+        own = prop != NULL && owner == obj;
+        if (prop) OBJ_DROP_PROPERTY(cx, owner, prop);
+        if (!own && !JS_DefinePropertyWithTinyId(cx, obj, "lastIndex", REGEXP_LAST_INDEX,
+                                               JSVAL_ZERO, regexp_getProperty,
+                                               regexp_setProperty, JSPROP_PERMANENT))
+            return JS_FALSE;
+    }
     if (!JS_GetPropertyAttributes(cx, obj, "lastIndex", &attrs, &found))
         return JS_FALSE;
     if (found && (attrs & JSPROP_READONLY)) {

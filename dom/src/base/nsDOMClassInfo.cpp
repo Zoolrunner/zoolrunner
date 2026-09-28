@@ -39,6 +39,7 @@
 
 #include "nscore.h"
 #include "nsDOMClassInfo.h"
+#include "nsDOMSelector.h"
 #include "nsCRT.h"
 #include "nsIServiceManager.h"
 #include "nsICategoryManager.h"
@@ -72,12 +73,14 @@
 #include "nsIDOM3Document.h"
 #include "nsIDOMXMLDocument.h"
 #include "nsIDOMNSDocument.h"
+#include "nsIDOMNSDocument2.h"
 #include "nsIDOMEvent.h"
 #include "nsIDOMNSEvent.h"
 #include "nsIDOMKeyEvent.h"
 #include "nsIDOMEventListener.h"
 #include "nsINodeInfo.h"
 #include "nsContentUtils.h"
+#include "nsHTMLAtoms.h"
 
 // Window scriptable helper includes
 #include "nsIDocShell.h"
@@ -113,7 +116,6 @@
 #include "nsIDOMDOMException.h"
 #include "nsIDOMNode.h"
 #include "nsIDOM3Node.h"
-#include "nsIDOMNodeSelector.h"
 #include "nsIDOMNodeList.h"
 #include "nsIDOMNamedNodeMap.h"
 #include "nsIDOMDOMStringList.h"
@@ -183,7 +185,6 @@
 #include "nsIFrame.h"
 #include "nsIPresShell.h"
 #include "nsIDOMViewCSS.h"
-#include "nsIDOMWindowCSS.h"
 #include "nsIDOMElement.h"
 #include "nsIDOMCSSStyleDeclaration.h"
 #include "nsIScriptGlobalObject.h"
@@ -1090,7 +1091,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
 
   NS_DEFINE_CLASSINFO_DATA(XMLHttpProgressEvent, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(XMLHttpRequest, nsDOMGCParticipantSH,
+  NS_DEFINE_CLASSINFO_DATA(XMLHttpRequest, nsXMLHttpRequestSH,
                            GCPARTICIPANT_SCRIPTABLE_FLAGS)
 
   // Define MOZ_SVG_FOREIGNOBJECT here so that when it gets switched on,
@@ -1199,6 +1200,9 @@ jsval nsDOMClassInfo::sAdd_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sAll_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sTags_id            = JSVAL_VOID;
 jsval nsDOMClassInfo::sAddEventListener_id= JSVAL_VOID;
+static jsval sXMLHttpRequestSend_id        = JSVAL_VOID;
+static jsval sElementQuerySelector_id      = JSVAL_VOID;
+static jsval sElementQuerySelectorAll_id   = JSVAL_VOID;
 
 const JSClass *nsDOMClassInfo::sObjectClass = nsnull;
 const JSClass *nsDOMClassInfo::sXPCNativeWrapperClass = nsnull;
@@ -1386,6 +1390,9 @@ nsDOMClassInfo::DefineStaticJSVals(JSContext *cx)
   SET_JSVAL_TO_STRING(sAll_id,             cx, "all");
   SET_JSVAL_TO_STRING(sTags_id,            cx, "tags");
   SET_JSVAL_TO_STRING(sAddEventListener_id,cx, "addEventListener");
+  SET_JSVAL_TO_STRING(sXMLHttpRequestSend_id, cx, "send");
+  SET_JSVAL_TO_STRING(sElementQuerySelector_id, cx, "querySelector");
+  SET_JSVAL_TO_STRING(sElementQuerySelectorAll_id, cx, "querySelectorAll");
 
   return NS_OK;
 }
@@ -1659,8 +1666,8 @@ nsDOMClassInfo::RegisterExternalClasses()
   }
 
 #define DOM_CLASSINFO_DOCUMENT_MAP_ENTRIES                                    \
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)                               \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocument)                                 \
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocument2)                                \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentEvent)                              \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentStyle)                              \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSDocumentStyle)                            \
@@ -1673,7 +1680,6 @@ nsDOMClassInfo::RegisterExternalClasses()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
 
 #define DOM_CLASSINFO_GENERIC_HTML_MAP_ENTRIES                                \
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)                               \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSHTMLElement_MOZILLA_1_8_BRANCH)           \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMElementCSSInlineStyle)                      \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)                                \
@@ -1751,7 +1757,6 @@ nsDOMClassInfo::Init()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMJSWindow)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMWindowInternal)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMWindowCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMViewCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMAbstractView)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageWindow)
@@ -1824,13 +1829,11 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(DocumentFragment, nsIDOMDocumentFragment)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentFragment)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(Element, nsIDOMElement)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMElement)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
@@ -2372,7 +2375,6 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_END_WITH_XPATH
 
   DOM_CLASSINFO_MAP_BEGIN(XULElement, nsIDOMXULElement)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMXULElement)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
@@ -2437,7 +2439,6 @@ nsDOMClassInfo::Init()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     // XXXjst: Do we want this on chrome windows?
     // DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageWindow)
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMWindowCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMViewCSS)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMAbstractView)
   DOM_CLASSINFO_MAP_END
@@ -2499,7 +2500,6 @@ nsDOMClassInfo::Init()
 
 #ifdef MOZ_SVG
 #define DOM_CLASSINFO_SVG_ELEMENT_MAP_ENTRIES \
-    DOM_CLASSINFO_MAP_ENTRY(nsIDOMNodeSelector) \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMSVGElement) \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
 
@@ -5402,6 +5402,58 @@ NS_DOMClassInfo_PreserveNodeWrapper(nsIXPConnectWrappedNative *aWrapper)
   return nsDOMClassInfo::PreserveNodeWrapper(aWrapper);
 }
 
+static nsresult
+ConsoleLogArguments(JSContext *cx, uintN argc, jsval *argv, uintN firstArg,
+                    const PRUnichar *prefix)
+{
+  nsCOMPtr<nsIConsoleService> consoleService =
+    do_GetService("@mozilla.org/consoleservice;1");
+  if (!consoleService) {
+    return NS_OK;
+  }
+
+  nsAutoString message(prefix);
+  for (uintN i = firstArg; i < argc; ++i) {
+    JSString *arg = ::JS_ValueToString(cx, argv[i]);
+    if (!arg) {
+      return NS_ERROR_FAILURE;
+    }
+    if (i != firstArg) {
+      message.Append(PRUnichar(' '));
+    }
+    message.Append(nsDependentString(::JS_GetStringChars(arg),
+                                     ::JS_GetStringLength(arg)));
+  }
+
+  return consoleService->LogStringMessage(message.get());
+}
+
+static JSBool JS_DLL_CALLBACK
+ConsoleAssert(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+              jsval *rval)
+{
+  JSBool condition = JS_FALSE;
+  *rval = JSVAL_VOID;
+  if (argc && !::JS_ValueToBoolean(cx, argv[0], &condition)) {
+    return JS_FALSE;
+  }
+  if (condition) {
+    return JS_TRUE;
+  }
+
+  return NS_SUCCEEDED(ConsoleLogArguments(cx, argc, argv, argc ? 1 : 0,
+                                           NS_LITERAL_STRING("Assertion failed: ").get()));
+}
+
+static JSBool JS_DLL_CALLBACK
+ConsoleLog(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+           jsval *rval)
+{
+  *rval = JSVAL_VOID;
+  return NS_SUCCEEDED(ConsoleLogArguments(cx, argc, argv, 0,
+                                           NS_LITERAL_STRING("").get()));
+}
+
 // static
 nsresult
 nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
@@ -5411,6 +5463,26 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
   *did_resolve = PR_FALSE;
 
   extern nsScriptNameSpaceManager *gNameSpaceManager;
+
+  // The classic Error Console collects engine diagnostics, but web pages also
+  // expect the common window.console methods used by diagnostics and tests.
+  if (::JS_GetStringLength(str) == 7 &&
+      !memcmp(::JS_GetStringChars(str), NS_LITERAL_STRING("console").get(),
+              7 * sizeof(jschar))) {
+    JSObject *console = ::JS_DefineObject(cx, obj, "console", nsnull,
+                                          nsnull, JSPROP_ENUMERATE);
+    if (!console ||
+        !::JS_DefineFunction(cx, console, "assert", ConsoleAssert, 1, 0) ||
+        !::JS_DefineFunction(cx, console, "log", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "info", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "warn", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "error", ConsoleLog, 0, 0) ||
+        !::JS_DefineFunction(cx, console, "debug", ConsoleLog, 0, 0)) {
+      return NS_ERROR_FAILURE;
+    }
+    *did_resolve = PR_TRUE;
+    return NS_OK;
+  }
 
   NS_ENSURE_TRUE(gNameSpaceManager, NS_ERROR_NOT_INITIALIZED);
 
@@ -5825,6 +5897,76 @@ ContentWindowGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
   return ::JS_GetProperty(cx, obj, "content", rval);
 }
 
+// CSSOM makes the pseudo-element argument optional in JavaScript, while this
+// historical XPIDL method still requires two arguments.
+JSBool JS_DLL_CALLBACK
+nsWindowSH::GetComputedStyle(JSContext *cx, JSObject *obj, uintN argc,
+                             jsval *argv, jsval *rval)
+{
+  if (argc < 1) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
+    return JS_FALSE;
+  }
+  if (JSVAL_IS_PRIMITIVE(argv[0])) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_WRONG_TYPE_ERR);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXPConnectWrappedNative> windowWrapper;
+  nsresult rv = sXPConnect->GetWrappedNativeOfJSObject(
+    cx, obj, getter_AddRefs(windowWrapper));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIDOMViewCSS> view(do_QueryWrappedNative(windowWrapper));
+  if (!view) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXPConnectWrappedNative> elementWrapper;
+  rv = sXPConnect->GetWrappedNativeOfJSObject(
+    cx, JSVAL_TO_OBJECT(argv[0]), getter_AddRefs(elementWrapper));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIDOMElement> element(do_QueryWrappedNative(elementWrapper));
+  if (!element) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_WRONG_TYPE_ERR);
+    return JS_FALSE;
+  }
+
+  nsAutoString pseudo;
+  if (argc > 1 && !JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
+    JSString *str = JS_ValueToString(cx, argv[1]);
+    if (!str) return JS_FALSE;
+    pseudo.Assign(nsDependentString(JS_GetStringChars(str),
+                                    JS_GetStringLength(str)));
+  }
+
+  nsCOMPtr<nsIDOMCSSStyleDeclaration> style;
+  rv = view->GetComputedStyle(element, pseudo, getter_AddRefs(style));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  if (!style) {
+    *rval = JSVAL_NULL;
+    return JS_TRUE;
+  }
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  rv = nsDOMClassInfo::WrapNative(cx, obj, style,
+                                  NS_GET_IID(nsIDOMCSSStyleDeclaration), rval,
+                                  getter_AddRefs(holder));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
 NS_IMETHODIMP
 nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                        JSObject *obj, jsval id, PRUint32 flags,
@@ -5893,6 +6035,23 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 #ifdef DEBUG_SH_FORWARDING
       printf(" --- Forwarding resolve to inner window %p\n", (void *)innerWin);
 #endif
+
+      // Resolve this CSSOM method on the inner global before the inherited
+      // XPIDL declaration is found. Its native interface requires two args,
+      // but the JavaScript API permits the pseudo-element argument to be
+      // omitted.
+      if (!(flags & JSRESOLVE_ASSIGNING) && JSVAL_IS_STRING(id) &&
+          JS_GetStringLength(JSVAL_TO_STRING(id)) == 16 &&
+          !memcmp(JS_GetStringChars(JSVAL_TO_STRING(id)),
+                  NS_LITERAL_STRING("getComputedStyle").get(),
+                  16 * sizeof(jschar))) {
+        JSFunction *fn = ::JS_DefineFunction(
+          cx, innerObj, "getComputedStyle", nsWindowSH::GetComputedStyle, 2,
+          JSPROP_ENUMERATE);
+        if (!fn) return NS_ERROR_FAILURE;
+        *objp = innerObj;
+        return NS_OK;
+      }
 
       jsid interned_id;
       JSObject *pobj;
@@ -6019,6 +6178,19 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     // The context is not yet initialized so there's nothing we can do
     // here yet.
 
+    return NS_OK;
+  }
+
+  if (!(flags & JSRESOLVE_ASSIGNING) && !ObjectIsNativeWrapper(cx, obj) &&
+      JS_GetStringLength(JSVAL_TO_STRING(id)) == 16 &&
+      !memcmp(JS_GetStringChars(JSVAL_TO_STRING(id)),
+              NS_LITERAL_STRING("getComputedStyle").get(),
+              16 * sizeof(jschar))) {
+    JSFunction *fn = ::JS_DefineFunction(cx, obj, "getComputedStyle",
+                                         nsWindowSH::GetComputedStyle, 2,
+                                         JSPROP_ENUMERATE);
+    if (!fn) return NS_ERROR_FAILURE;
+    *objp = obj;
     return NS_OK;
   }
 
@@ -6755,7 +6927,7 @@ JSBool JS_DLL_CALLBACK
 nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
                                           uintN argc, jsval *argv, jsval *rval)
 {
-  if (argc < 2) {
+  if (argc < 2 || argc > 4) {
     ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
 
     return JS_FALSE;
@@ -6810,24 +6982,22 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     return JS_FALSE;
   }
 
+  if (JSVAL_IS_PRIMITIVE(argv[1])) {
+    // The second argument must be a function, or a
+    // nsIDOMEventListener. Throw an error.
+    ThrowJSException(cx, NS_ERROR_XPC_BAD_CONVERT_JS);
+
+    return JS_FALSE;
+  }
+
   JSString* jsstr = JS_ValueToString(cx, argv[0]);
   if (!jsstr) {
-    // Preserve exceptions thrown by the type's string conversion.
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_OUT_OF_MEMORY);
+
     return JS_FALSE;
   }
 
-  // Keep the converted type alive while wrapping a listener can collect.
-  argv[0] = STRING_TO_JSVAL(jsstr);
   nsDependentJSString type(jsstr);
-
-  if (JSVAL_IS_NULL(argv[1]) || JSVAL_IS_VOID(argv[1])) {
-    *rval = JSVAL_VOID;
-    return JS_TRUE;
-  }
-  if (JSVAL_IS_PRIMITIVE(argv[1])) {
-    ThrowJSException(cx, NS_ERROR_XPC_BAD_CONVERT_JS);
-    return JS_FALSE;
-  }
 
   nsCOMPtr<nsIDOMEventListener> listener;
 
@@ -6845,11 +7015,11 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
   }
 
   JSBool useCapture = JS_FALSE;
-  if (argc > 2 && !JS_ValueToBoolean(cx, argv[2], &useCapture)) {
+  if (argc >= 3 && !JS_ValueToBoolean(cx, argv[2], &useCapture)) {
     return JS_FALSE;
   }
 
-  if (argc >= 4) {
+  if (argc == 4) {
     JSBool wantsUntrusted;
     if (!JS_ValueToBoolean(cx, argv[3], &wantsUntrusted)) {
       return JS_FALSE;
@@ -6960,8 +7130,7 @@ nsEventReceiverSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
 
   if (id == sAddEventListener_id && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *str = JSVAL_TO_STRING(id);
-    // The capture argument defaults to false. Keep the historical fourth
-    // wantsUntrusted argument for privileged Mozilla applications.
+    // The capture flag is optional, as in the DOM event-target API.
     JSFunction *fnc =
       ::JS_DefineFunction(cx, obj, ::JS_GetStringBytes(str),
                           AddEventListenerHelper, 2, JSPROP_ENUMERATE);
@@ -7012,6 +7181,69 @@ nsEventReceiverSH::AddProperty(nsIXPConnectWrappedNative *wrapper,
 
 // DOMGCParticipant helper
 
+JSBool JS_DLL_CALLBACK
+nsXMLHttpRequestSH::Send(JSContext *cx, JSObject *obj, uintN argc,
+                         jsval *argv, jsval *rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsresult rv = nsDOMClassInfo::sXPConnect->GetWrappedNativeOfJSObject(
+    cx, obj, getter_AddRefs(wrapper));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  if (NS_FAILED(nsDOMClassInfo::sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, sXMLHttpRequestSend_id,
+        nsIXPCSecurityManager::ACCESS_GET_PROPERTY)) ||
+      NS_FAILED(nsDOMClassInfo::sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, sXMLHttpRequestSend_id,
+        nsIXPCSecurityManager::ACCESS_CALL_METHOD))) {
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXMLHttpRequest> request(do_QueryWrappedNative(wrapper, &rv));
+  if (NS_FAILED(rv) || !request) {
+    nsDOMClassInfo::ThrowJSException(cx,
+      NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIVariant> body;
+  if (argc && NS_FAILED(rv = nsDOMClassInfo::sXPConnect->JSToVariant(cx, argv[0],
+                                                      getter_AddRefs(body)))) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  rv = request->Send(body);
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+NS_IMETHODIMP
+nsXMLHttpRequestSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
+                               JSContext *cx, JSObject *obj, jsval id,
+                               PRUint32 flags, JSObject **objp,
+                               PRBool *_retval)
+{
+  if (id == sXMLHttpRequestSend_id && !(flags & JSRESOLVE_ASSIGNING)) {
+    JSFunction *fnc = JS_DefineFunction(cx, obj, "send",
+                                        nsXMLHttpRequestSH::Send, 0,
+                                        JSPROP_ENUMERATE);
+    *objp = obj;
+    return fnc ? NS_OK : NS_ERROR_UNEXPECTED;
+  }
+
+  return nsDOMGCParticipantSH::NewResolve(wrapper, cx, obj, id, flags, objp,
+                                           _retval);
+}
+
 NS_IMETHODIMP
 nsDOMGCParticipantSH::Finalize(nsIXPConnectWrappedNative *wrapper,
                                JSContext *cx, JSObject *obj)
@@ -7034,6 +7266,489 @@ nsDOMGCParticipantSH::Mark(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 
 
 // Element helper
+
+// classList is implemented as a live DOMTokenList-like object here because
+// this branch predates generated WebIDL bindings. Keep the backing element
+// alive for as long as script retains the token list.
+struct DOMTokenListData {
+  nsCOMPtr<nsIContent> mElement;
+};
+
+static JSBool DOMTokenListGetTokens(JSContext *cx, JSObject *obj,
+                                    nsTArray<nsString>& tokens)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) return JS_FALSE;
+
+  nsAutoString value;
+  data->mElement->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value);
+  PRUint32 i = 0, length = value.Length();
+  while (i < length) {
+    while (i < length && (value[i] == ' ' || value[i] == '\t' ||
+           value[i] == '\n' || value[i] == '\r' || value[i] == '\f')) ++i;
+    PRUint32 start = i;
+    while (i < length && value[i] != ' ' && value[i] != '\t' &&
+           value[i] != '\n' && value[i] != '\r' && value[i] != '\f') ++i;
+    if (i > start) {
+      nsAutoString token(Substring(value, start, i - start));
+      if (tokens.IndexOf(token) == nsTArray<nsString>::NoIndex)
+        tokens.AppendElement(token);
+    }
+  }
+  return JS_TRUE;
+}
+
+static nsresult DOMTokenListSetTokens(JSContext *cx, JSObject *obj,
+                                      nsTArray<nsString>& tokens)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  NS_ENSURE_TRUE(data && data->mElement, NS_ERROR_UNEXPECTED);
+  nsAutoString value;
+  for (PRUint32 i = 0; i < tokens.Length(); ++i) {
+    if (i) value.Append(PRUnichar(' '));
+    value.Append(tokens[i]);
+  }
+  data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value, PR_TRUE);
+  return NS_OK;
+}
+
+static JSBool DOMTokenListValidate(JSContext *cx, JSString *str,
+                                   nsString& token)
+{
+  if (!str) return JS_FALSE;
+  token.Assign(nsDependentString(JS_GetStringChars(str),
+                                 JS_GetStringLength(str)));
+  if (token.IsEmpty()) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SYNTAX_ERR);
+    return JS_FALSE;
+  }
+  for (PRUint32 i = 0; i < token.Length(); ++i) {
+    if (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' ||
+        token[i] == '\r' || token[i] == '\f') {
+      nsDOMClassInfo::ThrowJSException(cx,
+                                      NS_ERROR_DOM_INVALID_CHARACTER_ERR);
+      return JS_FALSE;
+    }
+  }
+  return JS_TRUE;
+}
+
+static void JS_DLL_CALLBACK
+DOMTokenListFinalize(JSContext *cx, JSObject *obj)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  delete data;
+}
+
+static JSBool DOMTokenListValueGetter(JSContext *cx, JSObject *obj,
+                                      jsval id, jsval *vp)
+{
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) return JS_FALSE;
+  nsAutoString value;
+  data->mElement->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value);
+  JSString *str = JS_NewUCStringCopyN(cx,
+    NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
+  if (!str) return JS_FALSE;
+  *vp = STRING_TO_JSVAL(str);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListToString(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval)
+{
+  return DOMTokenListValueGetter(cx, obj, JSVAL_VOID, rval);
+}
+
+static JSBool DOMTokenListValueSetter(JSContext *cx, JSObject *obj,
+                                      jsval id, jsval *vp)
+{
+  JSString *str = JS_ValueToString(cx, *vp);
+  if (!str) return JS_FALSE;
+  DOMTokenListData *data =
+    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) return JS_FALSE;
+  nsDependentString value(JS_GetStringChars(str), JS_GetStringLength(str));
+  data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value, PR_TRUE);
+  *vp = STRING_TO_JSVAL(str);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListLengthGetter(JSContext *cx, JSObject *obj,
+                                       jsval id, jsval *vp)
+{
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  *vp = INT_TO_JSVAL(tokens.Length());
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListItem(JSContext *cx, JSObject *obj, uintN argc,
+                               jsval *argv, jsval *rval)
+{
+  uint32 index = 0;
+  if (argc && !JS_ValueToECMAUint32(cx, argv[0], &index)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  if (index >= tokens.Length()) { *rval = JSVAL_NULL; return JS_TRUE; }
+  JSString *str = JS_NewUCStringCopyN(cx,
+    NS_REINTERPRET_CAST(const jschar *, tokens[index].get()),
+    tokens[index].Length());
+  if (!str) return JS_FALSE;
+  *rval = STRING_TO_JSVAL(str);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListContains(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval)
+{
+  if (!argc) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  JSString *str = JS_ValueToString(cx, argv[0]);
+  nsString token;
+  if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  *rval = BOOLEAN_TO_JSVAL(tokens.IndexOf(token) !=
+                           nsTArray<nsString>::NoIndex);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListMutate(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval, PRBool add)
+{
+  nsTArray<nsString> requested;
+  for (uintN i = 0; i < argc; ++i) {
+    JSString *str = JS_ValueToString(cx, argv[i]);
+    nsString token;
+    if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+    if (requested.IndexOf(token) == nsTArray<nsString>::NoIndex)
+      requested.AppendElement(token);
+  }
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  PRBool changed = PR_FALSE;
+  for (PRUint32 i = 0; i < requested.Length(); ++i) {
+    PRInt32 at = tokens.IndexOf(requested[i]);
+    if (add && at < 0) { tokens.AppendElement(requested[i]); changed = PR_TRUE; }
+    if (!add && at >= 0) { tokens.RemoveElementAt(at); changed = PR_TRUE; }
+  }
+  if (changed) {
+    nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+    if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  }
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListAdd(JSContext *cx, JSObject *obj, uintN argc,
+                              jsval *argv, jsval *rval)
+{ return DOMTokenListMutate(cx, obj, argc, argv, rval, PR_TRUE); }
+
+static JSBool DOMTokenListRemove(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval)
+{ return DOMTokenListMutate(cx, obj, argc, argv, rval, PR_FALSE); }
+
+static JSBool DOMTokenListToggle(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval)
+{
+  if (!argc) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  JSString *str = JS_ValueToString(cx, argv[0]);
+  nsString token;
+  if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  PRInt32 at = tokens.IndexOf(token);
+  PRBool force = argc > 1, present = at >= 0;
+  if (!force || JSVAL_IS_VOID(argv[1])) {
+    if (present) tokens.RemoveElementAt(at);
+    else tokens.AppendElement(token);
+    present = !present;
+  } else {
+    JSBool wanted;
+    if (!JS_ValueToBoolean(cx, argv[1], &wanted)) return JS_FALSE;
+    if (wanted && !present) { tokens.AppendElement(token); present = PR_TRUE; }
+    if (!wanted && present) { tokens.RemoveElementAt(at); present = PR_FALSE; }
+  }
+  nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  *rval = BOOLEAN_TO_JSVAL(present);
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListReplace(JSContext *cx, JSObject *obj, uintN argc,
+                                  jsval *argv, jsval *rval)
+{
+  if (argc < 2) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  JSString *oldStr = JS_ValueToString(cx, argv[0]);
+  JSString *newStr = JS_ValueToString(cx, argv[1]);
+  nsString oldToken, newToken;
+  if (!DOMTokenListValidate(cx, oldStr, oldToken) ||
+      !DOMTokenListValidate(cx, newStr, newToken)) return JS_FALSE;
+  nsTArray<nsString> tokens;
+  if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
+  PRInt32 at = tokens.IndexOf(oldToken);
+  if (at < 0) { *rval = JSVAL_FALSE; return JS_TRUE; }
+  PRInt32 duplicate = tokens.IndexOf(newToken);
+  if (duplicate >= 0 && duplicate != at) tokens.RemoveElementAt(duplicate);
+  at = tokens.IndexOf(oldToken);
+  tokens[at] = newToken;
+  nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  *rval = JSVAL_TRUE;
+  return JS_TRUE;
+}
+
+static JSBool DOMTokenListSupports(JSContext *cx, JSObject *obj, uintN argc,
+                                   jsval *argv, jsval *rval)
+{
+  JS_ReportError(cx, "classList does not define supported tokens");
+  return JS_FALSE;
+}
+
+static JSFunctionSpec sDOMTokenListFunctions[] = {
+  { "item", DOMTokenListItem, 1, 0, 0 },
+  { "contains", DOMTokenListContains, 1, 0, 0 },
+  { "add", DOMTokenListAdd, 1, 0, 0 },
+  { "remove", DOMTokenListRemove, 1, 0, 0 },
+  { "toggle", DOMTokenListToggle, 1, 0, 0 },
+  { "replace", DOMTokenListReplace, 2, 0, 0 },
+  { "supports", DOMTokenListSupports, 1, 0, 0 },
+  { "toString", DOMTokenListToString, 0, 0, 0 },
+  { 0, 0, 0, 0, 0 }
+};
+
+static JSClass sDOMTokenListClass = {
+  "DOMTokenList", JSCLASS_HAS_PRIVATE,
+  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, DOMTokenListFinalize
+};
+
+// Expose HTML data-* attributes through the string-valued dataset properties
+// used by classic applications such as TodoMVC. This is a snapshot object;
+// reads of attributes present when dataset is first accessed are supported.
+static JSObject *
+DOMCreateDataset(JSContext *cx, JSObject *parent, nsIContent *content)
+{
+  JSObject *dataset = JS_NewObject(cx, nsnull, nsnull, parent);
+  if (!dataset) return nsnull;
+
+  PRUint32 count = content->GetAttrCount();
+  for (PRUint32 i = 0; i < count; ++i) {
+    PRInt32 nameSpace;
+    nsCOMPtr<nsIAtom> nameAtom;
+    nsCOMPtr<nsIAtom> prefixAtom;
+    if (NS_FAILED(content->GetAttrNameAt(i, &nameSpace,
+                                          getter_AddRefs(nameAtom),
+                                          getter_AddRefs(prefixAtom))) ||
+        nameSpace != kNameSpaceID_None || !nameAtom) {
+      continue;
+    }
+
+    nsAutoString attrName;
+    nameAtom->ToString(attrName);
+    if (attrName.Length() <= 5 ||
+        !Substring(attrName, 0, 5).Equals(NS_LITERAL_STRING("data-"))) {
+      continue;
+    }
+
+    nsAutoString propertyName;
+    PRBool uppercaseNext = PR_FALSE;
+    for (PRUint32 j = 5; j < attrName.Length(); ++j) {
+      PRUnichar ch = attrName[j];
+      if (ch == '-' && j + 1 < attrName.Length() &&
+          attrName[j + 1] >= 'a' && attrName[j + 1] <= 'z') {
+        uppercaseNext = PR_TRUE;
+        continue;
+      }
+      if (uppercaseNext) {
+        ch = ch - ('a' - 'A');
+        uppercaseNext = PR_FALSE;
+      }
+      propertyName.Append(ch);
+    }
+    if (propertyName.IsEmpty()) continue;
+
+    nsAutoString value;
+    content->GetAttr(kNameSpaceID_None, nameAtom, value);
+    JSString *jsValue = JS_NewUCStringCopyN(
+      cx, NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
+    if (!jsValue ||
+        !JS_DefineUCProperty(cx, dataset,
+          NS_REINTERPRET_CAST(const jschar *, propertyName.get()),
+          propertyName.Length(), STRING_TO_JSVAL(jsValue), nsnull, nsnull,
+          JSPROP_ENUMERATE)) {
+      return nsnull;
+    }
+  }
+
+  return dataset;
+}
+
+NS_IMETHODIMP
+nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
+                        JSObject *obj, jsval id, PRUint32 flags,
+                        JSObject **objp, PRBool *_retval)
+{
+  if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
+    JSString *name = JSVAL_TO_STRING(id);
+    JSBool querySelectorAll =
+      JS_GetStringLength(name) == 16 &&
+      !memcmp(JS_GetStringChars(name),
+              NS_LITERAL_STRING("querySelectorAll").get(), 16 * sizeof(jschar));
+    JSBool querySelector =
+      JS_GetStringLength(name) == 13 &&
+      !memcmp(JS_GetStringChars(name),
+              NS_LITERAL_STRING("querySelector").get(), 13 * sizeof(jschar));
+    if (querySelector || querySelectorAll) {
+      JSBool all = querySelectorAll;
+      JSFunction *fnc = JS_DefineFunction(cx, obj,
+          all ? "querySelectorAll" : "querySelector",
+          all ? QuerySelectorAll : QuerySelector, 1, JSPROP_ENUMERATE);
+      *objp = obj;
+      return fnc ? NS_OK : NS_ERROR_UNEXPECTED;
+    }
+    if (JS_GetStringLength(name) == 7 &&
+        !memcmp(JS_GetStringChars(name), NS_LITERAL_STRING("dataset").get(), 7 * sizeof(jschar))) {
+      nsresult rv = nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp,
+                                         _retval);
+      NS_ENSURE_SUCCESS(rv, rv);
+      if (!*_retval || ObjectIsNativeWrapper(cx, obj)) return NS_OK;
+
+      nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper));
+      NS_ENSURE_TRUE(content, NS_ERROR_UNEXPECTED);
+      JSObject *dataset = DOMCreateDataset(cx, JS_GetParent(cx, obj), content);
+      if (!dataset) return NS_ERROR_OUT_OF_MEMORY;
+      if (!JS_DefineProperty(cx, obj, "dataset", OBJECT_TO_JSVAL(dataset),
+                             nsnull, nsnull, JSPROP_ENUMERATE | JSPROP_READONLY))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
+    if (JS_GetStringLength(name) == 9 &&
+        !memcmp(JS_GetStringChars(name), NS_LITERAL_STRING("classList").get(), 9 * sizeof(jschar))) {
+      // Respect the normal element wrapper's security and cross-origin checks.
+      nsresult rv = nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp,
+                                         _retval);
+      NS_ENSURE_SUCCESS(rv, rv);
+      if (!*_retval) return NS_OK;
+      if (ObjectIsNativeWrapper(cx, obj)) return NS_OK;
+
+      nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper));
+      NS_ENSURE_TRUE(content, NS_ERROR_UNEXPECTED);
+      JSObject *list = JS_NewObject(cx, &sDOMTokenListClass, nsnull,
+                                    JS_GetParent(cx, obj));
+      if (!list) return NS_ERROR_OUT_OF_MEMORY;
+      DOMTokenListData *data = new DOMTokenListData();
+      if (!data) return NS_ERROR_OUT_OF_MEMORY;
+      data->mElement = content;
+      if (!JS_SetPrivate(cx, list, data) ||
+          !JS_DefineFunctions(cx, list, sDOMTokenListFunctions) ||
+          !JS_DefineUCProperty(cx, list,
+              NS_REINTERPRET_CAST(const jschar *, NS_LITERAL_STRING("value").get()),
+              5, JSVAL_VOID, DOMTokenListValueGetter, DOMTokenListValueSetter,
+              JSPROP_ENUMERATE | JSPROP_SHARED) ||
+          !JS_DefineUCProperty(cx, list,
+              NS_REINTERPRET_CAST(const jschar *, NS_LITERAL_STRING("length").get()),
+              6, JSVAL_VOID, DOMTokenListLengthGetter, nsnull,
+              JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_READONLY)) {
+        if (JS_GetPrivate(cx, list) != data) delete data;
+        return NS_ERROR_FAILURE;
+      }
+      if (!JS_DefineProperty(cx, obj, "classList", OBJECT_TO_JSVAL(list),
+                             nsnull, nsnull, JSPROP_ENUMERATE | JSPROP_READONLY))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
+  }
+  return nsNodeSH::NewResolve(wrapper, cx, obj, id, flags, objp, _retval);
+}
+
+JSBool JS_DLL_CALLBACK
+nsElementSH::QuerySelector(JSContext *cx, JSObject *obj, uintN argc,
+                           jsval *argv, jsval *rval)
+{
+  return QuerySelectorHelper(cx, obj, argc, argv, rval, PR_FALSE);
+}
+
+JSBool JS_DLL_CALLBACK
+nsElementSH::QuerySelectorAll(JSContext *cx, JSObject *obj, uintN argc,
+                              jsval *argv, jsval *rval)
+{
+  return QuerySelectorHelper(cx, obj, argc, argv, rval, PR_TRUE);
+}
+
+JSBool
+nsElementSH::QuerySelectorHelper(JSContext *cx, JSObject *obj, uintN argc,
+                                 jsval *argv, jsval *rval, PRBool all)
+{
+  jsval method = all ? sElementQuerySelectorAll_id :
+                       sElementQuerySelector_id;
+  if (NS_FAILED(sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, method,
+        nsIXPCSecurityManager::ACCESS_GET_PROPERTY)) ||
+      NS_FAILED(sSecMan->CheckPropertyAccess(
+        cx, obj, JS_GET_CLASS(cx, obj)->name, method,
+        nsIXPCSecurityManager::ACCESS_CALL_METHOD))) {
+    return JS_FALSE;
+  }
+
+  if (!argc) {
+    ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
+    return JS_FALSE;
+  }
+
+  JSString *selector = JS_ValueToString(cx, argv[0]);
+  if (!selector) return JS_FALSE;
+  nsDependentJSString selectors(selector);
+
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsresult rv = sXPConnect->GetWrappedNativeOfJSObject(
+    cx, obj, getter_AddRefs(wrapper));
+  if (NS_FAILED(rv)) {
+    ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper, &rv));
+  if (NS_FAILED(rv) || !content) {
+    ThrowJSException(cx, NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  if (all) {
+    nsCOMPtr<nsIDOMNodeList> matches;
+    rv = NS_QuerySelectorAll(content, PR_FALSE, selectors,
+                             getter_AddRefs(matches));
+    if (NS_SUCCEEDED(rv)) {
+      rv = WrapNative(cx, obj, matches, NS_GET_IID(nsIDOMNodeList), rval,
+                      getter_AddRefs(holder));
+    }
+  } else {
+    nsCOMPtr<nsIDOMElement> match;
+    rv = NS_QuerySelector(content, PR_FALSE, selectors,
+                          getter_AddRefs(match));
+    if (NS_SUCCEEDED(rv)) {
+      if (match) {
+        rv = WrapNative(cx, obj, match, NS_GET_IID(nsIDOMElement), rval,
+                        getter_AddRefs(holder));
+      } else {
+        *rval = JSVAL_NULL;
+      }
+    }
+  }
+
+  if (NS_FAILED(rv)) {
+    ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
 
 NS_IMETHODIMP
 nsElementSH::PostCreate(nsIXPConnectWrappedNative *wrapper, JSContext *cx,

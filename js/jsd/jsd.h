@@ -642,6 +642,9 @@ extern JSTrapStatus JS_DLL_CALLBACK
 jsd_ThrowHandler(JSContext *cx, JSScript *script, jsbytecode *pc,
                  jsval *rval, void *closure);
 
+extern void
+jsd_SyncCallHooks(JSDContext *jsdc);
+
 extern JSBool
 jsd_SetFunctionHook(JSDContext*      jsdc,
                     JSD_CallHookProc hook,

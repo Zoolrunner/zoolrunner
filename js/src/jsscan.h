@@ -139,6 +139,17 @@ typedef enum JSTokenType {
     TOK_BODY = 84,                      /* synthetic body of function with
                                            destructuring formal parameters */
     TOK_RESERVED,                       /* reserved keywords */
+    TOK_ELLIPSIS,                       /* ES2015 rest/spread punctuator */
+    TOK_ARROW,                          /* ES2015 => punctuator */
+    TOK_COMPUTED_NAME,                  /* computed object property parse node */
+    TOK_TEMPLATE_HEAD,                  /* template segment ending in ${ */
+    TOK_TEMPLATE_TAIL,                  /* template segment ending in ` */
+    TOK_TEMPLATE,                       /* template expression AST list */
+    TOK_TEMPLATE_OBJECT,                /* tagged-template record */
+    TOK_TEMPLATE_SEGMENT,               /* cooked/raw AST atom pair */
+    TOK_FOROFVALUE,                     /* internal for-of binding RHS */
+    TOK_CLASS, TOK_EXTENDS, TOK_SUPER_CALL,
+    TOK_SUPER,                         /* ES2015 method super reference */
     TOK_LIMIT                           /* domain size */
 } JSTokenType;
 
@@ -198,6 +209,7 @@ struct JSTokenPos {
 struct JSToken {
     JSTokenType         type;           /* char value or above enumerator */
     uintN               flags;          /* lexical facts retained by lookahead */
+    size_t              sourceBegin, sourceEnd; /* normalized source offsets */
     JSTokenPos          pos;            /* token position in file */
     jschar              *ptr;           /* beginning of token in line buffer */
     union {
@@ -237,10 +249,14 @@ struct JSTokenStream {
     uintN               ungetpos;       /* next free char slot in ungetbuf */
     jschar              ungetbuf[6];    /* at most 6, for \uXXXX lookahead */
     uintN               flags;          /* flags -- see below */
+    jschar              lineTerminator; /* original linebuf terminator */
     ptrdiff_t           linelen;        /* physical linebuf segment length */
     ptrdiff_t           linepos;        /* linebuf offset in physical line */
     JSTokenBuf          linebuf;        /* line buffer for diagnostics */
     JSTokenBuf          userbuf;        /* user input buffer if !file */
+    JSStringBuffer      sourcebuf;      /* ES2015 source for class decompilation */
+    size_t              sourceCursor;
+    JSBool              retainSource;
     JSStringBuffer      tokenbuf;       /* current token string buffer */
     const char          *filename;      /* input filename or null */
     FILE                *file;          /* stdio stream if reading from file */
@@ -259,6 +275,14 @@ struct JSTokenStream {
 #define TOKF_OCTAL      0x01            /* legacy numeric literal or escape */
 #define TOKF_PAREN  0x04 /* parenthesized literal is not a directive */
 #define TOKF_ESCAPE 0x02 /* raw string contains an escape or continuation */
+#define TOKF_GENERATOR_METHOD 0x08
+#define TOKF_METHOD 0x10
+#define TOKF_DERIVED_CONSTRUCTOR 0x20
+#define TSF_NEW_TARGET_ALLOWED 0x100000 /* enclosing non-arrow function */
+#define TSF_MODULE     0x80000        /* Module source-text lexical goal */
+#define TSF_SUPER_CALL_ALLOWED 0x40000
+#define TSF_SUPER_ALLOWED 0x20000
+#define TSF_GENERATOR 0x10000
 #define TSF_STRICT_MODE 0x8000          /* ES5 strict lexical grammar */
 
 #define TSF_ERROR       0x01            /* fatal error while compiling */
@@ -375,6 +399,9 @@ js_PeekTokenSameLine(JSContext *cx, JSTokenStream *ts);
 /*
  * Get the next token from ts.
  */
+extern JSTokenType
+js_GetTemplateContinuation(JSContext *cx, JSTokenStream *ts);
+
 extern JSTokenType
 js_GetToken(JSContext *cx, JSTokenStream *ts);
 

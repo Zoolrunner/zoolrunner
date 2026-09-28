@@ -105,6 +105,12 @@ JS_PROTO(StopIteration,         27,     js_InitIteratorClasses)
 JS_PROTO(UnusedProto28,         28,     js_InitNullClass)
 JS_PROTO(File,                  29,     FILE_INIT)
 JS_PROTO(Block,                 30,     js_InitBlockClass)
+JS_PROTO(Symbol,                31,     js_InitSymbolClass)
+JS_PROTO(Map,                   32,     js_InitMapClass)
+JS_PROTO(Set,                   33,     js_InitSetClass)
+JS_PROTO(WeakMap,               34,     js_InitWeakMapClass)
+JS_PROTO(WeakSet,               35,     js_InitWeakSetClass)
+JS_PROTO(Reflect,               36,     js_InitReflectClass)
 
 #undef SCRIPT_INIT
 #undef XML_INIT
@@ -114,3 +120,16 @@ JS_PROTO(Block,                 30,     js_InitBlockClass)
 #undef ATTRIBUTE_INIT
 #undef GENERATOR_INIT
 #undef FILE_INIT
+JS_PROTO(Proxy,                 37,     js_InitProxyClass)
+JS_PROTO(ArrayBuffer,           38,     js_InitArrayBufferClass)
+JS_PROTO(DataView,              39,     js_InitDataViewClass)
+JS_PROTO(Promise,               40,     js_InitPromiseClass)
+JS_PROTO(Int8Array, 41, js_InitInt8ArrayClass)
+JS_PROTO(Uint8Array, 42, js_InitUint8ArrayClass)
+JS_PROTO(Uint8ClampedArray, 43, js_InitUint8ClampedArrayClass)
+JS_PROTO(Int16Array, 44, js_InitInt16ArrayClass)
+JS_PROTO(Uint16Array, 45, js_InitUint16ArrayClass)
+JS_PROTO(Int32Array, 46, js_InitInt32ArrayClass)
+JS_PROTO(Uint32Array, 47, js_InitUint32ArrayClass)
+JS_PROTO(Float32Array, 48, js_InitFloat32ArrayClass)
+JS_PROTO(Float64Array, 49, js_InitFloat64ArrayClass)

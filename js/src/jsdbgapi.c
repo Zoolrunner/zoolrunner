@@ -878,6 +878,12 @@ JS_IsNativeFrame(JSContext *cx, JSStackFrame *fp)
     return !fp->script;
 }
 
+JS_PUBLIC_API(JSBool)
+JS_IsJobFrame(JSContext *cx, JSStackFrame *fp)
+{
+    return (fp->flags & JSFRAME_JOB) != 0;
+}
+
 /* this is deprecated, use JS_GetFrameScopeChain instead */
 JS_PUBLIC_API(JSObject *)
 JS_GetFrameObject(JSContext *cx, JSStackFrame *fp)
@@ -1350,6 +1356,8 @@ JS_GetFunctionTotalSize(JSContext *cx, JSFunction *fun)
         nbytes += JS_GetScriptTotalSize(cx, fun->u.i.script);
     if (fun->atom)
         nbytes += GetAtomTotalSize(cx, fun->atom);
+    if (fun->inferredName)
+        nbytes += GetAtomTotalSize(cx, fun->inferredName);
     return nbytes;
 }
 

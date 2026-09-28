@@ -89,7 +89,6 @@
 #include "nsIBoxObject.h"
 #include "nsPIBoxObject.h"
 #include "nsIDOMNSDocument.h"
-#include "nsNodeSelector.h"
 
 #include "nsLayoutAtoms.h"
 #include "nsHTMLAtoms.h"
@@ -3700,8 +3699,6 @@ nsGenericElement::RemoveChild(nsIDOMNode *aOldChild, nsIDOMNode **aReturn)
 // nsISupports implementation
 
 NS_INTERFACE_MAP_BEGIN(nsGenericElement)
-  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMNodeSelector,
-    new nsNodeSelector(NS_STATIC_CAST(nsIContent*, this)))
   NS_INTERFACE_MAP_ENTRY(nsIContent)
   NS_INTERFACE_MAP_ENTRY(nsIStyledContent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMGCParticipant)

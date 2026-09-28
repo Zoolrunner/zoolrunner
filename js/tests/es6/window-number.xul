@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="ES6 Number window test" onload="setTimeout(run, 1000)">
+  <browser id="content" type="content" src="chrome://es6window/content/window-content.html"/>
+  <script><![CDATA[
+var checks = 0, failures = 0;
+function check(value, label) {
+    ++checks;
+    if (!value) ++failures;
+    dump((value ? "PASS " : "FAIL ") + label + "\n");
+}
+function checkWindow(w, label) {
+    w = w.wrappedJSObject || w;
+    var N = w.Number, O = w.Object;
+    check(N.isNaN(N.NaN) && !N.isNaN("NaN"), label + " isNaN");
+    check(N.isFinite(1) && !N.isFinite(new N(1)), label + " isFinite");
+    check(N.isInteger(9007199254740992) && !N.isInteger(1.5), label + " isInteger");
+    check(N.isSafeInteger(N.MAX_SAFE_INTEGER) && !N.isSafeInteger(9007199254740992),
+          label + " isSafeInteger");
+    var d = O.getOwnPropertyDescriptor(N, "EPSILON");
+    check(d.value === 2.220446049250313e-16 && !d.writable && !d.configurable,
+          label + " constant descriptor");
+    check(w.isFinite("1") && w.isNaN(undefined), label + " global coercion");
+    check(O.getPrototypeOf(N) === w.Function.prototype && N.prototype.constructor === N,
+          label + " constructor chain");
+}
+function run() {
+    try {
+        checkWindow(window, "chrome");
+        checkWindow(document.getElementById("content").contentWindow, "content");
+        // This legacy setter syntax remains valid in an unversioned XUL script.
+        var legacy = {set value() { this.saved = arguments[0]; }};
+        legacy.value = 42;
+        check(legacy.saved === 42, "legacy XUL setter");
+    } catch (e) { check(false, String(e)); }
+    dump("ES6-WINDOW checks=" + checks + " failures=" + failures + "\n");
+    Components.classes["@mozilla.org/toolkit/app-startup;1"]
+        .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+  ]]></script>
+</window>
