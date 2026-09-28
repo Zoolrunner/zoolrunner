@@ -11,6 +11,13 @@ XULRunner. All four x86 Suite configurations pass the complete local workflow;
 the full sixteen-entry x86 application matrix remains unverified. The additional LoongArch Calendar and Xlib
 application profiles have not been runtime-tested on this host.
 
+The native LoongArch GCC profiles also preserve `-flifetime-dse=1` and
+`-fno-strict-aliasing`. A GCC 15 Suite lifecycle run exposed an invalid frame
+style context during Venkman startup without these settings. Validation of
+the corrected profiles is tracked in the
+[Speedometer work notes](../../layout/html/tests/speedometer21/README.md);
+the flags alone do not establish a passing application matrix.
+
 ```sh
 docker build --platform linux/amd64 -f build/linux/oraclelinux8.Dockerfile \
   -t zoolrunner-oraclelinux8-gcc14 build/linux

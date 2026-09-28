@@ -37,5 +37,7 @@ ac_add_options --enable-canvas
 ac_add_options --disable-javaxpcom
 
 CFLAGS="-std=gnu89 -fcommon -Wno-implicit-int -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types"
-CXXFLAGS="-fcommon -fpermissive"
+# Frame arenas zero storage before construction; nsCOMPtr output parameters
+# also require the historical aliasing rules (as on the other GCC targets).
+CXXFLAGS="-fcommon -fpermissive -flifetime-dse=1 -fno-strict-aliasing"
 export CFLAGS CXXFLAGS
