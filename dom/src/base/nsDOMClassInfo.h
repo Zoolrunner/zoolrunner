@@ -559,6 +559,8 @@ protected:
                                 PRBool *did_resolve);
 
 public:
+  NS_IMETHOD Mark(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
+                   JSObject* obj, void* arg, PRUint32* retval);
   static JSBool JS_DLL_CALLBACK GetComputedStyle(JSContext *cx, JSObject *obj,
                                                   uintN argc, jsval *argv,
                                                   jsval *rval);

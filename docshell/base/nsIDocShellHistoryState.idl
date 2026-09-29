@@ -1,0 +1,16 @@
+/* Additive same-document History API integration. MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsISupports.idl"
+interface nsISHEntry;
+interface nsIDOMDocument;
+interface nsIURI;
+
+[uuid(4dfe3b57-6f67-44a5-9abd-d8b5d0cddf25)]
+interface nsIDocShellHistoryState : nsISupports
+{
+  readonly attribute nsISHEntry historyStateEntry;
+  // aDocument identifies the document checked before argument conversion and
+  // serialization. Revalidate it here before mutating any history or URI.
+  void updateHistoryState(in nsIDOMDocument aDocument,
+                          in nsISupports aSerializedState,
+                          in nsIURI aURI, in boolean aReplace);
+};

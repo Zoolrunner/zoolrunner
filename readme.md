@@ -1195,8 +1195,9 @@ see the [layout probes](layout/html/tests/style/README-probes.md).
 CSSStyleDeclaration.setProperty now supplies the optional priority in JavaScript
 while preserving its historical native interface. Its CSSOM parser replaces
 priorities correctly and rejects embedded declaration delimiters atomically.
-The final Speedometer UI also requires History.pushState, which is still being
-implemented; 480 successful workload checks alone are not a complete run.
+The final Speedometer UI now passes its synthetic callback diagnostic with
+native History state bindings. A fresh complete run is pending; 480 successful
+workload checks alone were not a complete run.
 
 History-state work now includes an immutable native graph serializer, preserving
 cycles and shared binary buffers without retaining source windows. Its 63
@@ -1204,3 +1205,9 @@ focused native checks pass on both LoongArch Suite backends, and the engine
 passes the full pinned ES5.1 and ES2015 runs. This is a foundation for the
 unfinished History API, not a claim of complete structured serialization;
 see the [ES2015 test guide](js/tests/es6/README.md).
+
+Native History pushState/replaceState/state bindings pass 120 HTTP assertions
+and 24 Suite lifecycle checks on both LoongArch GTK2 and Xlib. Same-document
+traversal and popstate are still pending; the
+[Speedometer notes](layout/html/tests/speedometer21/README.md) separate these
+partial results from complete benchmark and application validation.

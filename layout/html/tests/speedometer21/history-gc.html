@@ -1,0 +1,27 @@
+<!doctype html><title>History state garbage collection</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+a+' expected='+b);}
+function collect(then){testGCDone=false;testRequestGC=true;setTimeout(function wait(){if(!testGCDone){setTimeout(wait,30);return;}try{then();}catch(e){check(String(e),'no exception','after GC exception');testDone=true;}},30);}
+try {
+ history.replaceState({nested:{value:91},text:new Array(20000).join('x')},'');
+ var weak=new WeakMap();weak.set(history.state,'original clone');
+ history.state.changed=true;
+ history.state.window=window;
+ collect(function(){
+  check(history.state.nested.value,91,'native cache survives GC');
+  check(history.state.text.length,19999,'cached string survives GC');
+  check(history.state.changed,true,'cached mutation survives GC');
+  check(history.state.window,window,'state-window cycle survives while active');
+  check(weak.get(history.state),'original clone','GC does not recreate state');
+  var retained=history.state;history.replaceState({value:92},'');
+  collect(function(){
+   check(history.state.value,92,'replacement state survives GC');
+   check(history.state===retained,false,'replacement identity differs');
+   check(retained.nested.value,91,'externally retained old state survives');
+   check(weak.get(retained),'original clone','old weak key remains live');
+   retained=null;history.replaceState(null,'');
+   collect(function(){check(history.state,null,'cleared state after GC');testDone=true;});
+  });
+ });
+}catch(e){check(String(e),'no exception','unexpected exception');testDone=true;}
+</script></body>

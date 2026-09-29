@@ -344,6 +344,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mTimeoutPublicIdCounter(1),
     mTimeoutFiringDepth(0),
     mJSObject(nsnull),
+    mHistoryStateValue(JSVAL_NULL),
     mPendingStorageEvents(nsnull)
 #ifdef DEBUG
     , mSetOpenerWindowCalled(PR_FALSE)
@@ -529,6 +530,7 @@ nsGlobalWindow::FreeInnerObjects(JSContext *cx)
   NS_ASSERTION(IsInnerWindow(), "Don't free inner objects on an outer window");
 
   ClearAllTimeouts();
+  ClearHistoryState();
 
   mChromeEventHandler = nsnull;
 
@@ -1852,6 +1854,7 @@ void
 nsGlobalWindow::OnFinalize(JSObject *aJSObject)
 {
   if (aJSObject == mJSObject) {
+    ClearHistoryState();
     mJSObject = nsnull;
   } else if (mJSObject) {
     NS_ERROR("Huh? XPConnect created more than one wrapper for this global!");

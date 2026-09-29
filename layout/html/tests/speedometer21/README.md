@@ -510,3 +510,38 @@ foundation. Its 63 native checks pass on both LoongArch Suite backends, with
 engine binary. See the ES2015 test guide for supported value types and limits.
 It introduces no JavaScript global or post-ES2015 language feature. History
 bindings, same-document traversal and popstate integration remain unfinished.
+
+### History state bindings (native LoongArch Suite)
+
+`pushState`, `replaceState` and the `state` accessor now use the native
+serializer and additive docshell interface. Existing History and docshell
+vtable layouts remain intact. State entries preserve document identity and
+clone the child-entry tree; initial blank documents replace their current
+entry. URL changes enforce the document-URL rewrite restrictions in the
+[HTML History algorithm](https://html.spec.whatwg.org/multipage/nav-history-apis.html#the-history-interface).
+The inner window traces the deserialized state without an unconditional GC
+root. Reusing a subframe entry for a different document clears its old state.
+
+Run the HTTP regressions with:
+
+```sh
+python3 layout/html/tests/speedometer21/run-history-probes.py \
+  --runtime obj-suite/dist/bin --reports artifacts/history-probes
+```
+
+GTK2 and Xlib each pass **120 assertions** across state values/descriptors/URL
+restrictions (76), child realms and detachment (16), initial blank documents
+(11), forced GC (10), and replacement-navigation/stale receivers (7). The
+original session-entry shell regression still passes all ten checks, and both
+backends pass all 24 Suite lifecycle checks. Reports are under
+`artifacts/speedometer21/history-http-{gtk2,xlib}/` and
+`history-{suite,xlib}-lifecycle.stdout`. File-URL state restrictions also pass.
+
+The original benchmark results callback and summary/details navigation now
+pass a four-check diagnostic with explicitly synthetic input. A fresh complete
+benchmark is running against a frozen earlier binding build; no successful
+full-run result is claimed yet. Same-document traversal and `popstate` remain
+unimplemented, and the state snapshot facility still lacks DOM-specific
+serialized types. These are partial History improvements, not full API
+conformance. Other applications remain deferred until Suite completes the
+unmodified benchmark.

@@ -1,0 +1,26 @@
+<!doctype html><title>History entry document replacement</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+a+' expected='+b);}
+var frame=document.createElement('iframe'),oldHistory,oldGetter,phase=0;
+frame.onload=function(){try{
+ var w=frame.contentWindow;
+ if(phase===0){
+  oldHistory=w.history;oldGetter=Object.getOwnPropertyDescriptor(w.History.prototype,'state').get;
+  oldHistory.replaceState({oldDocument:true},'');
+  check(oldHistory.state.oldDocument,true,'old document has state');
+  phase=1;w.location.replace('history-child.html?replacement');return;
+ }
+ frame.onload=null;
+ check(w.history.state,null,'replacement document starts with null state');
+ var order=[],caught;
+ try{oldHistory.replaceState({get value(){order.push('data');return 1;}},{toString:function(){order.push('title');return '';}},{toString:function(){order.push('url');return '';}});}catch(e){caught=e;}
+ check(order.join(','),'title,url','inactive receiver converts arguments before activity check');
+ check(caught&&caught.name,'SecurityError','old document update rejected');
+ check(caught&&caught.code,18,'old document update error code');
+ caught=null;try{oldGetter.call(oldHistory);}catch(e){caught=e;}
+ check(caught&&caught.name,'SecurityError','old document state rejected');
+ check(w.history.state,null,'old receiver cannot change new document state');
+ frame.parentNode.removeChild(frame);testDone=true;
+}catch(e){check(String(e),'no exception','unexpected exception');testDone=true;}};
+frame.src='history-child.html';document.body.appendChild(frame);
+</script></body>

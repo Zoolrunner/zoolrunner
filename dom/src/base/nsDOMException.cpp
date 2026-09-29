@@ -123,6 +123,17 @@ NSResultToNameAndMessage(nsresult aNSResult,
     return;
   }
 
+  if (aNSResult == NS_ERROR_DOM_STANDARD_SECURITY_ERR) {
+    *aName = "SecurityError";
+    *aMessage = "The operation is not allowed for this document or URL";
+    return;
+  }
+  if (aNSResult == NS_ERROR_DOM_DATA_CLONE_ERR) {
+    *aName = "DataCloneError";
+    *aMessage = "The value cannot be stored by structured serialization";
+    return;
+  }
+
   ResultStruct* result_struct = gDOMErrorMsgMap;
 
   while (result_struct->mName) {

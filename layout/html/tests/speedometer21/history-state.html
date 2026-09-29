@@ -1,0 +1,102 @@
+<!doctype html><title>History state bindings</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+a+' expected='+b);}
+function throws(fn,name,code,label){var e;try{fn();}catch(x){e=x;}check(e&&e.name,name,label+' name');if(code!==null)check(e&&e.code,code,label+' code');}
+try {
+ var h=history,startLength=h.length,startURL=location.href,doc=document;
+ check(h.state,null,'initial state');
+ check(h.pushState.length,2,'pushState arity');
+ check(h.replaceState.length,2,'replaceState arity');
+ check(h.pushState,History.prototype.pushState,'shared prototype method');
+ check(h.hasOwnProperty('pushState'),false,'no own pushState');
+ throws(function(){h.pushState();},'TypeError',null,'missing arguments');
+ throws(function(){h.replaceState(1);},'TypeError',null,'missing title');
+ throws(function(){h.pushState.call({},null,'');},'TypeError',null,'receiver brand');
+ var source={nested:{n:1},array:[,2]};source.self=source;source.other=source.nested;
+ check(h.pushState(source,'unused'),undefined,'push returns undefined');
+ check(h.length,startLength+1,'push adds entry');
+ check(location.href,startURL,'omitted URL retained');
+ check(document,doc,'document retained');
+ var state=h.state;
+ check(state===source,false,'state cloned');
+ check(state.self,state,'cycle retained');
+ check(state.nested,state.other,'shared identity retained');
+ check(state.array.length,2,'sparse length');
+ check(0 in state.array,false,'sparse hole');
+ check(state,h.state,'state getter identity');
+ source.nested.n=9;check(state.nested.n,1,'source mutation isolated');
+ state.nested.n=5;check(h.state.nested.n,5,'state getter mutation visible');
+ check(h.replaceState({n:2},null),undefined,'replace returns undefined');
+ check(h.length,startLength+1,'replace retains length');
+ check(h.state.n,2,'replace updates state');
+ check(h.state===state,false,'replace refreshes identity');
+ var order=[],data={get n(){order.push('data');return 3;}};
+ h.replaceState(data,{toString:function(){order.push('title');return '';}},{toString:function(){order.push('url');return '#state';}});
+ check(order.join(','),'title,url,data','conversion before serialization');
+ check(location.hash,'#state','fragment URL updated');
+ check(document.URL,location.href,'document URL updated');
+ check(document,doc,'fragment keeps document');
+ var currentURL=location.href;
+ var base=document.createElement('base');base.href='http://elsewhere.invalid/path/';document.getElementsByTagName('head')[0].appendChild(base);
+ h.replaceState(1,'','');check(location.href,currentURL,'empty URL bypasses base');
+ h.replaceState(2,'',null);check(location.href,currentURL,'null URL bypasses base');
+ h.replaceState(3,'',undefined);check(location.href,currentURL,'undefined URL bypasses base');
+ base.parentNode.removeChild(base);
+ throws(function(){h.replaceState(4,'','http://elsewhere.invalid/');},'SecurityError',18,'cross-origin URL');
+ check(h.state,3,'bad URL leaves state');
+ check(location.href,currentURL,'bad URL leaves location');
+ throws(function(){h.replaceState(function(){},'');},'DataCloneError',25,'function state');
+ throws(function(){h.replaceState(Symbol('data'),'');},'DataCloneError',25,'symbol state');
+ throws(function(){h.replaceState(new WeakMap(),'');},'DataCloneError',25,'weak map state');
+ throws(function(){h.replaceState(new Proxy({},{}),'');},'DataCloneError',25,'proxy state');
+ throws(function(){h.replaceState(document,'');},'DataCloneError',25,'DOM node state');
+ check(h.state,3,'failed clone leaves state');
+ var sentinel={},caught;
+ try{h.replaceState({get bad(){throw sentinel;}},'');}catch(e){caught=e;}
+ check(caught,sentinel,'getter exception propagated');
+ throws(function(){h.replaceState(4,Symbol('title'));},'TypeError',null,'symbol title');
+ throws(function(){h.replaceState(4,'',Symbol('url'));},'TypeError',null,'symbol URL');
+ var buffer=new ArrayBuffer(8),view=new Uint8Array(buffer,2,3);view[0]=42;
+ h.replaceState({buffer:buffer,view:view,map:new Map([[1,'one']]),date:new Date(NaN),rx:/x/gi},'');
+ state=h.state;
+ check(state.view.buffer,state.buffer,'view shares cloned buffer');
+ check(state.buffer===buffer,false,'buffer copied');
+ check(state.view.byteOffset,2,'view offset');
+ check(state.view[0],42,'view bytes');
+ check(state.map.get(1),'one','map data');
+ check(isNaN(state.date.getTime()),true,'invalid Date');
+ check(state.rx.source,'x','regexp source');
+ check(state.rx.global&&state.rx.ignoreCase,true,'regexp flags');
+ h.replaceState(undefined,'');check(h.state,undefined,'undefined state');
+ h.replaceState(null,'');check(h.state,null,'null state');
+ h.replaceState({section:'summary'},document.title);
+ check(h.state.section,'summary','benchmark two-argument form');
+ h.replaceState(null,'',startURL);
+ var descriptor=Object.getOwnPropertyDescriptor(History.prototype,'state');
+ check(typeof descriptor.get,'function','state has callable getter');
+ check(descriptor.set,undefined,'state has no setter');
+ check(descriptor.enumerable,true,'state is enumerable');
+ check(descriptor.configurable,true,'state is configurable');
+ throws(function(){descriptor.get.call({});},'TypeError',null,'state getter brand');
+ if(location.protocol==='http:') {
+  var origin=location.protocol+'//'+location.host;
+  h.replaceState(10,'','/history-path?query=1#fragment');
+  check(location.pathname,'/history-path','HTTP path replacement');
+  check(location.search,'?query=1','HTTP query replacement');
+  check(document.URL,location.href,'HTTP document URL replacement');
+  var anchor=document.createElement('a');anchor.href='relative';
+  check(anchor.href,origin+'/relative','fallback document base updated');
+  throws(function(){h.replaceState(11,'',origin.replace('http:','https:')+'/');},'SecurityError',18,'scheme rewrite forbidden');
+  throws(function(){h.replaceState(11,'','http://user@'+location.host+'/');},'SecurityError',18,'credentials rewrite forbidden');
+  throws(function(){h.replaceState(11,'','http://'+location.hostname+':1/');},'SecurityError',18,'port rewrite forbidden');
+  check(h.state,10,'rejected HTTP rewrites preserve state');
+  h.replaceState(null,'',startURL);
+ } else {
+  throws(function(){h.replaceState(11,'','history-child.html');},'SecurityError',18,'file path rewrite forbidden');
+  h.replaceState(12,'','?query=1#fragment');
+  check(location.search,'?query=1','file query rewrite allowed');
+  h.replaceState(null,'',startURL);
+ }
+}catch(error){check(String(error),'no exception','unexpected exception');}
+testDone=true;
+</script></body>

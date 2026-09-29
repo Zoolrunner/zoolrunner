@@ -434,6 +434,9 @@ nsSHEntry::Create_MOZILLA_1_8_BRANCH(nsIURI * aURI, const nsAString &aTitle,
                                      const nsACString& aContentType,
                                      nsISupports* aOwner)
 {
+  // This entry may be reused by a subframe's replace navigation. Serialized
+  // state belongs to the old document, unlike an ordinary entry clone.
+  mHistoryState = nsnull;
   mURI = aURI;
   mTitle = aTitle;
   mPostData = aInputStream;

@@ -74,6 +74,11 @@
 #define NS_ERROR_DOM_VALIDATION_ERR              NS_ERROR_GENERATE_FAILURE(NS_ERROR_MODULE_DOM,16)
 #define NS_ERROR_DOM_TYPE_MISMATCH_ERR           NS_ERROR_GENERATE_FAILURE(NS_ERROR_MODULE_DOM,17)
 
+/* Standard codes used by additive HTML APIs; keep the historical security
+ * nsresult below unchanged for existing embedders and chrome applications. */
+#define NS_ERROR_DOM_STANDARD_SECURITY_ERR      NS_ERROR_GENERATE_FAILURE(NS_ERROR_MODULE_DOM,18)
+#define NS_ERROR_DOM_DATA_CLONE_ERR              NS_ERROR_GENERATE_FAILURE(NS_ERROR_MODULE_DOM,25)
+
 /* SVG DOM error codes from http://www.w3.org/TR/SVG11/svgdom.html */
 
 #ifdef MOZ_SVG

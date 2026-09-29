@@ -304,3 +304,11 @@ against the packaged xpcshell. The ten assertions check additive payload storage
 clone retention/replacement and preservation of historical entry identifiers,
 URI and title. Native LoongArch Suite development builds pass on both backends;
 packaged validation of this new check is pending the next package run.
+
+Suite History state checks can be run separately with
+`python3 layout/html/tests/speedometer21/run-history-probes.py --runtime OBJ/dist/bin --reports REPORT_DIR`.
+The runner serves the unchanged fixtures locally and uses disposable Suite
+profiles. Native LoongArch GTK2 and Xlib each pass 120 assertions and all 24
+Suite lifecycle checks for the initial pushState/replaceState/state integration.
+Traversal/popstate coverage remains pending. See the Speedometer test guide
+for limitations and the separate full benchmark status.

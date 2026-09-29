@@ -105,6 +105,7 @@ CPPSRCS =			\
 	nsJSUtils.cpp		\
 	nsScreen.cpp		\
 	nsHistory.cpp		\
+	nsHistoryState.cpp	\
 	nsMimeTypeArray.cpp	\
 	nsPluginArray.cpp	\
 	nsWindowRoot.cpp	\

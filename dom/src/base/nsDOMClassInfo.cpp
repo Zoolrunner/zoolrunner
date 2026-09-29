@@ -414,6 +414,10 @@
 #include "nsDOMStorage.h"
 #include "nsIDOMStorageList.h"
 #include "nsIDOMStorageItem.h"
+#include "nsHistoryState.h"
+#include "nsIDocShellHistoryState.h"
+#include "nsISHEntryState.h"
+#include "nsISHEntry.h"
 #include "nsIDOMStorageEvent.h"
 #include "nsIDOMToString.h"
 
@@ -1527,6 +1531,7 @@ JSClass nsDOMClassInfo::sDOMConstructorProtoClass = {
 
 static JSBool DefineStorageMethods(JSContext* cx, JSObject* proto);
 static JSBool DefineCSSStyleMethods(JSContext* cx, JSObject* proto);
+static JSBool DefineHistoryMethods(JSContext* cx, JSObject* proto);
 
 static const char *
 CutPrefix(const char *aName) {
@@ -6072,6 +6077,10 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
       NS_ENSURE_TRUE(dot_prototype, NS_ERROR_OUT_OF_MEMORY);
     }
 
+    if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_History_id] &&
+        !DefineHistoryMethods(cx, dot_prototype))
+      return NS_ERROR_OUT_OF_MEMORY;
+
     if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_Storage_id] &&
         !DefineStorageMethods(cx, dot_prototype))
       return NS_ERROR_OUT_OF_MEMORY;
@@ -6980,6 +6989,14 @@ nsWindowSH::NewEnumerate(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   }
 
   return NS_OK;
+}
+
+NS_IMETHODIMP
+nsWindowSH::Mark(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
+                  JSObject* obj, void* arg, PRUint32* retval)
+{
+  nsGlobalWindow::FromWrapper(wrapper)->MarkHistoryState(cx, arg);
+  return nsEventReceiverSH::Mark(wrapper, cx, obj, arg, retval);
 }
 
 NS_IMETHODIMP
@@ -11481,6 +11498,142 @@ nsCSSValueListSH::GetItemAt(nsISupports *aNative, PRUint32 aIndex,
   return rv;
 }
 
+
+// History's modern JavaScript surface is additive: the legacy nsIDOMHistory
+// and nsIDOMNSHistory signatures remain unchanged for embedding clients.
+static nsGlobalWindow*
+HistoryWindow(JSContext* cx, JSObject* obj, nsIDocShell** aShell,
+               PRBool aRequireActive = PR_TRUE)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIHistoryStateOwner> owner = do_QueryWrappedNative(wrapper);
+  if (!owner) {
+    DOMConstructorTypeError(cx, "History method requires a History object");
+    return nsnull;
+  }
+  nsCOMPtr<nsPIDOMWindow> native = do_QueryInterface(
+      nsJSUtils::GetStaticScriptGlobal(cx, obj));
+  nsCOMPtr<nsIDocShell> shell;
+  owner->GetHistoryDocShell(getter_AddRefs(shell));
+  nsGlobalWindow* window = native ?
+      NS_STATIC_CAST(nsGlobalWindow*, NS_STATIC_CAST(nsPIDOMWindow*, native)) : nsnull;
+  if (window && window->IsOuterWindow())
+    window = window->GetCurrentInnerWindowInternal();
+  if (!window || !nsContentUtils::CanCallerAccess(window) ||
+      (aRequireActive && (!shell || !window->GetOuterWindow() ||
+       window->GetOuterWindow()->GetCurrentInnerWindow() != window ||
+       window->GetDocShell() != shell || !window->GetExtantDocument()))) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+    return nsnull;
+  }
+  NS_IF_ADDREF(*aShell = shell);
+  return window;
+}
+
+static JSBool
+HistoryUpdate(JSContext* cx, JSObject* obj, uintN argc, jsval* argv,
+               jsval* rval, PRBool replace)
+{
+  nsCOMPtr<nsIDocShell> shell;
+  nsRefPtr<nsGlobalWindow> window = HistoryWindow(cx, obj, getter_AddRefs(shell), PR_FALSE);
+  if (!window) return JS_FALSE;
+  if (argc < 2) {
+    DOMConstructorTypeError(cx, "History update requires data and title");
+    return JS_FALSE;
+  }
+  // WebIDL argument conversion precedes serialization, including the unused
+  // title. Keep converted strings rooted in argv across user callbacks.
+  JSString* title = JS_ValueToString(cx, argv[1]);
+  if (!title) return JS_FALSE;
+  argv[1] = STRING_TO_JSVAL(title);
+  nsAutoString url;
+  if (argc > 2 && !JSVAL_IS_NULL(argv[2]) && !JSVAL_IS_VOID(argv[2])) {
+    JSString* string = JS_ValueToString(cx, argv[2]);
+    if (!string) return JS_FALSE;
+    argv[2] = STRING_TO_JSVAL(string);
+    url.Assign(nsDependentJSString(string));
+  }
+  if (!HistoryWindow(cx, obj, getter_AddRefs(shell))) return JS_FALSE;
+  nsCOMPtr<nsIDOMDocument> domDocument = window->GetExtantDocument();
+  nsCOMPtr<nsIDocument> document = do_QueryInterface(domDocument);
+  JSStructuredValue* value = nsnull;
+  JSBool unsupported = JS_FALSE;
+  if (!JS_WriteStructuredValue(cx, argv[0], &value, &unsupported)) {
+    if (unsupported)
+      nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_DATA_CLONE_ERR);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIHistoryStateData> data;
+  nsresult rv = NS_NewHistoryStateData(value, getter_AddRefs(data));
+  if (NS_FAILED(rv)) JS_FreeStructuredValue(value);
+  nsCOMPtr<nsIURI> uri = document->GetDocumentURI();
+  if (NS_SUCCEEDED(rv) && !url.IsEmpty())
+    rv = NS_NewURI(getter_AddRefs(uri), url, nsnull, document->GetBaseURI());
+  if (NS_FAILED(rv) && rv != NS_ERROR_OUT_OF_MEMORY)
+    rv = NS_ERROR_DOM_STANDARD_SECURITY_ERR;
+  nsCOMPtr<nsIDocShellHistoryState> history = do_QueryInterface(shell);
+  if (NS_SUCCEEDED(rv)) {
+    if (!history || window->GetExtantDocument() != domDocument ||
+        !window->GetOuterWindow() ||
+        window->GetOuterWindow()->GetCurrentInnerWindow() != window)
+      rv = NS_ERROR_DOM_STANDARD_SECURITY_ERR;
+    else
+      rv = history->UpdateHistoryState(domDocument, data, uri, replace);
+  }
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+static JSBool JS_DLL_CALLBACK
+HistoryPushState(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{ return HistoryUpdate(cx, obj, argc, argv, rval, PR_FALSE); }
+static JSBool JS_DLL_CALLBACK
+HistoryReplaceState(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{ return HistoryUpdate(cx, obj, argc, argv, rval, PR_TRUE); }
+static JSBool JS_DLL_CALLBACK
+HistoryStateGetter(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIDocShell> shell;
+  nsRefPtr<nsGlobalWindow> window = HistoryWindow(cx, obj, getter_AddRefs(shell));
+  if (!window) return JS_FALSE;
+  nsCOMPtr<nsIDocShellHistoryState> history = do_QueryInterface(shell);
+  nsCOMPtr<nsISHEntry> entry;
+  nsresult rv = history ? history->GetHistoryStateEntry(getter_AddRefs(entry)) :
+                          NS_ERROR_NOT_AVAILABLE;
+  nsCOMPtr<nsISHEntryState> state = do_QueryInterface(entry);
+  nsCOMPtr<nsISupports> data;
+  if (NS_SUCCEEDED(rv) && state)
+    rv = state->GetHistoryState(getter_AddRefs(data));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return window->ReadHistoryState(cx, data, rval);
+}
+static JSBool
+DefineHistoryMethods(JSContext* cx, JSObject* proto)
+{
+  JSFunction* getter = JS_NewFunction(cx, HistoryStateGetter, 0, 0,
+                                      JS_GetParent(cx, proto), "get state");
+  if (!getter) return JS_FALSE;
+  JSObject* getterObject = JS_GetFunctionObject(getter);
+  nsresult rv;
+  nsAutoGCRoot root(&getterObject, &rv);
+  if (NS_FAILED(rv)) return JS_FALSE;
+  return JS_DefineFunction(cx, proto, "pushState", HistoryPushState, 2,
+                           JSPROP_ENUMERATE) &&
+         JS_DefineFunction(cx, proto, "replaceState", HistoryReplaceState, 2,
+                           JSPROP_ENUMERATE) &&
+         JS_DefineProperty(cx, proto, "state", JSVAL_VOID,
+                            (JSPropertyOp)getterObject, nsnull,
+                            JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_GETTER);
+}
 
 // CSSStyleDeclaration helper
 

@@ -122,6 +122,8 @@
 #include "nsILayoutHistoryState.h"
 #include "nsITimer.h"
 #include "nsISHistoryInternal.h"
+#include "nsISHEntryState.h"
+#include "nsIURL.h"
 #include "nsIPrincipal.h"
 #include "nsIHistoryEntry.h"
 #include "nsISHistoryListener.h"
@@ -389,6 +391,7 @@ NS_INTERFACE_MAP_BEGIN(nsDocShell)
     NS_INTERFACE_MAP_ENTRY(nsIDocShellTreeItem)
     NS_INTERFACE_MAP_ENTRY(nsIDocShellTreeNode)
     NS_INTERFACE_MAP_ENTRY(nsIDocShellHistory)
+    NS_INTERFACE_MAP_ENTRY(nsIDocShellHistoryState)
     NS_INTERFACE_MAP_ENTRY(nsIWebNavigation)
     NS_INTERFACE_MAP_ENTRY(nsIBaseWindow)
     NS_INTERFACE_MAP_ENTRY(nsIScrollable)
@@ -8369,6 +8372,187 @@ nsDocShell::SetHistoryEntry(nsCOMPtr<nsISHEntry> *aPtr, nsISHEntry *aEntry)
     *aPtr = aEntry;
 }
 
+
+// A state entry shares a document with its predecessor, but owns an independent
+// entry tree. In particular, later subframe replacements must not mutate an
+// earlier joint-session-history entry.
+static nsresult
+CloneHistoryStateTree(nsISHEntry* aSource, nsISHEntry** aResult,
+                      PRUint32 aDepth = 0,
+                      nsISHEntry* aReplaceSource = nsnull,
+                      nsISHEntry* aReplacement = nsnull)
+{
+    NS_ENSURE_TRUE(aDepth < 512, NS_ERROR_FAILURE);
+    if (aSource == aReplaceSource) {
+        NS_ADDREF(*aResult = aReplacement);
+        return NS_OK;
+    }
+    nsCOMPtr<nsISHEntry> copy;
+    nsresult rv = aSource->Clone(getter_AddRefs(copy));
+    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsISHContainer> source = do_QueryInterface(aSource);
+    nsCOMPtr<nsISHContainer> target = do_QueryInterface(copy);
+    if (source && target) {
+        PRInt32 count;
+        rv = source->GetChildCount(&count);
+        NS_ENSURE_SUCCESS(rv, rv);
+        for (PRInt32 i = 0; i < count; ++i) {
+            nsCOMPtr<nsISHEntry> child, childCopy;
+            rv = source->GetChildAt(i, getter_AddRefs(child));
+            NS_ENSURE_SUCCESS(rv, rv);
+            if (!child)
+                continue; // AddChild preserves interior holes by its offset.
+            rv = CloneHistoryStateTree(child, getter_AddRefs(childCopy),
+                                       aDepth + 1, aReplaceSource, aReplacement);
+            NS_ENSURE_SUCCESS(rv, rv);
+            rv = target->AddChild(childCopy, i);
+            NS_ENSURE_SUCCESS(rv, rv);
+        }
+    }
+    copy.swap(*aResult);
+    return NS_OK;
+}
+
+static PRBool
+CanRewriteHistoryURI(nsIURI* aOld, nsIURI* aNew)
+{
+    nsCAutoString oldScheme, newScheme, oldPart, newPart;
+    if (NS_FAILED(aOld->GetScheme(oldScheme)) ||
+        NS_FAILED(aNew->GetScheme(newScheme)) || !oldScheme.Equals(newScheme))
+        return PR_FALSE;
+    if (oldScheme.EqualsLiteral("http") || oldScheme.EqualsLiteral("https") ||
+        oldScheme.EqualsLiteral("file")) {
+        if (NS_FAILED(aOld->GetPrePath(oldPart)) ||
+            NS_FAILED(aNew->GetPrePath(newPart)) || !oldPart.Equals(newPart))
+            return PR_FALSE;
+        if (!oldScheme.EqualsLiteral("file"))
+            return PR_TRUE;
+        nsCOMPtr<nsIURL> oldURL = do_QueryInterface(aOld);
+        nsCOMPtr<nsIURL> newURL = do_QueryInterface(aNew);
+        return oldURL && newURL &&
+            NS_SUCCEEDED(oldURL->GetFilePath(oldPart)) &&
+            NS_SUCCEEDED(newURL->GetFilePath(newPart)) && oldPart.Equals(newPart);
+    }
+    if (NS_FAILED(aOld->GetSpec(oldPart)) ||
+        NS_FAILED(aNew->GetSpec(newPart)))
+        return PR_FALSE;
+    PRInt32 hash = oldPart.FindChar('#');
+    if (hash >= 0) oldPart.Truncate(hash);
+    hash = newPart.FindChar('#');
+    if (hash >= 0) newPart.Truncate(hash);
+    return oldPart.Equals(newPart);
+}
+
+NS_IMETHODIMP
+nsDocShell::GetHistoryStateEntry(nsISHEntry** aResult)
+{
+    NS_ENSURE_ARG_POINTER(aResult);
+    NS_IF_ADDREF(*aResult = mOSHE);
+    return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDocShell::UpdateHistoryState(nsIDOMDocument* aDocument,
+                               nsISupports* aSerializedState,
+                               nsIURI* aURI, PRBool aReplace)
+{
+    nsCOMPtr<nsIDocShell> kungFuDeathGrip(this);
+    NS_ENSURE_TRUE(!mIsBeingDestroyed && mContentViewer,
+                  NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+    nsCOMPtr<nsIDOMDocument> current;
+    mContentViewer->GetDOMDocument(getter_AddRefs(current));
+    NS_ENSURE_TRUE(current == aDocument, NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+    nsCOMPtr<nsIDocument> document = do_QueryInterface(current);
+    NS_ENSURE_TRUE(document, NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+    nsCOMPtr<nsIURI> oldURI = document->GetDocumentURI();
+    NS_ENSURE_TRUE(oldURI && aURI && CanRewriteHistoryURI(oldURI, aURI),
+                  NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+    nsCOMPtr<nsIURI> uri;
+    nsresult rv = aURI->Clone(getter_AddRefs(uri));
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    nsCOMPtr<nsIDocument_MOZILLA_1_8_BRANCH2> initial = do_QueryInterface(document);
+    if (initial && initial->IsInitialDocument())
+        aReplace = PR_TRUE;
+    nsCOMPtr<nsISHEntry> oldEntry = mOSHE, entry;
+    if (!oldEntry) {
+        // Lazy initial about:blank viewers have no historical entry yet.
+        // Materialize their current entry without adding a child traversal.
+        rv = AddToSessionHistory(oldURI, nsnull, getter_AddRefs(oldEntry));
+        NS_ENSURE_SUCCESS(rv, rv);
+        NS_ENSURE_TRUE(oldEntry && !mIsBeingDestroyed && mContentViewer,
+                      NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+        mContentViewer->GetDOMDocument(getter_AddRefs(current));
+        NS_ENSURE_TRUE(current == aDocument, NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+        SetHistoryEntry(&mOSHE, oldEntry);
+        aReplace = PR_TRUE;
+    }
+    if (aReplace) {
+        entry = oldEntry;
+    } else {
+        rv = CloneHistoryStateTree(oldEntry, getter_AddRefs(entry));
+        NS_ENSURE_SUCCESS(rv, rv);
+        // Clone deliberately retains page identity. Give this entry a fresh
+        // navigation ID so nsSHistory does not skip it during traversal.
+        nsCOMPtr<nsISHEntry> identity = do_CreateInstance(NS_SHENTRY_CONTRACTID);
+        NS_ENSURE_TRUE(identity, NS_ERROR_OUT_OF_MEMORY);
+        PRUint32 id;
+        identity->GetID(&id);
+        entry->SetID(id);
+        entry->SetIsSubFrame(PR_FALSE);
+    }
+    nsCOMPtr<nsISHEntryState> state = do_QueryInterface(entry);
+    NS_ENSURE_TRUE(state, NS_ERROR_UNEXPECTED);
+    rv = entry->SetURI(uri);
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = state->SetHistoryState(aSerializedState);
+    NS_ENSURE_SUCCESS(rv, rv);
+    if (!aReplace) {
+        nscoord x = 0, y = 0;
+        GetCurScrollPos(ScrollOrientation_X, &x);
+        GetCurScrollPos(ScrollOrientation_Y, &y);
+        oldEntry->SetScrollPosition(x, y);
+        entry->SetScrollPosition(x, y);
+        nsCOMPtr<nsIDocShellTreeItem> rootItem;
+        GetSameTypeRootTreeItem(getter_AddRefs(rootItem));
+        nsCOMPtr<nsIDocShell> rootInterface = do_QueryInterface(rootItem);
+        NS_ENSURE_TRUE(rootInterface, NS_ERROR_FAILURE);
+        nsIDocShell* rootPointer = rootInterface;
+        nsDocShell* rootShell = NS_STATIC_CAST(nsDocShell*, rootPointer);
+        nsCOMPtr<nsISHistory> sessionHistory = rootShell->mSessionHistory;
+        nsCOMPtr<nsISHistoryInternal> history = do_QueryInterface(sessionHistory);
+        NS_ENSURE_TRUE(history, NS_ERROR_FAILURE);
+        nsCOMPtr<nsISHEntry> oldRoot = GetRootSHEntry(oldEntry), newRoot;
+        if (oldRoot == oldEntry)
+            newRoot = entry;
+        else {
+            rv = CloneHistoryStateTree(oldRoot, getter_AddRefs(newRoot), 0,
+                                       oldEntry, entry);
+            NS_ENSURE_SUCCESS(rv, rv);
+        }
+        sessionHistory->GetIndex(&mPreviousTransIndex);
+        rv = history->AddEntry(newRoot, PR_TRUE);
+        sessionHistory->GetIndex(&mLoadedTransIndex);
+        NS_ENSURE_SUCCESS(rv, rv);
+        // Native history listeners may reenter or close the window.
+        NS_ENSURE_TRUE(!mIsBeingDestroyed && mContentViewer,
+                      NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+        mContentViewer->GetDOMDocument(getter_AddRefs(current));
+        NS_ENSURE_TRUE(current == aDocument && mOSHE == oldEntry,
+                      NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+        SwapEntriesData data = { this, newRoot, nsnull };
+        rv = SetChildHistoryEntry(oldRoot, rootShell, 0, &data);
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
+    SetHistoryEntry(&mOSHE, entry);
+    if (mLSHE == oldEntry)
+        SetHistoryEntry(&mLSHE, entry);
+    if (document->GetBaseURI() == oldURI)
+        document->SetBaseURI(uri);
+    document->SetDocumentURI(uri);
+    SetCurrentURI(uri, nsnull, PR_TRUE);
+    return NS_OK;
+}
 
 nsresult
 nsDocShell::GetRootSessionHistory(nsISHistory ** aReturn)

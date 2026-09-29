@@ -43,12 +43,14 @@
 #include "nscore.h"
 #include "nsIScriptContext.h"
 #include "nsISHistory.h"
+#include "nsHistoryState.h"
 
 class nsIDocShell;
 
 // Script "History" object
 class nsHistory : public nsIDOMHistory,
-                  public nsIDOMNSHistory
+                  public nsIDOMNSHistory,
+                  public nsIHistoryStateOwner
 {
 public:
   nsHistory(nsIDocShell* aDocShell);
@@ -62,6 +64,8 @@ public:
 
   // nsIDOMNSHistory
   NS_DECL_NSIDOMNSHISTORY
+
+  virtual nsresult GetHistoryDocShell(nsIDocShell** aResult);
 
   void SetDocShell(nsIDocShell *aDocShell);
 

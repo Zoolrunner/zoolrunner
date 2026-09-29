@@ -1,0 +1,32 @@
+<!doctype html><title>History realms and inactive documents</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+a+' expected='+b);}
+function security(fn,s){var e;try{fn();}catch(x){e=x;}check(e&&e.name,'SecurityError',s+' name');check(e&&e.code,18,s+' code');}
+var frame=document.createElement('iframe');
+frame.onload=function(){
+ try {
+  frame.onload=null;
+  var w=frame.contentWindow,h=w.history,initial=h.length;
+  check(h.state,null,'child initial state');
+  h.pushState({n:7},'');
+  check(h.state.n,7,'parent can call child history');
+  check(Object.getPrototypeOf(h.state),w.Object.prototype,'cloned state uses target realm');
+  check(h.state instanceof Object,false,'cloned state is not parent object');
+  check(h.pushState,w.History.prototype.pushState,'child shared method');
+  check(h.length,initial+1,'child push adds joint entry');
+  var childDocument=w.document,oldURL=w.location.href;
+  h.replaceState({n:8},'','#child');
+  check(w.location.hash,'#child','child URL changes');
+  check(w.document,childDocument,'child document retained');
+  check(location.hash,'','parent URL unaffected');
+  var getter=Object.getOwnPropertyDescriptor(w.History.prototype,'state').get;
+  check(getter.call(h).n,8,'borrowed getter targets child');
+  frame.parentNode.removeChild(frame);
+  security(function(){h.pushState(null,'');},'detached child push');
+  security(function(){h.replaceState(null,'');},'detached child replace');
+  security(function(){return getter.call(h);},'detached child state');
+ } catch(e) { check(String(e),'no exception','unexpected exception'); }
+ testDone=true;
+};
+frame.src='history-child.html';document.body.appendChild(frame);
+</script></body>

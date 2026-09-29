@@ -1,0 +1,24 @@
+<!doctype html><title>Initial document history state</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+a+' expected='+b);}
+try {
+ var f=document.createElement('iframe');document.body.appendChild(f);
+ var w=f.contentWindow,h=w.history,doc=w.document,n=h.length;
+ check(w.location.href,'about:blank','initial blank URL');
+ check(h.state,null,'initial blank state');
+ h.pushState({n:1},'');
+ check(h.state.n,1,'initial blank push state');
+ check(h.length,n,'initial blank push replaces entry');
+ check(w.document,doc,'initial blank document retained');
+ h.replaceState({n:2},'','about:blank#fragment');
+ check(w.location.href,'about:blank#fragment','blank fragment rewrite');
+ check(h.state.n,2,'blank replace state');
+ h.pushState({n:2},'');check(h.length,n,'subsequent initial blank push also replaces');
+ var caught;try{h.replaceState(null,'',location.href);}catch(e){caught=e;}
+ check(caught&&caught.name,'SecurityError','blank cannot rewrite to inherited origin URL');
+ check(caught&&caught.code,18,'blank rewrite error code');
+ check(h.state.n,2,'rejected rewrite retains state');
+ f.parentNode.removeChild(f);
+}catch(e){check(String(e),'no exception','unexpected exception');}
+testDone=true;
+</script></body>

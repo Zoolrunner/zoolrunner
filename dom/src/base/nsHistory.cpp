@@ -75,6 +75,7 @@ NS_INTERFACE_MAP_BEGIN(nsHistory)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMHistory)
   NS_INTERFACE_MAP_ENTRY(nsIDOMHistory)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNSHistory)
+  NS_INTERFACE_MAP_ENTRY(nsIHistoryStateOwner)
   NS_DOM_INTERFACE_MAP_ENTRY_CLASSINFO(History)
 NS_INTERFACE_MAP_END
 
@@ -365,3 +366,11 @@ nsHistory::GetSessionHistoryFromDocShell(nsIDocShell * aDocShell,
   
 }
 
+
+nsresult
+nsHistory::GetHistoryDocShell(nsIDocShell** aResult)
+{
+  NS_ENSURE_ARG_POINTER(aResult);
+  NS_IF_ADDREF(*aResult = mDocShell);
+  return NS_OK;
+}

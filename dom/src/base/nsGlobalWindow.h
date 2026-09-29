@@ -179,6 +179,9 @@ public:
                                   nsEventStatus* aEventStatus);
   virtual JSObject *GetGlobalJSObject();
   virtual void OnFinalize(JSObject *aJSObject);
+  JSBool ReadHistoryState(JSContext* cx, nsISupports* aData, jsval* aResult);
+  void MarkHistoryState(JSContext* cx, void* aArg);
+  void ClearHistoryState();
   virtual void SetScriptsEnabled(PRBool aEnabled, PRBool aFireTimeouts);
   virtual nsresult SetNewArguments(PRUint32 aArgc, void* aArgv);
 
@@ -328,6 +331,7 @@ protected:
   void ClearControllers();
 
   void FreeInnerObjects(JSContext *cx);
+
 
   nsresult SetNewDocument(nsIDOMDocument *aDocument,
                           nsISupports *aState,
@@ -559,6 +563,9 @@ protected:
   // These member variables are used on both inner and the outer windows.
   nsCOMPtr<nsIPrincipal> mDocumentPrincipal;
   JSObject* mJSObject;
+  // Traced through the inner window wrapper, never an unconditional GC root.
+  nsCOMPtr<nsISupports> mHistoryStateData;
+  jsval mHistoryStateValue;
 
   nsDataHashtable<nsStringHashKey, PRBool> *mPendingStorageEvents;
 
