@@ -47,7 +47,9 @@ def main():
         try:
             storage = ('local-storage', 'legacy-storage-event') if args.storage_policy == 'allow' else ('storage-policy-denied',)
             for name in storage + ('xhr-event-lifetime', 'xhr-event-dispatch', 'xhr-event-error',
-                                   'xhr-listener-registration'):
+                                   'xhr-listener-registration', 'xhr-synthetic-events',
+                                   'xhr-handler-identity', 'xhr-listener-reuse',
+                                   'xhr-legacy-events'):
                 report = args.reports / (name + '.json')
                 report.unlink(missing_ok=True)
                 url = 'http://127.0.0.1:%d/%s.html' % (server.server_port, name)
