@@ -331,3 +331,21 @@ predates subsequent fixes; see `layout/html/tests/speedometer21/README.md` for
 its exact provenance. A current Xlib package rerun and Browser/Calendar/XULRunner
 validation are in progress. Missing rendering features remain unfinished, so
 benchmark execution is not a full standards or application compatibility claim.
+
+Current Suite packages at `989aaa00` pass the complete native LoongArch GTK2
+and Xlib package gates. Each passes 11,540 ES5.1 cases, 28,582 ES2015 cases,
+139 focused fixtures, 85 native probes, five internal probes, both ABI probes,
+native embedding, window bootstrap, lifecycle and ChatZilla checks. Reports
+are in `artifacts/speedometer21/history-package-{gtk2,xlib}/`. These package
+results are distinct from the earlier frozen GTK2 benchmark pass.
+
+Browser package checks now include all seven configured preference panes,
+homepage editing and the existing restore-default modal alert through
+`browser/components/preferences/tests/lifecycle.xul`. Native Browser GTK2
+passes its 28 compatibility assertions, including a separate run from the
+relocated package. The report explicitly records a pre-existing limitation:
+the literal `about:home` default is requested as an `nsIPrefLocalizedString`,
+so the default read fails and the old restore handler clears the homepage.
+The test preserves that legacy null-to-empty conversion; it does not claim
+the application's default-localization mismatch was fixed. Application sources
+and the frozen preference interfaces remain unchanged.

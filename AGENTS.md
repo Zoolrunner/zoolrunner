@@ -184,6 +184,14 @@ Therefore:
 * Supported content must render correctly.
 * Unsupported content should fail gracefully.
 
+Browser preference changes and platform bootstrap regressions should also run
+`browser/components/preferences/tests/lifecycle.xul`; Linux package checks run
+it automatically. It opens the unchanged Browser and preferences windows,
+visits every configured pane and acknowledges the original restore-default
+alert. Keep its explicit limitation reporting for the pre-existing literal
+homepage/localized-string mismatch; do not silently change frozen preference
+semantics or application defaults to hide it.
+
 Do not consider a platform-level change validated merely because it compiles.
 
 The browser should be used as a major integration test.

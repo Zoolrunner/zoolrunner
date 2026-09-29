@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<?xml-stylesheet href="chrome://global/skin/" type="text/css"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        width="300" height="120" onload="start()">
+<description>Browser preferences compatibility probe</description>
+<script><![CDATA[
+var C=Components.classes,I=Components.interfaces;
+var checks=[],failures=0,done=false,browserWindow=null,preferencesWindow=null;
+var service=C['@mozilla.org/consoleservice;1'].getService(I.nsIConsoleService);
+var errors=[],limitations=[];
+var watcher=C['@mozilla.org/embedcomp/window-watcher;1'].getService(I.nsIWindowWatcher);
+var restoreAlert=false,restoreValue=null,alertSeen=false;
+var dialogObserver={observe:function(subject,topic){
+ if(topic!=='domwindowopened'||!restoreAlert)return;
+ var dialog=subject.QueryInterface(I.nsIDOMWindow);
+ dialog.addEventListener('load',function loaded(event){
+  if(event.target!==dialog.document)return;
+  dialog.removeEventListener('load',loaded,false);
+  if(dialog.location.href!=='chrome://global/content/commonDialog.xul')return;
+  setTimeout(function(){try{
+   var message=dialog.gCommonDialogParam.GetString(0);
+   check(message===restoreValue,'restore-default alert contains homepage: actual='+String(message)+' expected='+String(restoreValue));
+   alertSeen=true;dialog.document.documentElement.acceptDialog();
+  }catch(e){check(false,'restore alert: '+e);dialog.close();}},100);
+ },false);
+}};
+var listener={observe:function(message){try{
+  var error=message.QueryInterface(I.nsIScriptError);
+  if(!(error.flags&I.nsIScriptError.warningFlag) &&
+     /chrome:\/\/(browser|global)\//.test(error.sourceName))
+    errors.push(error.sourceName+':'+error.lineNumber+' '+error.errorMessage);
+}catch(e){}}};
+function check(value,label){if(!value)++failures;checks.push((value?'PASS ':'FAIL ')+label);}
+function finish(){
+ if(done)return;done=true;
+ if(preferencesWindow&&!preferencesWindow.closed)preferencesWindow.close();
+ if(browserWindow&&!browserWindow.closed)browserWindow.close();
+ setTimeout(function(){
+  check(!errors.length,'no chrome script errors: '+errors.join(' | '));
+  service.unregisterListener(listener);
+  watcher.unregisterNotification(dialogObserver);
+  dump('BROWSER-PREFERENCES checks='+checks.length+' failures='+failures+'\n');
+  dump('SPEEDOMETER-RESULT '+JSON.stringify({pass:failures===0,mode:'chrome-probe',detail:{failures:failures,results:checks,limitations:limitations}})+'\n');
+  C['@mozilla.org/toolkit/app-startup;1'].getService(I.nsIAppStartup).quit(I.nsIAppStartup.eForceQuit);
+ },100);
+}
+function panes(){try{
+ var d=preferencesWindow.document,root=d.documentElement;
+ var list=root.preferencePanes,index=0;
+ check(list.length>=6,'all configured preference panes available');
+ function next(){try{
+  if(index===list.length){
+   var main=d.getElementById('paneMain');root.showPane(main);
+   setTimeout(function(){try{
+    var field=d.getElementById('browserHomePage');
+    check(field&&field.boxObject.width>0,'homepage textbox is laid out');
+    var preference=d.getElementById('browser.startup.homepage');
+    preference.value='about:blank#preferences-probe';
+    check(preference.value==='about:blank#preferences-probe','preference binding accepts value');
+    var localizedDefault=preference.defaultValue;
+    if(localizedDefault===null)
+     limitations.push('Configured homepage default is not a localized-string default; legacy restore clears the homepage.');
+    // The historical localized-string setter converts null to an empty native
+    // string. Check compatibility with that conversion without claiming the
+    // application's literal about:home default is correctly localized.
+    restoreValue=localizedDefault===null?'':String(localizedDefault);restoreAlert=true;
+    preferencesWindow.gMainPane.restoreDefaultHomePage();restoreAlert=false;
+    check(alertSeen,'original restore-default alert accepted');
+    check(preference.value===restoreValue,'legacy restore-default value conversion: actual='+String(preference.value)+' expected='+restoreValue);
+    finish();
+   }catch(e){check(false,'preference editing: '+e);finish();}},150);
+   return;
+  }
+  var pane=list[index++];root.showPane(pane);
+  setTimeout(function(){try{
+   check(pane.loaded,'pane loaded: '+pane.id);
+   check(root.lastSelected===pane.id,'pane selected: '+pane.id);
+   check(pane.boxObject.width>0&&pane.boxObject.height>0,'pane layout: '+pane.id);
+   next();
+  }catch(e){check(false,'pane verification: '+e);finish();}},200);
+ }catch(e){check(false,'pane selection: '+e);finish();}}
+ next();
+}catch(e){check(false,'preferences setup: '+e);finish();}}
+function start(){
+ service.registerListener(listener);
+ watcher.registerNotification(dialogObserver);
+ setTimeout(function(){if(!done){check(false,'preferences timeout');finish();}},45000);
+ try{
+  browserWindow=window.openDialog('chrome://browser/content/browser.xul','preferences-browser','chrome,dialog=no,width=800,height=600','about:blank');
+  browserWindow.addEventListener('load',function loaded(event){
+   if(event.target!==browserWindow.document)return;
+   browserWindow.removeEventListener('load',loaded,false);
+   setTimeout(function(){try{
+    preferencesWindow=browserWindow.openDialog('chrome://browser/content/preferences/preferences.xul','preferences-test','chrome,dialog=no,resizable');
+    preferencesWindow.addEventListener('load',function loadedPrefs(event){
+     if(event.target!==preferencesWindow.document)return;
+     preferencesWindow.removeEventListener('load',loadedPrefs,false);
+     setTimeout(panes,200);
+    },false);
+   }catch(e){check(false,'preferences opening: '+e);finish();}},200);
+  },false);
+ }catch(e){check(false,'browser opening: '+e);finish();}
+}
+]]></script></window>

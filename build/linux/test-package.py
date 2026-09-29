@@ -172,6 +172,9 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     if a.app == 'suite':
         cases += [('lifecycle', (root / 'editor/composer/tests/platform-lifecycle.xul').read_text(), 'PLATFORM-LIFECYCLE checks=24 failures=0'),
                   ('chatzilla', (tests / 'modern-chatzilla.xul').read_text(), 'SUITE-CHATZILLA initialized=true')]
+    if a.app == 'browser':
+        cases += [('preferences', (root / 'browser/components/preferences/tests/lifecycle.xul').read_text(),
+                   'BROWSER-PREFERENCES checks=28 failures=0')]
     for label, content, marker in cases:
         (fixture / 'early-application.xul').write_text(content)
         command = [executable]

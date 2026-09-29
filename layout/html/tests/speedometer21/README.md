@@ -77,6 +77,11 @@ The first native Browser GTK2 run passes all 985 content, 300 History and
 Calendar and XULRunner launcher execution has not yet been verified. These
 reports are `browser-gtk2-content.json`, `browser-gtk2-history/` and
 `browser-gtk2-http/` under `artifacts/speedometer21/`.
+For privileged application fixtures, use `--chrome-probe PATH` instead of
+`--url`; the XUL fixture must emit the same `SPEEDOMETER-RESULT` JSON marker.
+The Browser preferences lifecycle fixture passes 28 checks in its development
+runtime and relocated GTK2 package. It reports the old homepage localization
+mismatch separately rather than claiming every preferences behavior is correct.
 
 Remaining work includes the complete benchmark and original results UI,
 remaining DOM behavior and CSS layout/painting features, followed by the other

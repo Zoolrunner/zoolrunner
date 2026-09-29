@@ -13,13 +13,18 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--application', choices=['browser', 'calendar', 'xulrunner'], required=True)
     parser.add_argument('--runtime', type=Path, required=True)
-    parser.add_argument('--url', required=True)
+    fixture_input = parser.add_mutually_exclusive_group(required=True)
+    fixture_input.add_argument('--url')
+    fixture_input.add_argument('--chrome-probe', type=Path,
+                               help='Privileged XUL fixture using the same result marker')
     parser.add_argument('--restart-url', action='append', default=[])
     parser.add_argument('--mode', choices=['probe'], default='probe')
     parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
     parser.add_argument('--timeout', type=int, default=60)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
+    if args.chrome_probe and args.restart_url:
+        parser.error('--restart-url requires --url')
     source_runtime = args.runtime.resolve()
     here = Path(__file__).resolve().parent
     root = here.parents[3]
@@ -34,7 +39,7 @@ def main():
         home, profile, fixture = base / 'home', base / 'profile', base / 'fixture'
         for directory in (home, profile, fixture):
             directory.mkdir()
-        shutil.copy2(here / 'runner.xul', fixture / 'early-application.xul')
+        shutil.copy2(args.chrome_probe or here / 'runner.xul', fixture / 'early-application.xul')
         (fixture / 'contents.rdf').write_text('''<?xml version="1.0"?>
 <RDF:RDF xmlns:RDF="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:c="http://www.mozilla.org/rdf/chrome#">
 <RDF:Seq RDF:about="urn:mozilla:package:root"><RDF:li RDF:resource="urn:mozilla:package:zooltest"/></RDF:Seq>
@@ -74,9 +79,10 @@ def main():
             'zoolrunner.speedometer.mode': 'probe',
             'zoolrunner.speedometer.debugErrors': '',
             'zoolrunner.speedometer.timeout': args.timeout,
+            'zoolrunner.test.application': args.application,
             'toolkit.defaultChromeURI': 'chrome://zooltest/content/early-application.xul',
         }
-        urls = [args.url] + args.restart_url
+        urls = [args.url or args.chrome_probe.resolve().as_uri()] + args.restart_url
         for index, url in enumerate(urls):
             preferences['zoolrunner.speedometer.url'] = url
             (profile / 'user.js').write_text(''.join(
@@ -94,7 +100,8 @@ def main():
             markers = [line[len('SPEEDOMETER-RESULT '):] for line in log.read_text(errors='replace').splitlines()
                        if line.startswith('SPEEDOMETER-RESULT ')]
             report = {'pass': False, 'exit': status, 'application': args.application,
-                      'runtime': str(source_runtime), 'url': url, 'mode': 'probe',
+                      'runtime': str(source_runtime), 'url': url,
+                      'mode': 'chrome-probe' if args.chrome_probe else 'probe',
                       'contentEdition': args.content_edition}
             if len(markers) == 1:
                 try:
