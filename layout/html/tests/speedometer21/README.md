@@ -953,3 +953,14 @@ Intermediate prototype diagnostics are retained in
 `dataset-before-function-metadata-fix`. The interface test first exposed two
 wrong-realm TypeErrors and constructor resurrection, then metadata inherited
 from legacy function creation. The final run retains and passes those checks.
+
+The interface/realm build (46bd462d) passes 1,129 content, 300 History,
+274 HTTP, fifteen dataset GC and 24 Suite lifecycle assertions on both native
+LoongArch Linux GTK2 and Xlib. Reports are `dataset-interface-suite-*`.
+Full package gates and the other applications remain in progress.
+
+`../style/dataset-navigation.html` adds twelve checks for retained objects
+across actual iframe document navigation and removal, plus inert-document
+identity and writes. GTK2 Suite and Chromium 148 pass all twelve; reports are
+`dataset-navigation-gtk2-*` and `dataset-navigation-chromium.json`. The fixture
+uses `dataset-navigation-child.html` to force a document replacement.

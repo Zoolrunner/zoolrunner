@@ -1,0 +1,35 @@
+<!doctype html><title>Dataset identity across iframe navigation</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[],phase=0;
+var oldElement,oldDataset,oldPrototype,oldConstructor;
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label);}
+function finish(){document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;}
+var frame=document.createElement('iframe');
+frame.onload=function(){
+ try{
+  var foreign=frame.contentWindow;
+  if(phase===0){
+   phase=1;oldElement=foreign.document.createElement('div');oldDataset=oldElement.dataset;
+   oldConstructor=foreign.DOMStringMap;oldPrototype=oldConstructor.prototype;
+   oldDataset.item='before';check(oldElement.getAttribute('data-item'),'before','initial foreign attribute write');
+   frame.src='dataset-navigation-child.html';return;
+  }
+  check(oldElement.dataset,oldDataset,'old element retains SameObject after navigation');
+  check(Object.getPrototypeOf(oldDataset),oldPrototype,'old dataset retains its prototype');
+  check(oldDataset instanceof oldConstructor,true,'old dataset retains interface identity');
+  oldDataset.item='after';check(oldElement.getAttribute('data-item'),'after','old dataset remains live after navigation');
+  var current=foreign.document.createElement('div').dataset;
+  check(Object.getPrototypeOf(current),foreign.DOMStringMap.prototype,'new document uses its own prototype');
+  check(Object.getPrototypeOf(current)===oldPrototype,false,'navigation creates a distinct interface realm');
+  check(foreign.DOMStringMap===oldConstructor,false,'navigation creates a distinct constructor');
+  frame.parentNode.removeChild(frame);
+  check(oldElement.dataset,oldDataset,'old identity survives removing iframe');
+  oldElement.setAttribute('data-detached','alive');check(oldDataset.detached,'alive','detached frame element remains reflected');
+  var inert=document.implementation.createHTMLDocument('inert'),element=inert.createElement('div');
+  var dataset=element.dataset;dataset.value='inert';
+  check(element.getAttribute('data-value'),'inert','inert document dataset write');
+  check(element.dataset,dataset,'inert document SameObject');
+ }catch(e){check(String(e),'no exception','unexpected exception: '+String(e));}
+ finish();
+};
+frame.src='about:blank';document.body.appendChild(frame);
+</script>
