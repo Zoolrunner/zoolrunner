@@ -1,0 +1,25 @@
+<!doctype html><title>Explicit legacy XHR event compatibility</title>
+<script type="application/javascript;version=1.7">
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+var request=new XMLHttpRequest(),order=[],readyArgs=-1,synthetic=0;
+request.onload=function(){++synthetic;};
+var event=document.createEvent('Event');event.initEvent('load',false,false);
+check(request.dispatchEvent(event),true,'legacy no-op has initialized boolean result');
+check(synthetic,0,'legacy synthetic dispatch remains a no-op');
+check(event.target,null,'legacy no-op does not assign target');
+var rejected=false;try{request.addEventListener('custom',function(){},false);}catch(e){rejected=true;}
+check(rejected,true,'legacy custom listener rejection retained');
+request.onreadystatechange=function(){readyArgs=arguments.length;};
+function same(){order.push('listener');}
+request.addEventListener('load',same,false);request.addEventListener('load',same,false);
+request.onload=function(){order.push('handler');setTimeout(function(){
+ check(readyArgs,0,'legacy ready handler receives no event argument');
+ check(order.join(','),'handler,listener,listener','legacy handler ordering and duplicate registration');
+ check(request.onload,null,'legacy completion clears property handler');
+ check(request.onreadystatechange,null,'legacy completion clears ready handler');
+ testDone=true;
+},30);};
+request.onerror=function(){check('error','load','legacy request completed');testDone=true;};
+request.open('GET','xhr-legacy-events.html?payload='+new Date().getTime(),true);request.send(null);
+</script>

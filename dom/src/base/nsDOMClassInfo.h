@@ -470,6 +470,12 @@ protected:
   }
 
 public:
+  static JSBool JS_DLL_CALLBACK GetHandler(JSContext *cx, JSObject *obj,
+                                           jsval id, jsval *vp);
+  static JSBool JS_DLL_CALLBACK SetHandler(JSContext *cx, JSObject *obj,
+                                           jsval id, jsval *vp);
+  static JSBool AccessHandler(JSContext *cx, JSObject *obj, jsval id,
+                              jsval *vp, PRBool aSet);
   static JSBool JS_DLL_CALLBACK Send(JSContext *cx, JSObject *obj, uintN argc,
                                      jsval *argv, jsval *rval);
   NS_IMETHOD NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,

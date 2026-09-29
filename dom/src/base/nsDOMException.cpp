@@ -123,6 +123,12 @@ NSResultToNameAndMessage(nsresult aNSResult,
     return;
   }
 
+  if (aNSResult == NS_ERROR_DOM_STANDARD_INVALID_STATE_ERR) {
+    *aName = "InvalidStateError";
+    *aMessage = "The object is in an invalid state";
+    return;
+  }
+
   if (aNSResult == NS_ERROR_DOM_STANDARD_SECURITY_ERR) {
     *aName = "SecurityError";
     *aMessage = "The operation is not allowed for this document or URL";
@@ -163,7 +169,8 @@ nsDOMException::GetCode(PRUint32* aCode)
   NS_ENSURE_ARG_POINTER(aCode);
   nsresult result;
   GetResult(&result);
-  *aCode = NS_ERROR_GET_CODE(result);
+  *aCode = result == NS_ERROR_DOM_STANDARD_INVALID_STATE_ERR ? 11 :
+             NS_ERROR_GET_CODE(result);
 
   return NS_OK;
 }

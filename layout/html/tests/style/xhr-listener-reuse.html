@@ -1,0 +1,38 @@
+<!doctype html><title>XHR listener ordering and reuse</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+var request=new XMLHttpRequest(),round=1,order=[],progress=0,states=0,handlerStates=0;
+request.addEventListener('readystatechange',function(e){
+ ++states;
+ if(request.readyState===1){check(e.type,'readystatechange','round '+round+' ready event type');
+  check(e.target,request,'round '+round+' ready target');check(e.currentTarget,request,'round '+round+' ready currentTarget');
+  check(e.eventPhase,2,'round '+round+' ready phase');}
+});
+request.onreadystatechange=function(e){
+ ++handlerStates;
+ if(request.readyState===1){check(e&&e.type,'readystatechange','round '+round+' ready handler receives event');
+  check(this,request,'round '+round+' ready handler receiver');}
+};
+request.addEventListener('load',function(){order.push('first');});
+request.onload=function(){order.push('handler');setTimeout(afterLoad,30);};
+function last(){order.push('last');}
+request.addEventListener('load',last);request.addEventListener('load',last);
+request.addEventListener('progress',function(e){++progress;
+ if(progress===1){check(e.type,'progress','registered progress type');check(e.target,request,'registered progress target');}});
+request.onerror=function(){check('error','load','request completed');testDone=true;};
+function send(){try{
+ request.open('GET','xhr-listener-reuse.html?round='+round+'&time='+new Date().getTime(),true);
+ request.send(null);
+}catch(e){check(String(e),'no exception','request setup');testDone=true;}}
+function afterLoad(){try{
+ check(order.join(','),'first,handler,last','round '+round+' load ordering and duplicate suppression');
+ check(typeof request.onload,'function','round '+round+' handler retained after completion');
+ if(round===1){round=2;order=[];window.testRequestGC=true;waitGC();return;}
+ check(progress>0,true,'listener-only progress delivered');
+ check(states>2,true,'readystatechange listeners receive transitions');
+ check(states,handlerStates,'ready handler and listener receive same transitions');
+ testDone=true;
+}catch(e){check(String(e),'no exception','post-load checks');testDone=true;}}
+function waitGC(){if(!window.testGCDone){setTimeout(waitGC,30);return;}send();}
+send();
+</script>

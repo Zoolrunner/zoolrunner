@@ -7827,12 +7827,115 @@ nsXMLHttpRequestSH::Send(JSContext *cx, JSObject *obj, uintN argc,
   return JS_TRUE;
 }
 
+// EventHandler getters return the original callback. XPConnect's generic
+// interface conversion deliberately double-wraps JavaScript components, which
+// is inappropriate for callback identity (and denies content access).
+JSBool
+nsXMLHttpRequestSH::AccessHandler(JSContext *cx, JSObject *obj, jsval id,
+                                   jsval *vp, PRBool aSet)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsresult rv = sXPConnect->GetWrappedNativeOfJSObject(cx, obj,
+                                                     getter_AddRefs(wrapper));
+  if (NS_SUCCEEDED(rv))
+    rv = sSecMan->CheckPropertyAccess(cx, obj, JS_GET_CLASS(cx, obj)->name, id,
+      aSet ? nsIXPCSecurityManager::ACCESS_SET_PROPERTY :
+             nsIXPCSecurityManager::ACCESS_GET_PROPERTY);
+  nsCOMPtr<nsIJSXMLHttpRequest> request;
+  if (NS_SUCCEEDED(rv))
+    request = do_QueryWrappedNative(wrapper, &rv);
+  if (NS_FAILED(rv) || !request) {
+    ThrowJSException(cx, NS_FAILED(rv) ? rv : NS_ERROR_UNEXPECTED);
+    return JS_FALSE;
+  }
+
+  nsDependentJSString name(id);
+  PRBool ready = name.EqualsLiteral("onreadystatechange");
+  nsCOMPtr<nsISupports> callback;
+  if (ready) {
+    nsCOMPtr<nsIOnReadyStateChangeHandler> listener;
+    if (aSet) {
+      if (JSVAL_IS_OBJECT(*vp) && !JSVAL_IS_NULL(*vp))
+        rv = sXPConnect->WrapJS(cx, JSVAL_TO_OBJECT(*vp),
+          NS_GET_IID(nsIOnReadyStateChangeHandler), getter_AddRefs(listener));
+      if (NS_SUCCEEDED(rv)) rv = request->SetOnreadystatechange(listener);
+    } else {
+      rv = request->GetOnreadystatechange(getter_AddRefs(listener));
+      callback = listener;
+    }
+  } else {
+    nsCOMPtr<nsIDOMEventListener> listener;
+    if (aSet && JSVAL_IS_OBJECT(*vp) && !JSVAL_IS_NULL(*vp))
+      rv = sXPConnect->WrapJS(cx, JSVAL_TO_OBJECT(*vp),
+        NS_GET_IID(nsIDOMEventListener), getter_AddRefs(listener));
+    if (NS_SUCCEEDED(rv)) {
+      if (name.EqualsLiteral("onload"))
+        rv = aSet ? request->SetOnload(listener) :
+                    request->GetOnload(getter_AddRefs(listener));
+      else if (name.EqualsLiteral("onerror"))
+        rv = aSet ? request->SetOnerror(listener) :
+                    request->GetOnerror(getter_AddRefs(listener));
+      else
+        rv = aSet ? request->SetOnprogress(listener) :
+                    request->GetOnprogress(getter_AddRefs(listener));
+    }
+    callback = listener;
+  }
+  if (NS_SUCCEEDED(rv) && !aSet) {
+    *vp = JSVAL_NULL;
+    if (callback) {
+      nsCOMPtr<nsIXPConnectWrappedJS> wrapped = do_QueryInterface(callback);
+      if (wrapped) {
+        JSObject *function = nsnull;
+        rv = wrapped->GetJSObject(&function);
+        if (NS_SUCCEEDED(rv)) *vp = OBJECT_TO_JSVAL(function);
+      } else {
+        nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+        rv = WrapNative(cx, obj, callback, ready ?
+          NS_GET_IID(nsIOnReadyStateChangeHandler) :
+          NS_GET_IID(nsIDOMEventListener), vp, getter_AddRefs(holder));
+      }
+    }
+  }
+  if (NS_FAILED(rv)) {
+    ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
+JSBool JS_DLL_CALLBACK
+nsXMLHttpRequestSH::GetHandler(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
+{
+  return AccessHandler(cx, obj, id, vp, PR_FALSE);
+}
+
+JSBool JS_DLL_CALLBACK
+nsXMLHttpRequestSH::SetHandler(JSContext *cx, JSObject *obj, jsval id, jsval *vp)
+{
+  return AccessHandler(cx, obj, id, vp, PR_TRUE);
+}
+
 NS_IMETHODIMP
 nsXMLHttpRequestSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
                                JSContext *cx, JSObject *obj, jsval id,
                                PRUint32 flags, JSObject **objp,
                                PRBool *_retval)
 {
+  JSVersion version = JS_GetVersion(cx);
+  if ((version == JSVERSION_DEFAULT || version == JSVERSION_ECMA_2015) &&
+      JSVAL_IS_STRING(id)) {
+    nsDependentJSString name(id);
+    if (name.EqualsLiteral("onload") || name.EqualsLiteral("onerror") ||
+        name.EqualsLiteral("onprogress") ||
+        name.EqualsLiteral("onreadystatechange")) {
+      if (!JS_DefineUCProperty(cx, obj, name.get(), name.Length(), JSVAL_NULL,
+                              GetHandler, SetHandler, JSPROP_ENUMERATE))
+        return NS_ERROR_OUT_OF_MEMORY;
+      *objp = obj;
+      return NS_OK;
+    }
+  }
   if (id == sXMLHttpRequestSend_id && !(flags & JSRESOLVE_ASSIGNING)) {
     JSFunction *fnc = JS_DefineFunction(cx, obj, "send",
                                         nsXMLHttpRequestSH::Send, 0,

@@ -1201,20 +1201,21 @@ LoongArch Suite backends.
 The full Speedometer 2.1 benchmark now passes in native LoongArch GTK2 Suite:
 16 enabled workloads, ten iterations, all 480 workload checks and the original
 completion callback. This first pass used a frozen initial History-binding
-runtime; a current Xlib package rerun and the other application builds/tests
-are in progress. Missing CSS rendering features and broader DOM conformance
+runtime; a current frozen Xlib package benchmark rerun remains in progress.
+All eight native application/backend package gates have since passed. Missing CSS rendering features and broader DOM conformance
 remain unfinished, independently of successful benchmark execution.
 Browser and Calendar GTK2 now pass their complete relocated-package gates;
 Calendar includes its eight unit-test groups and all four views. XULRunner
 GTK2 now also passes its complete package gate and standalone ChatZilla startup
 and XBL input checks. Calendar and XULRunner preserve their existing storage permission-service
 omissions; explicit denial-policy checks are recorded separately from storage
-conformance. The remaining Xlib application validation is in progress.
+conformance. Browser, Calendar and XULRunner Xlib also pass their complete
+package gates, content/History batches and appropriate HTTP policy checks.
 That validation exposed a native Browser preferences crash in Xlib font
 enumeration. The fix holds a live screen device while copying font names;
 both Browser backends pass the expanded thirty preference checks and twelve
-font-enumeration checks. Xlib Suite passes the font fixture, with remaining
-application/package validation continuing.
+font-enumeration checks. Xlib Suite passes the font fixture. These baseline
+results precede the subsequent XHR event-dispatch changes.
 
 History-state work now includes an immutable native graph serializer, preserving
 cycles and shared binary buffers without retaining source windows. Its 63

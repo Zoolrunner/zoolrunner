@@ -60,6 +60,7 @@
 #include "nsIProgressEventSink.h"
 #include "nsJSUtils.h"
 #include "nsTArray.h"
+#include "nsAutoPtr.h"
 #include "nsIDOMGCParticipant.h"
 #include "nsIJSNativeInitializer.h"
 #include "nsPIDOMWindow.h"
@@ -136,6 +137,30 @@ public:
 
 protected:
   typedef nsMarkedJSFunctionHolder<nsIDOMEventListener> ListenerHolder;
+  enum HandlerKind { ListenerCallback, LoadHandler, ErrorHandler,
+                     ProgressHandler, ReadyStateHandler };
+  struct EventRegistration {
+    EventRegistration(const nsAString& aType, PRBool aCapture, HandlerKind aKind)
+      : mType(aType), mCapture(aCapture), mRemoved(PR_FALSE), mKind(aKind), mRefs(0) {}
+    nsrefcnt AddRef() { return ++mRefs; }
+    nsrefcnt Release() {
+      nsrefcnt refs = --mRefs;
+      if (!refs) delete this;
+      return refs;
+    }
+    nsString mType;
+    PRBool mCapture;
+    PRBool mRemoved;
+    HandlerKind mKind;
+    ListenerHolder mListener;
+  private:
+    nsrefcnt mRefs;
+  };
+  nsresult UpdateEventHandler(const nsAString& aType, HandlerKind aKind,
+                             PRBool aActive);
+  nsresult DispatchModernEvent(nsIDOMEvent* aEvent, PRBool* aResult);
+  nsresult RootModernListeners(nsCOMArray<nsISupports>& aRoots);
+  PRBool HasModernEventListener(const nsAString& aType);
 
   nsresult GetStreamForWString(const PRUnichar* aStr,
                                PRInt32 aLength,
@@ -164,7 +189,7 @@ protected:
   void NotifyEventListeners(nsIDOMEventListener* aHandler,
                             const nsCOMArray<nsIDOMEventListener>* aListeners,
                             nsIDOMEvent* aEvent);
-  void ClearEventListeners();
+  void ClearEventListeners(PRBool aKeepRegistered = PR_FALSE);
   already_AddRefed<nsIHttpChannel> GetCurrentHttpChannel();
 
   nsresult CheckInnerWindowCorrectness()
@@ -189,6 +214,7 @@ protected:
 
   nsTArray<ListenerHolder*> mLoadEventListeners;
   nsTArray<ListenerHolder*> mErrorEventListeners;
+  nsTArray<nsRefPtr<EventRegistration> > mEventListeners;
   nsCOMPtr<nsIScriptContext> mScriptContext;
   nsWeakPtr mOwner; // Inner window.
 
@@ -233,6 +259,7 @@ protected:
   PRUint32 mState;
 
   PRPackedBool mDenyResponseDataAccess;
+  PRPackedBool mModernEvents;
 };
 
 

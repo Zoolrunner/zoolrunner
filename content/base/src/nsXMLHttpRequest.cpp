@@ -36,6 +36,7 @@
  * ***** END LICENSE BLOCK ***** */
 
 #include "nsXMLHttpRequest.h"
+#include "nsDOMError.h"
 #include "nsISimpleEnumerator.h"
 #include "nsIXPConnect.h"
 #include "nsIUnicodeEncoder.h"
@@ -242,6 +243,8 @@ nsXMLHttpRequest::Init()
     return NS_OK;
   }
 
+  JSVersion version = JS_GetVersion(cx);
+  mModernEvents = version == JSVERSION_DEFAULT || version == JSVERSION_ECMA_2015;
   nsIScriptContext* context = GetScriptContextFromJSContext(cx);
   if (!context) {
     return NS_OK;
@@ -268,6 +271,8 @@ NS_IMETHODIMP
 nsXMLHttpRequest::Initialize(nsISupports* aOwner, JSContext* cx, JSObject* obj,
                              PRUint32 argc, jsval *argv)
 {
+  JSVersion version = JS_GetVersion(cx);
+  mModernEvents = version == JSVERSION_DEFAULT || version == JSVERSION_ECMA_2015;
   mOwner = do_GetWeakReference(aOwner);
   if (!mOwner) {
     NS_WARNING("Unexpected nsIJSNativeInitializer owner");
@@ -319,13 +324,15 @@ GetDocumentFromScriptContext(nsIScriptContext *aScriptContext)
 
 nsXMLHttpRequest::nsXMLHttpRequest()
   : mState(XML_HTTP_REQUEST_UNINITIALIZED),
-    mDenyResponseDataAccess(PR_FALSE)
+    mDenyResponseDataAccess(PR_FALSE),
+    mModernEvents(PR_FALSE)
 {
   nsLayoutStatics::AddRef();
 }
 
 nsXMLHttpRequest::~nsXMLHttpRequest()
 {
+  if (mModernEvents) ClearEventListeners();
   if (mState & (XML_HTTP_REQUEST_STOPPED |
                 XML_HTTP_REQUEST_SENT |
                 XML_HTTP_REQUEST_INTERACTIVE)) {
@@ -371,6 +378,27 @@ nsXMLHttpRequest::AddEventListener(const nsAString& type,
                                    nsIDOMEventListener *listener,
                                    PRBool useCapture)
 {
+  if (mModernEvents) {
+    if (!listener) return NS_OK;
+    for (PRUint32 i = 0; i < mEventListeners.Length(); ++i) {
+      EventRegistration* entry = mEventListeners[i];
+      if (entry->mKind == ListenerCallback && entry->mType.Equals(type) &&
+          entry->mCapture == !!useCapture &&
+          nsCOMPtr<nsIDOMEventListener>(entry->mListener.Get()) == listener)
+        return NS_OK;
+    }
+    nsRefPtr<EventRegistration> entry = new EventRegistration(type, !!useCapture, ListenerCallback);
+    NS_ENSURE_TRUE(entry, NS_ERROR_OUT_OF_MEMORY);
+    entry->mListener.Set(listener, this);
+    NS_ENSURE_TRUE(mEventListeners.AppendElement(entry), NS_ERROR_OUT_OF_MEMORY);
+    if (type.EqualsLiteral("progress") && mChannel) {
+      nsLoadFlags flags;
+      nsresult rv = mChannel->GetLoadFlags(&flags);
+      NS_ENSURE_SUCCESS(rv, rv);
+      return mChannel->SetLoadFlags(flags & ~nsIRequest::LOAD_BACKGROUND);
+    }
+    return NS_OK;
+  }
   NS_ENSURE_ARG(listener);
 
   nsTArray<ListenerHolder*> *array;
@@ -399,6 +427,20 @@ nsXMLHttpRequest::RemoveEventListener(const nsAString & type,
                                       nsIDOMEventListener *listener,
                                       PRBool useCapture)
 {
+  if (mModernEvents) {
+    if (!listener) return NS_OK;
+    for (PRUint32 i = 0; i < mEventListeners.Length(); ++i) {
+      EventRegistration* entry = mEventListeners[i];
+      if (entry->mKind == ListenerCallback && entry->mType.Equals(type) &&
+          entry->mCapture == !!useCapture &&
+          nsCOMPtr<nsIDOMEventListener>(entry->mListener.Get()) == listener) {
+        entry->mRemoved = PR_TRUE;
+        mEventListeners.RemoveElementAt(i);
+        break;
+      }
+    }
+    return NS_OK;
+  }
   NS_ENSURE_ARG(listener);
 
   nsTArray<ListenerHolder*> *array;
@@ -429,9 +471,138 @@ nsXMLHttpRequest::RemoveEventListener(const nsAString & type,
 NS_IMETHODIMP
 nsXMLHttpRequest::DispatchEvent(nsIDOMEvent *evt, PRBool *_retval)
 {
-  // Ignored
-
+  NS_ENSURE_ARG_POINTER(_retval);
+  *_retval = PR_TRUE;
+  if (mModernEvents)
+    return DispatchModernEvent(evt, _retval);
+  // Preserve the historical no-op in explicitly selected legacy JS modes.
   return NS_OK;
+}
+
+nsresult
+nsXMLHttpRequest::UpdateEventHandler(const nsAString& aType,
+                                    HandlerKind aKind, PRBool aActive)
+{
+  for (PRUint32 i = 0; i < mEventListeners.Length(); ++i) {
+    EventRegistration* entry = mEventListeners[i];
+    if (entry->mKind != aKind) continue;
+    if (!aActive) {
+      entry->mRemoved = PR_TRUE;
+      mEventListeners.RemoveElementAt(i);
+    }
+    return NS_OK;
+  }
+  if (!aActive) return NS_OK;
+  nsRefPtr<EventRegistration> entry = new EventRegistration(aType, PR_FALSE, aKind);
+  NS_ENSURE_TRUE(entry, NS_ERROR_OUT_OF_MEMORY);
+  return mEventListeners.AppendElement(entry) ? NS_OK : NS_ERROR_OUT_OF_MEMORY;
+}
+
+PRBool
+nsXMLHttpRequest::HasModernEventListener(const nsAString& aType)
+{
+  for (PRUint32 i = 0; i < mEventListeners.Length(); ++i)
+    if (mEventListeners[i]->mType.Equals(aType)) return PR_TRUE;
+  return PR_FALSE;
+}
+
+nsresult
+nsXMLHttpRequest::RootModernListeners(nsCOMArray<nsISupports>& aRoots)
+{
+  for (PRUint32 i = 0; i < mEventListeners.Length(); ++i) {
+    EventRegistration* entry = mEventListeners[i];
+    nsCOMPtr<nsISupports> listener;
+    switch (entry->mKind) {
+      case ListenerCallback: listener = nsCOMPtr<nsIDOMEventListener>(entry->mListener.Get()); break;
+      case LoadHandler: listener = nsCOMPtr<nsIDOMEventListener>(mOnLoadListener.Get()); break;
+      case ErrorHandler: listener = nsCOMPtr<nsIDOMEventListener>(mOnErrorListener.Get()); break;
+      case ProgressHandler: listener = nsCOMPtr<nsIDOMEventListener>(mOnProgressListener.Get()); break;
+      case ReadyStateHandler: listener = nsCOMPtr<nsIOnReadyStateChangeHandler>(mOnReadystatechangeListener.Get()); break;
+    }
+    if (listener && !aRoots.AppendObject(listener)) return NS_ERROR_OUT_OF_MEMORY;
+  }
+  return NS_OK;
+}
+
+nsresult
+nsXMLHttpRequest::DispatchModernEvent(nsIDOMEvent* aEvent, PRBool* aResult)
+{
+  *aResult = PR_TRUE;
+  NS_ENSURE_ARG(aEvent);
+  nsCOMPtr<nsIPrivateDOMEvent> privateEvent = do_QueryInterface(aEvent);
+  NS_ENSURE_TRUE(privateEvent, NS_ERROR_INVALID_ARG);
+  nsEvent* event = nsnull;
+  privateEvent->GetInternalNSEvent(&event);
+  NS_ENSURE_TRUE(event, NS_ERROR_INVALID_ARG);
+  NS_ENSURE_TRUE(event->message && !NS_IS_EVENT_IN_DISPATCH(event),
+                 NS_ERROR_DOM_STANDARD_INVALID_STATE_ERR);
+  nsresult rv = CheckInnerWindowCorrectness();
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsAutoString type;
+  aEvent->GetType(type);
+  nsCOMPtr<nsIXMLHttpRequest> self = this;
+  nsCOMPtr<nsIDOMEvent> retainedEvent = aEvent;
+  nsCOMArray<nsISupports> listenerRoots;
+  rv = RootModernListeners(listenerRoots);
+  NS_ENSURE_SUCCESS(rv, rv);
+  privateEvent->SetTrusted(PR_FALSE);
+  privateEvent->SetTarget(this);
+  privateEvent->SetOriginalTarget(this);
+  NS_MARK_EVENT_DISPATCH_STARTED(event);
+  event->flags |= NS_EVENT_FLAG_CAPTURE | NS_EVENT_FLAG_BUBBLE;
+
+  nsCOMPtr<nsIJSContextStack> stack;
+  JSContext* cx = nsnull;
+  if (mScriptContext) {
+    stack = do_GetService("@mozilla.org/js/xpc/ContextStack;1");
+    if (stack) {
+      cx = NS_STATIC_CAST(JSContext*, mScriptContext->GetNativeContext());
+      if (cx && NS_FAILED(stack->Push(cx))) cx = nsnull;
+    }
+  }
+  for (PRUint32 phase = 0; phase < 2; ++phase) {
+    if (event->flags & NS_EVENT_FLAG_STOP_DISPATCH) break;
+    nsTArray<nsRefPtr<EventRegistration> > snapshot;
+    if (!snapshot.AppendElements(mEventListeners)) { rv = NS_ERROR_OUT_OF_MEMORY; break; }
+    privateEvent->SetCurrentTarget(this);
+    for (PRUint32 i = 0; i < snapshot.Length(); ++i) {
+      EventRegistration* entry = snapshot[i];
+      if (entry->mRemoved || !entry->mType.Equals(type) ||
+          entry->mCapture != (phase == 0)) continue;
+      if (NS_FAILED(CheckInnerWindowCorrectness())) break;
+      nsCOMPtr<nsIDOMEventListener> listener;
+      switch (entry->mKind) {
+        case ListenerCallback: listener = entry->mListener.Get(); break;
+        case LoadHandler: listener = mOnLoadListener.Get(); break;
+        case ErrorHandler: listener = mOnErrorListener.Get(); break;
+        case ProgressHandler: listener = mOnProgressListener.Get(); break;
+        case ReadyStateHandler: {
+          nsCOMPtr<nsIOnReadyStateChangeHandler> ready = mOnReadystatechangeListener.Get();
+          nsCOMPtr<nsIXPConnectWrappedJS> wrapped = do_QueryInterface(ready);
+          if (wrapped && cx) {
+            JSObject* callback = nsnull;
+            wrapped->GetJSObject(&callback);
+            nsCOMPtr<nsISupports> adapted;
+            if (callback && NS_SUCCEEDED(nsContentUtils::XPConnect()->WrapJS(
+                  cx, callback, NS_GET_IID(nsIDOMEventListener), getter_AddRefs(adapted))))
+              listener = do_QueryInterface(adapted);
+          } else if (ready) {
+            // Keep the frozen native callback interface for embedding clients.
+            ready->HandleEvent();
+          }
+          break;
+        }
+      }
+      if (listener) listener->HandleEvent(aEvent);
+      if (event->flags & NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY) break;
+    }
+  }
+  if (cx) stack->Pop(&cx);
+  privateEvent->SetCurrentTarget(nsnull);
+  event->flags &= ~(NS_EVENT_FLAG_CAPTURE | NS_EVENT_FLAG_BUBBLE);
+  NS_MARK_EVENT_DISPATCH_DONE(event);
+  *aResult = !(event->flags & NS_EVENT_FLAG_NO_DEFAULT);
+  return rv;
 }
 
 /* attribute nsIOnReadyStateChangeHandler onreadystatechange; */
@@ -448,6 +619,10 @@ nsXMLHttpRequest::GetOnreadystatechange(nsIOnReadyStateChangeHandler * *aOnready
 NS_IMETHODIMP
 nsXMLHttpRequest::SetOnreadystatechange(nsIOnReadyStateChangeHandler * aOnreadystatechange)
 {
+  if (mModernEvents) {
+    nsresult rv = UpdateEventHandler(NS_LITERAL_STRING("readystatechange"), ReadyStateHandler, aOnreadystatechange != nsnull);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
   mOnReadystatechangeListener.Set(aOnreadystatechange, this);
 
   return NS_OK;
@@ -468,6 +643,10 @@ nsXMLHttpRequest::GetOnload(nsIDOMEventListener * *aOnLoad)
 NS_IMETHODIMP
 nsXMLHttpRequest::SetOnload(nsIDOMEventListener * aOnLoad)
 {
+  if (mModernEvents) {
+    nsresult rv = UpdateEventHandler(NS_LITERAL_STRING("load"), LoadHandler, aOnLoad != nsnull);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
   mOnLoadListener.Set(aOnLoad, this);
 
   return NS_OK;
@@ -487,6 +666,10 @@ nsXMLHttpRequest::GetOnerror(nsIDOMEventListener * *aOnerror)
 NS_IMETHODIMP
 nsXMLHttpRequest::SetOnerror(nsIDOMEventListener * aOnerror)
 {
+  if (mModernEvents) {
+    nsresult rv = UpdateEventHandler(NS_LITERAL_STRING("error"), ErrorHandler, aOnerror != nsnull);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
   mOnErrorListener.Set(aOnerror, this);
 
   return NS_OK;
@@ -506,6 +689,10 @@ nsXMLHttpRequest::GetOnprogress(nsIDOMEventListener * *aOnprogress)
 NS_IMETHODIMP
 nsXMLHttpRequest::SetOnprogress(nsIDOMEventListener * aOnprogress)
 {
+  if (mModernEvents) {
+    nsresult rv = UpdateEventHandler(NS_LITERAL_STRING("progress"), ProgressHandler, aOnprogress != nsnull);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
   mOnProgressListener.Set(aOnprogress, this);
 
   // open() may have created a background channel before the handler was set.
@@ -896,6 +1083,11 @@ nsXMLHttpRequest::NotifyEventListeners(nsIDOMEventListener* aHandler,
 {
   if (!aEvent)
     return;
+  if (mModernEvents) {
+    PRBool result;
+    DispatchModernEvent(aEvent, &result);
+    return;
+  }
 
   nsCOMPtr<nsIJSContextStack> stack;
   JSContext *cx = nsnull;
@@ -953,12 +1145,18 @@ nsXMLHttpRequest::NotifyEventListeners(nsIDOMEventListener* aHandler,
 }
 
 void
-nsXMLHttpRequest::ClearEventListeners()
+nsXMLHttpRequest::ClearEventListeners(PRBool aKeepRegistered)
 {
   if (mState & XML_HTTP_REQUEST_ROOTED) {
     nsDOMClassInfo::UnsetExternallyReferenced(this);
     mState &= ~XML_HTTP_REQUEST_ROOTED;
   }
+
+  if (aKeepRegistered)
+    return;
+  for (PRUint32 index = 0; index < mEventListeners.Length(); ++index)
+    mEventListeners[index]->mRemoved = PR_TRUE;
+  mEventListeners.Clear();
 
   // This isn't *really* needed anymore now that we use
   // nsMarkedJSFunctionHolder, but we may as well keep it for safety
@@ -1103,7 +1301,8 @@ nsXMLHttpRequest::OpenRequest(const nsACString& method,
   // a progress event handler we must load with nsIRequest::LOAD_NORMAL or
   // necko won't generate any progress notifications
   nsLoadFlags loadFlags;
-  if (nsCOMPtr<nsIDOMEventListener>(mOnProgressListener.Get())) {
+  if (nsCOMPtr<nsIDOMEventListener>(mOnProgressListener.Get()) ||
+      (mModernEvents && HasModernEventListener(NS_LITERAL_STRING("progress")))) {
     loadFlags = nsIRequest::LOAD_NORMAL;
   } else {
     loadFlags = nsIRequest::LOAD_BACKGROUND;
@@ -1598,6 +1797,12 @@ nsXMLHttpRequest::RequestCompleted()
   for (PRUint32 i = 0; i < count; ++i)
     listenersCopy.ReplaceObjectAt(nsCOMPtr<nsIDOMEventListener>(mLoadEventListeners[i]->Get()), i);
 
+  nsCOMArray<nsISupports> listenerRoots;
+  if (mModernEvents) {
+    nsresult rootResult = RootModernListeners(listenerRoots);
+    NS_ENSURE_SUCCESS(rootResult, rootResult);
+  }
+
   // Clear listeners here unless we're multipart
   ChangeState(XML_HTTP_REQUEST_COMPLETED, PR_TRUE,
               !(mState & XML_HTTP_REQUEST_MULTIPART));
@@ -2017,7 +2222,12 @@ nsXMLHttpRequest::Error(nsIDOMEvent* aEvent)
   for (PRUint32 i = 0; i < count; ++i)
     listenersCopy.ReplaceObjectAt(nsCOMPtr<nsIDOMEventListener>(mErrorEventListeners[i]->Get()), i);
 
-  ClearEventListeners();
+  nsCOMArray<nsISupports> listenerRoots;
+  if (mModernEvents) {
+    nsresult rootResult = RootModernListeners(listenerRoots);
+    NS_ENSURE_SUCCESS(rootResult, rootResult);
+  }
+  ClearEventListeners(mModernEvents);
   
   NotifyEventListeners(onErrorListener, &listenersCopy, event);
 
@@ -2040,11 +2250,30 @@ nsXMLHttpRequest::ChangeState(PRUint32 aState, PRBool aBroadcast,
   nsCOMPtr<nsIOnReadyStateChangeHandler> onReadyStateChangeListener =
     mOnReadystatechangeListener.Get();
 
+  nsCOMArray<nsISupports> listenerRoots;
+  if (mModernEvents) {
+    nsresult rootResult = RootModernListeners(listenerRoots);
+    NS_ENSURE_SUCCESS(rootResult, rootResult);
+  }
   if (aClearEventListeners) {
-    ClearEventListeners();
+    ClearEventListeners(mModernEvents);
   }
 
-  if ((mState & XML_HTTP_REQUEST_ASYNC) &&
+  if (mModernEvents && (mState & XML_HTTP_REQUEST_ASYNC) &&
+      (aState & XML_HTTP_REQUEST_LOADSTATES) && aBroadcast &&
+      HasModernEventListener(NS_LITERAL_STRING("readystatechange")) &&
+      NS_SUCCEEDED(CheckInnerWindowCorrectness())) {
+    nsCOMPtr<nsIDOMEvent> event;
+    rv = NS_NewDOMEvent(getter_AddRefs(event), nsnull, nsnull);
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = event->InitEvent(NS_LITERAL_STRING("readystatechange"), PR_FALSE, PR_FALSE);
+    NS_ENSURE_SUCCESS(rv, rv);
+    nsCOMPtr<nsIPrivateDOMEvent2> owner = do_QueryInterface(event);
+    if (owner && mScriptContext) owner->SetEventGlobal(mScriptContext->GetGlobalObject());
+    PRBool result;
+    return DispatchModernEvent(event, &result);
+  }
+  if (!mModernEvents && (mState & XML_HTTP_REQUEST_ASYNC) &&
       (aState & XML_HTTP_REQUEST_LOADSTATES) && // Broadcast load states only
       aBroadcast &&
       onReadyStateChangeListener &&
@@ -2129,7 +2358,8 @@ NS_IMETHODIMP
 nsXMLHttpRequest::OnProgress(nsIRequest *aRequest, nsISupports *aContext, PRUint64 aProgress, PRUint64 aProgressMax)
 {
   nsCOMPtr<nsIDOMEventListener> listener = mOnProgressListener.Get();
-  if (listener) {
+  if (listener || (mModernEvents &&
+                   HasModernEventListener(NS_LITERAL_STRING("progress")))) {
     nsCOMPtr<nsIDOMEvent> event;
     nsEvent evt(PR_TRUE, NS_EVENT_NULL);
     nsresult rv = CreateEvent(&evt, getter_AddRefs(event), "progress");

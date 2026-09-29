@@ -716,14 +716,14 @@ checks, including actual font-menu population; Xlib Suite passes the font
 fixture too. Package validation is rerunning after this fix. See the
 [font regression notes](../../../../gfx/tests/README-font-enumeration.md).
 
-### Synthetic XHR dispatch diagnostic (known failures)
+### Synthetic XHR dispatch and callback regressions
 
 `../style/xhr-synthetic-events.html` exercises the
 [DOM dispatch algorithm](https://dom.spec.whatwg.org/#concept-event-dispatch)
 on [XMLHttpRequestEventTarget](https://xhr.spec.whatwg.org/#xmlhttprequesteventtarget):
 initialization, target/currentTarget, cancellation, listener identity/capture,
 handler activation order, removal/readdition, nested dispatch and propagation.
-It is a pending conformance target, not part of the passing 985-check batch.
+It runs separately from the baseline 985-check batch.
 The GTK2 Suite baseline records 22 failures in 27 reached assertions because
 synthetic callbacks never run and custom event types cannot be registered.
 The native `DispatchEvent` stub also returns success without initializing its
@@ -736,8 +736,8 @@ clearing both propagation flags after dispatch; the fixture retains those
 requirements rather than copying that reference browser's behavior. Reports
 are `xhr-synthetic-before-gtk2.json` and `xhr-synthetic-chromium.json`. These
 results reinforce that benchmark completion and browser comparisons alone are
-not evidence of complete conformance. Native dispatch implementation remains
-unfinished.
+not evidence of complete conformance. The new native implementation passes all 43 in GTK2 Suite; broader XHR
+conformance remains unfinished.
 
 ### Completed native application matrix (2026-09-29 baseline)
 
@@ -763,3 +763,21 @@ owned by the benchmark driver. A previous separate-server attempt stopped when
 that server exited; it is retained as an infrastructure failure, not a pass.
 Benchmark completion and this matrix do not establish exhaustive specification
 or historical-application compatibility; the feature limitations above remain.
+
+The XHR event registry now handles arbitrary synthetic event types, capture,
+callback identity, handler activation order and mutation during dispatch.
+Modern requests retain registered listeners across completion/reuse; explicitly
+selected historical JavaScript versions keep their legacy callback ordering,
+completion cleanup and no-op synthetic dispatch. The latter now initializes its
+boolean return value. Modern callback getters return the original JavaScript
+function through a security-checked binding, preserving native XPIDL interfaces.
+
+The focused GTK2 Suite run passes 181 assertions across synthetic dispatch,
+callback identity, reuse, legacy mode and the four existing network fixtures.
+The separate `xhr-gc.xul` fixture passes ten collection/reentrancy assertions.
+Reports are `xhr-modern-gtk2-*.json` and `xhr-modern-gtk2-gc.log`.
+This does not establish complete XHR compliance: native trust flags, abort and
+request event sequencing, callback return-value cancellation, additional XHR
+fields and listener options remain separate gaps. In particular the reuse
+fixture verifies delivery and ordering, not exact readyState transition counts.
+Xlib and other-application validation of these changes is still pending.

@@ -1,0 +1,19 @@
+<!doctype html><title>XHR event handler identity</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label);}
+try {
+ var names=['onload','onerror','onprogress','onreadystatechange'];
+ for(var i=0;i<names.length;i++) {
+  var request=new XMLHttpRequest(),name=names[i];
+  check(request[name],null,name+' initially null');
+  var first=function(){},second=function(){};
+  request[name]=first;check(request[name],first,name+' original function');
+  request[name]=second;check(request[name],second,name+' replacement function');
+  request[name]=null;check(request[name],null,name+' cleared');
+  request[name]=first;request[name]=12;check(request[name],null,name+' number clears');
+  request[name]=first;request[name]='text';check(request[name],null,name+' string clears');
+  request[name]=first;request[name]=undefined;check(request[name],null,name+' undefined clears');
+ }
+} catch(e){check(String(e),'no exception','handler identity exception '+e);}
+testDone=true;
+</script>

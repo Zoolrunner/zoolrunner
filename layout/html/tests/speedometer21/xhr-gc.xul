@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        onload="run()" width="300" height="100">
+<script type="application/javascript;version=2015"><![CDATA[
+var checks=[],failures=0;
+function check(a,b,label){if(a!==b)++failures;checks.push((a===b?'PASS ':'FAIL ')+label);}
+function run(){
+ var C=Components.classes,I=Components.interfaces;
+ var debuggerService=C['@mozilla.org/js/jsd/debugger-service;1'].getService(I.jsdIDebuggerService);
+ debuggerService.on();
+ try{
+  var request=new XMLHttpRequest(),order=[];
+  function removed(){order.push('removed');}
+  request.addEventListener('custom',function(e){
+   order.push('first');debuggerService.GC();
+   check(e.target,request,'target survives collection');
+   check(e.currentTarget,request,'currentTarget survives collection');
+  });
+  request.addEventListener('custom',removed);
+  request.addEventListener('custom',function(){order.push('last');});
+  removed=null;
+  // A different registration tests deletion during a snapshot.
+  var removable=function(){order.push('remove-me');};
+  request.addEventListener('second',function(){
+   request.removeEventListener('second',removable);removable=null;debuggerService.GC();
+  });
+  request.addEventListener('second',removable);
+  debuggerService.GC();
+  var event=new Event('custom');
+  check(request.dispatchEvent(event),true,'dispatch after collection');
+  check(order.join(','),'first,removed,last','registered callbacks survive collection');
+  order=[];request.dispatchEvent(new Event('second'));
+  check(order.length,0,'removed callback skipped after collection');
+  var saved=event;request=null;debuggerService.GC();
+  check(saved.target instanceof XMLHttpRequest,true,'retained event keeps native target usable');
+  check(saved.currentTarget,null,'retained event currentTarget cleared');
+  request=saved.target;
+  var nested=0;
+  request.addEventListener('inner',function(){++nested;debuggerService.GC();});
+  request.addEventListener('outer',function(e){
+   request.dispatchEvent(new Event('inner'));debuggerService.GC();
+   check(e.currentTarget,request,'nested collection preserves outer target');
+   check(e.eventPhase,2,'nested collection preserves outer phase');
+  });
+  request.dispatchEvent(new Event('outer'));
+  check(nested,1,'nested listener called');
+ }catch(e){check(String(e),'no exception','unexpected exception');}
+ finally{debuggerService.off();}
+ dump('XHR-GC checks='+checks.length+' failures='+failures+'\n');
+ dump('SPEEDOMETER-RESULT '+JSON.stringify({pass:failures===0,detail:{failures:failures,results:checks}})+'\n');
+ C['@mozilla.org/toolkit/app-startup;1'].getService(I.nsIAppStartup).quit(3);
+}
+]]></script></window>
