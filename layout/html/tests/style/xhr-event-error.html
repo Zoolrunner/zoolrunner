@@ -1,0 +1,36 @@
+<!doctype html><title>XMLHttpRequest network error event</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+var request=new XMLHttpRequest(),later=0;
+request.onerror=function(e){
+ try {
+  check(e.type,'error','network error type');
+  check(e.target,request,'network error target');
+  check(e.currentTarget,request,'network error current target');
+  check(e.eventPhase,2,'network error at-target phase');
+  check(e.bubbles,false,'network error does not bubble');
+  check(e.cancelable,false,'network error is not cancelable');
+  e.preventDefault();
+  check(e.defaultPrevented,false,'network error cannot be canceled');
+  e.initEvent('ignored',true,true);
+  check(e.type,'error','network error initialization ignored during dispatch');
+  e.stopImmediatePropagation();
+ }catch(error){check(String(error),'no exception','network error callback');}
+ setTimeout(function(){
+  try {
+   check(later,0,'later network error listener skipped');
+   check(e.type,'error','retained network error type');
+   check(e.target,request,'retained network error target');
+   check(e.currentTarget,null,'network error current target cleared');
+   check(e.eventPhase,0,'network error phase reset');
+   check(e.cancelBubble,false,'network error propagation reset');
+  }catch(error){check(String(error),'no exception','retained network error');}
+  check(testResults.length,14,'all network error assertions executed');
+  testDone=true;
+ },50);
+};
+request.addEventListener('error',function(){++later;},false);
+request.onload=function(){check('load','error','network error delivered');testDone=true;};
+request.open('GET','/connection-error',true);
+request.send(null);
+</script>

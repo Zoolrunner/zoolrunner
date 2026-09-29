@@ -863,6 +863,9 @@ nsXMLHttpRequest::CreateEvent(nsEvent* aEvent, nsIDOMEvent** aDOMEvent,
     NS_RELEASE(*aDOMEvent);
     return rv;
   }
+  nsEvent* ownedEvent;
+  privevent->GetInternalNSEvent(&ownedEvent);
+  ownedEvent->flags |= NS_EVENT_FLAG_CANT_BUBBLE | NS_EVENT_FLAG_CANT_CANCEL;
   privevent->SetTarget(this);
   privevent->SetCurrentTarget(this);
   privevent->SetOriginalTarget(this);
@@ -892,6 +895,16 @@ nsXMLHttpRequest::NotifyEventListeners(nsIDOMEventListener* aHandler,
     return;
   }
 
+  nsCOMPtr<nsIPrivateDOMEvent> privateEvent = do_QueryInterface(aEvent);
+  nsEvent* nativeEvent = nsnull;
+  if (privateEvent)
+    privateEvent->GetInternalNSEvent(&nativeEvent);
+  if (!nativeEvent || NS_IS_EVENT_IN_DISPATCH(nativeEvent))
+    return;
+  privateEvent->SetCurrentTarget(this);
+  nativeEvent->flags |= NS_EVENT_FLAG_CAPTURE | NS_EVENT_FLAG_BUBBLE;
+  NS_MARK_EVENT_DISPATCH_STARTED(nativeEvent);
+
   if (mScriptContext) {
     stack = do_GetService("@mozilla.org/js/xpc/ContextStack;1");
 
@@ -910,6 +923,8 @@ nsXMLHttpRequest::NotifyEventListeners(nsIDOMEventListener* aHandler,
 
   if (aListeners) {
     for (PRInt32 i = 0, i_end = aListeners->Count(); i < i_end; ++i) {
+      if (nativeEvent->flags & NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY)
+        break;
       nsIDOMEventListener *listener = aListeners->ObjectAt(i);
       if (listener) {
         if (NS_FAILED(CheckInnerWindowCorrectness())) {
@@ -923,6 +938,9 @@ nsXMLHttpRequest::NotifyEventListeners(nsIDOMEventListener* aHandler,
   if (cx) {
     stack->Pop(&cx);
   }
+  privateEvent->SetCurrentTarget(nsnull);
+  nativeEvent->flags &= ~(NS_EVENT_FLAG_CAPTURE | NS_EVENT_FLAG_BUBBLE);
+  NS_MARK_EVENT_DISPATCH_DONE(nativeEvent);
 }
 
 void
@@ -1972,12 +1990,12 @@ nsresult
 nsXMLHttpRequest::Error(nsIDOMEvent* aEvent)
 {
   // We need to create the event before nulling out mDocument
-  nsCOMPtr<nsIDOMEvent> event(do_QueryInterface(aEvent));
+  // A parser error may already be dispatching at its document. The request
+  // notification has its own target and dispatch lifetime.
+  nsCOMPtr<nsIDOMEvent> event;
   // There is no NS_PAGE_ERROR event but NS_SCRIPT_ERROR should be ok.
   nsEvent evt(PR_TRUE, NS_SCRIPT_ERROR);
-  if (!event) {
-    CreateEvent(&evt, getter_AddRefs(event));
-  }
+  CreateEvent(&evt, getter_AddRefs(event));
 
   mDocument = nsnull;
   ChangeState(XML_HTTP_REQUEST_COMPLETED);
@@ -2112,7 +2130,7 @@ nsXMLHttpRequest::OnProgress(nsIRequest *aRequest, nsISupports *aContext, PRUint
     if (!progressEvent)
       return NS_ERROR_OUT_OF_MEMORY;
 
-    event = do_QueryInterface(progressEvent); 
+    event = NS_STATIC_CAST(nsIDOMLSProgressEvent*, progressEvent);
     NotifyEventListeners(listener, nsnull, event);
   }
 
@@ -2233,6 +2251,11 @@ nsHeaderVisitor::VisitHeader(const nsACString &header, const nsACString &value)
 nsXMLHttpProgressEvent::nsXMLHttpProgressEvent(nsIDOMEvent * aInner, PRUint64 aCurrentProgress, PRUint64 aMaxProgress)
 {
   mInner = aInner; 
+  mNSEvent = do_QueryInterface(aInner);
+  mState = do_QueryInterface(aInner);
+  mPropagation = do_QueryInterface(aInner);
+  mPrivate = do_QueryInterface(aInner);
+  mOwner = do_QueryInterface(aInner);
   mCurProgress = aCurrentProgress;
   mMaxProgress = aMaxProgress;
 }
@@ -2245,6 +2268,11 @@ NS_INTERFACE_MAP_BEGIN(nsXMLHttpProgressEvent)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMLSProgressEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMLSProgressEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMEvent)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMNSEvent)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMEventState)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMEventPropagation)
+  NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent)
+  NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent2)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(XMLHttpProgressEvent)
 NS_INTERFACE_MAP_END
 

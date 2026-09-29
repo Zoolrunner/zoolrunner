@@ -434,3 +434,28 @@ event dispatch semantics and modern progress interfaces remain to be completed.
 The 24 Suite lifecycle checks and all three isolated AngularJS TodoMVC operations
 also pass with this ownership correction. The ongoing full benchmark uses an
 earlier frozen runtime and does not validate this later change.
+
+XHR load, progress and error notifications now mark dispatch state, expose the
+at-target phase, honor immediate stopping, reject reinitialization during
+callbacks, and clear currentTarget/phase/propagation afterward. The progress
+wrapper forwards shared event interfaces while preserving its own XPCOM identity
+and legacy progress interface. Parser errors get a separate request event rather
+than reusing an event still dispatching on its document. These notifications are
+non-bubbling and non-cancelable.
+
+Run the HTTP fixtures with a temporary loopback server (including a controlled
+connection reset for the network-error case):
+
+```sh
+python3 layout/html/tests/speedometer21/run-http-probes.py \
+  --runtime obj-speedometer21-suite-merged/dist/bin \
+  --reports artifacts/speedometer21/http-probes
+```
+
+Native LoongArch GTK2 passes all 155 assertions across its five fixtures: local
+storage, legacy storage events, XHR event lifetime, dispatch and network errors.
+The dispatch fixture reproduced 12 failures before the correction. General XHR
+EventTarget registration/dispatch, callback ordering, and modern ProgressEvent
+construction/data fields remain separate gaps; these results are bounded event
+notification coverage, not complete XHR conformance.
+The 24 Suite lifecycle checks also pass after these dispatch changes.

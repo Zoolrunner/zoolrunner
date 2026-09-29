@@ -1,0 +1,56 @@
+<!doctype html><title>XMLHttpRequest event dispatch state</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+var request=new XMLHttpRequest(),progress=null,load=null,later=0;
+function during(e,type){
+ check(e.type,type,type+' type');
+ check(e.target,request,type+' target');
+ check(e.currentTarget,request,type+' current target');
+ check(e.eventPhase,2,type+' at-target phase');
+ check(e.bubbles,false,type+' does not bubble');
+ check(e.cancelable,false,type+' is not cancelable');
+ check(e.defaultPrevented,false,type+' starts uncanceled');
+ e.preventDefault();
+ check(e.defaultPrevented,false,type+' cannot be canceled');
+ e.initEvent('ignored',true,true);
+ check(e.type,type,type+' initialization ignored during dispatch');
+ check(e.target,request,type+' initialization preserves target');
+ e.stopImmediatePropagation();
+ check(e.cancelBubble,true,type+' immediate stopping visible');
+}
+request.onprogress=function(e){
+ if(progress)return;
+ progress=e;
+ try{during(e,'progress');}catch(error){check(String(error),'no exception','progress dispatch');}
+};
+request.onload=function(e){
+ load=e;
+ try{during(e,'load');}catch(error){check(String(error),'no exception','load dispatch');}
+ setTimeout(function(){
+  try {
+   check(progress!==null,true,'progress delivered');
+   check(later,0,'immediate stopping skips later load listener');
+   var events=[progress,load];
+   for(var i=0;i<events.length;++i){
+    var event=events[i],type=i?'load':'progress';
+    check(event.currentTarget,null,type+' current target cleared');
+    check(event.eventPhase,0,type+' phase cleared');
+    check(event.cancelBubble,false,type+' propagation reset');
+    check(event.target,request,type+' target retained');
+    event.initEvent('redispatch-'+type,true,true);
+    var target=document.createElement('div'),calls=0;
+    target.addEventListener('redispatch-'+type,function(ev){++calls;ev.preventDefault();},false);
+    check(target.dispatchEvent(event),false,type+' completed event redispatches');
+    check(calls,1,type+' redispatch listener called');
+    check(event.defaultPrevented,true,type+' redispatch cancellation visible');
+   }
+  }catch(error){check(String(error),'no exception','completed event state');}
+  check(testResults.length,38,'all dispatch assertions executed');
+  testDone=true;
+ },50);
+};
+request.addEventListener('load',function(){++later;},false);
+request.onerror=function(){check('error','load','request completed');testDone=true;};
+request.open('GET','xhr-event-dispatch.html?payload='+new Date().getTime(),true);
+request.send(null);
+</script>

@@ -64,6 +64,10 @@
 #include "nsIJSNativeInitializer.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDOMLSProgressEvent.h"
+#include "nsIDOMNSEvent.h"
+#include "nsIDOMEventState.h"
+#include "nsIDOMEventPropagation.h"
+#include "nsIPrivateDOMEvent.h"
 
 class nsILoadGroup;
 
@@ -234,7 +238,12 @@ protected:
 
 // helper class to expose a progress DOM Event
 
-class nsXMLHttpProgressEvent : public nsIDOMLSProgressEvent
+class nsXMLHttpProgressEvent : public nsIDOMLSProgressEvent,
+                               public nsIDOMNSEvent,
+                               public nsIDOMEventState,
+                               public nsIDOMEventPropagation,
+                               public nsIPrivateDOMEvent,
+                               public nsIPrivateDOMEvent2
 {
 public:
   nsXMLHttpProgressEvent(nsIDOMEvent * aInner, PRUint64 aCurrentProgress, PRUint64 aMaxProgress);
@@ -243,9 +252,28 @@ public:
   NS_DECL_ISUPPORTS
   NS_DECL_NSIDOMLSPROGRESSEVENT
   NS_FORWARD_NSIDOMEVENT(mInner->)
+  NS_FORWARD_NSIDOMNSEVENT(mNSEvent->)
+  NS_FORWARD_NSIDOMEVENTSTATE(mState->)
+  NS_FORWARD_NSIDOMEVENTPROPAGATION(mPropagation->)
+
+  NS_IMETHOD DuplicatePrivateData() { return mPrivate->DuplicatePrivateData(); }
+  NS_IMETHOD SetTarget(nsIDOMEventTarget* aTarget) { return mPrivate->SetTarget(aTarget); }
+  NS_IMETHOD SetCurrentTarget(nsIDOMEventTarget* aTarget) { return mPrivate->SetCurrentTarget(aTarget); }
+  NS_IMETHOD SetOriginalTarget(nsIDOMEventTarget* aTarget) { return mPrivate->SetOriginalTarget(aTarget); }
+  NS_IMETHOD IsDispatchStopped(PRBool* aStopped) { return mPrivate->IsDispatchStopped(aStopped); }
+  NS_IMETHOD GetInternalNSEvent(nsEvent** aEvent) { return mPrivate->GetInternalNSEvent(aEvent); }
+  NS_IMETHOD HasOriginalTarget(PRBool* aResult) { return mPrivate->HasOriginalTarget(aResult); }
+  NS_IMETHOD SetTrusted(PRBool aTrusted) { return mPrivate->SetTrusted(aTrusted); }
+  NS_IMETHOD GetEventGlobal(nsIScriptGlobalObject** aGlobal) { return mOwner->GetEventGlobal(aGlobal); }
+  NS_IMETHOD SetEventGlobal(nsIScriptGlobalObject* aGlobal) { return mOwner->SetEventGlobal(aGlobal); }
 
 protected:
   nsCOMPtr<nsIDOMEvent> mInner;
+  nsCOMPtr<nsIDOMNSEvent> mNSEvent;
+  nsCOMPtr<nsIDOMEventState> mState;
+  nsCOMPtr<nsIDOMEventPropagation> mPropagation;
+  nsCOMPtr<nsIPrivateDOMEvent> mPrivate;
+  nsCOMPtr<nsIPrivateDOMEvent2> mOwner;
   PRUint64 mCurProgress;
   PRUint64 mMaxProgress;
 };
