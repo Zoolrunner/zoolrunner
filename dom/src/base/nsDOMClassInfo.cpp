@@ -592,17 +592,17 @@ static nsDOMClassInfoData sClassInfoData[] = {
                                      ARRAY_SCRIPTABLE_FLAGS)
 
   // Event
-  NS_DEFINE_CLASSINFO_DATA(Event, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(Event, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(MutationEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(MutationEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(UIEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(UIEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(MouseEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(MouseEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(KeyboardEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(KeyboardEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(PopupBlockedEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(PopupBlockedEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
 
   // Misc HTML classes
@@ -875,7 +875,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
   NS_DEFINE_CLASSINFO_DATA(CSSMozDocumentRule, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
 
-  NS_DEFINE_CLASSINFO_DATA(BeforeUnloadEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(BeforeUnloadEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
 
 #ifdef MOZ_SVG
@@ -962,7 +962,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(SVGAnimatedTransformList, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(SVGEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(SVGEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(SVGException, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
@@ -1028,7 +1028,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(SVGTransformList, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(SVGZoomEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(SVGZoomEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
 #endif // MOZ_SVG
 
@@ -1043,9 +1043,9 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
 #endif // MOZ_ENABLE_CANVAS
 
- NS_DEFINE_CLASSINFO_DATA(SmartCardEvent, nsDOMGenericSH,
+ NS_DEFINE_CLASSINFO_DATA(SmartCardEvent, nsDOMEventSH,
                           DOM_DEFAULT_SCRIPTABLE_FLAGS)
- NS_DEFINE_CLASSINFO_DATA(PageTransitionEvent, nsDOMGenericSH,
+ NS_DEFINE_CLASSINFO_DATA(PageTransitionEvent, nsDOMEventSH,
                           DOM_DEFAULT_SCRIPTABLE_FLAGS)
 
    // WhatWG Storage
@@ -1066,7 +1066,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
                             ARRAY_SCRIPTABLE_FLAGS)
    NS_DEFINE_CLASSINFO_DATA(StorageItem, nsDOMGenericSH,
                             DOM_DEFAULT_SCRIPTABLE_FLAGS)
-   NS_DEFINE_CLASSINFO_DATA(StorageEvent, nsDOMGenericSH,
+   NS_DEFINE_CLASSINFO_DATA(StorageEvent, nsDOMEventSH,
                             DOM_DEFAULT_SCRIPTABLE_FLAGS)
  
 
@@ -1095,7 +1095,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
   NS_DEFINE_CLASSINFO_DATA(XMLSerializer, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
 
-  NS_DEFINE_CLASSINFO_DATA(XMLHttpProgressEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(XMLHttpProgressEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(XMLHttpRequest, nsXMLHttpRequestSH,
                            GCPARTICIPANT_SCRIPTABLE_FLAGS)
@@ -1108,7 +1108,7 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            ELEMENT_SCRIPTABLE_FLAGS)
 #endif
 
-  NS_DEFINE_CLASSINFO_DATA(XULCommandEvent, nsDOMGenericSH,
+  NS_DEFINE_CLASSINFO_DATA(XULCommandEvent, nsDOMEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(DOMRect, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
@@ -3221,6 +3221,27 @@ nsDOMClassInfo::PreCreate(nsISupports *nativeObj, JSContext *cx,
       GetCurrentInnerWindowInternal()->GetGlobalJSObject();
   }
 
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEventSH::PreCreate(nsISupports* native, JSContext* cx,
+                        JSObject* global, JSObject** parent)
+{
+  nsresult rv = nsDOMGenericSH::PreCreate(native, cx, global, parent);
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIPrivateDOMEvent2> event = do_QueryInterface(native);
+  if (!event) return NS_OK;
+  nsCOMPtr<nsIScriptGlobalObject> owner;
+  event->GetEventGlobal(getter_AddRefs(owner));
+  if (owner && owner->GetGlobalJSObject()) {
+    *parent = owner->GetGlobalJSObject();
+    return NS_OK;
+  }
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  sXPConnect->GetWrappedNativeOfJSObject(cx, *parent, getter_AddRefs(wrapper));
+  owner = do_QueryWrappedNative(wrapper);
+  if (owner) event->SetEventGlobal(owner);
   return NS_OK;
 }
 

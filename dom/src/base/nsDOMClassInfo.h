@@ -405,10 +405,21 @@ public:
 
 typedef nsDOMClassInfo nsDOMGenericSH;
 
-class nsCustomEventSH : public nsDOMGenericSH
+class nsDOMEventSH : public nsDOMGenericSH
 {
 protected:
-  nsCustomEventSH(nsDOMClassInfoData* aData) : nsDOMGenericSH(aData) {}
+  nsDOMEventSH(nsDOMClassInfoData* data) : nsDOMGenericSH(data) {}
+public:
+  NS_IMETHOD PreCreate(nsISupports* native, JSContext* cx,
+                       JSObject* global, JSObject** parent);
+  static nsIClassInfo* doCreate(nsDOMClassInfoData* data)
+  { return new nsDOMEventSH(data); }
+};
+
+class nsCustomEventSH : public nsDOMEventSH
+{
+protected:
+  nsCustomEventSH(nsDOMClassInfoData* aData) : nsDOMEventSH(aData) {}
 public:
   NS_IMETHOD NewResolve(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
                         JSObject* obj, jsval id, PRUint32 flags,

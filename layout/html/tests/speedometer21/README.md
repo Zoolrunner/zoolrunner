@@ -118,7 +118,7 @@ remain unvalidated. These focused fixtures are also in the layout probe list.
 
 The native ES2015 driver now accepts `loongarch64`. With the Suite runtime it
 passes 139 focused JavaScript fixtures, 83 native probes and the complete
-28,582-mode pinned ES2015 suite. The unmodified benchmark passes the first five
+28,582-mode pinned ES2015 suite. The unmodified benchmark reports the first five
 workloads (15 steps), then Ember requires `createHTMLDocument`; the subsequent
 benchmark run with that implementation is pending. No other application has
 been tested during this Suite-first stage.
@@ -149,7 +149,7 @@ This fixture requires a host without a usable Java VM and is not in the generic
 layout probe list. Timeout reports now include frame DOM and Ember boot/queue
 state, and the runner captures plain console messages as well as script errors.
 
-After the LiveConnect correction both Ember workloads complete their steps.
+After the LiveConnect correction both Ember workloads report completed steps.
 The debug workload exposed Symbol-key handling in DOM helpers: Symbol keys
 must not be converted to numeric indices or document/storage names, and Window
 must forward them to its inner global. The opt-in `dom-symbol-keys.html` probe
@@ -175,3 +175,18 @@ hidden-iframe probe reproduces two failures before this correction and passes
 all ten checks afterward. The Suite lifecycle runner also passes all 24 checks
 again, including Composer, Address Book, Inspector and Venkman. The frame-depth
 limit and LiveConnect support remain unchanged.
+
+Generic Event dispatch now selects listeners by the event type name without
+casting a generic native structure to a keyboard/mouse structure. Event
+wrappers retain their first window realm through an additive weak-owner
+interface, preserving identity and expandos across same-origin frames. The
+native Suite probe passes 50 assertions for cross-frame data, capture,
+cancellation, listener removal and nested dispatch; Suite lifecycle passes
+all 24 checks.
+
+The benchmark runner now checks TodoMVC item and checked counts after each
+measured step. Earlier step totals alone did **not** establish that the
+operations succeeded. Validation currently finds failures in deletion and
+React/Ember item creation; full benchmark compatibility remains incomplete.
+The local mirror also needed Angular's dynamically loaded, unchanged upstream
+`todomvc-index.html`, now recorded in its SHA-256 manifest.

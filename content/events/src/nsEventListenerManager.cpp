@@ -1702,7 +1702,31 @@ nsEventListenerManager::HandleEvent(nsPresContext* aPresContext,
   const EventDispatchData* dispData = nsnull;
 
   if (aEvent->message == NS_USER_DEFINED_EVENT) {
-    listeners = GetListenersByType(eEventArrayType_Hash, aEvent->userType, PR_FALSE);
+    // Event type names select listeners independently of the native event
+    // structure. A plain Event("keypress"), for example, must reach keypress
+    // listeners without pretending to contain an nsKeyEvent's native fields.
+    PRInt32 subType;
+    EventArrayType arrayType;
+    nsCOMPtr<nsIAtom> atom;
+    nsStringKey* typeKey = NS_STATIC_CAST(nsStringKey*, aEvent->userType);
+    if (typeKey)
+      atom = do_GetAtom(NS_LITERAL_STRING("on") +
+                       nsDependentString(typeKey->GetString(),
+                                         typeKey->GetStringLength()));
+    if (atom && NS_SUCCEEDED(GetIdentifiersForType(atom, &arrayType, &subType))) {
+      const EventTypeData* knownType = &sEventTypes[arrayType];
+      for (PRInt32 i = 0; i < knownType->numEvents; ++i) {
+        if (knownType->events[i].bits == subType) {
+          dispData = &knownType->events[i];
+          listeners = GetListenersByType(arrayType, nsnull, PR_FALSE);
+          break;
+        }
+      }
+      // Keep typeData null: typed native dispatch is reserved for real native
+      // event structures. Generic listeners still receive the original event.
+    } else {
+      listeners = GetListenersByType(eEventArrayType_Hash, aEvent->userType, PR_FALSE);
+    }
   } else {
     for (PRInt32 i = 0; i < eEventArrayType_Hash; ++i) {
       typeData = &sEventTypes[i];
@@ -1752,7 +1776,8 @@ nsEventListenerManager::HandleEvent(nsPresContext* aPresContext,
 
             // If it doesn't implement that, call the generic HandleEvent()
             if (!hasInterface &&
-               (ls->mSubType == NS_EVENT_BITS_NONE || ls->mSubType & dispData->bits) &&
+               (ls->mSubType == NS_EVENT_BITS_NONE ||
+                (dispData && (ls->mSubType & dispData->bits))) &&
                 pusher.RePush(aCurrentTarget)) {
               HandleEventSubType(ls, eventListener, *aDOMEvent, aCurrentTarget,
                                  dispData ? dispData->bits : NS_EVENT_BITS_NONE,

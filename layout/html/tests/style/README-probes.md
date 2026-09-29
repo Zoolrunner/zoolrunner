@@ -93,3 +93,7 @@ GC from the [Suite probe runner](../speedometer21/run-suite.py); run that fixtur
 through the runner rather than opening it directly. Its rooted detail data
 survives GC, but collection of detail cycles remains unvalidated. These tests
 exercise native APIs and do not establish exhaustive DOM or CSS conformance.
+
+`cross-frame-event.html` checks generic event dispatch for built-in event names,
+same-origin cross-frame identity/expandos, capture, cancellation, listener
+removal and nested dispatch. It passes 50 assertions in native LoongArch Suite.

@@ -1,0 +1,58 @@
+<!doctype html>
+<html><head><title>Generic and cross-frame event regression</title></head>
+<body><iframe id="child"></iframe><div id="target"></div><script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name +
+                   (ok ? '' : ': ' + actual + ' expected ' + expected));
+}
+window.onload = function() {
+  try {
+    var w = document.getElementById('child').contentWindow;
+    w.document.body.innerHTML = '<input id="input">';
+    w.eval("window.seen=null;document.body.addEventListener('keypress',function(e){window.seen=e;window.whichSeen=e.which;window.keySeen=e.key;});");
+    var event = document.createEvent('Events');
+    event.initEvent('keypress', true, true);
+    event.which = 13; event.keyCode = 13; event.key = 'ENTER';
+    w.document.getElementById('input').dispatchEvent(event);
+    check(w.whichSeen, 13, 'cross-frame numeric expando');
+    check(w.keySeen, 'ENTER', 'cross-frame string expando');
+    check(w.seen, event, 'cross-frame event identity');
+    w.seen.roundTrip = {value:42};
+    check(event.roundTrip, w.seen.roundTrip, 'listener expando round trip');
+
+    var target = document.getElementById('target');
+    var types = ['click', 'keypress', 'keydown', 'keyup', 'input', 'change',
+                 'focus', 'blur', 'mouseover', 'DOMAttrModified', 'custom'];
+    for (var i = 0; i < types.length; ++i) {
+      var calls = 0, captureCalls = 0, seen;
+      var listener = function(e) { ++calls; seen = e; e.preventDefault(); };
+      var capture = function(e) { ++captureCalls; };
+      target.addEventListener(types[i], listener, false);
+      document.body.addEventListener(types[i], capture, true);
+      event = new Event(types[i], {bubbles:true, cancelable:true});
+      check(target.dispatchEvent(event), false, types[i] + ' cancellation');
+      check(calls, 1, types[i] + ' generic listener');
+      check(captureCalls, 1, types[i] + ' capture listener');
+      check(seen, event, types[i] + ' event identity');
+      target.removeEventListener(types[i], listener, false);
+      document.body.removeEventListener(types[i], capture, true);
+    }
+    var removedCalls = 0, nestedCalls = 0;
+    function removed() { ++removedCalls; }
+    function first() {
+      target.removeEventListener('input', removed);
+      target.dispatchEvent(new Event('change'));
+    }
+    target.addEventListener('input', first);
+    target.addEventListener('input', removed);
+    target.addEventListener('change', function() { ++nestedCalls; });
+    target.dispatchEvent(new Event('input'));
+    check(removedCalls, 0, 'listener removal during generic dispatch');
+    check(nestedCalls, 1, 'nested generic dispatch');
+  } catch (e) { check(String(e), 'no exception', 'unexpected exception'); }
+  testDone = true;
+};
+</script></body></html>

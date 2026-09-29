@@ -43,6 +43,7 @@
 #include "nsISupports.h"
 #include "nsIPrivateDOMEvent.h"
 #include "nsCOMPtr.h"
+#include "nsIWeakReference.h"
 #include "nsIDOMEventTarget.h"
 #include "nsPIDOMWindow.h"
 #include "nsPresContext.h"
@@ -61,6 +62,7 @@ class nsIScrollableView;
 class nsDOMEvent : public nsIDOMEvent,
                    public nsIDOMNSEvent,
                    public nsIPrivateDOMEvent,
+                   public nsIPrivateDOMEvent2,
                    public nsRecycledSingle<nsDOMEvent>
 {
 public:
@@ -142,6 +144,9 @@ public:
   NS_DECL_ISUPPORTS
 
   // nsIDOMEvent Interface
+  NS_IMETHOD GetEventGlobal(nsIScriptGlobalObject** aGlobal);
+  NS_IMETHOD SetEventGlobal(nsIScriptGlobalObject* aGlobal);
+
   NS_DECL_NSIDOMEVENT
 
   // nsIDOMNSEvent Interface
@@ -182,6 +187,7 @@ protected:
   nsCOMPtr<nsIDOMEventTarget> mTmpRealOriginalTarget;
   PRPackedBool mEventIsInternal;
 
+  nsWeakPtr mEventGlobal;
   void* mScriptObject;
 };
 

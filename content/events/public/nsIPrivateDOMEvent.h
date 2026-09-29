@@ -69,6 +69,19 @@ public:
   NS_IMETHOD SetTrusted(PRBool aTrusted)=0;
 };
 
+// Optional event wrapper ownership. Keep the original private-event IID and
+// vtable intact for embedders implementing historical DOM events.
+#define NS_IPRIVATEDOMEVENT2_IID \
+{ 0x632a8d41, 0x611f, 0x4e78, {0x8a, 0x69, 0x13, 0xb3, 0xd7, 0x4d, 0x77, 0x43} }
+class nsIScriptGlobalObject;
+class nsIPrivateDOMEvent2 : public nsISupports
+{
+public:
+  NS_DEFINE_STATIC_IID_ACCESSOR(NS_IPRIVATEDOMEVENT2_IID)
+  NS_IMETHOD GetEventGlobal(nsIScriptGlobalObject** aGlobal) = 0;
+  NS_IMETHOD SetEventGlobal(nsIScriptGlobalObject* aGlobal) = 0;
+};
+
 nsresult NS_NewDOMCustomEvent(nsIDOMEvent** aResult);
 
 nsresult

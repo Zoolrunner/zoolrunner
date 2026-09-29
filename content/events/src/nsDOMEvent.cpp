@@ -39,6 +39,8 @@
 
 #include "nsCOMPtr.h"
 #include "nsDOMEvent.h"
+#include "nsIScriptGlobalObject.h"
+#include "nsIWeakReferenceUtils.h"
 #include "nsEventStateManager.h"
 #include "nsIFrame.h"
 #include "nsIContent.h"
@@ -144,6 +146,21 @@ nsDOMEvent::~nsDOMEvent()
   }
 }
 
+NS_IMETHODIMP
+nsDOMEvent::GetEventGlobal(nsIScriptGlobalObject** aGlobal)
+{
+  nsCOMPtr<nsIScriptGlobalObject> global = do_QueryReferent(mEventGlobal);
+  global.swap(*aGlobal);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEvent::SetEventGlobal(nsIScriptGlobalObject* aGlobal)
+{
+  mEventGlobal = do_GetWeakReference(aGlobal);
+  return NS_OK;
+}
+
 NS_IMPL_ADDREF(nsDOMEvent)
 NS_IMPL_RELEASE(nsDOMEvent)
 
@@ -152,6 +169,7 @@ NS_INTERFACE_MAP_BEGIN(nsDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNSEvent)
   NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent)
+  NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent2)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(Event)
 NS_INTERFACE_MAP_END
 
