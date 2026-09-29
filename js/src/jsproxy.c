@@ -40,7 +40,7 @@ ProxyError(JSContext *cx, const char *operation)
 JSBool
 js_IsProxy(JSContext *cx, JSObject *obj)
 {
-    return OBJ_GET_CLASS(cx, obj) == &js_ProxyClass;
+    return OBJ_GET_CLASS(cx, obj) == &js_ProxyClass || JS_IsHostObject(cx, obj);
 }
 
 static void
@@ -197,7 +197,11 @@ js_ProxyGet(JSContext *cx, JSObject *obj, jsid id, jsval receiver, jsval *rval)
         goto out;
     }
     roots.v[P_ARG1] = roots.v[P_KEY];
-    if (!CallTrap(cx, &roots, 3) || !TargetDescriptor(cx, &roots)) goto out;
+    if (!CallTrap(cx, &roots, 3)) goto out;
+    if (JS_IsHostObject(cx, obj)) {
+        *rval = roots.v[P_RESULT]; ok = JS_TRUE; goto out;
+    }
+    if (!TargetDescriptor(cx, &roots)) goto out;
     if (!JSVAL_IS_VOID(roots.v[P_DESC])) {
         if (!DescriptorField(cx, roots.v[P_DESC], "configurable", &roots.v[P_EXTRA])) goto out;
         if (roots.v[P_EXTRA] == JSVAL_FALSE) {
@@ -237,7 +241,7 @@ js_ProxySet(JSContext *cx, JSObject *obj, jsid id, jsval value,
     }
     roots.v[P_ARG1] = roots.v[P_KEY];
     if (!CallTrap(cx, &roots, 4) || !JS_ValueToBoolean(cx, roots.v[P_RESULT], &boolean)) goto out;
-    if (!boolean) { *accepted = JS_FALSE; ok = JS_TRUE; goto out; }
+    if (!boolean || JS_IsHostObject(cx, obj)) { *accepted = boolean; ok = JS_TRUE; goto out; }
     if (!TargetDescriptor(cx, &roots)) goto out;
     if (!JSVAL_IS_VOID(roots.v[P_DESC])) {
         if (!DescriptorField(cx, roots.v[P_DESC], "configurable", &roots.v[P_EXTRA])) goto out;
@@ -284,7 +288,7 @@ js_ProxyHas(JSContext *cx, JSObject *obj, jsid id, JSBool *found)
     }
     roots.v[P_ARG1] = roots.v[P_KEY];
     if (!CallTrap(cx, &roots, 2) || !JS_ValueToBoolean(cx, roots.v[P_RESULT], &boolean)) goto out;
-    if (!boolean) {
+    if (!boolean && !JS_IsHostObject(cx, obj)) {
         if (!TargetDescriptor(cx, &roots)) goto out;
         if (!JSVAL_IS_VOID(roots.v[P_DESC])) {
             if (!DescriptorField(cx, roots.v[P_DESC], "configurable", &roots.v[P_EXTRA])) goto out;
@@ -318,7 +322,7 @@ js_ProxyDelete(JSContext *cx, JSObject *obj, jsid id, JSBool *accepted)
     }
     roots.v[P_ARG1] = roots.v[P_KEY];
     if (!CallTrap(cx, &roots, 2) || !JS_ValueToBoolean(cx, roots.v[P_RESULT], &boolean)) goto out;
-    if (boolean) {
+    if (boolean && !JS_IsHostObject(cx, obj)) {
         if (!TargetDescriptor(cx, &roots)) goto out;
         if (!JSVAL_IS_VOID(roots.v[P_DESC])) {
             if (!DescriptorField(cx, roots.v[P_DESC], "configurable", &roots.v[P_EXTRA])) goto out;
@@ -345,7 +349,7 @@ BooleanOperation(JSContext *cx, JSObject *obj, JSBool prevent, JSBool *result)
         goto out;
     }
     if (!CallTrap(cx, &roots, 1) || !JS_ValueToBoolean(cx, roots.v[P_RESULT], &answer)) goto out;
-    if (!prevent || answer) {
+    if ((!prevent || answer) && !JS_IsHostObject(cx, obj)) {
         if (!TargetOperation(cx, &roots, js_ReflectIsExtensible, 1, JSVAL_VOID,
                               JSVAL_VOID, JSVAL_VOID, &roots.v[P_EXTRA])) goto out;
         if (prevent ? roots.v[P_EXTRA] == JSVAL_TRUE
@@ -387,6 +391,9 @@ js_ProxyGetPrototype(JSContext *cx, JSObject *obj, JSObject **proto)
         if (!JSVAL_IS_OBJECT(roots.v[P_RESULT])) {
             ProxyError(cx, "getPrototypeOf result"); goto out;
         }
+        if (JS_IsHostObject(cx, obj)) {
+            *proto = JSVAL_TO_OBJECT(roots.v[P_RESULT]); ok = JS_TRUE; goto out;
+        }
         if (!TargetOperation(cx, &roots, js_ReflectIsExtensible, 1, JSVAL_VOID,
                               JSVAL_VOID, JSVAL_VOID, &roots.v[P_EXTRA])) goto out;
         if (roots.v[P_EXTRA] == JSVAL_FALSE) {
@@ -418,6 +425,7 @@ js_ProxySetPrototype(JSContext *cx, JSObject *obj, JSObject *proto, JSBool *acce
         goto out;
     }
     if (!CallTrap(cx, &roots, 2) || !JS_ValueToBoolean(cx, roots.v[P_RESULT], &answer)) goto out;
+    if (JS_IsHostObject(cx, obj)) { *accepted = answer; ok = JS_TRUE; goto out; }
     /* ES2015 performs these target queries even when the trap returns false. */
     if (!TargetOperation(cx, &roots, js_ReflectIsExtensible, 1, JSVAL_VOID,
                           JSVAL_VOID, JSVAL_VOID, &roots.v[P_EXTRA])) goto out;
@@ -453,6 +461,12 @@ js_ProxyGetOwnDescriptor(JSContext *cx, JSObject *obj, jsid id,
     if (!CallTrap(cx, &roots, 2)) goto out;
     if (JSVAL_IS_PRIMITIVE(roots.v[P_RESULT]) && !JSVAL_IS_VOID(roots.v[P_RESULT])) {
         ProxyError(cx, "getOwnPropertyDescriptor result"); goto out;
+    }
+    if (JS_IsHostObject(cx, obj)) {
+        if (JSVAL_IS_VOID(roots.v[P_RESULT])) { *rval = JSVAL_VOID; ok = JS_TRUE; }
+        else ok = js_ConvertProxyDescriptor(cx, roots.v[P_RESULT], JS_TRUE,
+                                            JS_FALSE, global, rval);
+        goto out;
     }
     if (!TargetDescriptor(cx, &roots)) goto out;
     if (JSVAL_IS_VOID(roots.v[P_RESULT])) {
@@ -513,7 +527,7 @@ js_ProxyDefineOwn(JSContext *cx, JSObject *obj, jsid id,
                                     js_ProxyOperationGlobal(cx), &roots.v[P_ARG2])) goto out;
     roots.v[P_ARG1] = roots.v[P_KEY];
     if (!CallTrap(cx, &roots, 3) || !JS_ValueToBoolean(cx, roots.v[P_RESULT], &answer)) goto out;
-    if (!answer) { *accepted = JS_FALSE; ok = JS_TRUE; goto out; }
+    if (!answer || JS_IsHostObject(cx, obj)) { *accepted = answer; ok = JS_TRUE; goto out; }
     if (!TargetDescriptor(cx, &roots) ||
         !TargetOperation(cx, &roots, js_ReflectIsExtensible, 1, JSVAL_VOID,
                           JSVAL_VOID, JSVAL_VOID, &roots.v[P_EXTRA])) goto out;
@@ -614,6 +628,7 @@ js_ProxyOwnKeys(JSContext *cx, JSObject *obj)
         goto accept;
     }
     if (!CallTrap(cx, &roots, 1) || !ArrayIds(cx, roots.v[P_RESULT], &keys)) goto out;
+    if (JS_IsHostObject(cx, obj)) goto accept;
     if (!TargetOperation(cx, &roots, js_ReflectIsExtensible, 1, JSVAL_VOID,
                           JSVAL_VOID, JSVAL_VOID, &roots.v[P_EXTRA])) goto out;
     extensible = roots.v[P_EXTRA] == JSVAL_TRUE;
@@ -766,6 +781,10 @@ js_ProxyEnumerate(JSContext *cx, JSObject *obj, jsval *rval)
     ProxyRoots roots;
     JSBool ok = JS_FALSE;
     RootProxy(cx, obj, &roots);
+    if (JS_IsHostObject(cx, obj)) {
+        ok = js_EnumerateHostObject(cx, obj, js_ProxyOperationGlobal(cx), rval);
+        goto out;
+    }
     if (!GetTrap(cx, obj, "enumerate", &roots)) goto out;
     if (JSVAL_IS_VOID(roots.v[P_TRAP])) {
         ok = TargetOperation(cx, &roots, js_ReflectEnumerate, 1, JSVAL_VOID,
@@ -1122,7 +1141,50 @@ static JSObjectOps proxyOps[4] = {
     PROXY_OPS(NULL, NULL), PROXY_OPS(ProxyCallOp, NULL),
     PROXY_OPS(NULL, ProxyConstructOp), PROXY_OPS(ProxyCallOp, ProxyConstructOp)
 };
+static JSObjectOps hostOps = PROXY_OPS(NULL, NULL);
 #undef PROXY_OPS
+
+JS_PUBLIC_API(JSObjectOps *)
+JS_GetHostObjectOps(JSContext *cx, JSClass *clasp)
+{
+    return &hostOps;
+}
+
+JS_PUBLIC_API(JSBool)
+JS_IsHostObject(JSContext *cx, JSObject *obj)
+{
+    return obj && obj->map->ops == &hostOps;
+}
+
+JS_PUBLIC_API(JSObject *)
+JS_NewHostObject(JSContext *cx, JSClass *clasp, JSObject *backing,
+                 JSObject *handler, JSObject *parent)
+{
+    jsval values[4];
+    JSTempValueRooter root;
+    JSObject *proto, *obj = NULL;
+    if (!clasp || clasp->flags != JSCLASS_HAS_RESERVED_SLOTS(2) ||
+        clasp->getObjectOps != JS_GetHostObjectOps ||
+        !backing || !handler || !parent) {
+        JS_ReportError(cx, "invalid native exotic object configuration");
+        return NULL;
+    }
+    values[0] = OBJECT_TO_JSVAL(backing);
+    values[1] = OBJECT_TO_JSVAL(handler);
+    values[2] = OBJECT_TO_JSVAL(parent);
+    values[3] = JSVAL_VOID;
+    JS_PUSH_TEMP_ROOT(cx, 4, values, &root);
+    proto = js_BuiltinPrototype(cx, ProxyGlobal(cx, parent), JSProto_Object);
+    if (proto) obj = js_NewObject(cx, clasp, proto, parent);
+    if (obj) {
+        values[3] = OBJECT_TO_JSVAL(obj);
+        obj->slots[JSSLOT_PROTO] = JSVAL_NULL;
+        obj->slots[JSSLOT_START(clasp)] = values[0];
+        obj->slots[JSSLOT_START(clasp) + 1] = values[1];
+    }
+    JS_POP_TEMP_ROOT(cx, &root);
+    return obj;
+}
 
 static JSObjectOps *
 ProxyObjectOps(JSContext *cx, JSClass *clasp)

@@ -1247,6 +1247,30 @@ JS_GetObjectId(JSContext *cx, JSObject *obj, jsid *idp);
 extern JS_PUBLIC_API(JSObject *)
 JS_NewObject(JSContext *cx, JSClass *clasp, JSObject *proto, JSObject *parent);
 
+/*
+ * Native exotic objects (for example Web IDL named-property objects).
+ * The embedding supplies a class with exactly HAS_RESERVED_SLOTS(2),
+ * getObjectOps = JS_GetHostObjectOps, and a handler implementing internal
+ * operations using the ES2015 Reflect argument/result conventions. This is
+ * not a JavaScript Proxy: the embedding, rather than Proxy target invariants,
+ * is responsible for the object's specified internal-method contracts.
+ *
+ * The backing object supplies absent operations. Target/handler are traced;
+ * neither reserved slot may be modified by the embedding. These objects are
+ * non-callable and non-constructible. [[Enumerate]] uses their own keys and
+ * descriptors, then their prototype chain; no enumerate trap is consulted.
+ * No existing JSClass or JSObjectOps layout is changed.
+ */
+extern JS_PUBLIC_API(JSObjectOps *)
+JS_GetHostObjectOps(JSContext *cx, JSClass *clasp);
+
+extern JS_PUBLIC_API(JSBool)
+JS_IsHostObject(JSContext *cx, JSObject *obj);
+
+extern JS_PUBLIC_API(JSObject *)
+JS_NewHostObject(JSContext *cx, JSClass *clasp, JSObject *backing,
+                 JSObject *handler, JSObject *parent);
+
 extern JS_PUBLIC_API(JSBool)
 JS_SealObject(JSContext *cx, JSObject *obj, JSBool deep);
 

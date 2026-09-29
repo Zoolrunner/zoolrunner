@@ -2865,7 +2865,7 @@ Array(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 JSBool
 js_IsArray(JSContext *cx, JSObject *obj, JSBool *answer)
 {
-    while (js_IsProxy(cx, obj)) {
+    while (js_IsProxy(cx, obj) && !JS_IsHostObject(cx, obj)) {
         if (!js_ProxyTarget(cx, obj, &obj)) return JS_FALSE;
     }
     *answer = OBJ_GET_CLASS(cx, obj) == &js_ArrayClass;

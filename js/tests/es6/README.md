@@ -4449,3 +4449,31 @@ passes all 11,540 cases. Both runs use America/Los_Angeles; reports are under
 `artifacts/speedometer21/weakmap-embedding-es2015/` and
 `artifacts/speedometer21/weakmap-embedding-es5.json`. DOM event/traversal
 integration is a separate, still-pending validation step.
+
+### Native named-property object support (in progress)
+
+Web IDL named-property objects need internal operations that ordinary ES2015
+Proxy invariants cannot express. For example, a DOMStringMap data-property
+definition accepts a non-configurable descriptor but exposes a live,
+configurable attribute property afterwards. Wrapping a plain object in a
+JavaScript Proxy cannot implement that contract.
+
+`JS_NewHostObject`, `JS_GetHostObjectOps` and `JS_IsHostObject` add an embedding
+path for such native objects without changing the existing JSClass or
+JSObjectOps layouts. The embedding supplies private backing/handler objects
+and owns the specified internal-method contracts. The engine traces their
+references, validates descriptor/key result types, and performs ordinary
+enumeration through the host's own properties and prototype chain. Ordinary
+JavaScript Proxy target invariants remain enforced. A host object is neither
+callable nor constructible, and does not inherit an Array brand from its
+backing object.
+
+`TestHostObject.c` passes 35 native LoongArch GTK2 embedding checks, including
+collection during callbacks, live keys and descriptors, attribute-order
+numeric keys, symbols, prototypes, rejected extensibility, and paired Proxy
+invariant checks. It is included in the shared native package fixture table.
+Both Suite backends rebuild and pass all 11,540 pinned ES5.1 cases; the
+remaining package checks, including ES2015, are in progress in
+`artifacts/speedometer21/host-package-suite-{gtk2,xlib}`. The DOM dataset binding still
+uses its old snapshot implementation; this engine support alone does not fix
+the known dataset failures or establish Web IDL compliance.

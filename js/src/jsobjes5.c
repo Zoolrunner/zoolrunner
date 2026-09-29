@@ -2006,7 +2006,7 @@ EnumerateNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
         if (JSVAL_IS_NULL(roots[0])) { done = JS_TRUE; break; }
         target = JSVAL_TO_OBJECT(roots[0]);
         if (!JS_GetReservedSlot(cx, iterator, 1, &roots[1])) goto out;
-        if (js_IsProxy(cx, target)) {
+        if (js_IsProxy(cx, target) && !JS_IsHostObject(cx, target)) {
             /* A prototype's [[Enumerate]] owns the remainder of its chain. */
             if (JSVAL_IS_VOID(roots[1])) {
                 if (!js_ProxyEnumerate(cx, target, &roots[1]) ||
@@ -2031,7 +2031,7 @@ EnumerateNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
             ids.ids = OwnNames(cx, target);
             if (!ids.ids) goto out;
             JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &ids.root);
-            ok = OrderOwnKeys(cx, ids.ids);
+            ok = !OBJ_IS_NATIVE(target) || OrderOwnKeys(cx, ids.ids);
             proto = ok ? js_BuiltinPrototype(cx, global, JSProto_Array) : NULL;
             array = proto ? js_NewArrayObjectWithProto(cx, 0, NULL, proto, global) : NULL;
             ok = array != NULL;
@@ -2088,12 +2088,19 @@ EnumerateNext(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval
 JSBool
 js_ReflectEnumerate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 {
-    JSObject *target = RequireObject(cx, argc, argv), *global, *parent, *proto, *iterator, *visited;
-    JSTempValueRooter root;
-    JSBool ok;
+    JSObject *target = RequireObject(cx, argc, argv);
     if (!target) return JS_FALSE;
     if (js_IsProxy(cx, target)) return js_ProxyEnumerate(cx, target, rval);
-    global = js_BuiltinGlobal(cx, argv);
+    return js_EnumerateHostObject(cx, target, js_BuiltinGlobal(cx, argv), rval);
+}
+
+/* Ordinary enumeration for embeddings with exotic own-property operations. */
+JSBool
+js_EnumerateHostObject(JSContext *cx, JSObject *target, JSObject *global, jsval *rval)
+{
+    JSObject *parent, *proto, *iterator, *visited;
+    JSTempValueRooter root;
+    JSBool ok;
     proto = js_GetCachedIntrinsic(cx, global, JS_INTRINSIC_ENUMERATOR_PROTO);
     if (!proto) {
         parent = js_GetIteratorPrototype(cx, global);
@@ -2114,7 +2121,7 @@ js_ReflectEnumerate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
     if (!visited) return JS_FALSE;
     JS_PUSH_TEMP_ROOT_OBJECT(cx, visited, &root);
     ok = JS_SetPrototype(cx, visited, NULL) &&
-         JS_SetReservedSlot(cx, iterator, 0, argv[0]) &&
+         JS_SetReservedSlot(cx, iterator, 0, OBJECT_TO_JSVAL(target)) &&
          JS_SetReservedSlot(cx, iterator, 1, JSVAL_VOID) &&
          JS_SetReservedSlot(cx, iterator, 2, JSVAL_ZERO) &&
          JS_SetReservedSlot(cx, iterator, 3, OBJECT_TO_JSVAL(visited)) &&

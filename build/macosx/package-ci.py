@@ -623,7 +623,8 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestCollections.c", "ES6-COLLECTIONS-EMBEDDING checks=26 failures=0"),
                 ("es6/TestModernIterators.c", "ES6-MODERN-ITERATORS-EMBEDDING checks=23 failures=0"),
                 ("es6/TestArrayFrom.c", "ES6-ARRAY-FROM-EMBEDDING checks=17 failures=0"),
-                ("es6/TestUnscopables.c", "ES6-UNSCOPABLES-EMBEDDING checks=14 failures=0")):
+                ("es6/TestUnscopables.c", "ES6-UNSCOPABLES-EMBEDDING checks=14 failures=0"),
+                ("es6/TestHostObject.c", "HOST-OBJECT checks=35 failures=0")):
             print("Building packaged runtime embedding test " + source, flush=True)
             subprocess.run([
                 "xcrun", "clang", "-arch", args.arch, "-isysroot", str(sdk),

@@ -3,6 +3,8 @@
 #define jsreflect_h___
 #include "jspubtd.h"
 JS_BEGIN_EXTERN_C
+extern JSBool js_EnumerateHostObject(JSContext *cx, JSObject *target,
+                                     JSObject *global, jsval *rval);
 extern JSClass js_ReflectClass;
 extern JSObject *js_InitReflectClass(JSContext *cx, JSObject *global);
 #define REFLECT_NATIVE(name) \
