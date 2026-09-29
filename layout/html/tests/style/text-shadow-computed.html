@@ -1,0 +1,50 @@
+<!doctype html><title>Computed text shadow values and inheritance</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+function shadow(e,pseudo){return getComputedStyle(e,pseudo||null).getPropertyValue('text-shadow');}
+try{
+ var parent=document.createElement('div'),child=document.createElement('span');
+ parent.style.cssText='font-size: 10px; color: rgb(20, 40, 60)';child.style.cssText='font-size: 20px; color: rgb(2, 4, 6)';
+ parent.appendChild(child);document.body.appendChild(parent);child.textContent='shadow';
+ check(shadow(parent),'none','initial shadow');
+ parent.style.textShadow='1em 2em';
+ check(shadow(parent),'rgb(20, 40, 60) 10px 20px 0px','relative lengths and default color');
+ check(shadow(child),'rgb(2, 4, 6) 10px 20px 0px','inherited absolute lengths and current child color');
+ parent.style.textShadow='red -1px 2px 3px';
+ check(shadow(parent),'rgb(255, 0, 0) -1px 2px 3px','explicit color and negative offset');
+ check(shadow(child),'rgb(255, 0, 0) -1px 2px 3px','explicit shadow color inherited');
+ child.style.textShadow='initial';check(shadow(child),'none','initial overrides inherited shadow');
+ child.style.textShadow='unset';check(shadow(child),'rgb(255, 0, 0) -1px 2px 3px','unset inherits shadow');
+ child.style.textShadow='none';check(shadow(child),'none','none overrides inherited shadow');
+ child.style.textShadow='inherit';check(shadow(child),'rgb(255, 0, 0) -1px 2px 3px','explicit inheritance');
+ parent.style.textShadow='1px 2px currentColor';
+ check(shadow(child),'rgb(2, 4, 6) 1px 2px 0px','explicit currentColor resolves after inheritance');
+ child.style.color='blue';check(shadow(child),'rgb(0, 0, 255) 1px 2px 0px','color mutation updates inherited currentColor');
+ parent.style.textShadow='red 1px 2px, blue 3px 4px 5px';
+ check(shadow(child),'rgb(255, 0, 0) 1px 2px 0px, rgb(0, 0, 255) 3px 4px 5px','list order and omitted blur');
+ parent.style.textShadow='1px 2px -1px';
+ check(shadow(child),'rgb(255, 0, 0) 1px 2px 0px, rgb(0, 0, 255) 3px 4px 5px','invalid shadow preserves computed list');
+ parent.style.textShadow='transparent 1px 2px';check(shadow(child),'rgba(0, 0, 0, 0) 1px 2px 0px','transparent computed color');
+ parent.style.textShadow='0.5em -0.5em 0.25em black';check(shadow(parent),'rgb(0, 0, 0) 5px -5px 2.5px','fractional relative lengths');
+ parent.style.fontSize='20px';check(shadow(child),'rgb(0, 0, 0) 10px -10px 5px','font mutation recomputes inherited lengths');
+ child.style.setProperty('text-shadow','red 1px 2px','important');child.style.textShadow='none';check(shadow(child),'none','CSS2 replacement updates computed value');
+ child.style.removeProperty('text-shadow');check(shadow(child),'rgb(0, 0, 0) 10px -10px 5px','removal restores inherited computed value');
+ var copy=parent.cloneNode(true);document.body.appendChild(copy);check(shadow(copy.firstChild),'rgb(0, 0, 0) 10px -10px 5px','style clone retains computed shadow');
+ parent.style.textShadow='none';check(shadow(copy.firstChild),'rgb(0, 0, 0) 10px -10px 5px','mutating original does not alter clone');
+ copy.style.display='none';check(shadow(copy.firstChild),'rgb(0, 0, 0) 10px -10px 5px','computed shadow without rendered frame');
+ parent.id='pseudo-shadow';var style=document.createElement('style');style.textContent='#pseudo-shadow:before {content:"x"; text-shadow: 1px 2px green;}';document.getElementsByTagName('head')[0].appendChild(style);
+ check(shadow(parent,':before'),'rgb(0, 128, 0) 1px 2px 0px','pseudo-element computed shadow');
+ var sheet=document.createElement('style');sheet.textContent='.shared-shadow {text-shadow: currentColor 2px 3px} .shared-shadow.reset-shadow {text-shadow: initial}';document.getElementsByTagName('head')[0].appendChild(sheet);
+ var a=document.createElement('div'),b=document.createElement('div');a.className=b.className='shared-shadow';a.style.color='red';b.style.color='blue';document.body.appendChild(a);document.body.appendChild(b);
+ check(shadow(a),'rgb(255, 0, 0) 2px 3px 0px','shared rule first color');
+ check(shadow(b),'rgb(0, 0, 255) 2px 3px 0px','shared rule independent color');
+ a.className+=' reset-shadow';check(shadow(a),'none','stylesheet reset overrides shadow');
+ check(shadow(b),'rgb(0, 0, 255) 2px 3px 0px','sibling rule remains intact');
+ a.className='shared-shadow';check(shadow(a),'rgb(255, 0, 0) 2px 3px 0px','stylesheet shadow restored');
+ document.documentElement.style.textShadow='inherit';check(shadow(document.documentElement),'none','root inherit uses initial shadow');
+ document.documentElement.style.textShadow='red 1px 2px';check(shadow(document.body),'rgb(255, 0, 0) 1px 2px 0px','root list inherits through body');
+ document.documentElement.style.removeProperty('text-shadow');check(shadow(document.body),'none','root removal invalidates descendant inheritance');
+
+}catch(e){check(String(e),'no exception','unexpected exception');}
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>

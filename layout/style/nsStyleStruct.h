@@ -713,6 +713,21 @@ struct nsStyleTextReset : public nsStyleStruct {
   nsStyleCoord  mVerticalAlign;         // [reset] see nsStyleConsts.h for enums
 };
 
+struct nsStyleTextShadow {
+  nscoord mXOffset, mYOffset, mRadius;
+  nscolor mColor;
+  PRPackedBool mHasColor; // False preserves currentColor through inheritance.
+};
+
+// Immutable once installed in a style struct; inherited lists share ownership.
+class nsStyleTextShadowArray : public nsISupports {
+public:
+  NS_DECL_ISUPPORTS
+  nsTArray<nsStyleTextShadow> mItems;
+private:
+  ~nsStyleTextShadowArray() {}
+};
+
 struct nsStyleText : public nsStyleStruct {
   nsStyleText(void);
   nsStyleText(const nsStyleText& aOther);
@@ -733,6 +748,7 @@ struct nsStyleText : public nsStyleStruct {
   static nsChangeHint MaxDifference();
 #endif
 
+  nsStyleTextShadowArray* mTextShadow;   // [inherited], null means none
   PRUint8 mTextAlign;                   // [inherited] see nsStyleConsts.h
   PRUint8 mTextTransform;               // [inherited] see nsStyleConsts.h
   PRUint8 mWhiteSpace;                  // [inherited] see nsStyleConsts.h

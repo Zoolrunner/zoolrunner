@@ -365,3 +365,22 @@ plus browser preferences, Calendar startup/four views and standalone ChatZilla
 as applicable. The six-result aggregate is
 `text-shadow-parser-applications-summary.json`. This remains parser/CSSOM work,
 not text-shadow painting.
+
+`text-shadow-computed.html` now passes thirty computed-value checks in native
+LoongArch64 GTK2 Suite and Chromium 148. Coverage includes inherited absolute
+lengths, deferred currentColor, explicit/transparent colors, list order, font
+and color mutations, declaration removal, cloning, unrendered elements,
+pseudo-elements, shared rules and root inheritance. The expanded GTK2 Suite
+run passes 1,307 content, 300 History, 274 HTTP, fifteen dataset GC and 24
+lifecycle assertions. The final null-color guard also passes the thirty new
+checks in ES5 content mode. Reports are `text-shadow-computed-*` under
+`artifacts/speedometer21`; Xlib and other-application follow-up is pending.
+
+Enabling rule mapping initially exposed incorrect ownership of the borrowed
+specified shadow list. `GetTextData` now clears that borrowed pointer before
+its temporary rule-data destructor runs, matching the existing content/quotes
+ownership convention. The failed run and crash trace are retained as
+`text-shadow-computed-borrowed-list-crash.*`; the subsequent mutation and
+lifecycle checks pass. Computed lists are independently owned and shared
+immutably through inheritance. **Shadow painting remains unimplemented**;
+computed-style success is not rendering conformance.

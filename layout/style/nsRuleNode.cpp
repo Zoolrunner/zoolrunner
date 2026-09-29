@@ -984,7 +984,17 @@ nsRuleNode::CheckSpecifiedProperties(const nsStyleStructID aSID,
         break;
 
       case eCSSType_Shadow:
-        NS_NOTYETIMPLEMENTED("nsCSSShadow not yet transferred to structs");
+        {
+          ++total;
+          const nsCSSShadow* shadow = *NS_REINTERPRET_CAST(
+              const nsCSSShadow*const*,
+              NS_REINTERPRET_CAST(const char*, &aRuleDataStruct) + prop->offset);
+          if (shadow) {
+            ++specified;
+            if (shadow->mXOffset.GetUnit() == eCSSUnit_Inherit)
+              ++inherited;
+          }
+        }
         break;
 
       default:
@@ -1046,7 +1056,12 @@ nsRuleNode::GetTextData(nsStyleContext* aContext)
   nsRuleData ruleData(eStyleStruct_Text, mPresContext, aContext);
   ruleData.mTextData = &textData;
 
-  return WalkRuleTree(eStyleStruct_Text, aContext, &ruleData, &textData);
+  const nsStyleStruct* result =
+    WalkRuleTree(eStyleStruct_Text, aContext, &ruleData, &textData);
+  // Mapping borrows the declaration's list, like content/counter/quote lists.
+  // Only the computed array belongs to the style struct.
+  textData.mTextShadow = nsnull;
+  return result;
 }
 
 const nsStyleStruct*
@@ -2277,6 +2292,46 @@ nsRuleNode::ComputeTextData(nsStyleStruct* aStartStruct,
   else if (eCSSUnit_Inherit == textData.mWhiteSpace.GetUnit()) {
     inherited = PR_TRUE;
     text->mWhiteSpace = parentText->mWhiteSpace;
+  }
+
+  // Resolve lengths before inheritance, but currentColor on the using element.
+  if (textData.mTextShadow) {
+    const nsCSSShadow* source = textData.mTextShadow;
+    nsCSSUnit unit = source->mXOffset.GetUnit();
+    nsCOMPtr<nsStyleTextShadowArray> shadows;
+    if (unit == eCSSUnit_Inherit) {
+      inherited = PR_TRUE;
+      shadows = parentContext ? parentText->mTextShadow : nsnull;
+    } else if (unit != eCSSUnit_None && unit != eCSSUnit_Initial) {
+      shadows = new nsStyleTextShadowArray;
+      if (!shadows) {
+        text->Destroy(mPresContext);
+        return nsnull;
+      }
+      for (; source; source = source->mNext) {
+        nsStyleTextShadow item;
+        item.mXOffset = CalcLength(source->mXOffset, nsnull, aContext,
+                                   mPresContext, inherited);
+        item.mYOffset = CalcLength(source->mYOffset, nsnull, aContext,
+                                   mPresContext, inherited);
+        item.mRadius = source->mRadius.GetUnit() == eCSSUnit_Null ? 0 :
+          CalcLength(source->mRadius, nsnull, aContext, mPresContext, inherited);
+        item.mColor = NS_RGB(0, 0, 0);
+        item.mHasColor = source->mColor.GetUnit() != eCSSUnit_Null &&
+          !(source->mColor.GetUnit() == eCSSUnit_Integer &&
+            source->mColor.GetIntValue() == NS_COLOR_CURRENTCOLOR);
+        if (item.mHasColor)
+          SetColor(source->mColor, NS_RGB(0, 0, 0), mPresContext, aContext,
+                   item.mColor, inherited);
+        if (!shadows->mItems.AppendElement(item)) {
+          text->Destroy(mPresContext);
+          return nsnull;
+        }
+      }
+    }
+    NS_IF_RELEASE(text->mTextShadow);
+    text->mTextShadow = shadows;
+    NS_IF_ADDREF(text->mTextShadow);
   }
 
   // word-spacing: normal, length, inherit

@@ -259,6 +259,7 @@ private:
   nsresult GetLineHeight(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetTextAlign(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetTextDecoration(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
+  nsresult GetTextShadow(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetTextIndent(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetTextTransform(nsIFrame *aFrame, nsIDOMCSSValue** aValue);
   nsresult GetLetterSpacing(nsIFrame *aFrame, nsIDOMCSSValue** aValue);

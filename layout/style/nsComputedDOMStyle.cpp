@@ -1972,6 +1972,48 @@ nsComputedDOMStyle::GetTextDecoration(nsIFrame *aFrame,
 }
 
 nsresult
+nsComputedDOMStyle::GetTextShadow(nsIFrame *aFrame, nsIDOMCSSValue** aValue)
+{
+  nsROCSSPrimitiveValue *val = GetROCSSPrimitiveValue();
+  NS_ENSURE_TRUE(val, NS_ERROR_OUT_OF_MEMORY);
+  const nsStyleText *text = nsnull;
+  GetStyleData(eStyleStruct_Text, (const nsStyleStruct*&)text, aFrame);
+  if (!text || !text->mTextShadow) {
+    val->SetIdent(nsLayoutAtoms::none);
+    return CallQueryInterface(val, aValue);
+  }
+  const nsStyleColor *color = nsnull;
+  GetStyleData(eStyleStruct_Color, (const nsStyleStruct*&)color, aFrame);
+  if (!color) {
+    delete val;
+    return NS_ERROR_OUT_OF_MEMORY;
+  }
+  nsAutoString result;
+  const nsTArray<nsStyleTextShadow>& items = text->mTextShadow->mItems;
+  for (PRUint32 i = 0; i < items.Length(); ++i) {
+    if (i) result.AppendLiteral(", ");
+    const nsStyleTextShadow& item = items[i];
+    nscolor c = item.mHasColor ? item.mColor : color->mColor;
+    result.AppendLiteral("rgb");
+    if (NS_GET_A(c) != 255) result.AppendLiteral("a");
+    result.AppendLiteral("(");
+    result.AppendInt(NS_GET_R(c)); result.AppendLiteral(", ");
+    result.AppendInt(NS_GET_G(c)); result.AppendLiteral(", ");
+    result.AppendInt(NS_GET_B(c));
+    if (NS_GET_A(c) != 255) {
+      result.AppendLiteral(", ");
+      result.AppendFloat(NS_GET_A(c) / 255.0f);
+    }
+    result.AppendLiteral(") ");
+    result.AppendFloat(item.mXOffset * mT2P); result.AppendLiteral("px ");
+    result.AppendFloat(item.mYOffset * mT2P); result.AppendLiteral("px ");
+    result.AppendFloat(item.mRadius * mT2P); result.AppendLiteral("px");
+  }
+  val->SetString(result);
+  return CallQueryInterface(val, aValue);
+}
+
+nsresult
 nsComputedDOMStyle::GetTextIndent(nsIFrame *aFrame,
                                   nsIDOMCSSValue** aValue)
 {
@@ -3816,7 +3858,7 @@ nsComputedDOMStyle::GetQueryablePropertyMap(PRUint32* aLength)
     COMPUTED_STYLE_MAP_ENTRY(text_align,                    TextAlign),
     COMPUTED_STYLE_MAP_ENTRY(text_decoration,               TextDecoration),
     COMPUTED_STYLE_MAP_ENTRY(text_indent,                   TextIndent),
-    // COMPUTED_STYLE_MAP_ENTRY(text_shadow,                TextShadow),
+    COMPUTED_STYLE_MAP_ENTRY(text_shadow,                TextShadow),
     COMPUTED_STYLE_MAP_ENTRY(text_transform,                TextTransform),
     COMPUTED_STYLE_MAP_ENTRY(top,                           Top),
     COMPUTED_STYLE_MAP_ENTRY(unicode_bidi,                  UnicodeBidi),

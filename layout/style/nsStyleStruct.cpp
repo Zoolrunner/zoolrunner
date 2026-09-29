@@ -1576,8 +1576,11 @@ nsChangeHint nsStyleTextReset::MaxDifference()
 // nsStyleText
 //
 
+NS_IMPL_ISUPPORTS0(nsStyleTextShadowArray)
+
 nsStyleText::nsStyleText(void) 
 { 
+  mTextShadow = nsnull;
   mTextAlign = NS_STYLE_TEXT_ALIGN_DEFAULT;
   mTextTransform = NS_STYLE_TEXT_TRANSFORM_NONE;
   mWhiteSpace = NS_STYLE_WHITESPACE_NORMAL;
@@ -1591,13 +1594,15 @@ nsStyleText::nsStyleText(void)
 nsStyleText::nsStyleText(const nsStyleText& aSource) 
 { 
   memcpy((nsStyleText*)this, &aSource, sizeof(nsStyleText));
+  NS_IF_ADDREF(mTextShadow);
 }
 
-nsStyleText::~nsStyleText(void) { }
+nsStyleText::~nsStyleText(void) { NS_IF_RELEASE(mTextShadow); }
 
 nsChangeHint nsStyleText::CalcDifference(const nsStyleText& aOther) const
 {
-  if ((mTextAlign == aOther.mTextAlign) &&
+  if ((mTextShadow == aOther.mTextShadow) &&
+      (mTextAlign == aOther.mTextAlign) &&
       (mTextTransform == aOther.mTextTransform) &&
       (mWhiteSpace == aOther.mWhiteSpace) &&
       (mLetterSpacing == aOther.mLetterSpacing) &&
