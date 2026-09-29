@@ -78,6 +78,7 @@
 #include "nsIDOMNSDocument2.h"
 #include "nsIDOMEvent.h"
 #include "nsIDOMEventState.h"
+#include "nsIDOMEventPropagation.h"
 #include "nsIDOMNSEvent.h"
 #include "nsIDOMKeyEvent.h"
 #include "nsIDOMEventListener.h"
@@ -1710,6 +1711,7 @@ nsDOMClassInfo::RegisterExternalClasses()
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEvent)                                      \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMNSEvent)                                    \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventState)                                 \
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventPropagation)                           \
 
 #define DOM_CLASSINFO_UI_EVENT_MAP_ENTRIES                                    \
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMUIEvent)                                    \
@@ -2986,9 +2988,8 @@ nsDOMClassInfo::Init()
    DOM_CLASSINFO_MAP_END
  
    DOM_CLASSINFO_MAP_BEGIN(CustomEvent, nsIDOMCustomEvent2)
-     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventState)
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMCustomEvent2)
-     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEvent)
+     DOM_CLASSINFO_EVENT_MAP_ENTRIES
    DOM_CLASSINFO_MAP_END
    DOM_CLASSINFO_MAP_BEGIN(DOMRect, nsIDOMDOMRect)
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMRect)

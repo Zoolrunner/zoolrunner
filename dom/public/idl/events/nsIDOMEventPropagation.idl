@@ -1,0 +1,8 @@
+/* Additive event propagation API. License: MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsISupports.idl"
+[scriptable, uuid(11f3cbf9-df04-4790-a3b1-31e449a1fa8b)]
+interface nsIDOMEventPropagation : nsISupports
+{
+  void stopImmediatePropagation();
+  attribute boolean cancelBubble;
+};

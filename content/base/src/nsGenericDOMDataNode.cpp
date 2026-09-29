@@ -891,6 +891,8 @@ nsGenericDOMDataNode::HandleDOMEvent(nsPresContext* aPresContext,
   }
 
   if (NS_EVENT_FLAG_INIT & aFlags) {
+    NS_MARK_EVENT_DISPATCH_DONE(aEvent);
+
     // We're leaving the DOM event loop so if we created a DOM event,
     // release here.
 
@@ -912,9 +914,6 @@ nsGenericDOMDataNode::HandleDOMEvent(nsPresContext* aPresContext,
 
     aDOMEvent = nsnull;
 
-    // Now that we're done with this event, remove the flag that says
-    // we're in the process of dispatching this event.
-    NS_MARK_EVENT_DISPATCH_DONE(aEvent);
   }
 
   return ret;

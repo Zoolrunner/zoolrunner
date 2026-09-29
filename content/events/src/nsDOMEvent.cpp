@@ -170,6 +170,7 @@ NS_INTERFACE_MAP_BEGIN(nsDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNSEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMEventState)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMEventPropagation)
   NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent2)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(Event)
@@ -368,6 +369,30 @@ NS_IMETHODIMP
 nsDOMEvent::GetDefaultPrevented(PRBool* aDefaultPrevented)
 {
   *aDefaultPrevented = !!(mEvent->flags & NS_EVENT_FLAG_NO_DEFAULT);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEvent::StopImmediatePropagation()
+{
+  mEvent->flags |= NS_EVENT_FLAG_STOP_DISPATCH |
+                   NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY;
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEvent::GetCancelBubble(PRBool* aCancelBubble)
+{
+  NS_ENSURE_ARG_POINTER(aCancelBubble);
+  *aCancelBubble = !!(mEvent->flags & NS_EVENT_FLAG_STOP_DISPATCH);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEvent::SetCancelBubble(PRBool aCancelBubble)
+{
+  if (aCancelBubble)
+    mEvent->flags |= NS_EVENT_FLAG_STOP_DISPATCH;
   return NS_OK;
 }
 
@@ -590,9 +615,7 @@ nsDOMEvent::InitEvent(const nsAString& aEventTypeArg, PRBool aCanBubbleArg, PRBo
   mEvent->flags |=
     aCancelableArg ? NS_EVENT_FLAG_NONE : NS_EVENT_FLAG_CANT_CANCEL;
 
-  // Unset the NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY bit (which is
-  // set at the end of event dispatch) so that this event can be
-  // dispatched.
+  // Reinitialization clears both propagation flags.
   mEvent->flags &= ~NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY;
 
   return NS_OK;

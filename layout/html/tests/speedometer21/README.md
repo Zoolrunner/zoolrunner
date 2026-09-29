@@ -365,3 +365,12 @@ The previous long benchmark stopped at 408 successful workload checks when its
 local HTTP server exited. Its retained log is incomplete and is not a benchmark
 pass. A fresh full run uses the themed harness and a frozen runtime; other
 application testing remains deferred until Suite completes the benchmark.
+
+`event-propagation-state.html` adds 47 assertions for Event, UIEvent and
+CustomEvent propagation. It checks stopping before dispatch, immediate versus
+ordinary stopping, reset after dispatch, redispatch, cancelBubble setters, and
+retaining a native click event past its original stack-backed dispatch. The
+additive propagation interface leaves existing interface vtables intact. Native
+LoongArch GTK2 Suite passes all 904 checks across 30 content fixtures after this
+change. The native event copy is now made after dispatch flags are cleared;
+otherwise a retained event could incorrectly remain marked as dispatching.

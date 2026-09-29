@@ -1030,8 +1030,9 @@ enum nsDragDropEventStatus {
 #define NS_MARK_EVENT_DISPATCH_DONE(event) \
   NS_ASSERTION(NS_IS_EVENT_IN_DISPATCH(event), \
                "Event never got marked for dispatch!"); \
-  (event)->flags &= ~NS_EVENT_FLAG_DISPATCHING; \
-  (event)->flags |= NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY;
+  (event)->flags &= ~(NS_EVENT_FLAG_DISPATCHING | \
+                      NS_EVENT_FLAG_STOP_DISPATCH | \
+                      NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY);
 
 /*
  * Virtual key bindings for keyboard events.

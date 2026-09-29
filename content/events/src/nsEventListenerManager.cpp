@@ -1754,7 +1754,8 @@ nsEventListenerManager::HandleEvent(nsPresContext* aPresContext,
 
       nsAutoPopupStatePusher popupStatePusher(nsDOMEvent::GetEventPopupControlState(aEvent));
 
-      for (PRInt32 k = 0; !mListenersRemoved && listeners && k < count; ++k) {
+      for (PRInt32 k = 0; !mListenersRemoved && listeners && k < count &&
+           !(aEvent->flags & NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY); ++k) {
         nsListenerStruct* ls = NS_STATIC_CAST(nsListenerStruct*, originalListeners.FastElementAt(k));
         // Don't fire the listener if it's been removed
 

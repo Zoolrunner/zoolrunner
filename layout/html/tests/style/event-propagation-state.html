@@ -1,0 +1,52 @@
+<!doctype html><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+' actual='+a+' expected='+b);}
+function run(kind){
+ var parent=document.createElement('div'),target=document.createElement('div'),order=[];
+ parent.appendChild(target);document.body.appendChild(parent);
+ var e=document.createEvent(kind);e.initEvent('propagation',true,true);
+ check(e.cancelBubble,false,kind+' initial propagation flag');
+ e.stopPropagation();check(e.cancelBubble,true,kind+' pre-dispatch stop flag');
+ e.cancelBubble=false;check(e.cancelBubble,true,kind+' false assignment does not clear flag');
+ function first(ev){order.push('first');ev.stopImmediatePropagation();check(ev.cancelBubble,true,kind+' immediate stop also stops propagation');}
+ function second(){order.push('second');}
+ function ancestor(){order.push('ancestor');}
+ target.addEventListener('propagation',first,false);target.addEventListener('propagation',second,false);
+ parent.addEventListener('propagation',ancestor,false);
+ target.dispatchEvent(e);check(order.join(','),'',kind+' pre-dispatch stop prevents listeners');
+ check(e.cancelBubble,false,kind+' dispatch clears preexisting stop');
+ target.dispatchEvent(e);check(order.join(','),'first',kind+' immediate stop suppresses later and ancestor listeners');
+ check(e.cancelBubble,false,kind+' dispatch clears immediate stop');
+ check(e.eventPhase,0,kind+' completed event phase');check(e.currentTarget,null,kind+' completed current target');
+ target.removeEventListener('propagation',first,false);order=[];
+ target.dispatchEvent(e);check(order.join(','),'second,ancestor',kind+' redispatch after immediate stop');
+ target.removeEventListener('propagation',second,false);order=[];
+ target.addEventListener('propagation',function(ev){order.push('stop');ev.stopPropagation();},false);
+ target.addEventListener('propagation',second,false);
+ target.dispatchEvent(e);check(order.join(','),'stop,second',kind+' ordinary stop retains same-target listeners');
+ check(e.cancelBubble,false,kind+' ordinary stop cleared on return');
+ parent.removeChild(target);document.body.removeChild(parent);
+}
+try {
+ run('Event');run('UIEvents');run('CustomEvent');
+ var button=document.createElement('button'),retained=null,count=0;
+ document.body.appendChild(button);
+ button.addEventListener('click',function(ev){retained=ev;++count;ev.stopImmediatePropagation();});
+ button.addEventListener('click',function(){++count;});
+ button.click();
+ check(count,1,'native click obeys immediate propagation stop');
+ check(retained.cancelBubble,false,'retained native event has cleared stop flag');
+ check(retained.eventPhase,0,'retained native event has completed phase');
+ var other=document.createElement('div'),delivered=0;
+ other.addEventListener('click',function(){++delivered;});
+ var threw=false;try{other.dispatchEvent(retained);}catch(error){threw=true;}
+ check(threw,false,'retained native event copy is no longer dispatching');
+ check(delivered,1,'retained native event redispatch is delivered');
+ document.body.removeChild(button);
+ var canceled=new Event('no-listeners',{cancelable:true});canceled.preventDefault();
+ check(document.createElement('div').dispatchEvent(canceled),false,'pre-canceled event with no listeners returns false');
+ check(canceled.defaultPrevented,true,'dispatch preserves canceled state');
+ check(testResults.length,46,'all propagation assertions executed');
+}catch(error){check(String(error),'no exception','unexpected exception');}
+testDone=true;
+</script>

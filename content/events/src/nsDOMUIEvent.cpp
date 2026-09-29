@@ -373,28 +373,13 @@ nsDOMUIEvent::GetRangeOffset(PRInt32* aRangeOffset)
 NS_IMETHODIMP
 nsDOMUIEvent::GetCancelBubble(PRBool* aCancelBubble)
 {
-  NS_ENSURE_ARG_POINTER(aCancelBubble);
-  if (mEvent->flags & NS_EVENT_FLAG_BUBBLE || mEvent->flags & NS_EVENT_FLAG_INIT) {
-    *aCancelBubble = (mEvent->flags & NS_EVENT_FLAG_STOP_DISPATCH) ? PR_TRUE : PR_FALSE;
-  }
-  else {
-    *aCancelBubble = PR_FALSE;
-  }
-  return NS_OK;
+  return nsDOMEvent::GetCancelBubble(aCancelBubble);
 }
 
 NS_IMETHODIMP
 nsDOMUIEvent::SetCancelBubble(PRBool aCancelBubble)
 {
-  if (mEvent->flags & NS_EVENT_FLAG_BUBBLE || mEvent->flags & NS_EVENT_FLAG_INIT) {
-    if (aCancelBubble) {
-      mEvent->flags |= NS_EVENT_FLAG_STOP_DISPATCH;
-    }
-    else {
-      mEvent->flags &= ~NS_EVENT_FLAG_STOP_DISPATCH;
-    }
-  }
-  return NS_OK;
+  return nsDOMEvent::SetCancelBubble(aCancelBubble);
 }
 
 NS_IMETHODIMP

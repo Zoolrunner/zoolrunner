@@ -192,3 +192,8 @@ and MouseEvent relatedTarget retention. `defaultPrevented` uses an additive
 interface, preserving legacy event interface layouts. Suite's 24 lifecycle
 checks pass after these changes. Chromium 148 differs on two target-reset
 assertions; the fixture retains the DOM specification's required null target.
+
+`event-propagation-state.html` covers stopImmediatePropagation and cancelBubble
+on Event, UIEvent and CustomEvent, propagation reset and retained native-event
+redispatch (47 assertions). Native LoongArch GTK2 Suite passes these tests and
+all 904 assertions across the current 30-fixture content collection.
