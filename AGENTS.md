@@ -344,6 +344,15 @@ features in the engine rather than adding site-specific rendering exceptions.
 Do not claim complete rendering based only on parser/CSSOM tests: compare
 painting and layout, exercise menus and resizing, and test the browser and Suite.
 Track remaining feature gaps in the README and layout probe documentation.
+CSSOM property-assignment changes must exercise
+`layout/html/tests/style/css-property-assignment.html` and
+`layout/html/tests/speedometer21/css-assignment-legacy.xul`. Default/ES2015
+JavaScript assignments use setProperty validation and replace priority; explicit
+JavaScript 1.x and native callers retain the historical setter path. Preserve
+standard initial/unset and legacy -moz-initial spelling through shadow cloning
+and serialization. Run text-shadow-parser.html and text-shadow-quirks.html
+when changing shadow grammar; their passes do not establish shadow painting.
+
 
 Acid2 and Acid3 may be used as bounded standards/regression targets.
 

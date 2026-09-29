@@ -353,3 +353,11 @@ assignment checks). Reports are `text-shadow-parser-suite-gtk2-*` and
 other-application checks remain pending for these changes. Computed text-shadow
 values and shadow painting remain unfinished; these parser passes do not
 establish rendering support or full CSS conformance.
+
+The Xlib Suite build now passes the same 1,277 content, 300 History, 274 HTTP,
+fifteen dataset GC and 24 lifecycle assertions after 36b2fad8. Both backends
+also pass 107 assertions in ES5 content mode, ten explicit legacy/modern chrome
+assertions, and unchanged Suite ChatZilla startup. Reports are
+`text-shadow-parser-suite-{gtk2,xlib}-*`, `css-assignment-*` and
+`text-shadow-parser-chatzilla-*`. Follow-up checks in the other applications
+are running; this remains parser/CSSOM work, not text-shadow painting.
