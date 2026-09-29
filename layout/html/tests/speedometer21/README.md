@@ -971,3 +971,18 @@ iframe, then requests forced GC through the Suite probe runner. Both native
 backends pass ten post-collection read/write, descriptor, enumeration, symbol
 and interface checks (`dataset-frame-gc-{gtk2,xlib}-*`). This fixture requires
 the runner's GC handshake; opening it alone does not complete the test.
+
+The full native LoongArch Suite package gates now pass on both GTK2 and Xlib
+for the 46bd462d dataset interface build. Each passes all 11,540 required-mode
+ES5.1 cases and 28,582 historical ES2015 modes, 139 focused shell runs, 86 native
+probes (including five internal probes), and the existing embedding, chrome,
+ChatZilla and lifecycle checks. The packaged engine SHA-256 is
+`1693a711f9b6629c2f7607244ea7ec015336a389d54fbe4251a43b521167f39b`.
+See `dataset-package-suite-{gtk2,xlib}/logs/runtime-result.txt` and the adjacent
+conformance reports. Other-application matrix checks and the new full benchmark
+remain in progress; these gates do not establish full DOM/CSS compliance.
+
+The preceding 79c97eb5 XHR GTK2 snapshot has also completed its full unmodified
+benchmark: sixteen suites, ten iterations, 480 successful workload checks and
+exit zero in `benchmark-xhr-modern-gtk2.json`. This snapshot predates both the
+synchronous ready-state correction and the dataset work.

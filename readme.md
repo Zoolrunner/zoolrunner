@@ -193,7 +193,7 @@ the ES2015 features required by its workloads, while preserving historical
 application behavior. Complete ten-iteration runs pass all sixteen workloads
 and 480 checked steps on both native LoongArch Suite backends, using the frozen
 revisions recorded in the [Speedometer validation notes](layout/html/tests/speedometer21/README.md).
-This does not establish complete standards compliance: live dataset behavior,
+This does not establish complete standards compliance: dataset edge cases,
 CSS painting and other DOM gaps remain under development.
 
 Application compatibility is tested separately from language conformance:
