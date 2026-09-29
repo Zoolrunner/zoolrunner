@@ -437,6 +437,10 @@ in native LoongArch Linux Suite. Only after all enabled Speedometer workloads
 complete in Suite, validate Browser, Calendar and XULRunner. Record actual
 benchmark, standards and application results separately; a benchmark pass
 does not establish exhaustive specification conformance.
+Event-prototype changes must exercise `layout/html/tests/style/event-prototype.html`,
+including Window initialization, frame realms, document fragments and historical
+named-property lookup, alongside Suite lifecycle and chrome/content bootstrap.
+Do not link Window's legacy global-scope polluter into a shared DOM prototype.
 
 Full ECMAScript 2015 (ES6) compliance is the next required modernization target.
 Track the conformance corpus, failures and implementation status in

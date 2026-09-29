@@ -1,0 +1,64 @@
+<!doctype html><html><head><title>Inherited native event operations</title></head>
+<body><div id="eventPrototypeNamedElement"></div><iframe id="child"></iframe><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,name){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' expected '+expected));}
+try {
+  var add=Node.prototype.addEventListener,remove=Node.prototype.removeEventListener;
+  check(typeof add,'function','Node prototype add operation');
+  check(typeof remove,'function','Node prototype remove operation');
+  check(add.length,2,'optional capture arity');
+  check(add,EventTarget.prototype.addEventListener,'shared EventTarget operation');
+  check(EventTarget.prototype.constructor,EventTarget,'EventTarget prototype constructor');
+  check(Object.getPrototypeOf(Node.prototype),EventTarget.prototype,'Node EventTarget inheritance');
+  check(window instanceof EventTarget,true,'Window EventTarget interface');
+  check(document instanceof EventTarget,true,'Document EventTarget interface');
+  check(new XMLHttpRequest() instanceof EventTarget,true,'XHR EventTarget interface');
+  check(window.addEventListener,add,'Window inherited operation');
+  check(new XMLHttpRequest().addEventListener,add,'XHR inherited operation');
+  check(typeof EventTarget.prototype.dispatchEvent,'function','shared dispatch operation');
+  check(window.eventPrototypeNamedElement,undefined,'historical standards-mode named-property boundary');
+  check(EventTarget.prototype.eventPrototypeNamedElement,undefined,'named window properties do not pollute EventTarget');
+  check(document.createElement('div').eventPrototypeNamedElement,undefined,'named window properties do not pollute nodes');
+  var child=document.getElementById('child').contentWindow;
+  check(child.addEventListener,child.EventTarget.prototype.addEventListener,'child window realm operation');
+  check(child.EventTarget.prototype===EventTarget.prototype,false,'separate realm EventTarget prototypes');
+  child.document.open();child.document.write('<html><body><div id="legacyNamedEventNode"></div></body></html>');child.document.close();
+  check(child.document.compatMode,'BackCompat','legacy named-property fixture mode');
+  check(child.eval('legacyNamedEventNode'),child.document.getElementById('legacyNamedEventNode'),'legacy unqualified named window property');
+  check(child.EventTarget.prototype.legacyNamedEventNode,undefined,'legacy names do not pollute shared prototype');
+  var nodes=[document,document.createElement('button'),document.createElement('input'),document.createElement('div'),document.createTextNode('text'),document.createComment('comment'),document.createDocumentFragment()];
+  for(var i=0;i<nodes.length;++i){
+    check(nodes[i].addEventListener,add,'inherited add '+i);
+    check(nodes[i].removeEventListener,remove,'inherited remove '+i);
+    check(Object.prototype.hasOwnProperty.call(nodes[i],'addEventListener'),false,'no instance shadow '+i);
+  }
+  var registrations=0,removals=0,calls=0;
+  Node.prototype.addEventListener=function(){++registrations;return add.apply(this,arguments);};
+  Node.prototype.removeEventListener=function(){++removals;return remove.apply(this,arguments);};
+  var target=document.createElement('button');document.body.appendChild(target);
+  function listener(e){++calls;check(e.currentTarget,target,'inherited listener receiver');}
+  nodes[1].addEventListener('unused',listener);
+  target.addEventListener('click',listener);
+  target.click();target.removeEventListener('click',listener);target.click();
+  check(registrations,2,'prototype replacement affects old and new nodes');
+  check(removals,1,'prototype removal replacement');check(calls,1,'native listener identity retained');
+  Node.prototype.addEventListener=add;Node.prototype.removeEventListener=remove;
+  check(target.addEventListener,add,'prototype restoration visible');
+  var event=new Event('shared',{cancelable:true}),seen=0;
+  add.call(target,'shared',function(e){++seen;e.preventDefault();});
+  check(EventTarget.prototype.dispatchEvent.call(target,event),false,'prototype dispatch cancellation');
+  check(seen,1,'prototype dispatch listener');
+  var bad;try{EventTarget.prototype.dispatchEvent.call({},event);}catch(e){bad=e;}
+  check(bad instanceof TypeError,true,'prototype dispatch receiver validation');
+  var fragment=document.createDocumentFragment(),nested=document.createElement('div'),path=[];
+  fragment.appendChild(nested);
+  fragment.addEventListener('fragment',function(e){path.push('capture');try{check(e.currentTarget,fragment,'fragment capture target');}catch(error){check(String(error),'no exception','fragment currentTarget conversion');}},true);
+  fragment.addEventListener('fragment',function(e){path.push('bubble');check(e.target,nested,'fragment descendant target');});
+  nested.addEventListener('fragment',function(){path.push('target');});
+  nested.dispatchEvent(new Event('fragment',{bubbles:true}));
+  check(path.join(','),'capture,target,bubble','fragment capture and bubble');
+  var direct=0;fragment.addEventListener('direct',function(){++direct;});
+  fragment.dispatchEvent(new Event('direct'));check(direct,1,'fragment direct dispatch');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+testDone=true;
+</script></body></html>

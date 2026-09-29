@@ -109,3 +109,11 @@ concurrent-dispatch rejection and bubbling in detached subtrees.
 ordinary objects as receivers without dereferencing a missing XPConnect
 wrapper. Six assertions pass in native LoongArch Suite; the unchanged Suite
 lifecycle fixture also passes all 24 checks after the shared null-query fix.
+
+`event-prototype.html` checks the shared EventTarget prototype across Node,
+Window and XMLHttpRequest; method replacement on existing/new nodes; native
+listener identity; dispatch; document-fragment capture/bubbling/currentTarget;
+and frame realm separation. It also preserves the historical standards/quirks
+boundary for unqualified named window properties, without exposing those names
+through the prototype shared by ordinary nodes. All 53 checks pass in native
+LoongArch GTK2 Suite. This is focused coverage, not complete DOM conformance.

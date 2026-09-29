@@ -518,6 +518,8 @@ protected:
 
   static JSBool JS_DLL_CALLBACK RemoveEventListenerHelper(JSContext* cx,
     JSObject* obj, uintN argc, jsval* argv, jsval* rval);
+  static JSBool JS_DLL_CALLBACK DispatchEventHelper(JSContext* cx,
+    JSObject* obj, uintN argc, jsval* argv, jsval* rval);
   static JSBool EventListenerHelper(JSContext* cx, JSObject* obj,
     uintN argc, jsval* argv, jsval* rval, PRBool aRemove);
 
@@ -527,6 +529,7 @@ protected:
                                   PRBool *did_define);
 
 public:
+  static JSBool DefineEventListenerMethods(JSContext* cx, JSObject* proto);
   NS_IMETHOD NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                         JSObject *obj, jsval id, PRUint32 flags,
                         JSObject **objp, PRBool *_retval);
@@ -596,6 +599,7 @@ public:
   static JSBool JS_DLL_CALLBACK SecurityCheckOnSetProp(JSContext *cx,
                                                        JSObject *obj, jsval id,
                                                        jsval *vp);
+  static nsresult InitEventTargetPrototype(JSContext* cx, JSObject* obj);
   static void InvalidateGlobalScopePolluter(JSContext *cx, JSObject *obj);
   static nsresult InstallGlobalScopePolluter(JSContext *cx, JSObject *obj,
                                              nsIHTMLDocument *doc);

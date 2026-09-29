@@ -1848,6 +1848,7 @@ nsDOMClassInfo::Init()
 
   DOM_CLASSINFO_MAP_BEGIN(DocumentFragment, nsIDOMDocumentFragment)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentFragment2)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMEventTarget)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentFragment)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
   DOM_CLASSINFO_MAP_END
@@ -4062,6 +4063,34 @@ nsWindowSH::GlobalScopePolluterNewResolve(JSContext *cx, JSObject *obj,
   return JS_TRUE;
 }
 
+// Complete the inner realm's chain after the outer/inner prototype swap.
+// Keep the legacy named-property object on Window's private chain, rather
+// than linking it into EventTarget.prototype (which every node shares).
+nsresult
+nsWindowSH::InitEventTargetPrototype(JSContext* cx, JSObject* obj)
+{
+  jsval value;
+  if (!JS_GetProperty(cx, obj, "EventTarget", &value) ||
+      JSVAL_IS_PRIMITIVE(value))
+    return NS_ERROR_FAILURE;
+  JSObject* constructor = JSVAL_TO_OBJECT(value);
+  if (!JS_GetProperty(cx, constructor, "prototype", &value) ||
+      JSVAL_IS_PRIMITIVE(value))
+    return NS_ERROR_FAILURE;
+  JSObject* eventProto = JSVAL_TO_OBJECT(value);
+  JSObject* current = JS_GetPrototype(cx, obj);
+  while (current) {
+    JSObject* parent = JS_GetPrototype(cx, current);
+    if (parent == eventProto) return NS_OK;
+    if (!parent || JS_GET_CLASS(cx, parent) == sObjectClass ||
+        JS_GET_CLASS(cx, parent) == &sDOMConstructorProtoClass) {
+      return JS_SetPrototype(cx, current, eventProto) ? NS_OK : NS_ERROR_FAILURE;
+    }
+    current = parent;
+  }
+  return NS_ERROR_UNEXPECTED;
+}
+
 // static
 void
 nsWindowSH::InvalidateGlobalScopePolluter(JSContext *cx, JSObject *obj)
@@ -4106,11 +4135,12 @@ nsWindowSH::InstallGlobalScopePolluter(JSContext *cx, JSObject *obj,
   JSObject *o = obj, *proto;
 
   // Find the place in the prototype chain where we want this global
-  // scope polluter (right before Object.prototype).
+  // scope polluter, before the shared EventTarget/Object prototypes.
 
   while ((proto = ::JS_GetPrototype(cx, o))) {
-    if (JS_GET_CLASS(cx, proto) == sObjectClass) {
-      // Set the global scope polluters prototype to Object.prototype
+    if (JS_GET_CLASS(cx, proto) == sObjectClass ||
+        JS_GET_CLASS(cx, proto) == &sDOMConstructorProtoClass) {
+      // Keep named window properties out of shared DOM prototypes.
       if (!::JS_SetPrototype(cx, gsp, proto)) {
         return NS_ERROR_UNEXPECTED;
       }
@@ -5770,6 +5800,19 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
     rv = DefineInterfaceConstants(cx, class_obj, &name_struct->mIID);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    if (name_struct->mIID.Equals(NS_GET_IID(nsIDOMEventTarget))) {
+      JSObject* eventProto = JS_NewObject(cx, &sDOMConstructorProtoClass,
+                                         nsnull, obj);
+      if (!eventProto ||
+          !JS_DefineProperty(cx, class_obj, "prototype",
+                             OBJECT_TO_JSVAL(eventProto), nsnull, nsnull,
+                             JSPROP_PERMANENT | JSPROP_READONLY) ||
+          !JS_DefineProperty(cx, eventProto, "constructor",
+                             OBJECT_TO_JSVAL(class_obj), nsnull, nsnull, 0) ||
+          !nsEventReceiverSH::DefineEventListenerMethods(cx, eventProto))
+        return NS_ERROR_OUT_OF_MEMORY;
+    }
+
     *did_resolve = PR_TRUE;
 
     return NS_OK;
@@ -5900,6 +5943,13 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
       }
     }
 
+    // DOM inheritance is independent of the historical XPCOM vtables.
+    if (primary_iid && (!ci_data || ci_data->mHasClassInterface) &&
+        (primary_iid->Equals(NS_GET_IID(nsIDOMNode)) ||
+         primary_iid->Equals(NS_GET_IID(nsIDOMWindow)) ||
+         primary_iid->Equals(NS_GET_IID(nsIXMLHttpRequest))))
+      class_parent_name.Assign("nsIDOMEventTarget");
+
     JSObject *proto = nsnull;
 
     if (class_parent_name) {
@@ -5970,6 +6020,14 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
       NS_ENSURE_SUCCESS(rv, NS_ERROR_UNEXPECTED);
 
       JSObject *xpc_proto_proto = ::JS_GetPrototype(cx, dot_prototype);
+
+      if (proto && ci_id == eDOMClassInfo_Window_id &&
+          JS_GET_CLASS(cx, xpc_proto_proto) == &sGlobalScopePolluterClass) {
+        // Preserve legacy named window properties without placing their
+        // polluter on the EventTarget prototype shared by every DOM node.
+        if (!JS_SetPrototype(cx, xpc_proto_proto, proto))
+          return NS_ERROR_UNEXPECTED;
+      }
 
       if (proto && JS_GET_CLASS(cx, xpc_proto_proto) == sObjectClass) {
         if (!::JS_SetPrototype(cx, dot_prototype, proto)) {
@@ -7265,6 +7323,52 @@ nsEventReceiverSH::ReallyIsEventName(jsval id, jschar aFirstChar)
   return PR_FALSE;
 }
 
+JSBool
+nsEventReceiverSH::DefineEventListenerMethods(JSContext* cx, JSObject* proto)
+{
+  return JS_DefineFunction(cx, proto, "addEventListener",
+                           AddEventListenerHelper, 2, JSPROP_ENUMERATE) &&
+         JS_DefineFunction(cx, proto, "removeEventListener",
+                           RemoveEventListenerHelper, 2, JSPROP_ENUMERATE) &&
+         JS_DefineFunction(cx, proto, "dispatchEvent",
+                           DispatchEventHelper, 1, JSPROP_ENUMERATE);
+}
+
+JSBool JS_DLL_CALLBACK
+nsEventReceiverSH::DispatchEventHelper(JSContext* cx, JSObject* obj,
+                                      uintN argc, jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  sXPConnect->GetWrappedNativeOfJSObject(cx, obj, getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMEventTarget> target(do_QueryWrappedNative(wrapper));
+  if (!target || argc < 1 || JSVAL_IS_PRIMITIVE(argv[0])) {
+    DOMConstructorTypeError(cx, "dispatchEvent requires an EventTarget and Event");
+    return JS_FALSE;
+  }
+  JSString* method = JS_InternString(cx, "dispatchEvent");
+  if (!method) return JS_FALSE;
+  if (NS_FAILED(sSecMan->CheckPropertyAccess(cx, obj,
+                  JS_GET_CLASS(cx, obj)->name, STRING_TO_JSVAL(method),
+                  nsIXPCSecurityManager::ACCESS_CALL_METHOD)))
+    return JS_FALSE;
+  nsCOMPtr<nsIXPConnectWrappedNative> eventWrapper;
+  sXPConnect->GetWrappedNativeOfJSObject(cx, JSVAL_TO_OBJECT(argv[0]),
+                                        getter_AddRefs(eventWrapper));
+  nsCOMPtr<nsIDOMEvent> event(do_QueryWrappedNative(eventWrapper));
+  if (!event) {
+    DOMConstructorTypeError(cx, "dispatchEvent requires an Event");
+    return JS_FALSE;
+  }
+  PRBool result;
+  nsresult rv = target->DispatchEvent(event, &result);
+  if (NS_FAILED(rv)) {
+    ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *rval = BOOLEAN_TO_JSVAL(result);
+  return JS_TRUE;
+}
+
 // static
 JSBool JS_DLL_CALLBACK
 nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
@@ -7495,6 +7599,16 @@ nsEventReceiverSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
 
   if ((id == sAddEventListener_id || id == sRemoveEventListener_id) &&
       !(flags & JSRESOLVE_ASSIGNING)) {
+    nsCOMPtr<nsIDOMEventTarget> target(do_QueryWrappedNative(wrapper));
+    if (target) {
+      JSObject* proto = JS_GetPrototype(cx, obj);
+      JSBool found = JS_FALSE;
+      if (proto && !JS_HasUCProperty(cx, proto,
+            JS_GetStringChars(JSVAL_TO_STRING(id)),
+            JS_GetStringLength(JSVAL_TO_STRING(id)), &found))
+        return NS_ERROR_FAILURE;
+      if (found) return NS_OK;
+    }
     JSString *str = JSVAL_TO_STRING(id);
     // The capture flag is optional, as in the DOM event-target API.
     JSFunction *fnc =

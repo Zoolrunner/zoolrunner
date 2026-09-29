@@ -1428,6 +1428,13 @@ nsGlobalWindow::SetNewDocument(nsIDOMDocument* aDocument,
     scx->GC();
 
     scx->DidInitializeContext();
+    if (!aState && !reUseInnerWindow) {
+      // Global DOM names are deliberately unavailable until initialization
+      // finishes. Resolve EventTarget after that boundary, with the document,
+      // principal and legacy global-scope polluter already installed.
+      rv = nsWindowSH::InitEventTargetPrototype(cx, newInnerWindow->mJSObject);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
   }
 
   // Clear our mutation bitfield.

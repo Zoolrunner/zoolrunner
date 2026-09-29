@@ -1126,3 +1126,9 @@ The isolated workload passes add/complete/delete item checks; the complete
 benchmark is still pending, including Angular 2 deletion. Storage events,
 prototype semantics and boundary/persistence validation remain incomplete;
 see the [Suite-first validation notes](layout/html/tests/speedometer21/README.md).
+
+The shared native EventTarget prototype now preserves event-method replacement
+through Node, Window and XMLHttpRequest. Its 53 focused Suite checks include
+frame realms, document fragments and legacy named window properties. Angular 2's
+isolated TodoMVC workload now passes all three item-count checks; the full
+benchmark and remaining standards/application validation are still pending.

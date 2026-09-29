@@ -1570,6 +1570,27 @@ XPC_WN_ModsAllowed_Proto_Resolve(JSContext *cx, JSObject *obj, jsval idval)
     if(!self)
         return JS_FALSE;
 
+    // DOM event methods inherited from a shared EventTarget prototype must not be
+    // shadowed by another copy reflected from an auxiliary XPCOM interface.
+    // Keep unrelated XPConnect interfaces and immutable prototypes unchanged.
+    if((self->GetClassInfoFlags() & nsIClassInfo::DOM_OBJECT) &&
+       JSVAL_IS_STRING(idval))
+    {
+        const char* name = JS_GetStringBytes(JSVAL_TO_STRING(idval));
+        size_t length = JS_GetStringLength(JSVAL_TO_STRING(idval));
+        if((length == 16 && !strcmp(name, "addEventListener")) ||
+           (length == 19 && !strcmp(name, "removeEventListener")) ||
+           (length == 13 && !strcmp(name, "dispatchEvent")))
+        {
+            JSObject* parent = JS_GetPrototype(cx, obj);
+            JSBool found = JS_FALSE;
+            if(parent && !JS_HasProperty(cx, parent, name, &found))
+                return JS_FALSE;
+            if(found)
+                return JS_TRUE;
+        }
+    }
+
     XPCCallContext ccx(JS_CALLER, cx);
     if(!ccx.IsValid())
         return JS_FALSE;

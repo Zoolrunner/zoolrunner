@@ -235,3 +235,24 @@ The local-storage HTTP fixture passes all 41 assertions on native LoongArch
 GTK2 Suite, including six legacy storage compatibility assertions. Suite window
 bootstrap passes all 19 checks. Invalid DOM method receivers also pass six
 focused checks after a null-safe wrapped-native query correction.
+
+Angular 2's isolated workload now passes add/complete/delete checks after fixing
+native event-method inheritance. EventTarget had been exposed as an interface
+name without a shared prototype; per-instance event methods also hid prototype
+replacements. EventTarget now supplies shared native operations, and Node,
+Window and XMLHttpRequest inherit them while retaining their XPCOM interfaces.
+Document fragments use the existing native dispatch machinery and expose their
+event-target interfaces. Window setup runs after context initialization and
+keeps legacy named-property lookup off the shared EventTarget prototype.
+
+The 53-assertion prototype fixture and all eleven existing event/window fixtures
+pass in native LoongArch GTK2 Suite. These cover event construction, cross-frame
+identity, clicks, handler properties, redispatch, listener removal, hidden
+iframes, Symbol keys, CustomEvent/forced GC, and invalid receivers. Angular's
+polyfill still logs a missing HTMLMediaElement interface; this remains a feature
+gap even though its isolated TodoMVC operations succeed. Full ten-iteration
+benchmark validation remains pending.
+
+After the prototype changes, Suite lifecycle passes all 24 checks, chrome/content
+window bootstrap passes all 19, and unchanged ChatZilla initializes and shuts
+down successfully. Other applications remain deferred until Suite completion.

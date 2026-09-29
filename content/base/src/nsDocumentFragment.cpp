@@ -158,9 +158,8 @@ public:
                                   nsEvent* aEvent, nsIDOMEvent** aDOMEvent,
                                   PRUint32 aFlags, nsEventStatus* aEventStatus)
   {
-    NS_ENSURE_ARG_POINTER(aEventStatus);
-    *aEventStatus = nsEventStatus_eIgnore;
-    return NS_OK;
+    return nsGenericElement::HandleDOMEvent(aPresContext, aEvent, aDOMEvent,
+                                            aFlags, aEventStatus);
   }
 };
 
@@ -207,6 +206,14 @@ NS_INTERFACE_MAP_BEGIN(nsDocumentFragment)
   NS_INTERFACE_MAP_ENTRY(nsIDOM3Node)
   NS_INTERFACE_MAP_ENTRY(nsIContent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMGCParticipant)
+  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMEventReceiver,
+                                 nsDOMEventRTTearoff::Create(this))
+  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMEventTarget,
+                                 nsDOMEventRTTearoff::Create(this))
+  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOM3EventTarget,
+                                 nsDOMEventRTTearoff::Create(this))
+  NS_INTERFACE_MAP_ENTRY_TEAROFF(nsIDOMNSEventTarget,
+                                 nsDOMEventRTTearoff::Create(this))
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIContent)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(DocumentFragment)
 NS_INTERFACE_MAP_END
