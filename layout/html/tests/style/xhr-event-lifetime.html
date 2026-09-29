@@ -1,0 +1,36 @@
+<!doctype html><title>XMLHttpRequest event lifetime</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+var request=new XMLHttpRequest(),retainedLoad=null,retainedProgress=null;
+request.onprogress=function(e){
+ if(!retainedProgress){
+  retainedProgress=e;
+  try {
+   check(e.type,'progress','progress event type during callback');
+   check(e.target,request,'progress target during callback');
+  }catch(error){check(String(error),'no exception','progress callback access');}
+ }
+};
+request.onload=function(e){
+ retainedLoad=e;
+ check(e.type,'load','load event type during callback');
+ check(e.target,request,'load target during callback');
+ setTimeout(function(){
+  try {
+   check(retainedLoad.type,'load','retained load type');
+   check(retainedLoad.target,request,'retained load target');
+   check(retainedProgress!==null,true,'progress callback delivered');
+   if(retainedProgress){
+    check(retainedProgress.type,'progress','retained progress type');
+    check(retainedProgress.target,request,'retained progress target');
+    check(retainedProgress.position>0,true,'legacy progress position retained');
+   }
+  }catch(error){check(String(error),'no exception','retained event access');}
+  check(testResults.length,10,'all event lifetime assertions executed');
+  testDone=true;
+ },50);
+};
+request.onerror=function(){check('error','load','request completed');testDone=true;};
+request.open('GET','xhr-event-lifetime.html?payload='+new Date().getTime(),true);
+request.send(null);
+</script>

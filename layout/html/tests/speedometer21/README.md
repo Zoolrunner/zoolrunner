@@ -422,3 +422,15 @@ GTK2 passes all 36; the prior binding threw on the inherited state getter.
 This fixture requires an HTTP origin (file content has no sessionStorage in this
 platform). It does not establish modern StorageEvent constructor or cross-window
 local-storage notification support.
+
+`style/xhr-event-lifetime.html` requests its own source over HTTP and retains
+both load and progress events beyond their callbacks. All 11 checks pass on
+native LoongArch GTK2 after making the native event data owned before script
+notification and initializing the progress event's type. Before this correction,
+reading the retained load type accessed expired stack data and failed, and the
+progress type was uninitialized. Serve this fixture over HTTP in probe mode.
+The existing legacy progress position/totalSize API is retained. Broader XHR
+event dispatch semantics and modern progress interfaces remain to be completed.
+The 24 Suite lifecycle checks and all three isolated AngularJS TodoMVC operations
+also pass with this ownership correction. The ongoing full benchmark uses an
+earlier frozen runtime and does not validate this later change.

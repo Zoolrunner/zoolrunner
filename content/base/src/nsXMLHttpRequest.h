@@ -155,7 +155,8 @@ protected:
   nsresult RequestCompleted();
   nsresult GetLoadGroup(nsILoadGroup **aLoadGroup);
   nsIURI *GetBaseURI();
-  nsresult CreateEvent(nsEvent* event, nsIDOMEvent** domevent);
+  nsresult CreateEvent(nsEvent* aEvent, nsIDOMEvent** aDOMEvent,
+                       const char* aType = nsnull);
   void NotifyEventListeners(nsIDOMEventListener* aHandler,
                             const nsCOMArray<nsIDOMEventListener>* aListeners,
                             nsIDOMEvent* aEvent);

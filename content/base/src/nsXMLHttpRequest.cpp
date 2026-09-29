@@ -824,7 +824,8 @@ nsXMLHttpRequest::GetBaseURI()
 }
 
 nsresult
-nsXMLHttpRequest::CreateEvent(nsEvent* aEvent, nsIDOMEvent** aDOMEvent)
+nsXMLHttpRequest::CreateEvent(nsEvent* aEvent, nsIDOMEvent** aDOMEvent,
+                             const char* aType)
 {
   nsresult rv;
 
@@ -850,6 +851,17 @@ nsXMLHttpRequest::CreateEvent(nsEvent* aEvent, nsIDOMEvent** aDOMEvent)
   if (!privevent) {
     NS_IF_RELEASE(*aDOMEvent);
     return NS_ERROR_FAILURE;
+  }
+  // The caller's native event is stack-backed. Script may keep either this
+  // wrapper or the progress wrapper after notification returns.
+  rv = privevent->DuplicatePrivateData();
+  if (NS_SUCCEEDED(rv) && aType) {
+    rv = (*aDOMEvent)->InitEvent(NS_ConvertASCIItoUTF16(aType),
+                               PR_FALSE, PR_FALSE);
+  }
+  if (NS_FAILED(rv)) {
+    NS_RELEASE(*aDOMEvent);
+    return rv;
   }
   privevent->SetTarget(this);
   privevent->SetCurrentTarget(this);
@@ -2092,8 +2104,8 @@ nsXMLHttpRequest::OnProgress(nsIRequest *aRequest, nsISupports *aContext, PRUint
   nsCOMPtr<nsIDOMEventListener> listener = mOnProgressListener.Get();
   if (listener) {
     nsCOMPtr<nsIDOMEvent> event;
-    nsEvent evt(PR_TRUE, NS_EVENT_NULL); // what name do we make up here? 
-    nsresult rv = CreateEvent(&evt, getter_AddRefs(event));
+    nsEvent evt(PR_TRUE, NS_EVENT_NULL);
+    nsresult rv = CreateEvent(&evt, getter_AddRefs(event), "progress");
     NS_ENSURE_SUCCESS(rv, rv);
     
     nsXMLHttpProgressEvent * progressEvent = new nsXMLHttpProgressEvent(event, aProgress, aProgressMax); 
