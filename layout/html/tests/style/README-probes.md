@@ -359,5 +359,9 @@ fifteen dataset GC and 24 lifecycle assertions after 36b2fad8. Both backends
 also pass 107 assertions in ES5 content mode, ten explicit legacy/modern chrome
 assertions, and unchanged Suite ChatZilla startup. Reports are
 `text-shadow-parser-suite-{gtk2,xlib}-*`, `css-assignment-*` and
-`text-shadow-parser-chatzilla-*`. Follow-up checks in the other applications
-are running; this remains parser/CSSOM work, not text-shadow painting.
+`text-shadow-parser-chatzilla-*`. Browser, Calendar and XULRunner now pass the follow-up checks on both backends:
+997 content assertions and ten legacy/modern assignment assertions per build,
+plus browser preferences, Calendar startup/four views and standalone ChatZilla
+as applicable. The six-result aggregate is
+`text-shadow-parser-applications-summary.json`. This remains parser/CSSOM work,
+not text-shadow painting.
