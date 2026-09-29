@@ -2259,8 +2259,13 @@ nsXMLHttpRequest::ChangeState(PRUint32 aState, PRBool aBroadcast,
     ClearEventListeners(mModernEvents);
   }
 
-  if (mModernEvents && (mState & XML_HTTP_REQUEST_ASYNC) &&
-      (aState & XML_HTTP_REQUEST_LOADSTATES) && aBroadcast &&
+  // SENT is an internal flag with the same public readyState as OPENED.
+  // Synchronous requests expose OPENED and DONE, without intermediate events.
+  if (mModernEvents &&
+      ((mState & XML_HTTP_REQUEST_ASYNC) ||
+       (aState & (XML_HTTP_REQUEST_OPENED | XML_HTTP_REQUEST_COMPLETED))) &&
+      (aState & XML_HTTP_REQUEST_LOADSTATES) &&
+      aState != XML_HTTP_REQUEST_SENT && aBroadcast &&
       HasModernEventListener(NS_LITERAL_STRING("readystatechange")) &&
       NS_SUCCEEDED(CheckInnerWindowCorrectness())) {
     nsCOMPtr<nsIDOMEvent> event;

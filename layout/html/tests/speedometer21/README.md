@@ -816,3 +816,17 @@ also passes. The X server is launched outside the caller-HOME isolation test:
 Xvfb's own font cache is separate from Suite's profile isolation. Reports are
 `private-home-isolation.json`, `private-home-{gtk2,xlib}.json` and
 `private-home-history/summary.json`.
+
+The state-notification correction now passes all fifteen assertions in GTK2
+Suite. Modern XHR suppresses the internal SENT transition (which still has
+public state OPENED), and synchronous requests dispatch OPENED/DONE. Explicit
+legacy modes retain their historical notifications. The complete focused XHR
+batch now reaches 184 passing assertions: the reuse fixture reaches 21 instead
+of 33 because the duplicate OPENED callbacks are gone, and the new sequence
+fixture adds fifteen checks. No assertions were removed. Suite lifecycle stays
+at 24 passes. The GC fixture now has fourteen passing assertions, including
+collection from synchronous ready-state callbacks. The expanded HTTP driver
+includes the new sequence fixture. Remaining applications are being rechecked
+with the corrected native component; the earlier package results remain a
+separate baseline. JavaScript library SHA-256 remains
+`1d29abb799a6522dc58735d5274b00304a10a48b3cbe79a67ffa3b5a3e360782`.

@@ -1231,3 +1231,13 @@ on both backends (GTK2 over HTTP; Xlib uses HTTP plus file reload/legacy checks)
 Cross-document events and other History behavior remain incomplete; the
 [Speedometer notes](layout/html/tests/speedometer21/README.md) separate these
 partial results from complete benchmark and application validation.
+
+Modern XMLHttpRequest now dispatches synthetic events with listener identity,
+capture/handler ordering, cancellation and reentrancy handling, retains callbacks
+across request reuse, and exposes the original callback functions through its
+JavaScript properties. Synchronous ready-state notifications and duplicate
+OPENED suppression have focused native Suite coverage. Explicit historical
+JavaScript versions retain their legacy callback behavior and frozen XPIDL
+interfaces. These checks do not establish complete XHR compliance; native abort
+sequencing, additional fields and other gaps remain documented in the
+[Speedometer validation notes](layout/html/tests/speedometer21/README.md).

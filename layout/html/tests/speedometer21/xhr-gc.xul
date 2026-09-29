@@ -44,6 +44,17 @@ function run(){
   });
   request.dispatchEvent(new Event('outer'));
   check(nested,1,'nested listener called');
+  var synchronous=new XMLHttpRequest(),states=[],valid=true;
+  synchronous.onreadystatechange=function(e){
+   states.push(synchronous.readyState);debuggerService.GC();
+   valid=valid&&e.target===synchronous&&e.currentTarget===synchronous&&e.eventPhase===2;
+  };
+  synchronous.open('GET',window.location.href,false);
+  synchronous.send(null);debuggerService.GC();
+  check(states.join(','),'1,4','synchronous transitions survive callback collection');
+  check(valid,true,'synchronous event fields survive collection');
+  check(synchronous.readyState,4,'synchronous completion survives collection');
+  check(typeof synchronous.onreadystatechange,'function','synchronous handler remains after collection');
  }catch(e){check(String(e),'no exception','unexpected exception');}
  finally{debuggerService.off();}
  dump('XHR-GC checks='+checks.length+' failures='+failures+'\n');
