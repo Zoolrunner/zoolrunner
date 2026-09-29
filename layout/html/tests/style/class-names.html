@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><title>Live class-name collections</title></head><body>
+<iframe id="quirks" src="class-names-quirks.html"></iframe>
+<script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,name) {
+ var ok=actual===expected; if(!ok)++testFailures;
+ testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' expected '+expected));
+}
+window.onload=function() {
+ try {
+  var root=document.createElement('div');root.className='a';document.body.appendChild(root);
+  var first=document.createElement('span');first.id='class-first';first.className='a b';root.appendChild(first);
+  var second=document.createElement('span');second.className='a';root.appendChild(second);
+  var list=root.getElementsByClassName(' a\tb\n\r\f');
+  check(list.length,1,'ASCII whitespace tokenization');check(list[0],first,'indexed collection');
+  check(list.item(99),null,'item out of bounds');check(list.namedItem('class-first'),first,'named item');
+  check(root.getElementsByClassName('a').length,2,'root excluded');
+  check(document.getElementsByClassName('a').length,3,'document includes root descendants');
+  second.className='a b';check(list.length,2,'class change adds match');
+  first.className='b';check(list.length,1,'class change removes match');check(list[0],second,'tree order after mutation');
+  root.removeChild(second);check(list.length,0,'removal updates collection');
+  second.className='a b';root.insertBefore(second,first);check(list[0],second,'insertion updates collection');
+  check(root.getElementsByClassName('a a').length,1,'duplicate query token');
+  check(root.getElementsByClassName('').length,0,'empty query');
+  check(root.getElementsByClassName(' \t\n\r\f').length,0,'whitespace-only query');
+  second.className='a\u00a0b';check(root.getElementsByClassName('a').length,0,'non-ASCII space is not a separator');
+  check(root.getElementsByClassName('a\u00a0b')[0],second,'non-ASCII token retained');
+  second.className='Upper';check(root.getElementsByClassName('upper').length,0,'standards case-sensitive');
+  var quirks=document.getElementById('quirks').contentDocument;
+  check(quirks.compatMode,'BackCompat','quirks fixture mode');
+  var q=quirks.createElement('div');q.className='UPPER \u00c6';quirks.body.appendChild(q);
+  check(quirks.getElementsByClassName('upper')[0],q,'quirks ASCII case folding');
+  check(quirks.getElementsByClassName('\u00e6').length,0,'quirks does not fold non-ASCII');
+  var detached=document.createElement('div'), live=detached.getElementsByClassName('x');
+  var child=document.createElement('div');child.className='x';detached.appendChild(child);
+  check(live.length,1,'detached collection stays live');
+  child.className='y';check(live.length,0,'detached attribute changes');
+  document.body.appendChild(detached);child.className='x';check(live[0],child,'detached collection follows attachment');
+  document.body.removeChild(detached);child.className='y';check(live.length,0,'collection follows detachment');
+  var xml=document.implementation.createDocument('','root',null), n=xml.createElement('n');
+  n.setAttribute('class','a b');xml.documentElement.appendChild(n);
+  check(xml.getElementsByClassName('b')[0],n,'XML class attribute');
+  n.setAttribute('class','null');check(xml.getElementsByClassName(null)[0],n,'null converts to string');
+  n.setAttribute('class','undefined');check(xml.getElementsByClassName(undefined)[0],n,'undefined converts to string');
+  var sentinel={},caught;
+  try { document.getElementsByClassName({toString:function(){throw sentinel;}}); }catch(e){caught=e;}
+  check(caught,sentinel,'conversion exception preserved');
+  caught=null;try {document.getElementsByClassName();}catch(e){caught=e;}
+  check(caught instanceof TypeError,true,'required argument');
+ } catch(e) {check(String(e),'no exception','unexpected exception');}
+ testDone=true;
+};
+</script></body></html>

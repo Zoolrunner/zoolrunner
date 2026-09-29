@@ -69,6 +69,7 @@
 #include "nsGlobalWindow.h"
 #include "nsAnimationFrame.h"
 #include "nsIContent.h"
+#include "nsDOMGeometry.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
 #include "nsIDOM3Document.h"
@@ -203,7 +204,7 @@
 #include "nsIDOMBarProp.h"
 #include "nsIDOMScreen.h"
 #include "nsIDOMDocumentType.h"
-#include "nsIDOMDOMImplementation.h"
+#include "nsIDOMDOMImplementation2.h"
 #include "nsIDOMDocumentFragment2.h"
 #include "nsIPrivateDOMEvent.h"
 #include "nsIDOMDocumentEvent.h"
@@ -557,8 +558,8 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            nsIXPCScriptable::WANT_ENUMERATE)
   NS_DEFINE_CLASSINFO_DATA(DocumentType, nsNodeSH,
                            NODE_SCRIPTABLE_FLAGS)
-  NS_DEFINE_CLASSINFO_DATA(DOMImplementation, nsDOMGenericSH,
-                           DOM_DEFAULT_SCRIPTABLE_FLAGS)
+  NS_DEFINE_CLASSINFO_DATA(DOMImplementation, nsDOMImplementationSH,
+                           DOM_DEFAULT_SCRIPTABLE_FLAGS | nsIXPCScriptable::WANT_NEWRESOLVE)
   NS_DEFINE_CLASSINFO_DATA(DOMException, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(DocumentFragment, nsNodeSH, NODE_SCRIPTABLE_FLAGS)
@@ -1106,6 +1107,10 @@ static nsDOMClassInfoData sClassInfoData[] = {
 
   NS_DEFINE_CLASSINFO_DATA(XULCommandEvent, nsDOMGenericSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
+  NS_DEFINE_CLASSINFO_DATA(DOMRect, nsDOMGenericSH,
+                           DOM_DEFAULT_SCRIPTABLE_FLAGS)
+  NS_DEFINE_CLASSINFO_DATA(DOMRectList, nsDOMRectListSH,
+                           ARRAY_SCRIPTABLE_FLAGS)
 };
 
 // Objects that shuld be constructable through |new Name();|
@@ -1823,6 +1828,7 @@ nsDOMClassInfo::Init()
 
   DOM_CLASSINFO_MAP_BEGIN(DOMImplementation, nsIDOMDOMImplementation)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMImplementation)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMImplementation2)
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(DOMException, nsIDOMDOMException)
@@ -2961,6 +2967,13 @@ nsDOMClassInfo::Init()
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageEvent)
    DOM_CLASSINFO_MAP_END
  
+   DOM_CLASSINFO_MAP_BEGIN(DOMRect, nsIDOMDOMRect)
+     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMRect)
+   DOM_CLASSINFO_MAP_END
+   DOM_CLASSINFO_MAP_BEGIN(DOMRectList, nsIDOMDOMRectList)
+     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMRectList)
+   DOM_CLASSINFO_MAP_END
+
    DOM_CLASSINFO_MAP_BEGIN(XULCommandEvent, nsIDOMXULCommandEvent)
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMXULCommandEvent)
      DOM_CLASSINFO_UI_EVENT_MAP_ENTRIES
@@ -7762,6 +7775,225 @@ DOMCreateDataset(JSContext *cx, JSObject *parent, nsIContent *content)
   return dataset;
 }
 
+static JSBool JS_DLL_CALLBACK
+CreateHTMLDocument(JSContext* cx, JSObject* obj, uintN argc,
+                    jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMDOMImplementation2> implementation = do_QueryWrappedNative(wrapper);
+  if (!implementation) {
+    DOMConstructorTypeError(cx, "createHTMLDocument requires a DOMImplementation");
+    return JS_FALSE;
+  }
+  nsAutoString title;
+  title.SetIsVoid(PR_TRUE);
+  if (argc && !JSVAL_IS_VOID(argv[0])) {
+    JSString* string = JS_ValueToString(cx, argv[0]);
+    if (!string) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(string);
+    title.Assign(nsDependentJSString(string));
+  }
+  nsCOMPtr<nsIDOMDocument> document;
+  nsresult rv = implementation->CreateHTMLDocument(title, getter_AddRefs(document));
+  if (NS_SUCCEEDED(rv)) {
+    nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+    rv = nsDOMClassInfo::WrapNative(cx, obj, document, NS_GET_IID(nsIDOMDocument),
+                                    rval, getter_AddRefs(holder));
+  }
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
+NS_IMETHODIMP
+nsDOMImplementationSH::NewResolve(nsIXPConnectWrappedNative* wrapper,
+                                   JSContext* cx, JSObject* obj, jsval id,
+                                   PRUint32 flags, JSObject** objp, PRBool* aOK)
+{
+  if (!(flags & JSRESOLVE_ASSIGNING) && JSVAL_IS_STRING(id) &&
+      nsDependentJSString(JSVAL_TO_STRING(id)).EqualsLiteral("createHTMLDocument")) {
+    if (!JS_DefineFunction(cx, obj, "createHTMLDocument", CreateHTMLDocument,
+                           0, JSPROP_ENUMERATE))
+      return NS_ERROR_FAILURE;
+    *objp = obj;
+    return NS_OK;
+  }
+  return nsDOMGenericSH::NewResolve(wrapper, cx, obj, id, flags, objp, aOK);
+}
+
+static PRBool ClassSpace(PRUnichar ch)
+{
+  return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f';
+}
+
+static PRBool
+ClassTokenEquals(const PRUnichar* aClasses, PRUint32 aStart, PRUint32 aLength,
+                  const PRUnichar* aWanted, PRUint32 aWantedStart,
+                  PRUint32 aWantedLength, PRBool aQuirks)
+{
+  if (aLength != aWantedLength) return PR_FALSE;
+  for (PRUint32 i = 0; i < aLength; ++i) {
+    PRUnichar a = aClasses[aStart + i], b = aWanted[aWantedStart + i];
+    if (aQuirks) {
+      if (a >= 'A' && a <= 'Z') a += 'a' - 'A';
+      if (b >= 'A' && b <= 'Z') b += 'a' - 'A';
+    }
+    if (a != b) return PR_FALSE;
+  }
+  return PR_TRUE;
+}
+
+static PRBool
+MatchClassNames(nsIContent* aContent, PRInt32 aQuirks, nsIAtom*,
+                 const nsAString& aWanted)
+{
+  if (!aContent->IsContentOfType(nsIContent::eELEMENT)) return PR_FALSE;
+  nsAutoString classes;
+  aContent->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, classes);
+  const nsAFlatString& wanted = PromiseFlatString(aWanted);
+  PRUint32 i = 0;
+  PRBool any = PR_FALSE;
+  while (i < aWanted.Length()) {
+    while (i < aWanted.Length() && ClassSpace(wanted.get()[i])) ++i;
+    PRUint32 start = i;
+    while (i < aWanted.Length() && !ClassSpace(wanted.get()[i])) ++i;
+    if (start == i) break;
+    any = PR_TRUE;
+    PRBool found = PR_FALSE;
+    PRUint32 j = 0;
+    while (j < classes.Length() && !found) {
+      while (j < classes.Length() && ClassSpace(classes[j])) ++j;
+      PRUint32 classStart = j;
+      while (j < classes.Length() && !ClassSpace(classes[j])) ++j;
+      found = ClassTokenEquals(classes.get(), classStart, j - classStart,
+                               wanted.get(), start, i - start, aQuirks != 0);
+    }
+    if (!found) return PR_FALSE;
+  }
+  return any;
+}
+
+class nsClassNameContentList : public nsContentList {
+public:
+  nsClassNameContentList(nsIDocument* aDocument, const nsAString& aClasses,
+                         nsIContent* aRoot, PRBool aQuirks)
+    : nsContentList(aDocument, MatchClassNames, aClasses, aRoot, PR_TRUE,
+                     nsnull, aQuirks ? 1 : 0) {}
+  PRBool HasMatchData() const { return mData != nsnull; }
+};
+
+static JSBool JS_DLL_CALLBACK
+GetElementsByClassName(JSContext* cx, JSObject* obj, uintN argc,
+                        jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDocument> document = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIContent> content = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIDOMNode> node = do_QueryWrappedNative(wrapper);
+  if (!document && (!content || !content->IsContentOfType(nsIContent::eELEMENT))) {
+    DOMConstructorTypeError(cx, "getElementsByClassName requires a Document or Element");
+    return JS_FALSE;
+  }
+  if (!nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  if (!argc) {
+    DOMConstructorTypeError(cx, "getElementsByClassName requires class names");
+    return JS_FALSE;
+  }
+  JSString* classes = JS_ValueToString(cx, argv[0]);
+  if (!classes) return JS_FALSE;
+  argv[0] = STRING_TO_JSVAL(classes);
+  nsCOMPtr<nsIHTMLDocument> html =
+    do_QueryInterface(document ? document.get() : content->GetOwnerDoc());
+  PRBool quirks = html && html->GetCompatibilityMode() == eCompatibility_NavQuirks;
+  nsRefPtr<nsClassNameContentList> list = new nsClassNameContentList(
+    document ? document.get() : content->GetCurrentDoc(),
+    nsDependentJSString(classes), content, quirks);
+  if (!list || !list->HasMatchData()) {
+    JS_ReportOutOfMemory(cx);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  nsresult rv = nsDOMClassInfo::WrapNative(cx, obj,
+    NS_STATIC_CAST(nsIDOMHTMLCollection*, list.get()),
+    NS_GET_IID(nsIDOMHTMLCollection), rval, getter_AddRefs(holder));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
+static JSBool
+ElementClientGeometry(JSContext* cx, JSObject* obj, jsval* rval, PRBool aAll)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIContent> content = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIDOMNode> node = do_QueryInterface(content);
+  if (!content || !content->IsContentOfType(nsIContent::eELEMENT)) {
+    DOMConstructorTypeError(cx, "Client geometry requires an Element");
+    return JS_FALSE;
+  }
+  if (!nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  nsRefPtr<nsDOMGeometryRectList> rects;
+  nsresult rv = NS_GetElementClientRects(content, getter_AddRefs(rects));
+  nsCOMPtr<nsISupports> result;
+  if (NS_SUCCEEDED(rv)) {
+    if (aAll) {
+      result = NS_STATIC_CAST(nsIDOMDOMRectList*, rects.get());
+    } else {
+      nsCOMPtr<nsIDOMDOMRect> rect;
+      rv = rects->BoundingRect(getter_AddRefs(rect));
+      result = rect;
+    }
+  }
+  if (NS_SUCCEEDED(rv)) {
+    nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+    rv = nsDOMClassInfo::WrapNative(cx, obj, result, NS_GET_IID(nsISupports),
+                                    rval, getter_AddRefs(holder));
+  }
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
+static JSBool JS_DLL_CALLBACK
+ElementBoundingClientRect(JSContext* cx, JSObject* obj, uintN argc,
+                           jsval* argv, jsval* rval)
+{ return ElementClientGeometry(cx, obj, rval, PR_FALSE); }
+
+static JSBool JS_DLL_CALLBACK
+ElementClientRects(JSContext* cx, JSObject* obj, uintN argc,
+                    jsval* argv, jsval* rval)
+{ return ElementClientGeometry(cx, obj, rval, PR_TRUE); }
+
+nsresult
+nsDOMRectListSH::GetItemAt(nsISupports* aNative, PRUint32 aIndex,
+                          nsISupports** aResult)
+{
+  nsCOMPtr<nsIDOMDOMRectList> list = do_QueryInterface(aNative);
+  NS_ENSURE_TRUE(list, NS_ERROR_UNEXPECTED);
+  nsIDOMDOMRect* item = nsnull;
+  nsresult rv = list->Item(aIndex, &item);
+  *aResult = item;
+  return rv;
+}
+
 NS_IMETHODIMP
 nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                         JSObject *obj, jsval id, PRUint32 flags,
@@ -7769,6 +8001,24 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 {
   if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *name = JSVAL_TO_STRING(id);
+    nsDependentJSString methodName(name);
+    if (methodName.EqualsLiteral("getElementsByClassName")) {
+      if (!JS_DefineFunction(cx, obj, "getElementsByClassName",
+                             GetElementsByClassName, 1, JSPROP_ENUMERATE))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
+    PRBool clientRects = methodName.EqualsLiteral("getClientRects");
+    if (clientRects || methodName.EqualsLiteral("getBoundingClientRect")) {
+      JSFunction* function = JS_DefineFunction(cx, obj,
+        clientRects ? "getClientRects" : "getBoundingClientRect",
+        clientRects ? ElementClientRects : ElementBoundingClientRect,
+        0, JSPROP_ENUMERATE);
+      if (!function) return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
     JSBool querySelectorAll =
       JS_GetStringLength(name) == 16 &&
       !memcmp(JS_GetStringChars(name),
@@ -8410,6 +8660,15 @@ nsDocumentSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                          JSObject **objp, PRBool *_retval)
 {
   nsresult rv;
+  if (!(flags & JSRESOLVE_ASSIGNING) && JSVAL_IS_STRING(id) &&
+      nsDependentJSString(JSVAL_TO_STRING(id)).EqualsLiteral("getElementsByClassName")) {
+    if (!JS_DefineFunction(cx, obj, "getElementsByClassName",
+                           GetElementsByClassName, 1, JSPROP_ENUMERATE))
+      return NS_ERROR_FAILURE;
+    *objp = obj;
+    return NS_OK;
+  }
+
 
   if (id == sLocation_id) {
     // This must be done even if we're just getting the value of
@@ -9187,11 +9446,56 @@ nsHTMLDocumentSH::DocumentAllTagsNewResolve(JSContext *cx, JSObject *obj,
 }
 
 
+static JSBool JS_DLL_CALLBACK
+HTMLDocumentHead(JSContext* cx, JSObject* obj, jsval id, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDocument> document = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIDOMNode> node = do_QueryInterface(document);
+  if (!document) {
+    DOMConstructorTypeError(cx, "head requires a Document");
+    return JS_FALSE;
+  }
+  if (!nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  *rval = JSVAL_NULL;
+  nsIContent* root = document->GetRootContent();
+  if (!root || !root->IsContentOfType(nsIContent::eHTML) ||
+      root->Tag() != nsHTMLAtoms::html)
+    return JS_TRUE;
+  for (PRUint32 i = 0; i < root->GetChildCount(); ++i) {
+    nsIContent* child = root->GetChildAt(i);
+    if (child->IsContentOfType(nsIContent::eHTML) && child->Tag() == nsHTMLAtoms::head) {
+      nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+      nsresult rv = nsDOMClassInfo::WrapNative(cx, obj, child,
+        NS_GET_IID(nsIDOMElement), rval, getter_AddRefs(holder));
+      if (NS_FAILED(rv)) {
+        nsDOMClassInfo::ThrowJSException(cx, rv);
+        return JS_FALSE;
+      }
+      break;
+    }
+  }
+  return JS_TRUE;
+}
+
 NS_IMETHODIMP
 nsHTMLDocumentSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                              JSObject *obj, jsval id, PRUint32 flags,
                              JSObject **objp, PRBool *_retval)
 {
+  if (JSVAL_IS_STRING(id) &&
+      nsDependentJSString(JSVAL_TO_STRING(id)).EqualsLiteral("head")) {
+    if (!JS_DefineProperty(cx, obj, "head", JSVAL_VOID, HTMLDocumentHead,
+                           nsnull, JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_READONLY))
+      return NS_ERROR_FAILURE;
+    *objp = obj;
+    return NS_OK;
+  }
   // nsDocumentSH::NewResolve() does a security check that we'd kinda
   // want to do here too before doing anything else. But given that we
   // only define dynamic properties here before the call to

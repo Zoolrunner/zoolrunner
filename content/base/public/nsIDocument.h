@@ -975,6 +975,10 @@ private:
 nsresult
 NS_NewHTMLDocument(nsIDocument** aInstancePtrResult);
 
+// Standards HTML namespace without changing historical document defaults.
+nsresult
+NS_NewHTMLDocumentWithHTMLNamespace(nsIDocument** aInstancePtrResult);
+
 nsresult
 NS_NewXMLDocument(nsIDocument** aInstancePtrResult);
 

@@ -5,7 +5,7 @@
 <script><![CDATA[
 var C = Components.classes, I = Components.interfaces;
 var prefs = C['@mozilla.org/preferences-service;1'].getService(I.nsIPrefBranch);
-var done = false, started = false, deadline, browser, mode;
+var done = false, started = false, deadline, browser, mode, lastStep = -1;
 var consoleService = C['@mozilla.org/consoleservice;1'].getService(I.nsIConsoleService);
 var listener = { observe: function(message) {
   try {
@@ -48,6 +48,13 @@ function poll() {
         'original.apply(this, arguments); window.zoolrunnerBenchmarkDone = true;' +
         '}; })();');
       w.startTest();
+    }
+    if (mode == 'benchmark' && w.benchmarkClient &&
+        w.benchmarkClient._finishedTestCount !== lastStep) {
+      lastStep = w.benchmarkClient._finishedTestCount;
+      var info = w.document.getElementById('info');
+      dump('SPEEDOMETER-PROGRESS ' + lastStep + ' ' +
+           (info ? info.textContent : '') + '\n');
     }
     if (mode == 'benchmark' && w.zoolrunnerBenchmarkDone) {
       var client = w.benchmarkClient;

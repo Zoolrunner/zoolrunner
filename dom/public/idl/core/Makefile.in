@@ -52,8 +52,10 @@ SDK_XPIDLSRCS =                                 \
 	nsIDOMCharacterData.idl			\
 	nsIDOMComment.idl			\
 	nsIDOMDOMException.idl			\
+	nsIDOMDOMImplementation2.idl		\
 	nsIDOMDOMImplementation.idl		\
 	nsIDOMDocument.idl			\
+	nsIDOMDOMRect.idl			\
 	nsIDOMDocumentFragment2.idl		\
 	nsIDOMDocumentFragment.idl		\
 	nsIDOMDocumentType.idl			\

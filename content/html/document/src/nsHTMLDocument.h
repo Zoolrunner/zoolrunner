@@ -71,6 +71,7 @@ class nsHTMLDocument : public nsDocument,
                        public nsIDOMNSHTMLDocument
 {
 public:
+  void UseHTMLNamespace() { mUseHTMLNamespace = PR_TRUE; }
   nsHTMLDocument();
   virtual ~nsHTMLDocument();
   virtual nsresult Init();
@@ -249,7 +250,7 @@ protected:
 
   PRInt32 GetDefaultNamespaceID() const
   {
-    return mDefaultNamespaceID;
+    return mUseHTMLNamespace ? kNameSpaceID_XHTML : mDefaultNamespaceID;
   };
 
   nsCompatibility mCompatMode;
@@ -339,6 +340,7 @@ protected:
   // XXXbz should this be reset if someone manually calls
   // SetContentType() on this document?
   PRInt32 mDefaultNamespaceID;
+  PRPackedBool mUseHTMLNamespace;
 };
 
 #endif /* nsHTMLDocument_h___ */

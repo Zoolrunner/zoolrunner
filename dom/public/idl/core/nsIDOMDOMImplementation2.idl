@@ -1,0 +1,7 @@
+/* Additive HTML document creation; nsIDOMDOMImplementation remains frozen. */
+#include "nsIDOMDOMImplementation.idl"
+[scriptable, uuid(70340a4e-a1a2-4076-aadc-4b58c59e42a0)]
+interface nsIDOMDOMImplementation2 : nsIDOMDOMImplementation
+{
+  nsIDOMDocument createHTMLDocument(in DOMString title);
+};

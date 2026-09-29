@@ -48,7 +48,7 @@ def fixtures(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('arch', choices=['i686', 'x86_64', 'aarch64'])
+    parser.add_argument('arch', choices=['i686', 'x86_64', 'aarch64', 'loongarch64'])
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--objdir', type=Path, required=True)
     parser.add_argument('--runtime', type=Path, required=True)

@@ -246,3 +246,9 @@ mode and assertion. The full XULRunner retry passes all 11,540 ES5 cases with
 zero failures or timeouts, followed by all 28,582 ES6 cases, all 122 focused
 fixtures, 70 native probes, runtime checks and both uploads. Its complete workflow
 passes; the remaining Xlib entries are still pending. Runner reports now include the per-case limit and worker count.
+
+The native ES2015 driver accepts `loongarch64` as well as the existing Linux
+architectures. The Speedometer Suite development runtime passes its 139 focused
+fixtures, 83 native probes and all 28,582 pinned ES2015 modes. This result does
+not establish package validation or results for other LoongArch applications;
+see the [Suite work notes](../../layout/html/tests/speedometer21/README.md).

@@ -148,6 +148,11 @@ public:
 
   nsresult Init();
   nsresult SetDocumentTitle(const nsAString& aString, const nsIParserNode* aNode);
+  PRInt32 ElementNamespace() const {
+    nsIDocument* document = mNodeInfoManager->GetDocument();
+    return document ? document->GetDefaultNamespaceID() : kNameSpaceID_None;
+  }
+
 
   PRPackedBool mAllContent;
   PRPackedBool mProcessing;
@@ -421,7 +426,7 @@ nsHTMLFragmentContentSink::SetDocumentTitle(const nsAString& aString, const nsIP
 
   nsCOMPtr<nsINodeInfo> nodeInfo;
   nsresult rv = mNodeInfoManager->GetNodeInfo(nsHTMLAtoms::title, nsnull,
-                                              kNameSpaceID_None,
+                                              ElementNamespace(),
                                               getter_AddRefs(nodeInfo));
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -462,7 +467,7 @@ nsHTMLFragmentContentSink::OpenContainer(const nsIParserNode& aNode)
     if (nodeType == eHTMLTag_userdefined) {
       result =
         mNodeInfoManager->GetNodeInfo(aNode.GetText(), nsnull,
-                                      kNameSpaceID_None,
+                                      ElementNamespace(),
                                       getter_AddRefs(nodeInfo));
     } else {
       nsIParserService* parserService =
@@ -473,7 +478,7 @@ nsHTMLFragmentContentSink::OpenContainer(const nsIParserNode& aNode)
       nsIAtom *name = parserService->HTMLIdToAtomTag(nodeType);
       NS_ASSERTION(name, "This should not happen!");
 
-      result = mNodeInfoManager->GetNodeInfo(name, nsnull, kNameSpaceID_None,
+      result = mNodeInfoManager->GetNodeInfo(name, nsnull, ElementNamespace(),
                                              getter_AddRefs(nodeInfo));
     }
 
@@ -569,14 +574,14 @@ nsHTMLFragmentContentSink::AddLeaf(const nsIParserNode& aNode)
         if (nodeType == eHTMLTag_userdefined) {
           result =
             mNodeInfoManager->GetNodeInfo(aNode.GetText(), nsnull,
-                                          kNameSpaceID_None,
+                                          ElementNamespace(),
                                           getter_AddRefs(nodeInfo));
         } else {
           nsIAtom *name = parserService->HTMLIdToAtomTag(nodeType);
           NS_ASSERTION(name, "This should not happen!");
 
           result = mNodeInfoManager->GetNodeInfo(name, nsnull,
-                                                 kNameSpaceID_None,
+                                                 ElementNamespace(),
                                                  getter_AddRefs(nodeInfo));
         }
 
@@ -1077,7 +1082,7 @@ nsHTMLParanoidFragmentSink::NameFromNode(const nsIParserNode& aNode,
     nsCOMPtr<nsINodeInfo> nodeInfo;
     rv =
       mNodeInfoManager->GetNodeInfo(aNode.GetText(), nsnull,
-                                    kNameSpaceID_None,
+                                    ElementNamespace(),
                                     getter_AddRefs(nodeInfo));
     NS_ENSURE_SUCCESS(rv, rv);
     NS_IF_ADDREF(*aResult = nodeInfo->NameAtom());
@@ -1256,7 +1261,7 @@ nsHTMLParanoidFragmentSink::AddLeaf(const nsIParserNode& aNode)
       if (!parserService)
         return NS_ERROR_OUT_OF_MEMORY;
       rv = mNodeInfoManager->GetNodeInfo(name, nsnull,
-                                         kNameSpaceID_None,
+                                         ElementNamespace(),
                                          getter_AddRefs(nodeInfo));
       NS_ENSURE_SUCCESS(rv, rv);
       rv = NS_NewHTMLElement(getter_AddRefs(content), nodeInfo);

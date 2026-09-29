@@ -656,6 +656,18 @@ public:
 };
 
 
+class nsDOMImplementationSH : public nsDOMGenericSH
+{
+protected:
+  nsDOMImplementationSH(nsDOMClassInfoData* aData) : nsDOMGenericSH(aData) {}
+public:
+  NS_IMETHOD NewResolve(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
+                        JSObject* obj, jsval id, PRUint32 flags,
+                        JSObject** objp, PRBool* aOK);
+  static nsIClassInfo* doCreate(nsDOMClassInfoData* aData)
+  { return new nsDOMImplementationSH(aData); }
+};
+
 // Element helper
 
 class nsElementSH : public nsNodeSH
@@ -744,6 +756,17 @@ public:
   }
 };
 
+
+class nsDOMRectListSH : public nsArraySH
+{
+protected:
+  nsDOMRectListSH(nsDOMClassInfoData* aData) : nsArraySH(aData) {}
+  virtual nsresult GetItemAt(nsISupports* aNative, PRUint32 aIndex,
+                             nsISupports** aResult);
+public:
+  static nsIClassInfo* doCreate(nsDOMClassInfoData* aData)
+  { return new nsDOMRectListSH(aData); }
+};
 
 // NamedArray helper
 

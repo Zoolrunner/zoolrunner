@@ -1108,3 +1108,10 @@ preference defaults to false for existing application profiles and leaves
 privileged/XUL edition selection intact. See the [Speedometer test guide](layout/html/tests/speedometer21/README.md)
 for the unmodified benchmark runner, limitations and recorded results; a
 complete benchmark pass has not yet been established.
+
+The native LoongArch GTK2 Suite development build passes the focused client
+geometry, live class-name collection and inert HTML-document probes, plus the
+Linux driver's 139 focused ES2015 fixtures, 83 native probes and all 28,582
+pinned modes. Speedometer framework integration and complete CSS painting
+validation remain in progress; these results do not establish a full benchmark
+pass or validation of the remaining applications.

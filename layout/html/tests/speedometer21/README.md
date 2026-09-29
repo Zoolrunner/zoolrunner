@@ -107,3 +107,18 @@ LoongArch runtime uses CLOCK_MONOTONIC timestamps; Windows/macOS timing paths
 are compiled conditionally but have not been validated in this work. The
 animation probe passes 17 assertions in Suite. The next benchmark blocker is
 `Element.getBoundingClientRect`; complete workload execution remains pending.
+
+Further native LoongArch GTK2 Suite validation: client geometry passes 33
+assertions, live class-name collections pass 29, and inert HTML-document
+creation passes 31. The implementations use native layout boxes, live content
+lists, and an additive DOMImplementation interface. Created HTML documents
+have HTML namespaces, a live head getter, and no active window; classic parsed
+HTML and XHTML retain their existing document modes. Transform and SVG geometry
+remain unvalidated. These focused fixtures are also in the layout probe list.
+
+The native ES2015 driver now accepts `loongarch64`. With the Suite runtime it
+passes 139 focused JavaScript fixtures, 83 native probes and the complete
+28,582-mode pinned ES2015 suite. The unmodified benchmark passes the first five
+workloads (15 steps), then Ember requires `createHTMLDocument`; the subsequent
+benchmark run with that implementation is pending. No other application has
+been tested during this Suite-first stage.

@@ -64,7 +64,8 @@
 
 #include "nsIDOMStyleSheet.h"
 #include "nsDOMAttribute.h"
-#include "nsIDOMDOMImplementation.h"
+#include "nsIDOMDOMImplementation2.h"
+#include "nsIHTMLDocument.h"
 #include "nsIDOMDocumentView.h"
 #include "nsIDOMAbstractView.h"
 #include "nsIDOMDocumentXBL.h"
@@ -481,7 +482,7 @@ nsOnloadBlocker::SetLoadFlags(nsLoadFlags aLoadFlags)
 }
 
 
-class nsDOMImplementation : public nsIDOMDOMImplementation,
+class nsDOMImplementation : public nsIDOMDOMImplementation2,
                             public nsIPrivateDOMImplementation
 {
 public:
@@ -493,6 +494,7 @@ public:
 
   // nsIDOMDOMImplementation
   NS_DECL_NSIDOMDOMIMPLEMENTATION
+  NS_DECL_NSIDOMDOMIMPLEMENTATION2
 
   // nsIPrivateDOMImplementation
   NS_IMETHOD Init(nsIURI* aBaseURI);
@@ -500,6 +502,7 @@ public:
 protected:
   nsWeakPtr mScriptObject;
   nsCOMPtr<nsIURI> mBaseURI;
+  nsCOMPtr<nsIPrincipal> mPrincipal;
 };
 
 
@@ -521,6 +524,9 @@ nsDOMImplementation::nsDOMImplementation(nsIScriptGlobalObject* aScriptObject,
 {
   mScriptObject = do_GetWeakReference(aScriptObject);
   mBaseURI = aBaseURI;
+  nsCOMPtr<nsIScriptObjectPrincipal> owner = do_QueryInterface(aScriptObject);
+  if (owner)
+    mPrincipal = owner->GetPrincipal();
 }
 
 nsDOMImplementation::~nsDOMImplementation()
@@ -530,6 +536,7 @@ nsDOMImplementation::~nsDOMImplementation()
 // QueryInterface implementation for nsDOMImplementation
 NS_INTERFACE_MAP_BEGIN(nsDOMImplementation)
   NS_INTERFACE_MAP_ENTRY(nsIDOMDOMImplementation)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMDOMImplementation2)
   NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMImplementation)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMDOMImplementation)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(DOMImplementation)
@@ -571,6 +578,67 @@ nsDOMImplementation::CreateDocumentType(const nsAString& aQualifiedName,
     
   return NS_NewDOMDocumentType(aReturn, nsnull, principal, name, nsnull,
                                nsnull, aPublicId, aSystemId, EmptyString());
+}
+
+NS_IMETHODIMP
+nsDOMImplementation::CreateHTMLDocument(const nsAString& aTitle,
+                                         nsIDOMDocument** aResult)
+{
+  *aResult = nsnull;
+  nsCOMPtr<nsIDocument> document;
+  nsresult rv = NS_NewHTMLDocumentWithHTMLNamespace(getter_AddRefs(document));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIScriptGlobalObject> scope = do_QueryReferent(mScriptObject);
+  nsCOMPtr<nsIDocument_MOZILLA_1_8_BRANCH3> scriptDocument = do_QueryInterface(document);
+  NS_ENSURE_TRUE(scriptDocument, NS_ERROR_UNEXPECTED);
+  scriptDocument->SetScriptHandlingObject(scope);
+  if (mPrincipal)
+    document->SetPrincipal(mPrincipal);
+  nsCOMPtr<nsIURI> uri;
+  rv = NS_NewURI(getter_AddRefs(uri), "about:blank");
+  NS_ENSURE_SUCCESS(rv, rv);
+  document->SetDocumentURI(uri);
+  document->SetContentType(NS_LITERAL_STRING("text/html"));
+  document->SetDocumentCharacterSet(NS_LITERAL_CSTRING("UTF-8"));
+  nsCOMPtr<nsIHTMLDocument> htmlDocument = do_QueryInterface(document);
+  htmlDocument->SetCompatibilityMode(eCompatibility_FullStandards);
+  nsCOMPtr<nsIDOMDocument> dom = do_QueryInterface(document);
+
+  nsCOMPtr<nsIDOMDocumentType> doctype;
+  rv = CreateDocumentType(NS_LITERAL_STRING("html"), EmptyString(), EmptyString(),
+                           getter_AddRefs(doctype));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIDOMNode> appended;
+  rv = dom->AppendChild(doctype, getter_AddRefs(appended));
+  NS_ENSURE_SUCCESS(rv, rv);
+  const nsAString& htmlNamespace = NS_LITERAL_STRING("http://www.w3.org/1999/xhtml");
+  nsCOMPtr<nsIDOMElement> root, head, body;
+  rv = dom->CreateElementNS(htmlNamespace, NS_LITERAL_STRING("html"), getter_AddRefs(root));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = dom->AppendChild(root, getter_AddRefs(appended));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = dom->CreateElementNS(htmlNamespace, NS_LITERAL_STRING("head"), getter_AddRefs(head));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = root->AppendChild(head, getter_AddRefs(appended));
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (!aTitle.IsVoid()) {
+    nsCOMPtr<nsIDOMElement> title;
+    nsCOMPtr<nsIDOMText> text;
+    rv = dom->CreateElementNS(htmlNamespace, NS_LITERAL_STRING("title"), getter_AddRefs(title));
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = dom->CreateTextNode(aTitle, getter_AddRefs(text));
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = title->AppendChild(text, getter_AddRefs(appended));
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = head->AppendChild(title, getter_AddRefs(appended));
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  rv = dom->CreateElementNS(htmlNamespace, NS_LITERAL_STRING("body"), getter_AddRefs(body));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = root->AppendChild(body, getter_AddRefs(appended));
+  NS_ENSURE_SUCCESS(rv, rv);
+  dom.swap(*aResult);
+  return NS_OK;
 }
 
 NS_IMETHODIMP

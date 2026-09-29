@@ -395,7 +395,9 @@ nsGenericHTMLElement::GetNodeName(nsAString& aNodeName)
 {
   mNodeInfo->GetQualifiedName(aNodeName);
 
-  if (mNodeInfo->NamespaceEquals(kNameSpaceID_None))
+  if (mNodeInfo->NamespaceEquals(kNameSpaceID_None) ||
+      (mNodeInfo->NamespaceEquals(kNameSpaceID_XHTML) &&
+       GetOwnerDoc() && !GetOwnerDoc()->IsCaseSensitive()))
     ToUpperCase(aNodeName);
 
   return NS_OK;

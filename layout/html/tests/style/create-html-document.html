@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><title>HTML document creation regression</title></head><body>
+<script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,name) {
+ var ok=actual===expected;if(!ok)++testFailures;
+ testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' expected '+expected));
+}
+window.onload=function() {
+ try {
+  var impl=document.implementation, d=impl.createHTMLDocument();
+  check(impl.createHTMLDocument.length,0,'optional title arity');
+  check(d.doctype.name,'html','HTML doctype');check(d.childNodes.length,2,'doctype and root');
+  check(d.documentElement.tagName,'HTML','HTML root');
+  check(d.documentElement.namespaceURI,'http://www.w3.org/1999/xhtml','root namespace');
+  check(d.documentElement.childNodes.length,2,'head and body');
+  check(d.documentElement.firstChild.tagName,'HEAD','head first');
+  check(d.head,d.documentElement.firstChild,'live head getter');
+  var oldHead=d.head;d.documentElement.removeChild(oldHead);
+  check(d.head,null,'head getter reflects removal');
+  d.documentElement.insertBefore(oldHead,d.body);
+  check(d.head,oldHead,'head getter reflects insertion');
+  check(d.body.tagName,'BODY','body last');check(d.title,'','default title');
+  check(d.getElementsByTagName('title').length,0,'omitted title creates no title element');
+  check(d.compatMode,'CSS1Compat','standards mode');check(d.contentType,'text/html','HTML content type');
+  check(d.characterSet,'UTF-8','UTF-8 document');check(d.URL,'about:blank','document URL');
+  check(d.defaultView,null,'inert document has no window');
+  var text='  A & <B> \u03a9  ';
+  d=impl.createHTMLDocument(text);
+  check(d.querySelector('title').textContent,text,'title is literal text');
+  check(d.querySelector('title').childNodes.length,1,'one title text node');
+  check(impl.createHTMLDocument('').querySelector('title').childNodes.length,1,'empty title still creates text node');
+  check(impl.createHTMLDocument(null).title,'null','null title conversion');
+  check(impl.createHTMLDocument(undefined).querySelector('title'),null,'undefined optional title');
+  var count=0;
+  check(impl.createHTMLDocument({toString:function(){++count;return 'converted';}}).title,'converted','title conversion');
+  check(count,1,'title converts once');
+  var sentinel={},caught;
+  try{impl.createHTMLDocument({toString:function(){throw sentinel;}});}catch(e){caught=e;}
+  check(caught,sentinel,'title exception preserved');
+  var p=d.createElement('DIV');check(p.tagName,'DIV','HTML element case normalization');
+  check(p.namespaceURI,'http://www.w3.org/1999/xhtml','HTML-created element namespace');
+  d.body.innerHTML='<form></form><form></form><p>parsed</p>';
+  check(d.body.childNodes.length,3,'HTML fragment parsing');
+  check(d.body.lastChild.namespaceURI,'http://www.w3.org/1999/xhtml','parsed HTML namespace');
+  window.inertScriptRan=false;
+  var script=d.createElement('script');script.text='window.inertScriptRan=true;';d.body.appendChild(script);
+  check(window.inertScriptRan,false,'inert document does not execute appended script');
+ } catch(e) {check(String(e),'no exception','unexpected exception');}
+ testDone=true;
+};
+</script></body></html>

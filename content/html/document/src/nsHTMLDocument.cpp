@@ -210,6 +210,15 @@ NS_NewHTMLDocument(nsIDocument** aInstancePtrResult)
   return rv;
 }
 
+nsresult
+NS_NewHTMLDocumentWithHTMLNamespace(nsIDocument** aResult)
+{
+  nsresult rv = NS_NewHTMLDocument(aResult);
+  NS_ENSURE_SUCCESS(rv, rv);
+  NS_STATIC_CAST(nsHTMLDocument*, *aResult)->UseHTMLNamespace();
+  return NS_OK;
+}
+
 class IdAndNameMapEntry : public PLDHashEntryHdr
 {
 public:
@@ -1549,7 +1558,42 @@ nsHTMLDocument::SetXmlVersion(const nsAString& aXmlVersion)
 NS_IMETHODIMP
 nsHTMLDocument::GetTitle(nsAString& aTitle)
 {
-  return nsDocument::GetTitle(aTitle);
+  if (!mUseHTMLNamespace)
+    return nsDocument::GetTitle(aTitle);
+
+  aTitle.Truncate();
+  nsCOMPtr<nsIDOMNodeList> titles;
+  nsresult rv = GetElementsByTagNameNS(
+    NS_LITERAL_STRING("http://www.w3.org/1999/xhtml"),
+    NS_LITERAL_STRING("title"), getter_AddRefs(titles));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIDOMNode> title;
+  titles->Item(0, getter_AddRefs(title));
+  if (!title)
+    return NS_OK;
+  nsCOMPtr<nsIContent> content = do_QueryInterface(title);
+  nsAutoString text;
+  for (PRUint32 i = 0; i < content->GetChildCount(); ++i) {
+    nsCOMPtr<nsIDOMText> child = do_QueryInterface(content->GetChildAt(i));
+    if (child) {
+      nsAutoString data;
+      child->GetData(data);
+      text.Append(data);
+    }
+  }
+  PRBool space = PR_FALSE;
+  for (PRUint32 j = 0; j < text.Length(); ++j) {
+    PRUnichar c = text.CharAt(j);
+    if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') {
+      space = !aTitle.IsEmpty();
+    } else {
+      if (space)
+        aTitle.Append(PRUnichar(' '));
+      space = PR_FALSE;
+      aTitle.Append(c);
+    }
+  }
+  return NS_OK;
 }
 
 NS_IMETHODIMP
@@ -1747,7 +1791,7 @@ NS_IMETHODIMP
 nsHTMLDocument::GetImages(nsIDOMHTMLCollection** aImages)
 {
   if (!mImages) {
-    mImages = new nsContentList(this, nsHTMLAtoms::img, mDefaultNamespaceID);
+    mImages = new nsContentList(this, nsHTMLAtoms::img, GetDefaultNamespaceID());
     if (!mImages) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -1764,7 +1808,7 @@ nsHTMLDocument::GetApplets(nsIDOMHTMLCollection** aApplets)
 {
   if (!mApplets) {
     mApplets = new nsContentList(this, nsHTMLAtoms::applet,
-                                 mDefaultNamespaceID);
+                                 GetDefaultNamespaceID());
     if (!mApplets) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -2920,7 +2964,7 @@ NS_IMETHODIMP
 nsHTMLDocument::GetEmbeds(nsIDOMHTMLCollection** aEmbeds)
 {
   if (!mEmbeds) {
-    mEmbeds = new nsContentList(this, nsHTMLAtoms::embed, mDefaultNamespaceID);
+    mEmbeds = new nsContentList(this, nsHTMLAtoms::embed, GetDefaultNamespaceID());
     if (!mEmbeds) {
       return NS_ERROR_OUT_OF_MEMORY;
     }
@@ -3551,7 +3595,7 @@ nsHTMLDocument::GetBodyContent()
 
     if (child->IsContentOfType(nsIContent::eHTML) &&
         child->GetNodeInfo()->Equals(nsHTMLAtoms::body,
-                                     mDefaultNamespaceID)) {
+                                     GetDefaultNamespaceID())) {
       mBodyContent = do_QueryInterface(child);
 
       return PR_TRUE;
@@ -3592,7 +3636,7 @@ nsContentList*
 nsHTMLDocument::GetForms()
 {
   if (!mForms)
-    mForms = new nsContentList(this, nsHTMLAtoms::form, mDefaultNamespaceID);
+    mForms = new nsContentList(this, nsHTMLAtoms::form, GetDefaultNamespaceID());
 
   return mForms;
 }

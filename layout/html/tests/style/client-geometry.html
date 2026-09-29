@@ -1,0 +1,65 @@
+<!doctype html>
+<html><head><title>Client geometry regression</title><style>
+html, body { margin:0; padding:0; } body { height:3000px; }
+#box { position:absolute; left:31px; top:42px; width:100px; height:20px; padding:3px; border:2px solid; }
+#fixed { position:fixed; left:11px; top:13px; width:17px; height:19px; }
+#scroller { position:absolute; left:200px; top:60px; width:100px; height:50px; border:5px solid; overflow:auto; }
+#child { margin-left:60px; margin-top:80px; width:200px; height:200px; }
+#lines { position:absolute; left:350px; top:60px; width:80px; font:16px/20px monospace; }
+#hidden { display:none; } #invisible { visibility:hidden; width:23px; height:29px; }
+</style></head><body>
+<div id="box"></div><div id="fixed"></div><div id="scroller"><div id="child"></div></div>
+<div id="lines"><span id="inline">one two three four five six seven eight</span></div>
+<div id="hidden"></div><div id="invisible"></div><div id="zero" style="position:absolute;left:70px;top:90px;width:0;height:0"></div>
+<script>
+var testDone=false, testFailures=0, testResults=[];
+function check(actual, expected, name) {
+  var ok = typeof expected == 'number' ? Math.abs(actual-expected)<0.01 : actual === expected;
+  if(!ok) ++testFailures;
+  testResults.push((ok?'PASS ':'FAIL ')+name+(ok?'':': '+actual+' expected '+expected));
+}
+window.onload=function() {
+ try {
+  var box=document.getElementById('box'), r=box.getBoundingClientRect();
+  check(r.left,31,'left border edge'); check(r.top,42,'top border edge');
+  check(r.width,110,'border box width'); check(r.height,30,'border box height');
+  check(r.right,141,'right border edge'); check(r.bottom,72,'bottom border edge');
+  check(r.x,r.left,'x coordinate'); check(r.y,r.top,'y coordinate');
+  var list=box.getClientRects();
+  check(list.length,1,'single block rectangle');
+  check(list[0].left,31,'indexed rectangle'); check(list.item(4),null,'out of range item');
+  box.style.left='51px';
+  check(box.getBoundingClientRect().left,51,'query flushes style and reflow');
+  check(r.left,31,'bounding result is static'); check(list[0].left,31,'rectangle list is static');
+  r.x=90; r.width=-10;
+  check(r.left,80,'mutable rectangle negative width'); check(r.right,90,'negative width right');
+  check(box.getBoundingClientRect().left,51,'rectangle mutation does not affect layout');
+  var hidden=document.getElementById('hidden');
+  check(hidden.getClientRects().length,0,'display none has no boxes');
+  check(hidden.getBoundingClientRect().left,0,'display none zero origin');
+  check(hidden.getBoundingClientRect().height,0,'display none zero height');
+  check(document.createElement('div').getClientRects().length,0,'detached element has no boxes');
+  check(document.getElementById('invisible').getBoundingClientRect().width,23,'visibility hidden retains box');
+  var zero=document.getElementById('zero');
+  check(zero.getClientRects().length,1,'zero-size box retained');
+  check(zero.getBoundingClientRect().left,70,'zero-size box origin retained');
+  var scroller=document.getElementById('scroller'), child=document.getElementById('child');
+  var before=child.getBoundingClientRect(); scroller.scrollLeft=30; scroller.scrollTop=40;
+  var after=child.getBoundingClientRect();
+  check(before.left-after.left,30,'ancestor horizontal scroll');
+  check(before.top-after.top,40,'ancestor vertical scroll');
+  var inline=document.getElementById('inline'), pieces=inline.getClientRects();
+  check(pieces.length>1,true,'wrapped inline fragments');
+  var union=inline.getBoundingClientRect(), left=pieces[0].left, top=pieces[0].top;
+  var right=pieces[0].right, bottom=pieces[0].bottom;
+  for(var i=1;i<pieces.length;i++) {left=Math.min(left,pieces[i].left);top=Math.min(top,pieces[i].top);right=Math.max(right,pieces[i].right);bottom=Math.max(bottom,pieces[i].bottom);}
+  check(union.left,left,'inline union left'); check(union.top,top,'inline union top');
+  check(union.right,right,'inline union right'); check(union.bottom,bottom,'inline union bottom');
+  window.scrollTo(0,200);
+  check(box.getBoundingClientRect().top,42-window.pageYOffset,'viewport scrolling');
+  check(document.getElementById('fixed').getBoundingClientRect().top,13,'fixed box stays at viewport position');
+  window.scrollTo(0,0);
+ } catch(e) {check(String(e),'no exception','unexpected exception');}
+ testDone=true;
+};
+</script></body></html>

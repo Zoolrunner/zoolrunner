@@ -1,0 +1,21 @@
+/* Geometry objects returned by CSSOM View; historical nsIDOMRect is unchanged. */
+#include "nsISupports.idl"
+[scriptable, uuid(3375b93d-1919-4a92-aef2-d8121cce7287)]
+interface nsIDOMDOMRect : nsISupports
+{
+  attribute double x;
+  attribute double y;
+  attribute double width;
+  attribute double height;
+  readonly attribute double top;
+  readonly attribute double right;
+  readonly attribute double bottom;
+  readonly attribute double left;
+};
+
+[scriptable, uuid(7fa6995f-ea13-4ea2-949f-6f37613f1862)]
+interface nsIDOMDOMRectList : nsISupports
+{
+  readonly attribute unsigned long length;
+  nsIDOMDOMRect item(in unsigned long index);
+};
