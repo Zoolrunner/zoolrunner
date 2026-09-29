@@ -125,6 +125,8 @@ struct nsCSSShadow {
   nsCSSValue mXOffset;
   nsCSSValue mYOffset;
   nsCSSValue mRadius;
+  // CSS-wide syntax: 0 preserves legacy spelling, 1 initial, 2 unset.
+  PRUint8 mKeywordSyntax;
   nsCSSShadow*  mNext;
 };
 

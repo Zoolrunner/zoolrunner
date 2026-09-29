@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" onload="run()" width="300" height="100">
+<script type="application/javascript;version=1.7"><![CDATA[
+function legacy(){
+ var e=document.createElementNS('http://www.w3.org/1999/xhtml','div');
+ e.style.setProperty('width','10px','important');e.style.width='20px';
+ check(e.style.width,'10px','explicit legacy assignment retains important declaration');
+ check(e.style.getPropertyPriority('width'),'important','explicit legacy priority retained');
+ e.style.textShadow='-moz-initial';check(e.style.textShadow,'-moz-initial','legacy initial spelling retained');
+ e.style.width='';check(e.style.width,'','legacy empty assignment still removes');
+}
+]]></script>
+<script type="application/javascript;version=2015"><![CDATA[
+var checks=[],failures=0;
+function check(a,b,label){if(a!==b)++failures;checks.push((a===b?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+function run(){
+ try{
+  legacy();
+  var e=document.createElementNS('http://www.w3.org/1999/xhtml','div');
+  e.style.setProperty('width','10px','important');e.style.width='20px';
+  check(e.style.width,'20px','modern assignment replaces important declaration');
+  check(e.style.getPropertyPriority('width'),'','modern assignment removes priority');
+  e.style.setProperty('width','10px','important');e.style.width='20px !important';
+  check(e.style.width,'10px','modern invalid assignment preserves value');
+  check(e.style.getPropertyPriority('width'),'important','modern invalid assignment preserves priority');
+  e.style.textShadow='-moz-initial';check(e.style.textShadow,'-moz-initial','legacy extension remains accepted in modern mode');
+  e.style.textShadow='initial';check(e.style.textShadow,'initial','standard spelling remains distinct');
+ }catch(e){check(String(e),'no exception','unexpected exception');}
+ dump('CSS-ASSIGNMENT-LEGACY checks='+checks.length+' failures='+failures+'\n');
+ dump('SPEEDOMETER-RESULT '+JSON.stringify({pass:failures===0,detail:{failures:failures,results:checks}})+'\n');
+ Components.classes['@mozilla.org/toolkit/app-startup;1'].getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+]]></script></window>

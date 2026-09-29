@@ -325,3 +325,31 @@ version failed twelve; the added keyword spelling/clone assertions are retained.
 `text-shadow-quirks.html` separately checks thirteen compound-value and legacy
 length-quirk cases. Chromium passes thirteen. Parser acceptance alone will not
 establish text-shadow support: computed style and painting are still absent.
+
+The first text-shadow parser correction reached 71/72: the remaining failure
+exposed CSS2 IDL property assignment retaining an old `!important` declaration.
+That diagnostic is retained in `text-shadow-before-css2-assignment-fix`. The
+parser now accepts standard initial/unset spelling, currentColor and transparent,
+rejects negative blur atomically, and preserves commas with omitted blur values.
+Its compound grammar does not admit quirks-mode unitless lengths or hashless
+colors; ordinary legacy width/height quirks remain intact. The original native
+quirks baseline failed eight of thirteen assertions.
+
+Standard/default and ES2015 CSS2 assignments now use the existing CSSOM
+setProperty replacement/validation path. Explicit JavaScript 1.x and native
+callers retain their historical path. `css-property-assignment.html` passes
+22 checks in GTK2 Suite. Chromium 148 disagrees on one: it accepts
+`inherit !important` as an assignment value. The test retains rejection because
+[CSSOM setProperty parsing](https://drafts.csswg.org/cssom/#dom-cssstyledeclaration-setproperty)
+excludes priorities in value strings; a reference browser is not the specification.
+The chrome fixture `../speedometer21/css-assignment-legacy.xul` passes ten
+legacy/modern checks, including the historical `-moz-initial` spelling.
+
+The GTK2 Suite integration passes 1,277 content, 300 History, 274 HTTP, fifteen
+dataset GC and 24 lifecycle assertions. Its ES5-content run passes the same
+107 new content assertions (72 shadow grammar, thirteen quirks and 22 property
+assignment checks). Reports are `text-shadow-parser-suite-gtk2-*` and
+`css-assignment-{legacy,es5}-gtk2.*` under `artifacts/speedometer21`. Xlib and
+other-application checks remain pending for these changes. Computed text-shadow
+values and shadow painting remain unfinished; these parser passes do not
+establish rendering support or full CSS conformance.

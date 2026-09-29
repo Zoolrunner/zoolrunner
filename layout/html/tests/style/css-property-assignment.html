@@ -1,0 +1,15 @@
+<!doctype html><title>CSS property assignment replacement semantics</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+try{
+ var e=document.createElement('div'),pairs=[['width','width','10px','20px'],['margin-left','marginLeft','3px','4px'],['color','color','red','blue'],['text-shadow','textShadow','none','1px 2px']];
+ for(var i=0;i<pairs.length;++i){var p=pairs[i];e.style.cssText='';e.style.setProperty(p[0],p[2],'important');e.style[p[1]]=p[3];check(e.style.getPropertyValue(p[0]),p[3],'assignment replaces important '+p[0]);check(e.style.getPropertyPriority(p[0]),'','assignment clears priority '+p[0]);}
+ e.style.cssText='margin-left: 8px !important; margin-top: 9px !important;';e.style.margin='2px';
+ check(e.style.marginLeft,'2px','shorthand replaces important longhand');check(e.style.getPropertyPriority('margin-left'),'','shorthand clears longhand priority');
+ e.style.setProperty('width','11px','important');
+ var bad=['12px !important','12px;','12px; height: 30px','12px garbage','inherit !important'];
+ for(i=0;i<bad.length;++i){e.style.width=bad[i];check(e.style.width,'11px','invalid assignment preserves value '+bad[i]);check(e.style.getPropertyPriority('width'),'important','invalid assignment preserves priority '+bad[i]);}
+ e.style.width='';check(e.style.width,'','empty assignment removes property');check(e.style.getPropertyPriority('width'),'','removal clears priority');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>

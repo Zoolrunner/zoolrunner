@@ -191,7 +191,7 @@ void nsCSSColor::List(FILE* out, PRInt32 aIndent) const
 // --- nsCSSText support -----------------
 
 nsCSSShadow::nsCSSShadow(void)
-  : mNext(nsnull)
+  : mKeywordSyntax(0), mNext(nsnull)
 {
   MOZ_COUNT_CTOR(nsCSSShadow);
 }
@@ -201,6 +201,7 @@ nsCSSShadow::nsCSSShadow(const nsCSSShadow& aCopy)
     mXOffset(aCopy.mXOffset),
     mYOffset(aCopy.mYOffset),
     mRadius(aCopy.mRadius),
+    mKeywordSyntax(aCopy.mKeywordSyntax),
     mNext(nsnull)
 {
   MOZ_COUNT_CTOR(nsCSSShadow);
@@ -224,7 +225,8 @@ nsCSSShadow::Equal(nsCSSShadow* aList1, nsCSSShadow* aList2)
     if (p1->mColor != p2->mColor ||
         p1->mXOffset != p2->mXOffset ||
         p1->mYOffset != p2->mYOffset ||
-        p1->mRadius != p2->mRadius)
+        p1->mRadius != p2->mRadius ||
+        p1->mKeywordSyntax != p2->mKeywordSyntax)
       return PR_FALSE;
   }
   return !p1 && !p2; // true if same length, false otherwise

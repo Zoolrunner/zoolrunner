@@ -2982,6 +2982,10 @@ PRBool CSSParserImpl::ParseColor(nsresult& aErrorCode, nsCSSValue& aValue)
       break;
 
     case eCSSToken_Ident:
+      if (tk->mIdent.LowerCaseEqualsLiteral("transparent")) {
+        aValue.SetColorValue(NS_RGBA(0, 0, 0, 0));
+        return PR_TRUE;
+      }
       if (NS_ColorNameToRGB(tk->mIdent, &rgba)) {
         aValue.SetStringValue(tk->mIdent, eCSSUnit_String);
         return PR_TRUE;
@@ -4401,7 +4405,13 @@ PRBool CSSParserImpl::ParseProperty(nsresult& aErrorCode,
   case eCSSProperty_size:
     return ParseSize(aErrorCode);
   case eCSSProperty_text_shadow:
-    return ParseTextShadow(aErrorCode);
+    {
+      PRBool compound = IsParsingCompoundProperty();
+      SetParsingCompoundProperty(PR_TRUE);
+      PRBool parsed = ParseTextShadow(aErrorCode);
+      SetParsingCompoundProperty(compound);
+      return parsed;
+    }
 
 #ifdef MOZ_SVG
   case eCSSProperty_stroke_dasharray:
@@ -6240,10 +6250,29 @@ PRBool CSSParserImpl::ParseTextDecoration(nsresult& aErrorCode, nsCSSValue& aVal
 
 PRBool CSSParserImpl::ParseTextShadow(nsresult& aErrorCode)
 {
+  // Preserve standard CSS-wide spelling without changing the historical
+  // -moz-initial representation used by existing declarations.
+  if (!GetToken(aErrorCode, PR_TRUE)) return PR_FALSE;
+  if (mToken.mType == eCSSToken_Ident &&
+      (mToken.mIdent.LowerCaseEqualsLiteral("initial") ||
+       mToken.mIdent.LowerCaseEqualsLiteral("unset"))) {
+    PRUint8 syntax = mToken.mIdent.LowerCaseEqualsLiteral("initial") ? 1 : 2;
+    if (!ExpectEndProperty(aErrorCode, PR_TRUE)) return PR_FALSE;
+    nsCSSShadow* shadow = new nsCSSShadow();
+    if (!shadow) { aErrorCode = NS_ERROR_OUT_OF_MEMORY; return PR_FALSE; }
+    shadow->mKeywordSyntax = syntax;
+    if (syntax == 1) shadow->mXOffset.SetInitialValue();
+    else shadow->mXOffset.SetInheritValue(); // text-shadow is inherited.
+    mTempData.SetPropertyBit(eCSSProperty_text_shadow);
+    mTempData.mText.mTextShadow = shadow;
+    return PR_TRUE;
+  }
+  UngetToken();
   nsCSSValue  value;
   if (ParseVariant(aErrorCode, value, VARIANT_HC | VARIANT_LENGTH | VARIANT_NONE, nsnull)) {
     nsCSSUnit unit = value.GetUnit();
-    if ((eCSSUnit_Color == unit) || (eCSSUnit_String == unit) || value.IsLengthUnit()) {
+    if ((eCSSUnit_Color == unit) || (eCSSUnit_String == unit) ||
+        (eCSSUnit_Integer == unit) || value.IsLengthUnit()) {
       nsCSSShadow*  shadowHead = new nsCSSShadow();
       nsCSSShadow*  shadow = shadowHead;
       if (nsnull == shadow) {
@@ -6272,8 +6301,9 @@ PRBool CSSParserImpl::ParseTextShadow(nsresult& aErrorCode)
           break;
         }
         if (ParseVariant(aErrorCode, value, VARIANT_LENGTH, nsnull)) {
+          if (value.GetFloatValue() < 0) break;
           shadow->mRadius = value;
-        } // optional
+        } // optional; offsets may be negative, blur may not.
         if (PR_FALSE == haveColor) {
           if (ParseVariant(aErrorCode, value, VARIANT_COLOR, nsnull)) {
             shadow->mColor = value;
@@ -6306,6 +6336,10 @@ PRBool CSSParserImpl::ParseTextShadow(nsresult& aErrorCode)
     // value is inherit or none
     if (ExpectEndProperty(aErrorCode, PR_TRUE)) {
       nsCSSShadow* shadowHead = new nsCSSShadow();
+      if (!shadowHead) {
+        aErrorCode = NS_ERROR_OUT_OF_MEMORY;
+        return PR_FALSE;
+      }
       shadowHead->mXOffset = value;
       mTempData.SetPropertyBit(eCSSProperty_text_shadow);
       mTempData.mText.mTextShadow = shadowHead;

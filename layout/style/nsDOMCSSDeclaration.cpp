@@ -48,6 +48,8 @@
 #include "nsReadableUtils.h"
 
 #include "nsContentUtils.h"
+#include "nsIXPConnect.h"
+#include "jsapi.h"
 
 
 nsDOMCSSDeclaration::nsDOMCSSDeclaration()
@@ -99,6 +101,19 @@ nsDOMCSSDeclaration::SetPropertyValue(const nsCSSProperty aPropID,
     return RemoveProperty(aPropID);
   }
 
+  // CSS property assignment has the same replacement and validation rules
+  // as setProperty(name, value, ""). Keep the historical native/explicit
+  // JavaScript 1.x path for classic application callers.
+  nsCOMPtr<nsIXPCNativeCallContext> call;
+  nsContentUtils::XPConnect()->GetCurrentNativeCallContext(getter_AddRefs(call));
+  JSContext* cx = nsnull;
+  if (call) call->GetJSContext(&cx);
+  if (cx && (JS_GetVersion(cx) == JSVERSION_DEFAULT ||
+             JS_GetVersion(cx) == JSVERSION_ECMA_2015)) {
+    nsAutoString name;
+    CopyASCIItoUTF16(nsCSSProps::GetStringValue(aPropID), name);
+    return SetProperty(name, aValue, EmptyString());
+  }
   return ParsePropertyValue(aPropID, aValue);
 }
 

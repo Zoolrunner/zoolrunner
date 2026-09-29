@@ -291,16 +291,21 @@ PRBool nsCSSDeclaration::AppendValueToString(nsCSSProperty aProperty, nsAString&
             if (AppendCSSValueToString(aProperty, shadow->mXOffset, aResult)) {
               aResult.Append(PRUnichar(' '));
               AppendCSSValueToString(aProperty, shadow->mYOffset, aResult);
-              aResult.Append(PRUnichar(' '));
             }
-            if (AppendCSSValueToString(aProperty, shadow->mRadius, aResult) &&
-                shadow->mNext)
+            if (shadow->mRadius.GetUnit() != eCSSUnit_Null) {
+              aResult.Append(PRUnichar(' '));
+              AppendCSSValueToString(aProperty, shadow->mRadius, aResult);
+            }
+            if (shadow->mNext)
               aResult.AppendLiteral(", ");
             shadow = shadow->mNext;
           }
         }
-        else {  // none or inherit
-          AppendCSSValueToString(aProperty, shadow->mXOffset, aResult);
+        else {  // none, inherit or a CSS-wide keyword
+          if (shadow->mKeywordSyntax)
+            aResult.AppendASCII(shadow->mKeywordSyntax == 1 ? "initial" : "unset");
+          else
+            AppendCSSValueToString(aProperty, shadow->mXOffset, aResult);
         }
       } break;
     }
