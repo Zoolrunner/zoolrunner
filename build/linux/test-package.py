@@ -10,14 +10,16 @@ import tarfile
 import tempfile
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64'])
+p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64', 'loongarch64'])
 p.add_argument('app', choices=['suite', 'browser', 'calendar', 'xulrunner'])
 p.add_argument('work', type=Path)
 p.add_argument('--toolkit', choices=['gtk2', 'xlib'], default='gtk2')
+p.add_argument('--objdir', type=Path, help='Object directory override for native developer builds')
 a = p.parse_args()
 work = a.work.resolve()
 objname = 'obj-zoolrunner-linux-' + a.arch + '-' + a.app + ('-xlib' if a.toolkit == 'xlib' else '')
 root = work / 'source'
+obj = a.objdir.resolve() if a.objdir else root / objname
 logs = work / 'logs'
 name = 'zoolrunner-linux-' + a.arch + '-' + a.app + '-' + a.toolkit
 metadata = json.loads((logs / 'package.json').read_text())
@@ -67,7 +69,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     run([shell, '-e', 'print("INLINE-PASS")'], 'inline', 'INLINE-PASS')
     run([shell, '-f', '-'], 'stdin', 'STDIN-PASS', data='print("STDIN-PASS");\n')
     run([shell, '-e', 'quit(7)'], 'exit-status', expected=7)
-    if a.arch == 'aarch64':
+    if a.arch in ('aarch64', 'loongarch64'):
         suite = base / 'test262'
         revision = '7da91bceb9ce7613f87db47ddd1292a2dda58b42'
         run(['git', 'init', suite], 'test262-init')
@@ -85,7 +87,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
             run(['python3', root / 'calendar/test/run-compatibility.py', '--shell', shell,
                  '--report-dir', logs / 'calendar-unit'], 'calendar-unit',
                 'CALENDAR-COMPATIBILITY tests=8 failures=0', timeout=600)
-    includes = root / objname / 'dist/include'
+    includes = obj / 'dist/include'
     for case, source, marker in [('regexp', 'TestRegExpAbort.c', 'checks=3 failures=0'),
                                  ('embedding', 'TestObjectEmbedding.c', 'checks=18 failures=0')]:
         command = ['gcc'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
@@ -94,16 +96,19 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                     str(root / 'js/tests/es5' / source), '-L' + str(runtime), '-lmozjs', '-o', str(base / case)]
         run(command, case + '-build')
         run([base / case], case, marker)
-    if a.arch == 'aarch64':
+    if a.arch in ('aarch64', 'loongarch64'):
         xpcom_library = '-lxpcom_core' if (runtime / 'libxpcom_core.so').exists() else '-lxul'
-        command = ['g++', '-std=gnu++98', '-fno-rtti', '-fno-exceptions',
-                   '-fshort-wchar', '-fno-strict-aliasing', '-O2', '-DXP_UNIX',
-                   '-I' + str(includes / 'xpcom'), '-I' + str(includes / 'nspr'),
-                   str(root / 'build/linux/TestXPTCallABI.cpp'),
-                   '-L' + str(runtime), xpcom_library, '-lplds4', '-lplc4', '-lnspr4',
-                   '-o', str(base / 'xptcall-abi')]
-        run(command, 'xptcall-abi-build')
-        run([base / 'xptcall-abi'], 'xptcall-abi', 'XPTCALL-ABI checks=2000 failures=0')
+        for source, label, marker in [
+                ('TestXPTCallABI.cpp', 'xptcall-abi', 'XPTCALL-ABI checks=2000 failures=0'),
+                ('TestXPTCallFP.cpp', 'xptcall-fp', 'XPTCALL-FP checks=2000 failures=0')]:
+            command = ['g++', '-std=gnu++98', '-fno-rtti', '-fno-exceptions',
+                       '-fshort-wchar', '-fno-strict-aliasing', '-O2', '-DXP_UNIX',
+                       '-I' + str(includes / 'xpcom'), '-I' + str(includes / 'nspr'),
+                       str(root / 'build/linux' / source),
+                       '-L' + str(runtime), xpcom_library, '-lplds4', '-lplc4', '-lnspr4',
+                       '-o', str(base / label)]
+            run(command, label + '-build')
+            run([base / label], label, marker)
     expat = base / 'expat'
     command = ['gcc'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
     command += ['-DXP_UNIX', '-I' + str(includes / 'nspr'),
@@ -160,7 +165,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         if a.app != 'xulrunner':
             command += ['-zoolrunner-test'] if a.app == 'calendar' else ['-chrome', 'chrome://zooltest/content/early-application.xul']
         run(command, label, marker)
-    if a.arch == 'aarch64' and a.app == 'calendar':
+    if a.arch in ('aarch64', 'loongarch64') and a.app == 'calendar':
         shutil.copy2(str(root / 'calendar/test/compatibility-overlay.xul'),
                      str(fixture / 'compatibility-overlay.xul'))
         with (runtime / 'chrome/chrome.manifest').open('a') as manifest:
@@ -169,7 +174,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         run([executable, '-profile', profile], 'calendar-window',
             'CALENDAR-WINDOW views=4 failures=0')
     run(['python3', root / 'build/linux/test-es6.py', a.arch,
-         '--root', root, '--objdir', root / objname, '--runtime', runtime,
+         '--root', root, '--objdir', obj, '--runtime', runtime,
          '--logs', logs / 'es6'], 'es6', 'ES2015 PASS:', timeout=2400)
 (logs / 'runtime-result.txt').write_text('PASS: ' + a.arch + ' ' + a.toolkit + ' ' + a.app + '\n')
 print(a.arch + ' ' + a.toolkit + ' ' + a.app + ': packaged runtime checks passed')

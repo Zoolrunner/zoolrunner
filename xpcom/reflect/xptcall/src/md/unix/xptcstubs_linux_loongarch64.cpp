@@ -35,6 +35,7 @@
 /* Implement shared vtbl methods. */
 
 #include "xptcprivate.h"
+#include <string.h>
 
 #if !defined(LINUX) || !defined(__loongarch64)
 #error "This code is for Linux LoongArch64 only."
@@ -58,7 +59,7 @@ PrepareAndDispatch(nsXPTCStubBase* self, PRUint32 methodIndex,
     nsXPTCMiniVariant paramBuffer[PARAM_BUFFER_COUNT];
     nsXPTCMiniVariant* dispatchParams = nsnull;
     nsIInterfaceInfo* iface_info = nsnull;
-    const nsXPTMethodInfo* info;
+    const nsXPTMethodInfo* info = nsnull;
     PRUint32 paramCount;
     PRUint32 nr_gpr = 0;
     PRUint32 nr_fpr = 0;
@@ -97,16 +98,22 @@ PrepareAndDispatch(nsXPTCStubBase* self, PRUint32 methodIndex,
         if (!param.IsOut() && type == nsXPTType::T_DOUBLE) {
             if (nr_fpr < FPR_COUNT)
                 dp->val.d = fprData[nr_fpr++].d;
-            else
-                dp->val.d = *((double*) &stackData[nr_stack++]);
+            else {
+                value = nr_gpr < GPR_COUNT ? gprData[nr_gpr++]
+                                           : stackData[nr_stack++];
+                memcpy(&dp->val.d, &value, sizeof(double));
+            }
             continue;
         }
 
         if (!param.IsOut() && type == nsXPTType::T_FLOAT) {
             if (nr_fpr < FPR_COUNT)
                 dp->val.f = fprData[nr_fpr++].f;
-            else
-                dp->val.f = *((float*) &stackData[nr_stack++]);
+            else {
+                value = nr_gpr < GPR_COUNT ? gprData[nr_gpr++]
+                                           : stackData[nr_stack++];
+                memcpy(&dp->val.f, &value, sizeof(float));
+            }
             continue;
         }
 

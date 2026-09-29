@@ -8,14 +8,15 @@ import shutil
 import tarfile
 
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64'])
+p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64', 'loongarch64'])
 p.add_argument('app', choices=['suite', 'browser', 'calendar', 'xulrunner'])
 p.add_argument('work', type=Path)
 p.add_argument('--toolkit', choices=['gtk2', 'xlib'], default='gtk2')
+p.add_argument('--objdir', type=Path, help='Object directory override for native developer builds')
 a = p.parse_args()
 work = a.work.resolve()
 objname = 'obj-zoolrunner-linux-' + a.arch + '-' + a.app + ('-xlib' if a.toolkit == 'xlib' else '')
-obj = work / 'source' / objname
+obj = a.objdir.resolve() if a.objdir else work / 'source' / objname
 config = (obj / 'config/autoconf.mk').read_text()
 toolkit = re.search(r'^MOZ_WIDGET_TOOLKIT\s*=\s*(\S+)', config, re.M).group(1)
 if toolkit != a.toolkit:
@@ -44,7 +45,7 @@ for f in runtime.rglob('*'):
         header = stream.read(20)
     if header[:4] != b'\x7fELF':
         continue
-    expected = {'i686': (1, 3), 'x86_64': (2, 62), 'aarch64': (2, 183)}[a.arch]
+    expected = {'i686': (1, 3), 'x86_64': (2, 62), 'aarch64': (2, 183), 'loongarch64': (2, 258)}[a.arch]
     if (header[4], int.from_bytes(header[18:20], 'little')) != expected or header[5] != 1:
         raise RuntimeError('Wrong ELF architecture: ' + str(f))
     elfs.append(str(f.relative_to(stage)))

@@ -1170,3 +1170,9 @@ are not a claim of complete CSS sizing or Speedometer rendering conformance.
 The themed Suite probe harness passes 821 content checks and the 400-by-300
 box-sizing pixel comparison. Earlier unthemed benchmark runs establish workload
 execution only; they are not on-screen painting or comparative timing evidence.
+
+Native LoongArch package validation now checks both XPTCall argument directions,
+including FP register exhaustion with integer registers still available and
+interleaved stack arguments. The corrected invoke/stub bridge passes both
+2,000-call probes; full application package results remain tracked in the
+[Linux test guide](build/linux/README.md).

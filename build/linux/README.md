@@ -252,3 +252,31 @@ architectures. The Speedometer Suite development runtime passes its 139 focused
 fixtures, 83 native probes and all 28,582 pinned ES2015 modes. This result does
 not establish package validation or results for other LoongArch applications;
 see the [Suite work notes](../../layout/html/tests/speedometer21/README.md).
+
+The package and relocated-runtime drivers also accept `loongarch64`. For native
+builds whose object directory differs from the CI naming convention, pass
+`--objdir /absolute/path/to/object-directory` to both drivers. The work directory
+must contain a `source` checkout (or symlink), `logs`, and `artifacts`. For example:
+
+```sh
+python3 build/linux/package-ci.py loongarch64 suite "$work" --objdir "$obj"
+sh build/linux/with-display.sh python3 build/linux/test-package.py loongarch64 suite "$work" --objdir "$obj"
+```
+
+Use `--toolkit xlib` for an Xlib package. Architecture validation checks ELF64,
+little endian, machine 258. LoongArch runs the full pinned ES5.1 and ES2015 gates,
+the compiler-generated XPTCall argument/return ABI probe, native embedding,
+application windows, and Calendar unit/four-view coverage when testing Calendar.
+Adding this driver support does not establish that the application matrix passes;
+results remain tracked in the Speedometer work notes.
+
+The first LoongArch GTK2 Suite package attempt passed all 11,540 ES5.1 cases,
+then failed the XPTCall ABI probe at its first stack-passed float. The LoongArch
+invoke bridge now copies spilled FP bits, and its stub bridge consumes available
+integer registers before stack slots after exhausting FP registers. Unsigned
+32-bit register arguments receive the sign extension required by the
+[LoongArch procedure call standard](https://github.com/loongson/la-abi-specs/blob/release/lapcs.adoc).
+Both native probes pass 2,000 calls each after the correction. `TestXPTCallFP.cpp`
+adds coverage where FP registers run out first; the existing ABI probe covers
+interleaved stack arguments. Full package validation is being rerun; these
+focused passes do not substitute for it.

@@ -38,6 +38,7 @@
 /* Platform specific code to invoke XPCOM methods on native objects. */
 
 #include "xptcprivate.h"
+#include <string.h>
 
 #if !defined(LINUX) || !defined(__loongarch64)
 #error "This code is for Linux LoongArch64 only."
@@ -77,12 +78,16 @@ invoke_copy_to_stack(PRUint64* stackData, PRUint64* gprData,
                     fprData[nr_fpr++].f = s->val.f;
                     continue;
                 }
+                // With no FAR left, the raw value uses a GAR or stack slot.
+                value = 0;
+                memcpy(&value, &s->val.f, sizeof(float));
                 break;
             case nsXPTType::T_DOUBLE:
                 if (nr_fpr < FPR_COUNT) {
                     fprData[nr_fpr++].d = s->val.d;
                     continue;
                 }
+                memcpy(&value, &s->val.d, sizeof(double));
                 break;
             case nsXPTType::T_I8:     value = s->val.i8;  break;
             case nsXPTType::T_I16:    value = s->val.i16; break;
@@ -90,7 +95,7 @@ invoke_copy_to_stack(PRUint64* stackData, PRUint64* gprData,
             case nsXPTType::T_I64:    value = s->val.i64; break;
             case nsXPTType::T_U8:     value = s->val.u8;  break;
             case nsXPTType::T_U16:    value = s->val.u16; break;
-            case nsXPTType::T_U32:    value = s->val.u32; break;
+            case nsXPTType::T_U32:    value = (PRInt64)(PRInt32)s->val.u32; break;
             case nsXPTType::T_U64:    value = s->val.u64; break;
             case nsXPTType::T_BOOL:   value = s->val.b;   break;
             case nsXPTType::T_CHAR:   value = s->val.c;   break;
