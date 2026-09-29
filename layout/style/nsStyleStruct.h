@@ -714,7 +714,7 @@ struct nsStyleTextReset : public nsStyleStruct {
 };
 
 struct nsStyleTextShadow {
-  nscoord mXOffset, mYOffset, mRadius;
+  float mXOffset, mYOffset, mRadius; // Computed twips, before device rounding.
   nscolor mColor;
   PRPackedBool mHasColor; // False preserves currentColor through inheritance.
 };

@@ -2173,6 +2173,35 @@ nsRuleNode::ComputeFontData(nsStyleStruct* aStartStruct,
   return font;
 }
 
+// Shadow lengths are computed values, not rounded layout coordinates. In
+// particular, 0.25em at 10px must stay 2.5px even on a 15-twip pixel backend.
+static float
+CalcShadowLength(const nsCSSValue& aValue, nsStyleContext* aContext,
+                 nsPresContext* aPresContext, PRBool& aInherited)
+{
+  float scale;
+  switch (aValue.GetUnit()) {
+    case eCSSUnit_Inch: scale = 1440.0f; break;
+    case eCSSUnit_Foot: scale = 1440.0f * 12.0f; break;
+    case eCSSUnit_Mile: scale = 1440.0f * 12.0f * 5280.0f; break;
+    case eCSSUnit_Millimeter: scale = 1440.0f / 25.4f; break;
+    case eCSSUnit_Centimeter: scale = 1440.0f / 2.54f; break;
+    case eCSSUnit_Meter: scale = 1440.0f / 0.0254f; break;
+    case eCSSUnit_Kilometer: scale = 1440.0f / 0.0000254f; break;
+    case eCSSUnit_Point: scale = 20.0f; break;
+    case eCSSUnit_Pica: scale = 240.0f; break;
+    case eCSSUnit_Didot: scale = 20.0f * 16.0f / 15.0f; break;
+    case eCSSUnit_Cicero: scale = 240.0f * 16.0f / 15.0f; break;
+    case eCSSUnit_Pixel: scale = aPresContext->ScaledPixelsToTwips(); break;
+    default: {
+      nsCSSValue unit(1.0f, aValue.GetUnit());
+      scale = CalcLength(unit, nsnull, aContext, aPresContext, aInherited);
+      break;
+    }
+  }
+  return aValue.GetFloatValue() * scale;
+}
+
 const nsStyleStruct*
 nsRuleNode::ComputeTextData(nsStyleStruct* aStartStruct,
                             const nsRuleDataStruct& aData, 
@@ -2310,12 +2339,12 @@ nsRuleNode::ComputeTextData(nsStyleStruct* aStartStruct,
       }
       for (; source; source = source->mNext) {
         nsStyleTextShadow item;
-        item.mXOffset = CalcLength(source->mXOffset, nsnull, aContext,
+        item.mXOffset = CalcShadowLength(source->mXOffset, aContext,
                                    mPresContext, inherited);
-        item.mYOffset = CalcLength(source->mYOffset, nsnull, aContext,
+        item.mYOffset = CalcShadowLength(source->mYOffset, aContext,
                                    mPresContext, inherited);
         item.mRadius = source->mRadius.GetUnit() == eCSSUnit_Null ? 0 :
-          CalcLength(source->mRadius, nsnull, aContext, mPresContext, inherited);
+          CalcShadowLength(source->mRadius, aContext, mPresContext, inherited);
         item.mColor = NS_RGB(0, 0, 0);
         item.mHasColor = source->mColor.GetUnit() != eCSSUnit_Null &&
           !(source->mColor.GetUnit() == eCSSUnit_Integer &&

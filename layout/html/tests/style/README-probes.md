@@ -393,3 +393,12 @@ painting order, translucency and default shadow color fail (five of seven).
 failing rendering target is not part of the passing default probe sequence;
 blur, selection and decoration coverage must be added when painting is
 implemented. Do not use computed-style passes as a substitute for these pixels.
+
+The Xlib computed run initially failed its fractional-radius assertion:
+`0.25em` at a 10px font became 2.53333px because 37.5 twips was rounded to 38.
+Computed shadow lengths now retain fractional twips; existing layout-coordinate
+conversion is unchanged. The expanded fixture passes 32 checks in Xlib and
+Chromium, including fractional pixel values and negative-zero serialization.
+The original failure is `text-shadow-computed-xlib-fractional-failure.json`;
+the corrected result is `text-shadow-fractional-xlib.json`. Broader follow-up
+checks for this precision correction are still in progress.
