@@ -781,3 +781,21 @@ request event sequencing, callback return-value cancellation, additional XHR
 fields and listener options remain separate gaps. In particular the reuse
 fixture verifies delivery and ordering, not exact readyState transition counts.
 Xlib and other-application validation of these changes is still pending.
+
+### Dataset liveness diagnostic (known failures)
+
+`../style/dataset-live.html` contains 47 checks derived from the
+[DOMStringMap algorithms](https://html.spec.whatwg.org/multipage/dom.html#domstringmap).
+It covers live attribute changes, writes/deletes, empty and numeric names,
+ASCII name conversion, conversion exceptions, prototype collisions and property
+descriptors. Current GTK2 Suite fails 28 checks because its dataset object is a
+snapshot; Chromium 148.0.7778.180 passes all 47. This is a pending engine fix,
+not part of the passing content batch. Reports are
+`dataset-baseline-gtk2-dataset-live.json` and `dataset-live-chromium.json` under
+`artifacts/speedometer21`. Original TodoMVC editing scripts also write dataset
+properties; benchmark completion does not exercise all of those interactions.
+
+XHR focused validation now also passes on Xlib Suite: the same 181 content,
+ten collection/reentrancy and 24 application-lifecycle assertions as GTK2.
+Current Browser GTK2 passes the expanded 271-check HTTP batch and ten XHR GC
+checks. Package checks and the remaining application rebuilds are in progress.

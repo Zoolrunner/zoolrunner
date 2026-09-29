@@ -1,0 +1,65 @@
+<!doctype html><title>Live dataset named properties</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+function test(name,fn){try{fn();}catch(e){check(String(e),'no exception',name+' exception');}}
+function exception(fn){try{fn();return null;}catch(e){return e;}}
+function fresh(){return document.createElement('div');}
+function own(o,k){return Object.prototype.hasOwnProperty.call(o,k);}
+test('live reads',function(){
+ var e=fresh();e.setAttribute('data-first','before');var d=e.dataset;
+ check(e.dataset,d,'same dataset object');check(d.first,'before','initial attribute');
+ e.setAttribute('data-first','after');check(d.first,'after','attribute replacement visible');
+ e.setAttribute('data-second','new');check(d.second,'new','new attribute visible');
+ check(own(d,'second'),true,'new attribute owns property');
+ e.removeAttribute('data-first');check(d.first,undefined,'removed attribute absent');
+ check('first' in d,false,'removed attribute absent from in');check(own(d,'first'),false,'removed attribute not own');
+ check(Object.keys(d).join(','),'second','enumeration follows live attributes');
+});
+test('writes and deletes',function(){
+ var e=fresh(),d=e.dataset;d.itemId=17;
+ check(e.getAttribute('data-item-id'),'17','write reflects camel case');check(d.itemId,'17','write stores string');
+ d.flag=null;check(e.getAttribute('data-flag'),'null','null string conversion');
+ d.flag=undefined;check(e.getAttribute('data-flag'),'undefined','undefined string conversion');
+ d.flag=true;check(e.getAttribute('data-flag'),'true','boolean string conversion');
+ check(delete d.itemId,true,'delete succeeds');check(e.hasAttribute('data-item-id'),false,'delete removes attribute');
+ check(d.itemId,undefined,'deleted property absent');check(delete d.missing,true,'missing delete succeeds');
+ d['']='empty';check(e.getAttribute('data-'),'empty','empty name maps to data dash');check(d[''],'empty','empty property read');
+ d[0]='zero';check(e.getAttribute('data-0'),'zero','numeric key converted');
+ d['foo-Bar']='double';check(e.getAttribute('data-foo--bar'),'double','dash uppercase conversion');
+ d['caf\u00e9']='unicode';check(e.getAttribute('data-caf\u00e9'),'unicode','non ASCII name retained');
+});
+test('attribute name mapping',function(){
+ var e=fresh();e.setAttribute('data-','empty');e.setAttribute('data-a-b','camel');
+ e.setAttribute('data-a--b','double');e.setAttribute('data-a-','trailing');
+ e.setAttribute('data-0','number');e.setAttribute('data-\u00c9','nonascii');
+ var d=e.dataset;check(d[''],'empty','empty attribute suffix exposed');check(d.aB,'camel','ASCII lowercase after dash uppercased');
+ check(d['a-B'],'double','double dash retained');check(d['a-'],'trailing','trailing dash retained');
+ check(d[0],'number','numeric suffix exposed');check(d['\u00c9'],'nonascii','non ASCII uppercase not excluded');
+ check(Object.keys(d).join('|'),'|aB|a-B|a-|0|\u00c9','attribute list enumeration order');
+});
+test('invalid names and conversion',function(){
+ var e=fresh(),d=e.dataset;
+ var err=exception(function(){d['a-b']='bad';});check(err&&err.name,'SyntaxError','dash lowercase name rejected');
+ check(e.hasAttribute('data-a-b'),false,'invalid name leaves attribute absent');
+ err=exception(function(){d['bad name']='bad';});check(err&&err.name,'InvalidCharacterError','invalid XML name rejected');
+ var marker={},count=0;
+ err=exception(function(){d['a-b']={toString:function(){count++;throw marker;}};});
+ check(err,marker,'value conversion precedes name validation');check(count,1,'value converted once');
+ d.item={toString:function(){e.setAttribute('data-other','side');return 'value';}};
+ check(d.item,'value','converted string retained');check(d.other,'side','conversion mutation visible');
+});
+test('prototype collisions and descriptors',function(){
+ var e=fresh(),d=e.dataset,proto=Object.getPrototypeOf(d);
+ d.toString='method';check(e.getAttribute('data-to-string'),'method','prototype name creates attribute');
+ check(d.toString,'method','attribute overrides prototype method');
+ d.__proto__='literal';check(e.getAttribute('data-__proto__'),'literal','proto key creates attribute');
+ check(Object.getPrototypeOf(d),proto,'proto key does not change prototype');check(d.__proto__,'literal','proto key reads attribute');
+ var descriptor=Object.getOwnPropertyDescriptor(d,'toString');
+ check(descriptor&&descriptor.value,'method','named property descriptor value');
+ check(descriptor&&descriptor.writable,true,'named property writable');
+ check(descriptor&&descriptor.enumerable,true,'named property enumerable');
+ check(descriptor&&descriptor.configurable,true,'named property configurable');
+ delete d.toString;check(typeof d.toString,'function','deletion reveals prototype method');
+});
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>
