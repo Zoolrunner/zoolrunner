@@ -97,6 +97,7 @@ CPPSRCS =			\
 	nsDOMWindowUtils.cpp 	\
 	nsJSEnvironment.cpp	\
 	nsFocusController.cpp	\
+	nsAnimationFrame.cpp    \
 	nsGlobalWindow.cpp      \
 	nsGlobalWindowCommands.cpp \
 	nsLocation.cpp		\

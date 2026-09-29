@@ -3,7 +3,7 @@
         width="1100" height="800" onload="runNext()">
 <browser id="test" type="content" flex="1"/>
 <script><![CDATA[
-var files = ["structural-inline-block.html", "viewport-media-queries.html", "background-size.html", "linear-gradient.html", "faq-toggle.html", "dom-selectors.html", "window-bindings.html", "event-constructor.html"];
+var files = ["structural-inline-block.html", "viewport-media-queries.html", "background-size.html", "linear-gradient.html", "faq-toggle.html", "dom-selectors.html", "window-bindings.html", "event-constructor.html", "animation-frame.html"];
 var index = 0, failures = 0;
 function runNext() {
   if (index == files.length) {

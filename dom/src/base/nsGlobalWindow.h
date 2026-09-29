@@ -152,6 +152,8 @@ class nsGlobalWindow : public nsPIDOMWindow_MOZILLA_1_8_BRANCH2,
 {
 public:
   // public methods
+  double AnimationFrameTime(double aClock) const
+  { return aClock - mAnimationTimeOrigin; }
   nsPIDOMWindow* GetPrivateParent();
   // callback for close event
   void ReallyCloseWindow();
@@ -549,6 +551,7 @@ protected:
   nsCOMPtr<nsIEventListenerManager> mListenerManager;
   nsTimeout*                    mTimeouts;
   nsTimeout**                   mTimeoutInsertionPoint;
+  double                        mAnimationTimeOrigin;
   PRUint32                      mTimeoutPublicIdCounter;
   PRUint32                      mTimeoutFiringDepth;
   nsCOMPtr<nsIDOMStorage>       mSessionStorage;

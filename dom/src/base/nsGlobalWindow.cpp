@@ -44,6 +44,7 @@
 
 // Local Includes
 #include "nsGlobalWindow.h"
+#include "nsAnimationFrame.h"
 #include "nsScreen.h"
 #include "nsHistory.h"
 #include "nsBarProps.h"
@@ -349,6 +350,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
 #endif
 {
   nsLayoutStatics::AddRef();
+  mAnimationTimeOrigin = NS_AnimationFrameClock();
 
   // Initialize the PRCList (this).
   PR_INIT_CLIST(this);
@@ -7119,6 +7121,7 @@ nsGlobalWindow::ClearTimeoutOrInterval()
 void
 nsGlobalWindow::ClearAllTimeouts()
 {
+  NS_ClearAnimationFrames(this);
   nsTimeout *timeout, *next;
   nsIScriptContext *scx = GetContextInternal();
 

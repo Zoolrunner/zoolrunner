@@ -67,6 +67,7 @@
 
 // General helper includes
 #include "nsGlobalWindow.h"
+#include "nsAnimationFrame.h"
 #include "nsIContent.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
@@ -5966,6 +5967,84 @@ ContentWindowGetter(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
   return ::JS_GetProperty(cx, obj, "content", rval);
 }
 
+static nsGlobalWindow*
+AnimationWindow(JSContext* cx, JSObject* obj)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsPIDOMWindow> window = do_QueryWrappedNative(wrapper);
+  if (!window) {
+    DOMConstructorTypeError(cx, "Animation frame method requires a Window");
+    return nsnull;
+  }
+  if (!nsContentUtils::CanCallerAccess(window)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return nsnull;
+  }
+  nsPIDOMWindow* nativeWindow = window;
+  nsGlobalWindow* win = NS_STATIC_CAST(nsGlobalWindow*, nativeWindow);
+  if (win->IsOuterWindow())
+    win = win->GetCurrentInnerWindowInternal();
+  if (!win)
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_NOT_INITIALIZED);
+  return win;
+}
+
+static JSBool JS_DLL_CALLBACK
+RequestAnimationFrame(JSContext* cx, JSObject* obj, uintN argc,
+                       jsval* argv, jsval* rval)
+{
+  nsRefPtr<nsGlobalWindow> window = AnimationWindow(cx, obj);
+  if (!window) return JS_FALSE;
+  if (!argc || JS_TypeOfValue(cx, argv[0]) != JSTYPE_FUNCTION) {
+    DOMConstructorTypeError(cx, "requestAnimationFrame requires a callable callback");
+    return JS_FALSE;
+  }
+  PRUint32 handle;
+  nsresult rv = NS_RequestAnimationFrame(window, cx, JSVAL_TO_OBJECT(argv[0]),
+                                         &handle);
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_NewNumberValue(cx, handle, rval);
+}
+
+static JSBool JS_DLL_CALLBACK
+CancelAnimationFrame(JSContext* cx, JSObject* obj, uintN argc,
+                      jsval* argv, jsval* rval)
+{
+  nsRefPtr<nsGlobalWindow> window = AnimationWindow(cx, obj);
+  if (!window) return JS_FALSE;
+  if (!argc) {
+    DOMConstructorTypeError(cx, "cancelAnimationFrame requires a handle");
+    return JS_FALSE;
+  }
+  uint32 handle;
+  if (!JS_ValueToECMAUint32(cx, argv[0], &handle))
+    return JS_FALSE;
+  NS_CancelAnimationFrame(window, handle);
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+static JSNative
+AnimationFrameBinding(jsval aId, const char** aName)
+{
+  if (!JSVAL_IS_STRING(aId)) return nsnull;
+  nsDependentJSString name(JSVAL_TO_STRING(aId));
+  if (name.EqualsLiteral("requestAnimationFrame")) {
+    *aName = "requestAnimationFrame";
+    return RequestAnimationFrame;
+  }
+  if (name.EqualsLiteral("cancelAnimationFrame")) {
+    *aName = "cancelAnimationFrame";
+    return CancelAnimationFrame;
+  }
+  return nsnull;
+}
+
 // CSSOM makes the pseudo-element argument optional in JavaScript, while this
 // historical XPIDL method still requires two arguments.
 JSBool JS_DLL_CALLBACK
@@ -6104,6 +6183,16 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 #ifdef DEBUG_SH_FORWARDING
       printf(" --- Forwarding resolve to inner window %p\n", (void *)innerWin);
 #endif
+
+      const char* animationName;
+      JSNative animationBinding = AnimationFrameBinding(id, &animationName);
+      if (!(flags & JSRESOLVE_ASSIGNING) && animationBinding) {
+        if (!JS_DefineFunction(cx, innerObj, animationName, animationBinding,
+                                1, JSPROP_ENUMERATE))
+          return NS_ERROR_FAILURE;
+        *objp = innerObj;
+        return NS_OK;
+      }
 
       // Resolve this CSSOM method on the inner global before the inherited
       // XPIDL declaration is found. Its native interface requires two args,
@@ -6247,6 +6336,17 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     // The context is not yet initialized so there's nothing we can do
     // here yet.
 
+    return NS_OK;
+  }
+
+  const char* animationName;
+  JSNative animationBinding = AnimationFrameBinding(id, &animationName);
+  if (!(flags & JSRESOLVE_ASSIGNING) && !ObjectIsNativeWrapper(cx, obj) &&
+      animationBinding) {
+    if (!JS_DefineFunction(cx, obj, animationName, animationBinding,
+                            1, JSPROP_ENUMERATE))
+      return NS_ERROR_FAILURE;
+    *objp = obj;
     return NS_OK;
   }
 

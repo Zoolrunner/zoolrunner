@@ -1,0 +1,80 @@
+<!doctype html>
+<html><head><title>Native animation frame regression</title></head><body>
+<script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name);
+}
+window.onload = function() {
+  var watchdog = setTimeout(function() {
+    check(false, true, 'animation callbacks completed before watchdog');
+    testDone = true;
+  }, 5000);
+  try {
+    check(requestAnimationFrame.length, 1, 'request arity');
+    check(cancelAnimationFrame.length, 1, 'cancel arity');
+    var caught, sentinel = {};
+    try { requestAnimationFrame(null); } catch(e) {caught=e;}
+    check(caught instanceof TypeError, true, 'callback must be callable');
+    caught = null;
+    try { cancelAnimationFrame(); } catch(e) {caught=e;}
+    check(caught instanceof TypeError, true, 'cancel requires handle');
+    caught = null;
+    try { cancelAnimationFrame({valueOf:function() {throw sentinel;}}); }
+    catch(e) {caught=e;}
+    check(caught, sentinel, 'handle conversion exception preserved');
+    var order = [], firstTime, duplicateCalls = 0, removedCalls = 0;
+    var boundCalls = 0, exceptionCalls = 0;
+    window.onerror = function(message) {
+      if (String(message).indexOf('expected animation failure') >= 0) {
+        ++exceptionCalls;
+        return true;
+      }
+      return false;
+    };
+    function duplicate() { ++duplicateCalls; }
+    var canceled = requestAnimationFrame(function() {order.push('canceled');});
+    check(typeof canceled, 'number', 'numeric handle');
+    cancelAnimationFrame(canceled);
+    var second;
+    requestAnimationFrame(function(timestamp) {
+      check(this, window, 'callback window receiver');
+      check(arguments.length, 1, 'only timestamp argument');
+      check(typeof timestamp, 'number', 'numeric timestamp');
+      check(isFinite(timestamp) && timestamp >= 0, true, 'finite relative timestamp');
+      firstTime = timestamp;
+      order.push('first');
+      cancelAnimationFrame(second);
+      requestAnimationFrame(function(nextTime) {
+        check(order.join(','), 'first,last', 'snapshot cancellation and next-frame deferral');
+        check(nextTime > firstTime, true, 'next frame advances timestamp');
+        check(duplicateCalls, 2, 'duplicate callback registrations are independent');
+        check(removedCalls, 0, 'removed document callback discarded');
+        check(boundCalls, 1, 'bound callback invoked');
+        check(exceptionCalls, 1, 'callback exception reported without stopping batch');
+        clearTimeout(watchdog);
+        testDone = true;
+      });
+    });
+    second = requestAnimationFrame(function() {order.push('second');});
+    requestAnimationFrame(duplicate);
+    requestAnimationFrame(duplicate);
+    requestAnimationFrame(function() {++boundCalls;}.bind(null));
+    requestAnimationFrame(function() {throw Error('expected animation failure');});
+    requestAnimationFrame(function(timestamp) {
+      check(timestamp, firstTime, 'batch shares timestamp');
+      order.push('last');
+    });
+    var frame = document.createElement('iframe');
+    document.body.appendChild(frame);
+    frame.contentWindow.requestAnimationFrame(function() {++removedCalls;});
+    document.body.removeChild(frame);
+  } catch(e) {
+    check(String(e), 'no exception', 'unexpected exception: ' + e);
+    clearTimeout(watchdog);
+    testDone = true;
+  }
+};
+</script></body></html>

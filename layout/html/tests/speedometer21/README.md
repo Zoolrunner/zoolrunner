@@ -96,5 +96,14 @@ run passes all 11,540 cases with zero failures/timeouts/crashes/harness errors.
 The unchanged Suite lifecycle runner passes all 24 checks, including Venkman
 startup and close, with the corrected compiler flags. The unchanged benchmark
 now reaches its first workload and stops at the missing `requestAnimationFrame`.
-The complete pinned ES2015 run is still in progress. These results cover Suite
+The complete pinned ES2015 run passes all 28,582 modes with zero failures,
+unsupported modes, timeouts, crashes or harness errors. These results cover Suite
 only and do not establish complete CSS, DOM or language conformance.
+
+Native animation-frame scheduling now batches callbacks before layout and
+painting, preserves cancellation through callback reentry, defers newly queued
+callbacks to a later frame and clears callbacks during window teardown. The
+LoongArch runtime uses CLOCK_MONOTONIC timestamps; Windows/macOS timing paths
+are compiled conditionally but have not been validated in this work. The
+animation probe passes 17 assertions in Suite. The next benchmark blocker is
+`Element.getBoundingClientRect`; complete workload execution remains pending.
