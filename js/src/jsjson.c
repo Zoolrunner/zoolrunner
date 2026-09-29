@@ -2,6 +2,7 @@
 /* Native ECMAScript 5.1 JSON support. See LICENSE for project licensing. */
 #include <string.h>
 #include "jsapi.h"
+#include "jsstructuredclone.h"
 #include "jsarray.h"
 #include "jsatom.h"
 #include "jsbool.h"
@@ -759,4 +760,10 @@ js_InitJSONClass(JSContext *cx, JSObject *global)
          JS_DefineProperty(cx, global, "JSON", OBJECT_TO_JSVAL(obj), NULL, NULL, 0);
     JS_POP_TEMP_ROOT(cx, &root);
     return ok ? obj : NULL;
+}
+
+JSBool
+js_IsJSONNamespace(JSContext *cx, JSObject *obj)
+{
+    return OBJ_GET_CLASS(cx, obj) == &json_class;
 }

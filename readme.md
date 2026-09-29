@@ -1197,3 +1197,10 @@ while preserving its historical native interface. Its CSSOM parser replaces
 priorities correctly and rejects embedded declaration delimiters atomically.
 The final Speedometer UI also requires History.pushState, which is still being
 implemented; 480 successful workload checks alone are not a complete run.
+
+History-state work now includes an immutable native graph serializer, preserving
+cycles and shared binary buffers without retaining source windows. Its 63
+focused native checks pass on both LoongArch Suite backends, and the engine
+passes the full pinned ES5.1 and ES2015 runs. This is a foundation for the
+unfinished History API, not a claim of complete structured serialization;
+see the [ES2015 test guide](js/tests/es6/README.md).

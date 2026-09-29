@@ -6064,3 +6064,41 @@ js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex)
     return js_NewNumberValue(cx, lastIndex, &v) &&
            JS_SetReservedSlot(cx, obj, 0, v);
 }
+
+/* Storage deserialization uses target-realm intrinsics and the saved grammar
+ * edition, without calling mutable public constructors or source accessors. */
+JSBool
+js_IsRegExpPrototypeObject(JSContext *cx, JSObject *obj)
+{
+    return OBJ_GET_CLASS(cx, obj) == &regexpPrototypeClass;
+}
+
+JSObject *
+js_ReadStructuredRegExp(JSContext *cx, JSObject *global,
+                        const jschar *chars, size_t length, uintN flags,
+                        JSBool modern)
+{
+    jsval roots[2] = {JSVAL_VOID, JSVAL_VOID};
+    JSTempValueRooter root;
+    JSString *source;
+    JSObject *proto, *obj = NULL;
+    JSRegExp *regexp;
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    source = JS_NewUCStringCopyN(cx, chars, length);
+    if (!source) goto out;
+    roots[0] = STRING_TO_JSVAL(source);
+    proto = js_BuiltinPrototype(cx, global, JSProto_RegExp);
+    if (!proto) goto out;
+    obj = js_NewObject(cx, &js_RegExpClass, proto, global);
+    if (!obj) goto out;
+    roots[1] = OBJECT_TO_JSVAL(obj);
+    regexp = NewRegExpWithEdition(cx, NULL, source, flags, JS_FALSE, modern);
+    if (!regexp) { obj = NULL; goto out; }
+    if (!JS_SetPrivate(cx, obj, regexp)) {
+        js_DestroyRegExp(cx, regexp); obj = NULL; goto out;
+    }
+    if (!js_SetLastIndex(cx, obj, 0)) obj = NULL;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return obj;
+}

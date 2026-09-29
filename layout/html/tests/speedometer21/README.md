@@ -503,3 +503,10 @@ immutable serialized payload independently of later replacement or clearing.
 Its ten native xpcshell assertions pass in GTK2 and Xlib Suite builds and are
 included in the Linux package runner. This storage foundation does not yet
 expose pushState/replaceState or establish traversal/serialization support.
+
+An immutable native structured-value serializer now supplies the next history
+foundation. Its 63 native checks pass on both LoongArch Suite backends, with
+11,540 pinned ES5.1 cases and 28,582 pinned ES2015 modes passing on the same
+engine binary. See the ES2015 test guide for supported value types and limits.
+It introduces no JavaScript global or post-ES2015 language feature. History
+bindings, same-document traversal and popstate integration remain unfinished.

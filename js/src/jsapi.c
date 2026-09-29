@@ -53,6 +53,7 @@
 #include "jsdhash.h"
 #include "jsprf.h"
 #include "jsapi.h"
+#include "jsstructuredclone.h"
 #include "jsarray.h"
 #include "jsatom.h"
 #include "jsbool.h"
@@ -4044,6 +4045,28 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
     script = CompileTokenStream(cx, obj, ts, mark, NULL);
     LAST_FRAME_CHECKS(cx, script);
     return script;
+}
+
+JS_PUBLIC_API(JSBool)
+JS_WriteStructuredValue(JSContext *cx, jsval value,
+                        JSStructuredValue **result, JSBool *unsupported)
+{
+    CHECK_REQUEST(cx);
+    return js_WriteStructuredValue(cx, value, result, unsupported);
+}
+
+JS_PUBLIC_API(JSBool)
+JS_ReadStructuredValue(JSContext *cx, JSObject *global,
+                       const JSStructuredValue *data, jsval *result)
+{
+    CHECK_REQUEST(cx);
+    return js_ReadStructuredValue(cx, global, data, result);
+}
+
+JS_PUBLIC_API(void)
+JS_FreeStructuredValue(JSStructuredValue *data)
+{
+    js_FreeStructuredValue(data);
 }
 
 JS_PUBLIC_API(JSBool)

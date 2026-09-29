@@ -39,5 +39,18 @@ extern JSBool js_TypedArrayWrite(JSContext *, JSObject *, jsdouble, jsval, JSBoo
 extern JSBool js_TypedArrayGet(JSContext *, JSObject *, jsid, jsval, jsval *);
 extern JSBool js_IsTypedArrayConstructor(JSNative);
 extern JSBool js_TypedArraySet(JSContext *, JSObject *, jsid, jsval, jsval, JSBool *);
+/* Internal structured-storage view; borrowed pointers are valid only while the
+ * source is rooted and no script, allocation hook or GC callback is invoked. */
+typedef struct JSStructuredBinary {
+    const unsigned char *bytes;
+    JSObject *buffer;
+    size_t offset, length;
+    int kind; /* -1 DataView, otherwise typedClasses index */
+} JSStructuredBinary;
+extern int js_StructuredBinaryInfo(JSContext *, JSObject *, JSStructuredBinary *);
+extern JSObject *js_ReadStructuredBuffer(JSContext *, JSObject *,
+                                         const unsigned char *, size_t);
+extern JSObject *js_ReadStructuredView(JSContext *, JSObject *, JSObject *,
+                                       size_t, size_t, int);
 JS_END_EXTERN_C
 #endif

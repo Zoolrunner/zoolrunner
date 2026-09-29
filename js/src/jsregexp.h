@@ -204,4 +204,8 @@ js_SetLastIndex(JSContext *cx, JSObject *obj, jsdouble lastIndex);
 
 extern JSBool js_IsRegExpStaticPropertyHook(JSPropertyOp getter);
 
+extern JSBool js_IsRegExpPrototypeObject(JSContext *, JSObject *);
+extern JSObject *js_ReadStructuredRegExp(JSContext *, JSObject *,
+                                        const jschar *, size_t, uintN, JSBool);
+
 #endif /* jsregexp_h___ */

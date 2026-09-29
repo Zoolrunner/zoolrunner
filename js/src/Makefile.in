@@ -91,6 +91,7 @@ CSRCS		= \
 		jsproxy.c \
 		jsmodule.c \
 		jsbinarydata.c \
+		jsstructuredclone.c \
 		jscasing.c \
 		jsjobs.c \
 		jspromise.c \

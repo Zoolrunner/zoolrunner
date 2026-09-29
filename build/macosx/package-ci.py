@@ -538,6 +538,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
         for source, marker in (
                 ("es5/TestObjectEmbedding.c", "ES5-EMBEDDING checks=18 failures=0"),
                 ("es6/TestJSONRealms.c", "ES6-JSON-REALMS checks=28 failures=0"),
+                ("es6/TestStructuredValue.c", "STRUCTURED-VALUE checks=63 failures=0"),
                 ("es6/TestLocaleCompare.c", "ES6-LOCALE-COMPARE checks=20 failures=0"),
                 ("es6/TestRegExpHex.c", "ES6-REGEXP-HEX checks=15 failures=0"),
                 ("es6/TestEditionEmbedding.c", "ES6-EDITION-EMBEDDING checks=14 failures=0"),

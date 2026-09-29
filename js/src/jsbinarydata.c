@@ -1909,3 +1909,110 @@ TYPED_INIT(Uint32Array, 6)
 TYPED_INIT(Float32Array, 7)
 TYPED_INIT(Float64Array, 8)
 #undef TYPED_INIT
+
+/* Native storage hooks read internal slots without invoking public getters. */
+int
+js_StructuredBinaryInfo(JSContext *cx, JSObject *obj, JSStructuredBinary *info)
+{
+    BufferData *buffer;
+    ViewData *view;
+    TypedData *typed;
+    jsval value;
+    memset(info, 0, sizeof(*info));
+    if (OBJ_GET_CLASS(cx, obj) == &js_ArrayBufferClass) {
+        buffer = GetBuffer(cx, OBJECT_TO_JSVAL(obj));
+        if (!buffer) return 0; /* the ordinary ArrayBuffer prototype */
+        if (buffer->detached) return -1;
+        info->bytes = buffer->bytes; info->length = buffer->length;
+        return 1;
+    }
+    if (OBJ_GET_CLASS(cx, obj) == &js_DataViewClass) {
+        view = GetView(cx, OBJECT_TO_JSVAL(obj));
+        if (!view) return 0;
+        info->offset = view->offset; info->length = view->length;
+        info->kind = -1;
+        if (!JS_GetReservedSlot(cx, obj, 0, &value)) return -1;
+    } else {
+        typed = GetTyped(cx, obj);
+        if (!typed) return -1;
+        info->offset = typed->offset; info->length = typed->length;
+        info->kind = (int)typed->kind;
+        value = TypedSlot(cx, obj, 0);
+    }
+    buffer = GetBuffer(cx, value);
+    if (!buffer || buffer->detached) return -1;
+    info->buffer = JSVAL_TO_OBJECT(value);
+    return 2;
+}
+
+JSObject *
+js_ReadStructuredBuffer(JSContext *cx, JSObject *global,
+                         const unsigned char *bytes, size_t length)
+{
+    JSObject *proto, *obj;
+    BufferData *data;
+    JSTempValueRooter root;
+    proto = js_BuiltinPrototype(cx, global, JSProto_ArrayBuffer);
+    if (!proto) return NULL;
+    obj = js_NewObject(cx, &js_ArrayBufferClass, proto, global);
+    if (!obj) return NULL;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &root);
+    data = (BufferData *)JS_malloc(cx, sizeof(BufferData));
+    if (!data) { obj = NULL; goto out; }
+    data->length = length; data->detached = JS_FALSE;
+    data->bytes = (unsigned char *)malloc(length ? length : 1);
+    if (!data->bytes) {
+        JS_free(cx, data); JS_ReportOutOfMemory(cx); obj = NULL; goto out;
+    }
+    if (length) memcpy(data->bytes, bytes, length);
+    OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, PRIVATE_TO_JSVAL(data));
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return obj;
+}
+
+JSObject *
+js_ReadStructuredView(JSContext *cx, JSObject *global, JSObject *bufferObject,
+                       size_t offset, size_t length, int kind)
+{
+    BufferData *buffer = GetBuffer(cx, OBJECT_TO_JSVAL(bufferObject));
+    JSObject *proto, *obj = NULL;
+    JSClass *clasp;
+    JSProtoKey key;
+    TypedData *typed;
+    ViewData *view;
+    jsval roots[2] = {OBJECT_TO_JSVAL(bufferObject), JSVAL_NULL};
+    JSTempValueRooter root;
+    size_t width;
+    if (kind < -1 || kind >= 9 || !buffer || buffer->detached) {
+        BinaryTypeError(cx); return NULL;
+    }
+    width = kind < 0 ? 1 : typedSizes[kind];
+    if (offset > buffer->length || offset % width ||
+        length > (buffer->length - offset) / width) {
+        BinaryRangeError(cx); return NULL;
+    }
+    JS_PUSH_TEMP_ROOT(cx, 2, roots, &root);
+    clasp = kind < 0 ? &js_DataViewClass : typedClasses[kind];
+    key = (JSProtoKey)JSCLASS_CACHED_PROTO_KEY(clasp);
+    proto = js_BuiltinPrototype(cx, global, key);
+    if (!proto) goto out;
+    obj = js_NewObject(cx, clasp, proto, global);
+    if (!obj) goto out;
+    roots[1] = OBJECT_TO_JSVAL(obj);
+    if (kind < 0) {
+        view = (ViewData *)JS_malloc(cx, sizeof(ViewData));
+        if (!view) { obj = NULL; goto out; }
+        view->offset = offset; view->length = length;
+        OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, PRIVATE_TO_JSVAL(view));
+    } else {
+        typed = (TypedData *)JS_malloc(cx, sizeof(TypedData));
+        if (!typed) { obj = NULL; goto out; }
+        typed->offset = offset; typed->length = length; typed->kind = (uintN)kind;
+        OBJ_SET_SLOT(cx, obj, JSSLOT_PRIVATE, PRIVATE_TO_JSVAL(typed));
+    }
+    if (!JS_SetReservedSlot(cx, obj, 0, OBJECT_TO_JSVAL(bufferObject))) obj = NULL;
+  out:
+    JS_POP_TEMP_ROOT(cx, &root);
+    return obj;
+}

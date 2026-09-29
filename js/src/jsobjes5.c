@@ -58,6 +58,7 @@
 #include "jsregexp.h"
 #include "jsscope.h"
 #include "jsstr.h"
+#include "jsstructuredclone.h"
 
 static JSObject *
 RequireObject(JSContext *cx, uintN argc, jsval *argv)
@@ -2120,4 +2121,18 @@ js_ReflectEnumerate(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval
          JS_SetReservedSlot(cx, iterator, 4, JSVAL_FALSE);
     JS_POP_TEMP_ROOT(cx, &root);
     return ok;
+}
+
+JSIdArray *
+js_StructuredOwnKeys(JSContext *cx, JSObject *obj)
+{
+    RootedIds keys;
+    JSBool ok;
+    keys.ids = OwnNames(cx, obj);
+    if (!keys.ids) return NULL;
+    JS_PUSH_TEMP_ROOT_MARKER(cx, MarkIds, &keys.root);
+    ok = OrderOwnKeys(cx, keys.ids);
+    JS_POP_TEMP_ROOT(cx, &keys.root);
+    if (!ok) { JS_DestroyIdArray(cx, keys.ids); return NULL; }
+    return keys.ids;
 }

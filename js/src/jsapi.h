@@ -1644,6 +1644,19 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
                                 const jschar *chars, size_t length,
                                 const char *filename, uintN lineno);
 
+/* Immutable host-owned snapshots for structured storage. No new JavaScript
+ * global is installed. Unsupported types set *unsupported without replacing
+ * a getter exception. Snapshots own no GC things and may outlive the context. */
+typedef struct JSStructuredValue JSStructuredValue;
+extern JS_PUBLIC_API(JSBool)
+JS_WriteStructuredValue(JSContext *cx, jsval value,
+                        JSStructuredValue **result, JSBool *unsupported);
+extern JS_PUBLIC_API(JSBool)
+JS_ReadStructuredValue(JSContext *cx, JSObject *global,
+                       const JSStructuredValue *data, jsval *result);
+extern JS_PUBLIC_API(void)
+JS_FreeStructuredValue(JSStructuredValue *data);
+
 /* Explicit host detachment; existing views observe their detached buffer.
  * The object must be an ArrayBuffer, including one from another realm. */
 extern JS_PUBLIC_API(JSBool)

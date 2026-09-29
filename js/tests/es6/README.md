@@ -4402,3 +4402,30 @@ compatibility tests and its fresh-profile four-view GUI test. These Intel
 package runs use Rosetta on Apple Silicon and are not physical Intel hardware
 validation. Logs and reports are under
 `artifacts/macos-modern-validation/x86_64-*-current-*`.
+
+### Native structured-value snapshots for session history
+
+The additive `JS_WriteStructuredValue`, `JS_ReadStructuredValue` and
+`JS_FreeStructuredValue` embedding APIs store an immutable in-process graph
+without retaining source contexts, objects or GC roots. They preserve cycles,
+shared identities, sparse arrays, UTF-16, primitive wrappers, Date, RegExp,
+Map/Set and shared ArrayBuffer/view storage. Getters run in property order;
+unsupported functions, symbols, proxies, weak collections and promises are
+rejected. Getter exceptions and embedding access checks remain observable.
+Deserialization uses the destination realm's intrinsic prototypes.
+
+`TestStructuredValue.c` passes 63 native checks on LoongArch64 Linux Suite
+GTK2 and Xlib, including collection mutation, reentrant serialization, GC,
+realm teardown, access denial, cancellation and bounded deep-input failure.
+Both builds produced the same engine binary. The GTK2 driver additionally
+passes all 28,582 pinned ES2015 modes, 139 focused scripts and 84 native
+fixtures; the pinned ES5.1 run passes all 11,540 cases. Both full runs use
+America/Los_Angeles. Reports are in
+`artifacts/speedometer21/structured-value-es2015/` and
+`artifacts/speedometer21/structured-value-es5.json`. Both Suite backends pass
+24 application lifecycle checks after the change.
+
+This is an embedding facility, not a JavaScript `structuredClone` global or a
+portable persistence format. DOM-specific clone types and transfer operations
+are not implemented. These tests do not establish complete HTML structured
+serialization or History API conformance; browser integration remains pending.
