@@ -1148,3 +1148,6 @@ boundary/lifecycle checks are still incomplete.
 Local storage cache clearing now has a 27-check repeated-clear/frame regression;
 shutdown cache release retains the verified 15-check process-restart persistence
 behavior. Native LoongArch GTK2 Suite lifecycle remains passing (24 checks).
+
+Reading UI-event `cancelBubble` now preserves internal event state, including
+the recursive-dispatch guard; its 12-check regression and Suite lifecycle pass.

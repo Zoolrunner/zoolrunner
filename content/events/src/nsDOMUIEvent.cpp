@@ -373,7 +373,7 @@ nsDOMUIEvent::GetCancelBubble(PRBool* aCancelBubble)
 {
   NS_ENSURE_ARG_POINTER(aCancelBubble);
   if (mEvent->flags & NS_EVENT_FLAG_BUBBLE || mEvent->flags & NS_EVENT_FLAG_INIT) {
-    *aCancelBubble = (mEvent->flags &= NS_EVENT_FLAG_STOP_DISPATCH) ? PR_TRUE : PR_FALSE;
+    *aCancelBubble = (mEvent->flags & NS_EVENT_FLAG_STOP_DISPATCH) ? PR_TRUE : PR_FALSE;
   }
   else {
     *aCancelBubble = PR_FALSE;

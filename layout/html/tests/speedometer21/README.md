@@ -302,3 +302,8 @@ drops cached StorageItems without deleting persistent values. The separate
 three-process persistence/origin probe still passes all 15 checks, and Suite
 lifecycle passes all 24. This does not establish complete storage-event or
 quota conformance.
+
+`ui-event-cancel-bubble.html` verifies that reading the propagation flag does
+not change event phase, cancellation, bubbling, or the active-dispatch guard.
+The native LoongArch GTK2 Suite passes all 12 checks (nine failed before the
+fix), alongside 24 Suite lifecycle and 19 window bootstrap checks.

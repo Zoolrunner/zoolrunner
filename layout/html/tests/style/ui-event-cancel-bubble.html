@@ -1,0 +1,38 @@
+<!doctype html><html><head><title>UI event cancelBubble state regression</title></head>
+<body><div id="parent"><span id="target"></span></div><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+window.onload=function(){try{
+  var target=document.getElementById('target'),parent=document.getElementById('parent');
+  var calls=0,bubbles=0,reentrant=false;
+  target.addEventListener('probe',function(e){
+    ++calls;if(reentrant)return;
+    var phase=e.eventPhase;
+    check(e.cancelBubble,false,'initial propagation state');
+    check(e.eventPhase,phase,'reading cancelBubble preserves event phase');
+    check(e.cancelable,false,'reading cancelBubble preserves noncancelable flag');
+    check(e.bubbles,true,'reading cancelBubble preserves bubbles');
+    var rejected=false;reentrant=true;
+    try{target.dispatchEvent(e);}catch(ex){rejected=true;}
+    reentrant=false;
+    check(rejected,true,'reading cancelBubble preserves active dispatch guard');
+    e.preventDefault();
+  });
+  parent.addEventListener('probe',function(){++bubbles;});
+  var event=document.createEvent('MouseEvents');
+  event.initMouseEvent('probe',true,false,window,0,0,0,0,0,false,false,false,false,0,null);
+  check(target.dispatchEvent(event),true,'noncancelable dispatch remains uncanceled');
+  check(calls,1,'no recursive dispatch');
+  check(bubbles,1,'reading cancelBubble preserves propagation');
+  event=document.createEvent('UIEvents');
+  event.initUIEvent('stopped',false,false,window,0);
+  target.addEventListener('stopped',function(e){
+    e.stopPropagation();
+    check(e.cancelBubble,true,'stopped propagation readable');
+    check(e.bubbles,false,'stopped read preserves nonbubbling flag');
+    check(e.cancelable,false,'stopped read preserves noncancelable flag');
+    check(e.eventPhase,2,'stopped read preserves target phase');
+  });
+  target.dispatchEvent(event);
+}catch(e){check(String(e),'no exception','unexpected exception');}testDone=true;};
+</script></body></html>
