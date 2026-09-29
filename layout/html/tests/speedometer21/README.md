@@ -700,3 +700,7 @@ defaults. Accordingly its initial allowed-storage reports in
 `xulrunner-gtk2-http/` record security denial, not storage conformance. Explicit
 denial-policy validation passes nine checks plus all 69 XHR assertions in
 `xulrunner-gtk2-http-policy/`. No application or build configuration was changed.
+The unchanged built ChatZilla extension also passes twelve startup and XBL
+input assertions as a standalone XULRunner application
+(`xulrunner-gtk2-chatzilla.json`); see the
+[standalone test instructions](../../../../extensions/irc/tests/README.md).

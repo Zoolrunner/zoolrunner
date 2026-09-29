@@ -1,0 +1,53 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul" onload="run()">
+<script><![CDATA[
+var checks = 0, failures = 0, messages = [], clientWindow, deadline;
+function check(value, label) {
+  ++checks;
+  if (!value) ++failures;
+  messages.push((value ? 'PASS ' : 'FAIL ') + label);
+}
+function finish() {
+  dump('STANDALONE-CHATZILLA ' + JSON.stringify({checks:checks, failures:failures,
+       results:messages}) + '\n');
+  Components.classes['@mozilla.org/toolkit/app-startup;1']
+    .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+function poll() {
+  try {
+    var w = clientWindow;
+    if (!w.client || !w.client.initialized) {
+      if (Date.now() < deadline) { setTimeout(poll, 100); return; }
+      check(false, 'initialization before deadline'); finish(); return;
+    }
+    check(w.client.host == 'XULRunner', 'standalone XULRunner host');
+    check(w.client.initialized === true, 'historical client initialized');
+    check(typeof w.dispatch == 'function', 'command dispatch installed');
+    check(w.client.commandManager != null, 'command manager created');
+    check(w.client.prefs != null, 'preference manager created');
+    check(w.client.prefs.initialURLs.length == 0, 'no startup network connections');
+    check(typeof w.Object.keys == 'function', 'ES5 methods available in chrome');
+    check(w.Object.keys({legacy:1}).join(',') == 'legacy', 'ES5 method invocation');
+    var input = w.document.getElementById('input');
+    check(input != null, 'XUL input exists');
+    input.focus();
+    input.value = 'standalone compatibility';
+    check(input.value == 'standalone compatibility', 'XBL input value binding');
+    input.setSelectionRange(0, 10);
+    check(input.selectionStart == 0 && input.selectionEnd == 10, 'XBL selection binding');
+    input.value = '';
+    check(input.value == '', 'XBL input cleared');
+  } catch (e) {
+    check(false, 'unexpected exception: ' + e);
+  }
+  finish();
+}
+function run() {
+  deadline = Date.now() + 30000;
+  try {
+    clientWindow = window.openDialog('chrome://chatzilla/content/chatzilla.xul',
+                                     'standalone-client', 'chrome,dialog=no');
+    setTimeout(poll, 100);
+  } catch (e) { check(false, 'open client: ' + e); finish(); }
+}
+]]></script></window>
