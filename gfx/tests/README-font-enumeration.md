@@ -30,3 +30,9 @@ remain; these tests do not establish complete font selection correctness.
 Browser's preference fixture additionally requires a populated font menu and a
 completed font list, since the original font builder catches enumeration errors.
 Its expanded thirty checks pass on both native LoongArch backends.
+
+The Xlib-only `font-enumeration-headless.js` shell test covers both enumeration
+entry points before application-display initialization. It requires the
+documented safe failure rather than a crash or an empty success result. Both
+checks pass in native LoongArch Browser and Suite; Linux Xlib package validation
+runs them before starting any application windows.

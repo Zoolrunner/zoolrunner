@@ -63,6 +63,9 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     if a.toolkit == 'xlib' and ('libgtk-' in dependencies or 'libgdk-' in dependencies):
         raise RuntimeError('Xlib package unexpectedly depends on GTK/GDK')
     shell = runtime / 'xpcshell'
+    if a.toolkit == 'xlib':
+        run([shell, '-f', root / 'gfx/tests/font-enumeration-headless.js'],
+            'fonts-headless', 'FONT-ENUMERATION-HEADLESS checks=2 failures=0')
     for case in ['object-reflection', 'object-descriptors', 'json-bind-string', 'array-date',
                  'library-edge-cases', 'strict-mode', 'legacy-application', 'debugger-lifecycle']:
         run([shell, '-f', root / 'js/tests/es5' / (case + '.js')], case, 'failures=0')
