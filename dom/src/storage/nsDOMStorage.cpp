@@ -162,11 +162,24 @@ nsDOMStorageManager::Initialize()
   return NS_OK;
 }
 
+PR_STATIC_CALLBACK(PLDHashOperator)
+DropLocalStorageCache(const nsAString& aKey, nsIDOMStorage* aStorage,
+                      void* aClosure)
+{
+  // The manager owns these concrete backends. Clear only their cached items,
+  // not their persistent data, while the manager still holds a strong reference.
+  NS_STATIC_CAST(nsDOMStorage*, aStorage)->ClearAll();
+  return PL_DHASH_NEXT;
+}
+
 //static
 void
 nsDOMStorageManager::Shutdown()
 {
-  if (gStorageManager) gStorageManager->mLocalStorages.Clear();
+  if (gStorageManager) {
+    gStorageManager->mLocalStorages.EnumerateRead(DropLocalStorageCache, nsnull);
+    gStorageManager->mLocalStorages.Clear();
+  }
   NS_IF_RELEASE(gStorageManager);
   gStorageManager = nsnull;
 }
@@ -175,7 +188,9 @@ PR_STATIC_CALLBACK(PLDHashOperator)
 ClearStorage(nsDOMStorageEntry* aEntry, void* userArg)
 {
   aEntry->mStorage->ClearAll();
-  return PL_DHASH_REMOVE;
+  // Modern backends remain shared by live windows and must be cleared again
+  // on subsequent notifications. Preserve historical storage tracking.
+  return aEntry->mStorage->IsLocalStorage() ? PL_DHASH_NEXT : PL_DHASH_REMOVE;
 }
 
 nsresult
@@ -840,6 +855,13 @@ ClearStorageItem(nsSessionStorageEntry* aEntry, void* userArg)
 void
 nsDOMStorage::ClearAll()
 {
+  if (mIsLocalStorage) {
+    // StorageItem owns its backend, so dropping cached items also breaks the
+    // backend/item ownership cycle. This must not delete the on-disk values.
+    mItems.Clear();
+    mItemsCached = PR_FALSE;
+    return;
+  }
   mItems.EnumerateEntries(ClearStorageItem, nsnull);
 }
 

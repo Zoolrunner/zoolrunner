@@ -131,3 +131,12 @@ modern and legacy storage separately. The former passes 54 assertions; the
 latter passes 15 across three processes and two origins. See the
 [restart-probe instructions](../speedometer21/README.md) for serving and running
 them. They are not in the file-URL layout list.
+
+The HTTP `storage-cache-clear.html` probe exercises three cookie-clearing
+notifications in one process, including cached keys and same-origin frames.
+All 27 checks pass on the native LoongArch GTK2 Suite (13 failed before the
+cache fix). Modern backends stay registered for repeated clearing, and shutdown
+drops cached StorageItems without deleting persistent values. The separate
+three-process persistence/origin probe still passes all 15 checks, and Suite
+lifecycle passes all 24. This does not establish complete storage-event or
+quota conformance.

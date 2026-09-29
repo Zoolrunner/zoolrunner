@@ -88,6 +88,14 @@ function poll() {
   if (done) return;
   try {
     var w = browser.contentWindow.wrappedJSObject || browser.contentWindow;
+    if (mode == 'probe' && w.testRequestStorageClear) {
+      w.testRequestStorageClear = false;
+      // Only the disposable probe profile is affected. Exercise the same
+      // observer notification used when the application clears cookies.
+      C['@mozilla.org/observer-service;1'].getService(I.nsIObserverService)
+        .notifyObservers(null, 'cookie-changed', 'cleared');
+      w.testStorageClearDone = true;
+    }
     if (mode == 'probe' && w.testRequestGC) {
       w.testRequestGC = false;
       var debuggerService = C['@mozilla.org/js/jsd/debugger-service;1']

@@ -293,3 +293,12 @@ All 15 assertions across three separate Suite processes pass, including
 persistent NUL/lone-surrogate keys and values, empty keys, isolation by port,
 and unchanged legacy domain storage shared across ports. This does not yet
 validate quota boundaries, opaque origins or shutdown memory accounting.
+
+The HTTP `storage-cache-clear.html` probe exercises three cookie-clearing
+notifications in one process, including cached keys and same-origin frames.
+All 27 checks pass on the native LoongArch GTK2 Suite (13 failed before the
+cache fix). Modern backends stay registered for repeated clearing, and shutdown
+drops cached StorageItems without deleting persistent values. The separate
+three-process persistence/origin probe still passes all 15 checks, and Suite
+lifecycle passes all 24. This does not establish complete storage-event or
+quota conformance.

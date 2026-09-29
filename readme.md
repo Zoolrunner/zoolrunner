@@ -1144,3 +1144,7 @@ focused Suite assertions. Fifteen additional checks across three processes
 verify persistence of UTF-16 data and isolation by port while preserving legacy
 domain storage. Storage events, modern property descriptors and remaining
 boundary/lifecycle checks are still incomplete.
+
+Local storage cache clearing now has a 27-check repeated-clear/frame regression;
+shutdown cache release retains the verified 15-check process-restart persistence
+behavior. Native LoongArch GTK2 Suite lifecycle remains passing (24 checks).
