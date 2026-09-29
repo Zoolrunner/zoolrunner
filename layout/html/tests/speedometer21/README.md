@@ -613,3 +613,14 @@ transparency and other existing rendering gaps still require visual checks.
 The diagnostic files are `loaded-css-paths.txt`, `loaded-css-declarations.json`
 and `loaded-css-parser-gtk2.json` under `artifacts/speedometer21/`; it excludes
 vendor-prefixed declarations and is not an exhaustive standards inventory.
+
+The current GTK2 and Xlib builds also pass 12 checks each using the completed
+run's real measurements in the original results UI. Summary/details/home and
+queued Back/Forward navigation use the page's unchanged handlers without a
+document reload (`recorded-results-{gtk2,xlib}.json`). This replay is a UI
+regression check, not another benchmark run. The GTK2 summary screenshot
+`recorded-summary-suite.png` and Chromium reference
+`recorded-summary-chromium.png` confirm that the score is displayed, but the
+Suite gauge needle stays upright because CSS rotation is missing. They also
+show a border around the linked logo image that the reference omits. Full
+painting equivalence is therefore not claimed.
