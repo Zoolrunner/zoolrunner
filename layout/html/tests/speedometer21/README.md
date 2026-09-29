@@ -738,3 +738,28 @@ are `xhr-synthetic-before-gtk2.json` and `xhr-synthetic-chromium.json`. These
 results reinforce that benchmark completion and browser comparisons alone are
 not evidence of complete conformance. Native dispatch implementation remains
 unfinished.
+
+### Completed native application matrix (2026-09-29 baseline)
+
+All eight native LoongArch package gates pass: Suite, Browser, Calendar and
+XULRunner, each with GTK2 and Xlib. Reports are under
+`artifacts/speedometer21/{history,browser,calendar,xulrunner}-package-{gtk2,xlib}/logs/runtime-result.txt`.
+These gates include the full pinned 11,540-case ES5.1 suite, the selected
+28,582-case ES2015 suite, native embedding and application-specific runtime
+checks. Calendar passes its unit groups, startup and all four views on both
+backends. Standalone unchanged ChatZilla passes twelve checks on both XULRunner
+backends. Every application/backend also passes the 985-check content batch and
+300 History checks; Browser HTTP coverage passes 159 checks and the unchanged
+Calendar/XULRunner permission configuration passes the explicit 78-check denial
+policy/XHR batch described above.
+
+These are baseline results, not validation of subsequent uncommitted XHR work.
+Suite packages are from `989aaa00`; later Browser/Calendar/XULRunner builds
+include the Xlib font fix `45f3b7d3`. Older GTK2 package runs precede the new font
+fixture; separate current-build font and strengthened preferences runs pass.
+XULRunner Xlib's package includes both startup and headless font regressions.
+The pending Xlib benchmark uses a frozen Suite package, with its HTTP server
+owned by the benchmark driver. A previous separate-server attempt stopped when
+that server exited; it is retained as an infrastructure failure, not a pass.
+Benchmark completion and this matrix do not establish exhaustive specification
+or historical-application compatibility; the feature limitations above remain.

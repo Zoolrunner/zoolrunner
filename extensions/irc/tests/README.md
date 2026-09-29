@@ -16,5 +16,5 @@ The twelve assertions cover initialization, host recognition, command and
 preference managers, ES5 methods in real chrome, and the XBL input's value and
 selection bindings. A timeout, crash, missing result, or failed assertion fails
 the run. This is startup and local input coverage, not IRC protocol validation
-or a test of every ChatZilla command. Native LoongArch GTK2 passes with the
-current Speedometer engine; Xlib validation remains pending.
+or a test of every ChatZilla command. Native LoongArch GTK2 and Xlib both pass with the Speedometer engine
+(`xulrunner-gtk2-chatzilla.json` and `xulrunner-xlib-chatzilla.json`).
