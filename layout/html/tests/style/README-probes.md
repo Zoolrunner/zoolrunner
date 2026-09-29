@@ -197,3 +197,9 @@ assertions; the fixture retains the DOM specification's required null target.
 on Event, UIEvent and CustomEvent, propagation reset and retained native-event
 redispatch (47 assertions). Native LoongArch GTK2 Suite passes these tests and
 all 904 assertions across the current 30-fixture content collection.
+
+`event-type-strings.html` adds 23 assertions for complete UTF-16 event names and
+distinct listener lookup, including embedded NULs. Native LoongArch GTK2 Suite
+passes 927 assertions across 31 content fixtures after the string-key correction.
+The native `xpcom/tests/TestStringKeyLength.cpp` additionally checks hashing,
+cloning, lookup and removal (19 checks).

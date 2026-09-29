@@ -79,6 +79,7 @@ CPPSRCS		= \
 		TestAutoPtr.cpp \
 		TestMinStringAPI.cpp \
 		TestStrings.cpp \
+		TestStringKeyLength.cpp \
 		TestStorageStream.cpp \
 		TestVersionComparator.cpp \
 		$(NULL)

@@ -1176,3 +1176,10 @@ including FP register exhaustion with integer registers still available and
 interleaved stack arguments. The corrected invoke/stub bridge passes both
 2,000-call probes; full application package results remain tracked in the
 [Linux test guide](build/linux/README.md).
+
+The native event surface now exposes `defaultPrevented`,
+`stopImmediatePropagation` and generic `cancelBubble` through additive interfaces.
+Reinitialization and completed-dispatch state are corrected, and event names
+retain complete UTF-16 strings. The shared string-key regression covers embedded
+NULs without changing ordinary-key hashes. Current Suite validation and remaining
+DOM/CSS gaps are recorded in the [Speedometer notes](layout/html/tests/speedometer21/README.md).

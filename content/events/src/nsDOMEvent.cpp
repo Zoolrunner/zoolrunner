@@ -187,7 +187,8 @@ NS_METHOD nsDOMEvent::GetType(nsAString& aType)
   }
   else {
     if (mEvent->message == NS_USER_DEFINED_EVENT && mEvent->userType) {
-      aType.Assign(NS_STATIC_CAST(nsStringKey*, mEvent->userType)->GetString());
+      nsStringKey* key = NS_STATIC_CAST(nsStringKey*, mEvent->userType);
+      aType.Assign(key->GetString(), key->GetStringLength());
       return NS_OK;
     }
   }
@@ -579,8 +580,16 @@ nsDOMEvent::SetEventType(const nsAString& aEventTypeArg)
   }
 #endif // MOZ_SVG
 
-  if (mEvent->message == NS_USER_DEFINED_EVENT)
-    mEvent->userType = new nsStringKey(aEventTypeArg);
+  nsStringKey* type = nsnull;
+  if (mEvent->message == NS_USER_DEFINED_EVENT) {
+    type = new nsStringKey(aEventTypeArg);
+    if (!type || !type->GetString()) {
+      delete type;
+      return NS_ERROR_OUT_OF_MEMORY;
+    }
+  }
+  delete mEvent->userType;
+  mEvent->userType = type;
 
   return NS_OK;
 }

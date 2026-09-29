@@ -280,3 +280,12 @@ Both native probes pass 2,000 calls each after the correction. `TestXPTCallFP.cp
 adds coverage where FP registers run out first; the existing ABI probe covers
 interleaved stack arguments. Full package validation is being rerun; these
 focused passes do not substitute for it.
+
+The native LoongArch GTK2 Suite package retry passes the complete gate: 11,540
+ES5.1 cases, 28,582 ES2015 modes, 139 focused fixtures, 83 native ES2015 probes,
+both 2,000-call ABI probes, embedding, window and Suite application checks.
+Reports are retained in `artifacts/speedometer21/package-suite-gtk2-abi-fixed`.
+The package predates subsequent DOM propagation and string-key corrections;
+see the Speedometer notes for those focused results. Xlib's full gate is pending.
+The driver now also runs `TestStringKeyLength.cpp` (19 checks), and resolves
+native checkout symlinks when rejecting build-tree library dependencies.

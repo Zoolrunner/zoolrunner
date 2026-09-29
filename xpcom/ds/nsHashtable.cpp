@@ -683,7 +683,9 @@ nsStringKey::~nsStringKey(void)
 PRUint32
 nsStringKey::HashCode(void) const
 {
-    return nsCRT::HashCode(mStr, (PRUint32*)&mStrLen);
+    // Constructors retain the supplied length, including embedded NULs.
+    // Hashing must not shorten the key or read beyond a bounded buffer.
+    return mStr ? nsCRT::BufferHashCode(mStr, mStrLen) : 0;
 }
 
 PRBool

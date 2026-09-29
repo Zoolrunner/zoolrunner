@@ -374,3 +374,21 @@ additive propagation interface leaves existing interface vtables intact. Native
 LoongArch GTK2 Suite passes all 904 checks across 30 content fixtures after this
 change. The native event copy is now made after dispatch flags are cleared;
 otherwise a retained event could incorrectly remain marked as dispatching.
+
+`event-type-strings.html` passes 23 checks for event names with embedded NULs,
+lone surrogates and non-ASCII characters, including distinct listener lookup and
+reinitialization. The event getter now retains the entire DOMString, and replacing
+an event type releases its previous allocation. The shared `nsStringKey` hash
+uses its stored length instead of truncating and mutating that length at NUL.
+Its native 19-check regression reproduced 12 failures before the correction and
+passes afterward. Native LoongArch GTK2 Suite passes all 927 content assertions
+across 31 fixtures with the correction.
+
+The first successful relocated GTK2 Suite package gate passes 11,540 ES5.1 cases,
+28,582 ES2015 modes, 139 focused fixtures, 83 native ES2015 probes, both 2,000-call
+XPTCall probes, native embedding and Suite navigation/window/lifecycle/ChatZilla
+checks. Reports are in `artifacts/speedometer21/package-suite-gtk2-abi-fixed`.
+That package includes the ABI and initial event-state fixes, preceding the later
+mouse relatedTarget, propagation and event-name corrections. Its engine hash is
+unchanged; later DOM/XPCOM checks are recorded separately above. Xlib package
+validation and the full themed benchmark are still running.

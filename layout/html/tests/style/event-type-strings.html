@@ -1,0 +1,26 @@
+<!doctype html><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+' actual='+a+' expected='+b);}
+try {
+ var target=document.createElement('div'),seen=[],ids=[];
+ var names=['a\u0000b','a\u0000c','\u0000','\ud800','\u03a9'];
+ function listener(index){return function(e){seen.push(e.type);ids.push(index);};}
+ for(var i=0;i<names.length;++i)target.addEventListener(names[i],listener(i),false);
+ var event=document.createEvent('Event');
+ for(var i=0;i<names.length;++i){
+  event.initEvent(names[i],false,false);
+  check(event.type,names[i],'initialized type preserves UTF16 '+i);
+  target.dispatchEvent(event);
+  check(seen.length,i+1,'exact type listener dispatch '+i);
+  check(seen[i],names[i],'listener sees complete type '+i);
+  check(ids[i],i,'distinct names reach distinct listeners '+i);
+ }
+ var mouse=document.createEvent('MouseEvents');
+ mouse.initEvent('custom',false,false);mouse.initEvent('click',false,false);
+ check(mouse.type,'click','reinitialize custom type as native type');
+ mouse.initEvent('other\u0000type',false,false);
+ check(mouse.type,'other\u0000type','reinitialize native type as complete custom type');
+ check(testResults.length,22,'all type assertions executed');
+}catch(error){check(String(error),'no exception','unexpected exception');}
+testDone=true;
+</script>

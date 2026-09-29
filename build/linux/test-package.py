@@ -54,7 +54,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
         result = subprocess.run(['ldd', str(binary)], env=env, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, universal_newlines=True)
         imports.append(relative + '\n' + result.stdout)
-        if 'not found' in result.stdout or str(work / 'source') in result.stdout:
+        if 'not found' in result.stdout or str(root.resolve()) in result.stdout or str(obj) in result.stdout:
             raise RuntimeError('Unresolved or build-tree dependency: ' + relative + '\n' + result.stdout)
     dependencies = '\n'.join(imports)
     (logs / 'dependencies.log').write_text(dependencies)
@@ -109,6 +109,14 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                        '-o', str(base / label)]
             run(command, label + '-build')
             run([base / label], label, marker)
+    xpcom_library = '-lxpcom_core' if (runtime / 'libxpcom_core.so').exists() else '-lxul'
+    command = ['g++', '-std=gnu++98', '-fshort-wchar', '-DXP_UNIX', '-DMOZILLA_INTERNAL_API']
+    command += ['-m32', '-march=i686'] if a.arch == 'i686' else []
+    command += ['-I' + str(includes / 'xpcom'), '-I' + str(includes / 'string'),
+                '-I' + str(includes / 'nspr'), str(root / 'xpcom/tests/TestStringKeyLength.cpp'),
+                '-L' + str(runtime), xpcom_library, '-lnspr4', '-o', str(base / 'string-keys')]
+    run(command, 'string-keys-build')
+    run([base / 'string-keys'], 'string-keys', 'STRING-KEY-LENGTH checks=19 failures=0')
     expat = base / 'expat'
     command = ['gcc'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
     command += ['-DXP_UNIX', '-I' + str(includes / 'nspr'),
