@@ -1031,3 +1031,16 @@ or twelve unchanged standalone ChatZilla assertions as applicable. Reports are
 `css-attribute-APP-BACKEND-{content,application}.json` and
 `css-attribute-applications-summary.json`. These runs exercise the changed CSS
 parser; the complete unchanged-engine language gates are recorded above.
+
+### Full benchmark at the native dataset baseline
+
+The frozen 46bd462d GTK2 Suite package has now completed all sixteen upstream
+Speedometer 2.1 applications for ten iterations, with all 480 workload checks
+passing and exit zero. The report is
+`artifacts/speedometer21/benchmark-dataset-gtk2.json`; the runtime is
+`dataset-package-suite-gtk2/package/zoolrunner-linux-loongarch64-suite-gtk2/runtime`.
+This run includes the synchronous XHR ready-state fix and native dataset work.
+It predates the subsequent CSS attribute-name, shadow grammar and computed-style
+changes. Console permission-denied messages for `XMLHttpRequest.channel` remain
+visible in the retained log. Passing the benchmark does not establish full
+DOM/CSS specification compliance or validate later revisions.
