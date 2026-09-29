@@ -177,3 +177,11 @@ probe chrome window was blank in screenshot capture, so it was not used as
 painting evidence. This is bounded validation of
 [box sizing](https://www.w3.org/TR/css-sizing-3/#box-sizing), not complete CSS
 sizing, application-matrix or Speedometer rendering conformance.
+
+The probe XUL windows now load `chrome://global/skin/`, as ordinary application
+windows do. Without it, the minimal harness produced a blank screenshot even
+though content layout assertions executed. With the theme loaded, the native
+LoongArch GTK2 Suite passes 821 checks across 28 content fixtures, and the full
+400-by-300 box-sizing painting fixture matches Chromium pixel-for-pixel. Earlier
+benchmark runs using the unthemed harness remain functional workload evidence,
+not evidence of on-screen painting or comparable performance.

@@ -1166,3 +1166,7 @@ fixtures, 24 Suite lifecycle and 19 window bootstrap checks, plus ChatZilla
 startup/shutdown. The four-box painting fixture matches Chromium in its
 400-by-280 content region in a normal Navigator window. These bounded checks
 are not a claim of complete CSS sizing or Speedometer rendering conformance.
+
+The themed Suite probe harness passes 821 content checks and the 400-by-300
+box-sizing pixel comparison. Earlier unthemed benchmark runs establish workload
+execution only; they are not on-screen painting or comparative timing evidence.
