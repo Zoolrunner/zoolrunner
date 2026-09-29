@@ -1,0 +1,16 @@
+<!doctype html><html><head><title>Box sizing painting comparison</title><style>
+html,body{margin:0;padding:0;background:white}
+#anchor{position:absolute;left:10px;top:10px;width:10px;height:10px;background:#ff00ff}
+.box{position:absolute;width:100px;height:60px;padding:10px;border:5px solid #ff0000;background:#00ff00}
+.inner{width:100%;height:100%;background:#0000ff}
+#a{left:30px;top:40px;box-sizing:border-box}
+#b{left:200px;top:40px;box-sizing:content-box}
+#c{left:30px;top:180px;box-sizing:border-box;min-width:120px;min-height:80px}
+#d{left:200px;top:180px;box-sizing:border-box;width:1px;height:1px}
+</style></head><body><div id="anchor"></div><div id="a" class="box"><div class="inner"></div></div><div id="b" class="box"><div class="inner"></div></div><div id="c" class="box"><div class="inner"></div></div><div id="d" class="box"><div class="inner"></div></div><script>
+var testDone=false,testFailures=0,testResults=[];
+window.onload=function(){
+ console.log('BOX-SIZING-PAINT-READY');
+ setTimeout(function(){testResults.push('PASS painting fixture loaded');testDone=true;},10000);
+};
+</script></body></html>

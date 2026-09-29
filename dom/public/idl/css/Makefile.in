@@ -58,6 +58,7 @@ SDK_XPIDLSRCS = 				\
 	$(NULL)
 
 XPIDLSRCS =					\
+	nsIDOMCSSBoxSizing.idl		\
 	nsIDOMCSS2Properties.idl		\
 	nsIDOMCSSCharsetRule.idl		\
 	nsIDOMCSSFontFaceRule.idl		\

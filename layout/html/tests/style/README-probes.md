@@ -159,3 +159,21 @@ the specification; Chromium 148 creates an empty attribute in this case and
 therefore fails the two related assertions in the reference run.
 Shared DOMTokenList prototype bindings, indexed properties and iteration remain
 unverified/incomplete; these results do not claim full interface conformance.
+
+`box-sizing.html` adds 58 tests for the standard property and `style.boxSizing`,
+including specified/computed values, initial/unset/inherit, priority replacement,
+alias ordering, escapes, invalid input, cloning, width/height and min/max sizing.
+The legacy `MozBoxSizing` interface and `padding-box` grammar remain available;
+standard `box-sizing` rejects that legacy value. Declaration serialization keeps
+the winning spelling. New accessors and strict CSSOM parsing use additive
+interfaces, preserving the historical interface vtables.
+
+Native LoongArch GTK2 Suite passes these tests and 748 checks across 27 content
+fixtures, 24 Suite lifecycle, 19 window bootstrap and ChatZilla startup/shutdown.
+`box-sizing-paint.html` paints content/border boxes, minimum sizing and the
+zero-content-size floor. Its 400-by-280 content region matched Chromium 148
+pixel-for-pixel when loaded in a normal Suite Navigator window. The minimal
+probe chrome window was blank in screenshot capture, so it was not used as
+painting evidence. This is bounded validation of
+[box sizing](https://www.w3.org/TR/css-sizing-3/#box-sizing), not complete CSS
+sizing, application-matrix or Speedometer rendering conformance.

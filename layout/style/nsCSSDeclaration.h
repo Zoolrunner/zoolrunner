@@ -99,6 +99,14 @@ public:
    */
   PRBool InitializeEmpty();
 
+  PRBool SetBoxSizingSpelling(PRBool aStandard, PRUint8 aInitialKeyword) {
+    PRBool changed = mStandardBoxSizing != aStandard ||
+                     mBoxSizingInitialKeyword != aInitialKeyword;
+    mStandardBoxSizing = aStandard;
+    mBoxSizingInitialKeyword = aInitialKeyword;
+    return changed;
+  }
+
   /**
    * Transfer all of the state from |aExpandedData| into this declaration.
    * After calling, |aExpandedData| should be in its initial state.
@@ -137,6 +145,8 @@ public:
       mImportantData = nsnull;
     }
     mOrder.Clear();
+    mStandardBoxSizing = PR_FALSE;
+    mBoxSizingInitialKeyword = 0;
   }
 
 #ifdef DEBUG
@@ -250,6 +260,8 @@ private:
 
 private:
     nsValueArray mOrder;
+    PRBool mStandardBoxSizing;
+    PRUint8 mBoxSizingInitialKeyword; // 0: legacy serialization, 1: initial, 2: unset
     nsAutoRefCnt mRefCnt;
     nsCSSCompressedDataBlock *mData; // never null, except while expanded
     nsCSSCompressedDataBlock *mImportantData; // may be null

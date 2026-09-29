@@ -66,6 +66,7 @@ NS_INTERFACE_MAP_BEGIN(nsDOMCSSDeclaration)
   NS_INTERFACE_MAP_ENTRY(nsIDOMCSSStyleDeclaration)
   NS_INTERFACE_MAP_ENTRY_AGGREGATED(nsIDOMCSS2Properties, &mInner)
   NS_INTERFACE_MAP_ENTRY_AGGREGATED(nsIDOMNSCSS2Properties, &mInner)
+  NS_INTERFACE_MAP_ENTRY_AGGREGATED(nsIDOMCSSBoxSizing, &mInner)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMCSSStyleDeclaration)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(CSSStyleDeclaration)
 NS_INTERFACE_MAP_END
@@ -208,6 +209,9 @@ nsDOMCSSDeclaration::SetProperty(const nsAString& aPropertyName,
     return RemoveProperty(propID);
   }
 
+  if (aPropertyName.LowerCaseEqualsLiteral("box-sizing"))
+    return ParsePropertyValue(propID, aValue, &aPriority);
+
   if (aPriority.IsEmpty()) {
     return ParsePropertyValue(propID, aValue);
   }
@@ -240,7 +244,8 @@ nsDOMCSSDeclaration::RemoveProperty(const nsAString& aPropertyName,
 
 nsresult
 nsDOMCSSDeclaration::ParsePropertyValue(const nsCSSProperty aPropID,
-                                        const nsAString& aPropValue)
+                                        const nsAString& aPropValue,
+                                        const nsAString* aStandardPriority)
 {
   nsCSSDeclaration* decl;
   nsresult result = GetCSSDeclaration(&decl, PR_TRUE);
@@ -261,8 +266,15 @@ nsDOMCSSDeclaration::ParsePropertyValue(const nsCSSProperty aPropID,
   }
 
   PRBool changed;
-  result = cssParser->ParseProperty(aPropID, aPropValue, sheetURI, baseURI,
-                                    decl, &changed);
+  if (aStandardPriority) {
+    nsCOMPtr<nsICSSParserCSSOM> cssom = do_QueryInterface(cssParser);
+    result = cssom ? cssom->ParsePropertyByName(NS_LITERAL_STRING("box-sizing"),
+                      aPropValue, *aStandardPriority, sheetURI, baseURI,
+                      decl, &changed) : NS_ERROR_NOT_IMPLEMENTED;
+  } else {
+    result = cssParser->ParseProperty(aPropID, aPropValue, sheetURI, baseURI,
+                                      decl, &changed);
+  }
   if (NS_SUCCEEDED(result) && changed) {
     result = DeclarationChanged();
   }
@@ -417,3 +429,17 @@ CSS_PROP(X, outline_offset, MozOutlineOffset, X, X, X, X)
 #undef CSS_PROP_LIST_EXCLUDE_INTERNAL
 #undef CSS_PROP_LIST_EXCLUDE_NEW
 #undef CSS_PROP
+
+NS_IMETHODIMP
+CSS2PropertiesTearoff::GetBoxSizing(nsAString& aValue)
+{
+  return NS_STATIC_CAST(nsIDOMCSSStyleDeclaration*, mOuter)->
+    GetPropertyValue(NS_LITERAL_STRING("box-sizing"), aValue);
+}
+
+NS_IMETHODIMP
+CSS2PropertiesTearoff::SetBoxSizing(const nsAString& aValue)
+{
+  return mOuter->SetProperty(NS_LITERAL_STRING("box-sizing"), aValue,
+                             EmptyString());
+}

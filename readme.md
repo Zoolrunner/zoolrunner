@@ -217,7 +217,7 @@ for typing immediately after the first window opens, shortcuts, and reactivation
 
 Selective rendering improvements support application interfaces, MailNews HTML,
 and compatible web content. Implemented additions include structural HTML block
-elements, standard `inline-block` behavior, circular `border-radius` aliases,
+elements, standard `inline-block` and `box-sizing` behavior, circular `border-radius` aliases,
 viewport width/height/orientation media queries with resize restyling,
 single-layer `background-size`, and `linear-gradient()` rendering. Native opacity
 groups use an optional rendering-context interface while historical backends
@@ -1158,3 +1158,11 @@ raw UTF-16 text alongside selector atoms. The native LoongArch GTK2 Suite passes
 73 focused checks and 690 existing content checks, with Suite/ChatZilla lifecycle
 and legacy JavaScript checks passing. Complete DOMTokenList bindings remain
 unfinished; see the layout probe documentation.
+
+Standard `box-sizing` and `style.boxSizing` use the native sizing engine while
+retaining the historical CSS2 interfaces and `-moz-box-sizing` grammar. Native
+LoongArch GTK2 Suite passes 58 focused assertions, 748 checks across 27 content
+fixtures, 24 Suite lifecycle and 19 window bootstrap checks, plus ChatZilla
+startup/shutdown. The four-box painting fixture matches Chromium in its
+400-by-280 content region in a normal Navigator window. These bounded checks
+are not a claim of complete CSS sizing or Speedometer rendering conformance.

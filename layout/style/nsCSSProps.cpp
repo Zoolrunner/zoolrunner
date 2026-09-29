@@ -105,6 +105,7 @@ struct CSSPropertyAlias {
 };
 
 static const CSSPropertyAlias gAliases[] = {
+  { "box-sizing", eCSSProperty_box_sizing },
   { "-moz-opacity", eCSSProperty_opacity },
   { "-moz-outline", eCSSProperty_outline },
   { "-moz-outline-color", eCSSProperty_outline_color },

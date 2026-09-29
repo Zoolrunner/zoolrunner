@@ -84,6 +84,7 @@
 
 // Your basic top-down recursive descent style parser
 class CSSParserImpl : public nsICSSParser,
+                      public nsICSSParserCSSOM,
                       public nsICSSParser_MOZILLA_1_8_BRANCH {
 public:
   CSSParserImpl();
@@ -141,6 +142,19 @@ public:
                            nsIURI* aBaseURL,
                            nsCSSDeclaration* aDeclaration,
                            PRBool* aChanged);
+
+  NS_IMETHOD ParsePropertyByName(const nsAString& aName,
+                                 const nsAString& aValue,
+                                 const nsAString& aPriority,
+                                 nsIURI* aSheetURL, nsIURI* aBaseURL,
+                                 nsCSSDeclaration* aDeclaration,
+                                 PRBool* aChanged);
+  nsresult ParsePropertyValue(nsCSSProperty aPropID,
+                             const nsAString& aValue,
+                             nsIURI* aSheetURL, nsIURI* aBaseURL,
+                             nsCSSDeclaration* aDeclaration,
+                             PRBool* aChanged, PRBool aCSSOM,
+                             PRBool aImportant);
 
   NS_IMETHOD ParseMediaList(const nsSubstring& aBuffer,
                             nsIURI* aURL, // for error reporting
@@ -432,6 +446,8 @@ protected:
   // This flag is set when parsing a non-box shorthand; it's used to not apply
   // some quirks during shorthand parsing
   PRPackedBool  mParsingCompoundProperty : 1;
+  PRPackedBool  mStandardBoxSizing : 1;
+  PRUint8 mBoxSizingInitialKeyword;
 
   // Stack of rule groups; used for @media and such.
   nsCOMArray<nsICSSGroupRule> mGroupStack;
@@ -527,14 +543,16 @@ CSSParserImpl::CSSParserImpl()
 #endif
     mHandleAlphaColors(PR_TRUE),
     mCaseSensitive(PR_FALSE),
-    mParsingCompoundProperty(PR_FALSE)
+    mParsingCompoundProperty(PR_FALSE),
+    mStandardBoxSizing(PR_FALSE),
+    mBoxSizingInitialKeyword(0)
 #ifdef DEBUG
     , mScannerInited(PR_FALSE)
 #endif
 {
 }
 
-NS_IMPL_ISUPPORTS2(CSSParserImpl, nsICSSParser, nsICSSParser_MOZILLA_1_8_BRANCH)
+NS_IMPL_ISUPPORTS3(CSSParserImpl, nsICSSParser, nsICSSParser_MOZILLA_1_8_BRANCH, nsICSSParserCSSOM)
 
 CSSParserImpl::~CSSParserImpl()
 {
@@ -951,6 +969,37 @@ CSSParserImpl::ParseProperty(const nsCSSProperty aPropID,
                              nsCSSDeclaration* aDeclaration,
                              PRBool* aChanged)
 {
+  mStandardBoxSizing = PR_FALSE;
+  return ParsePropertyValue(aPropID, aPropValue, aSheetURL, aBaseURL,
+                            aDeclaration, aChanged, PR_FALSE, PR_FALSE);
+}
+
+NS_IMETHODIMP
+CSSParserImpl::ParsePropertyByName(const nsAString& aName,
+                                   const nsAString& aValue,
+                                   const nsAString& aPriority,
+                                   nsIURI* aSheetURL, nsIURI* aBaseURL,
+                                   nsCSSDeclaration* aDeclaration,
+                                   PRBool* aChanged)
+{
+  *aChanged = PR_FALSE;
+  if (!aPriority.IsEmpty() && !aPriority.LowerCaseEqualsLiteral("important"))
+    return NS_OK;
+  nsCSSProperty propID = nsCSSProps::LookupProperty(aName);
+  if (propID == eCSSProperty_UNKNOWN) return NS_OK;
+  mStandardBoxSizing = aName.LowerCaseEqualsLiteral("box-sizing");
+  return ParsePropertyValue(propID, aValue, aSheetURL, aBaseURL, aDeclaration,
+                            aChanged, PR_TRUE, !aPriority.IsEmpty());
+}
+
+nsresult
+CSSParserImpl::ParsePropertyValue(nsCSSProperty aPropID,
+                                  const nsAString& aPropValue,
+                                  nsIURI* aSheetURL, nsIURI* aBaseURL,
+                                  nsCSSDeclaration* aDeclaration,
+                                  PRBool* aChanged, PRBool aCSSOM,
+                                  PRBool aImportant)
+{
   NS_ASSERTION(nsnull != aBaseURL, "need base URL");
   NS_ASSERTION(nsnull != aDeclaration, "Need declaration to parse into!");
   *aChanged = PR_FALSE;
@@ -979,8 +1028,22 @@ CSSParserImpl::ParseProperty(const nsCSSProperty aPropID,
   mTempData.AssertInitialState();
   aDeclaration->ExpandTo(&mData);
   nsresult result = NS_OK;
-  if (ParseProperty(errorCode, aPropID)) {
-    TransferTempData(aDeclaration, aPropID, PR_FALSE, PR_FALSE, aChanged);
+  PRBool parsed = ParseProperty(errorCode, aPropID);
+  // CSSOM values cannot contain declaration terminators or priorities.
+  if (parsed && aCSSOM && GetToken(errorCode, PR_TRUE)) parsed = PR_FALSE;
+  if (parsed) {
+    if (aCSSOM) {
+      if (nsCSSProps::IsShorthand(aPropID)) {
+        CSSPROPS_FOR_SHORTHAND_SUBPROPERTIES(p, aPropID) {
+          if (mData.HasImportantBit(*p)) *aChanged = PR_TRUE;
+          mData.ClearImportantBit(*p);
+        }
+      } else {
+        if (mData.HasImportantBit(aPropID)) *aChanged = PR_TRUE;
+        mData.ClearImportantBit(aPropID);
+      }
+    }
+    TransferTempData(aDeclaration, aPropID, aImportant, PR_FALSE, aChanged);
   } else {
     NS_ConvertASCIItoUTF16 propName(nsCSSProps::GetStringValue(aPropID));
     const PRUnichar *params[] = {
@@ -3292,6 +3355,7 @@ CSSParserImpl::ParseDeclaration(nsresult& aErrorCode,
     OUTPUT_ERROR();
     return PR_FALSE;
   }
+  mStandardBoxSizing = propertyName.LowerCaseEqualsLiteral("box-sizing");
   if (! ParseProperty(aErrorCode, propID)) {
     // XXX Much better to put stuff in the value parsers instead...
     const PRUnichar *params[] = {
@@ -3447,6 +3511,11 @@ CSSParserImpl::DoTransferTempData(nsCSSDeclaration* aDeclaration,
       return;
     }
   }
+
+  if (aPropID == eCSSProperty_box_sizing &&
+      aDeclaration->SetBoxSizingSpelling(mStandardBoxSizing,
+                                          mBoxSizingInitialKeyword))
+    *aChanged = PR_TRUE;
 
   if (aMustCallValueAppended || !mData.HasPropertyBit(aPropID)) {
     aDeclaration->ValueAppended(aPropID);
@@ -4622,9 +4691,28 @@ PRBool CSSParserImpl::ParseSingleValueProperty(nsresult& aErrorCode,
     return ParseVariant(aErrorCode, aValue, VARIANT_AHK,
                         nsCSSProps::kTextRenderingKTable);
 #endif
-  case eCSSProperty_box_sizing:
+  case eCSSProperty_box_sizing: {
+    mBoxSizingInitialKeyword = 0;
+    if (mStandardBoxSizing) {
+      if (!GetToken(aErrorCode, PR_TRUE)) return PR_FALSE;
+      if (mToken.mType == eCSSToken_Ident &&
+          (mToken.mIdent.LowerCaseEqualsLiteral("initial") ||
+           mToken.mIdent.LowerCaseEqualsLiteral("unset"))) {
+        mBoxSizingInitialKeyword = mToken.mIdent.LowerCaseEqualsLiteral("initial") ? 1 : 2;
+        aValue.SetInitialValue(); // box-sizing is not inherited.
+        return PR_TRUE;
+      }
+      UngetToken();
+    }
+    static const PRInt32 standardKeywords[] = {
+      eCSSKeyword_content_box, NS_STYLE_BOX_SIZING_CONTENT,
+      eCSSKeyword_border_box, NS_STYLE_BOX_SIZING_BORDER,
+      eCSSKeyword_UNKNOWN, -1
+    };
     return ParseVariant(aErrorCode, aValue, VARIANT_HK,
-                        nsCSSProps::kBoxSizingKTable);
+                        mStandardBoxSizing ? standardKeywords :
+                                             nsCSSProps::kBoxSizingKTable);
+  }
   case eCSSProperty_height:
   case eCSSProperty_width:
     return ParsePositiveVariant(aErrorCode, aValue, VARIANT_AHLP, nsnull);

@@ -1,0 +1,50 @@
+<!doctype html><html><head><title>Standard box-sizing regression</title><style>
+html,body{margin:0;padding:0}
+#box{width:100px;height:60px;padding:10px;border:5px solid;box-sizing:border-box}
+#inherited{box-sizing:inherit;width:50px;height:40px;padding:4px;border:2px solid}
+#content{box-sizing:content-box;width:100px;height:60px;padding:10px;border:5px solid}
+#legacy{-moz-box-sizing:padding-box;width:100px;height:60px;padding:10px;border:5px solid}
+#escaped{b\6fx-sizing:b\6frder-box;width:100px;height:60px;padding:10px;border:5px solid}
+</style></head><body><div id="box"><div id="inherited"></div></div><div id="content"></div><div id="legacy"></div><div id="escaped"></div><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+window.onload=function(){try{
+ var box=document.getElementById('box'),style=box.style,computed=getComputedStyle(box,null);
+ check(box.offsetWidth,100,'stylesheet border-box width');check(box.offsetHeight,60,'stylesheet border-box height');
+ check(computed.getPropertyValue('box-sizing'),'border-box','computed standard property');check(computed.boxSizing,'border-box','computed accessor');
+ check(computed.MozBoxSizing,'border-box','legacy computed accessor sees same layout value');
+ var content=document.getElementById('content');check(content.offsetWidth,130,'content-box adds padding and borders');check(content.offsetHeight,90,'content-box height');
+ var inherited=document.getElementById('inherited');check(inherited.offsetWidth,50,'inherited border-box');
+ check(getComputedStyle(inherited,null).boxSizing,'border-box','computed inherited value');
+ var legacy=document.getElementById('legacy');check(legacy.offsetWidth,110,'legacy padding-box layout preserved');check(getComputedStyle(legacy,null).MozBoxSizing,'padding-box','legacy padding-box computed value');
+ check(document.getElementById('escaped').offsetWidth,100,'escaped property and value parsed');
+ style.boxSizing='content-box';check(style.getPropertyValue('box-sizing'),'content-box','accessor writes declaration');check(box.offsetWidth,130,'accessor triggers reflow');
+ check(style.item(0),'box-sizing','standard declaration name');check(style.cssText,'box-sizing: content-box;','standard serialization');
+ style.setProperty('box-sizing','border-box','IMPORTANT');check(style.getPropertyPriority('box-sizing'),'important','priority case insensitive');check(box.offsetWidth,100,'important update');
+ style.boxSizing='content-box';check(style.boxSizing,'content-box','accessor replaces important value');check(style.getPropertyPriority('box-sizing'),'','accessor removes old priority');
+ var invalid=['padding-box','border-box extra','border-box; color:red','border-box!important','"border-box"','10px',''];
+ for(var i=0;i<invalid.length-1;++i){style.boxSizing=invalid[i];check(style.boxSizing,'content-box','invalid value ignored: '+invalid[i]);}
+ style.setProperty('box-sizing','border-box','bad');check(style.boxSizing,'content-box','invalid priority ignored');
+ style.setProperty('box-sizing','border-box; color:red','important');check(style.boxSizing,'content-box','priority path rejects extra declaration');check(style.color,'','invalid value cannot inject declaration');
+ style.setProperty('BOX-SIZING','/*a*/ BORDER-box /*b*/','');check(style.boxSizing,'border-box','case comments and whitespace');
+ check(style.cssText,'box-sizing: border-box;','canonical standard name');
+ style.setProperty('box-sizing','content-box','important');check(style.getPropertyPriority('-moz-box-sizing'),'important','aliases share priority');
+ check(style.removeProperty('-moz-box-sizing'),'content-box','legacy removal returns standard value');check(style.boxSizing,'','legacy removal clears standard property');
+ style.MozBoxSizing='padding-box';check(style.MozBoxSizing,'padding-box','legacy accessor accepts historical grammar');check(style.item(0),'-moz-box-sizing','legacy declaration spelling retained');
+ check(style.cssText,'-moz-box-sizing: padding-box;','legacy serialization retained');
+ style.boxSizing='padding-box';check(style.item(0),'-moz-box-sizing','invalid standard write retains legacy spelling');
+ style.boxSizing='border-box';check(style.item(0),'box-sizing','standard write changes spelling');
+ style.MozBoxSizing='content-box';check(style.item(0),'-moz-box-sizing','legacy write changes spelling back');
+ style.cssText='box-sizing: border-box!important; -moz-box-sizing: content-box';check(style.boxSizing,'border-box','important standard wins over later normal alias');check(style.item(0),'box-sizing','losing alias preserves winning spelling');
+ style.cssText='-moz-box-sizing: padding-box!important; box-sizing: content-box!important';check(style.boxSizing,'content-box','last important alias wins');check(style.item(0),'box-sizing','last important spelling');
+ style.cssText='box-sizing: border-box; box-sizing: padding-box';check(style.boxSizing,'border-box','invalid stylesheet declaration preserves previous');
+ style.boxSizing='initial';check(style.boxSizing,'initial','initial specified value');check(getComputedStyle(box,null).boxSizing,'content-box','initial computed value');check(box.offsetWidth,130,'initial layout value');
+ style.boxSizing='unset';check(style.boxSizing,'unset','unset specified value');check(getComputedStyle(box,null).boxSizing,'content-box','noninherited unset computes initial');check(style.cssText,'box-sizing: unset;','unset serialization');
+ var clone=box.cloneNode(false);check(clone.style.cssText,style.cssText,'declaration clone keeps standard spelling');
+ style.boxSizing='';check(style.boxSizing,'','empty accessor removes declaration');
+ var readonly=false;try{computed.boxSizing='border-box';}catch(e){readonly=true;}check(readonly,true,'computed declaration remains read only');
+ style.cssText='box-sizing:border-box;min-width:120px;max-width:150px;width:100px';check(box.offsetWidth,120,'border-box minimum width');
+ style.width='200px';check(box.offsetWidth,150,'border-box maximum width');
+ style.cssText='box-sizing:border-box;width:1px;height:1px';check(box.offsetWidth,30,'border-box content width floored at zero');check(box.offsetHeight,30,'border-box content height floored at zero');
+}catch(e){check(String(e),'no exception','unexpected exception');}testDone=true;};
+</script></body></html>

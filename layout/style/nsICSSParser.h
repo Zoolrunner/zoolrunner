@@ -172,6 +172,20 @@ public:
                    nsICSSStyleSheet*&     aResult) = 0;
 };
 
+// Additive CSSOM entry point; retain the historical parser vtables.
+#define NS_ICSS_PARSER_CSSOM_IID \
+{ 0xc75f1f96, 0x6842, 0x494d, {0xb8, 0xa6, 0x5d, 0x38, 0x99, 0x14, 0x3b, 0x60} }
+class nsICSSParserCSSOM : public nsISupports {
+public:
+  NS_DEFINE_STATIC_IID_ACCESSOR(NS_ICSS_PARSER_CSSOM_IID)
+  NS_IMETHOD ParsePropertyByName(const nsAString& aName,
+                                 const nsAString& aValue,
+                                 const nsAString& aPriority,
+                                 nsIURI* aSheetURL, nsIURI* aBaseURL,
+                                 nsCSSDeclaration* aDeclaration,
+                                 PRBool* aChanged) = 0;
+};
+
 nsresult
 NS_NewCSSParser(nsICSSParser** aInstancePtrResult);
 

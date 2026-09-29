@@ -1,0 +1,8 @@
+/* Standard sizing accessors, additive to the historical CSS2 interfaces.
+ * License: MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsISupports.idl"
+[scriptable, uuid(9d43e0a4-f32a-4928-8ebc-6acda8baea57)]
+interface nsIDOMCSSBoxSizing : nsISupports
+{
+  attribute DOMString boxSizing;
+};

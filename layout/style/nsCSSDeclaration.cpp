@@ -81,6 +81,8 @@ MOZ_DECL_CTOR_COUNTER(nsCSSDeclaration)
 
 nsCSSDeclaration::nsCSSDeclaration() 
   : mOrder(eCSSProperty_COUNT_no_shorthands, 8),
+    mStandardBoxSizing(PR_FALSE),
+    mBoxSizingInitialKeyword(0),
     mData(nsnull),
     mImportantData(nsnull)
 {
@@ -89,6 +91,8 @@ nsCSSDeclaration::nsCSSDeclaration()
 
 nsCSSDeclaration::nsCSSDeclaration(const nsCSSDeclaration& aCopy)
   : mOrder(eCSSProperty_COUNT_no_shorthands, aCopy.mOrder.Count()),
+    mStandardBoxSizing(aCopy.mStandardBoxSizing),
+    mBoxSizingInitialKeyword(aCopy.mBoxSizingInitialKeyword),
     mData(aCopy.mData ? aCopy.mData->Clone() : nsnull),
     mImportantData(aCopy.mImportantData ? aCopy.mImportantData->Clone()
                                          : nsnull)
@@ -190,7 +194,12 @@ PRBool nsCSSDeclaration::AppendValueToString(nsCSSProperty aProperty, nsAString&
     switch (nsCSSProps::kTypeTable[aProperty]) {
       case eCSSType_Value: {
         const nsCSSValue *val = NS_STATIC_CAST(const nsCSSValue*, storage);
-        AppendCSSValueToString(aProperty, *val, aResult);
+        if (aProperty == eCSSProperty_box_sizing &&
+            val->GetUnit() == eCSSUnit_Initial && mBoxSizingInitialKeyword) {
+          aResult.AppendASCII(mBoxSizingInitialKeyword == 1 ? "initial" : "unset");
+        } else {
+          AppendCSSValueToString(aProperty, *val, aResult);
+        }
       } break;
       case eCSSType_Rect: {
         const nsCSSRect *rect = NS_STATIC_CAST(const nsCSSRect*, storage);
@@ -804,7 +813,10 @@ nsCSSDeclaration::AppendPropertyAndValueToString(nsCSSProperty aProperty,
 {
   NS_ASSERTION(0 <= aProperty && aProperty < eCSSProperty_COUNT_no_shorthands,
                "property enum out of range");
-  AppendASCIItoUTF16(nsCSSProps::GetStringValue(aPropertyName), aResult);
+  if (aPropertyName == eCSSProperty_box_sizing && mStandardBoxSizing)
+    aResult.AppendLiteral("box-sizing");
+  else
+    AppendASCIItoUTF16(nsCSSProps::GetStringValue(aPropertyName), aResult);
   aResult.AppendLiteral(": ");
   AppendValueToString(aProperty, aResult);
   PRBool  isImportant = GetValueIsImportant(aProperty);
@@ -1425,7 +1437,10 @@ nsCSSDeclaration::GetNthProperty(PRUint32 aIndex, nsAString& aReturn) const
   if (aIndex < (PRUint32)mOrder.Count()) {
     nsCSSProperty property = OrderValueAt(aIndex);
     if (0 <= property) {
-      AppendASCIItoUTF16(nsCSSProps::GetStringValue(property), aReturn);
+      if (property == eCSSProperty_box_sizing && mStandardBoxSizing)
+        aReturn.AssignLiteral("box-sizing");
+      else
+        AppendASCIItoUTF16(nsCSSProps::GetStringValue(property), aReturn);
     }
   }
   

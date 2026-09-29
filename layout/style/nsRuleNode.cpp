@@ -4000,13 +4000,16 @@ nsRuleNode::ComputePositionData(nsStyleStruct* aStartStruct,
     }
   }
 
-  // box-sizing: enum, inherit
+  // box-sizing: enum, inherit, initial
   if (eCSSUnit_Enumerated == posData.mBoxSizing.GetUnit()) {
     pos->mBoxSizing = posData.mBoxSizing.GetIntValue();
   }
   else if (eCSSUnit_Inherit == posData.mBoxSizing.GetUnit()) {
     inherited = PR_TRUE;
     pos->mBoxSizing = parentPos->mBoxSizing;
+  }
+  else if (eCSSUnit_Initial == posData.mBoxSizing.GetUnit()) {
+    pos->mBoxSizing = NS_STYLE_BOX_SIZING_CONTENT;
   }
 
   // z-index

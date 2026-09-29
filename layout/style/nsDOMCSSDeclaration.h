@@ -39,19 +39,22 @@
 
 #include "nsICSSDeclaration.h"
 #include "nsIDOMCSS2Properties.h"
+#include "nsIDOMCSSBoxSizing.h"
 
 class nsCSSDeclaration;
 class nsICSSParser;
 class nsICSSLoader;
 class nsIURI;
 
-class CSS2PropertiesTearoff : public nsIDOMNSCSS2Properties
+class CSS2PropertiesTearoff : public nsIDOMNSCSS2Properties,
+                             public nsIDOMCSSBoxSizing
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
 
   NS_DECL_NSIDOMCSS2PROPERTIES
   NS_DECL_NSIDOMNSCSS2PROPERTIES
+  NS_DECL_NSIDOMCSSBOXSIZING
 
   CSS2PropertiesTearoff(nsICSSDeclaration *aOuter);
   virtual ~CSS2PropertiesTearoff();
@@ -106,7 +109,8 @@ protected:
                                             nsICSSParser** aCSSParser) = 0;
 
   nsresult ParsePropertyValue(const nsCSSProperty aPropID,
-                              const nsAString& aPropValue);
+                              const nsAString& aPropValue,
+                              const nsAString* aStandardPriority = nsnull);
   nsresult ParseDeclaration(const nsAString& aDecl,
                             PRBool aParseOnlyOneDecl, PRBool aClearOldDecl);
 
