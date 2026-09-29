@@ -598,6 +598,7 @@ with tempfile.TemporaryDirectory(prefix="zool-package-") as temporary:
                 ("es6/TestHasInstanceEmbedding.c", "ES6-HAS-INSTANCE-EMBEDDING checks=13 failures=0"),
                 ("es6/TestBuiltinTags.c", "ES6-BUILTIN-TAGS-EMBEDDING checks=13 failures=0"),
                 ("es6/TestWeakCollectionGC.c", "ES6-WEAK-COLLECTION-GC checks=57 failures=0"),
+                ("es6/TestWeakMapEmbedding.c", "ES6-WEAK-MAP-EMBEDDING checks=38 failures=0"),
                 ("es6/TestReflect.c", "ES6-REFLECT-EMBEDDING checks=43 failures=0"),
                 ("es6/TestProxy.c", "ES6-PROXY-EMBEDDING checks=55 failures=0"),
                 ("es6/TestAnnexBuiltins.c", "ES6-ANNEX-EMBEDDING checks=28 failures=0"),

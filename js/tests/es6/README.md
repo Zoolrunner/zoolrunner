@@ -4429,3 +4429,23 @@ This is an embedding facility, not a JavaScript `structuredClone` global or a
 portable persistence format. DOM-specific clone types and transfer operations
 are not implemented. These tests do not establish complete HTML structured
 serialization or History API conformance; browser integration remains pending.
+
+### Native weak-key storage for DOM values
+
+`JS_NewWeakMapObject`, `JS_GetWeakMapEntry` and `JS_SetWeakMapEntry` provide
+embedding access to the existing ES2015 ephemeron implementation. They bypass
+mutable JavaScript constructors and methods, distinguish a missing entry from
+an undefined value, and do not create unconditional roots. Callers must keep
+the map, key and value rooted for each API call. No JavaScript global or
+post-ES2015 language feature is added.
+
+`TestWeakMapEmbedding.c` passes 38 checks on native LoongArch Suite GTK2 and
+Xlib, including constructor/method replacement, key/value cycles, cross-realm
+storage and collection when a map becomes unreachable. Both engines have hash
+`1d29abb799a6522dc58735d5274b00304a10a48b3cbe79a67ffa3b5a3e360782`.
+The full GTK2 driver passes 28,582 pinned ES2015 modes, 139 focused scripts,
+85 native fixtures and five internal fixtures. The separate pinned ES5.1 run
+passes all 11,540 cases. Both runs use America/Los_Angeles; reports are under
+`artifacts/speedometer21/weakmap-embedding-es2015/` and
+`artifacts/speedometer21/weakmap-embedding-es5.json`. DOM event/traversal
+integration is a separate, still-pending validation step.

@@ -1644,6 +1644,16 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
                                 const jschar *chars, size_t length,
                                 const char *filename, uintN lineno);
 
+/* Native ephemeron storage; callers root map, key and value for the call.
+ * Missing entries return JSVAL_VOID and found=false. No user methods run. */
+extern JS_PUBLIC_API(JSObject *)
+JS_NewWeakMapObject(JSContext *cx, JSObject *global);
+extern JS_PUBLIC_API(JSBool)
+JS_GetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key,
+                   jsval *value, JSBool *found);
+extern JS_PUBLIC_API(JSBool)
+JS_SetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key, jsval value);
+
 /* Immutable host-owned snapshots for structured storage. No new JavaScript
  * global is installed. Unsupported types set *unsupported without replacing
  * a getter exception. Snapshots own no GC things and may outlive the context. */

@@ -9,5 +9,10 @@ extern JSObject *js_InitWeakSetClass(JSContext *cx, JSObject *global);
 extern JSBool js_MarkWeakCollections(JSContext *cx);
 extern void js_SweepWeakCollections(JSContext *cx);
 extern void js_FinishWeakCollections(JSRuntime *rt);
+extern JSObject *js_NewWeakMapObject(JSContext *cx, JSObject *global);
+extern JSBool js_GetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key,
+                                 jsval *value, JSBool *found);
+extern JSBool js_SetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key,
+                                 jsval value);
 JS_END_EXTERN_C
 #endif

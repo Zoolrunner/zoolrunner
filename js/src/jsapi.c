@@ -4047,6 +4047,26 @@ JS_CompileUCScriptForPrincipals(JSContext *cx, JSObject *obj,
     return script;
 }
 
+JS_PUBLIC_API(JSObject *)
+JS_NewWeakMapObject(JSContext *cx, JSObject *global)
+{
+    CHECK_REQUEST(cx);
+    return js_NewWeakMapObject(cx, global);
+}
+JS_PUBLIC_API(JSBool)
+JS_GetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key,
+                   jsval *value, JSBool *found)
+{
+    CHECK_REQUEST(cx);
+    return js_GetWeakMapEntry(cx, map, key, value, found);
+}
+JS_PUBLIC_API(JSBool)
+JS_SetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key, jsval value)
+{
+    CHECK_REQUEST(cx);
+    return js_SetWeakMapEntry(cx, map, key, value);
+}
+
 JS_PUBLIC_API(JSBool)
 JS_WriteStructuredValue(JSContext *cx, jsval value,
                         JSStructuredValue **result, JSBool *unsupported)

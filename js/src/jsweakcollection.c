@@ -134,17 +134,10 @@ WEAK_OP(WeakSetHas, JS_TRUE, 2)
 WEAK_OP(WeakSetDelete, JS_TRUE, 3)
 
 static JSBool
-WeakConstruct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
-                jsval *rval, JSBool set)
+InitializeWeakData(JSContext *cx, JSObject *obj)
 {
     JSWeakCollection *data;
     JSRuntime *rt = cx->runtime;
-    if (!JS_IsConstructing(cx)) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
-                             JSMSG_INCOMPATIBLE_PROTO, set ? "WeakSet" : "WeakMap",
-                             "constructor", "receiver");
-        return JS_FALSE;
-    }
     data = (JSWeakCollection *)calloc(1, sizeof(*data));
     if (!data) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
     data->table = js_NewCollectionData();
@@ -160,9 +153,81 @@ WeakConstruct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     if (data->next) data->next->previous = data;
     rt->weakCollections = data;
     JS_UNLOCK_GC(rt);
+    return JS_TRUE;
+}
+
+static JSBool
+WeakConstruct(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
+                jsval *rval, JSBool set)
+{
+    if (!JS_IsConstructing(cx)) {
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_INCOMPATIBLE_PROTO, set ? "WeakSet" : "WeakMap",
+                             "constructor", "receiver");
+        return JS_FALSE;
+    }
+    if (!InitializeWeakData(cx, obj)) return JS_FALSE;
     *rval = OBJECT_TO_JSVAL(obj);
     return js_InitializeCollectionIterable(cx, obj, argc, argv, set);
 }
+
+/* Native clients need ephemeron storage without invoking mutable constructors
+ * or methods. The returned map and keys have the normal weak GC semantics. */
+JSObject *
+js_NewWeakMapObject(JSContext *cx, JSObject *global)
+{
+    JSObject *proto, *obj;
+    JSTempValueRooter root;
+    JSBool ok;
+    proto = js_BuiltinPrototype(cx, global, JSProto_WeakMap);
+    if (!proto) return NULL;
+    obj = JS_NewObject(cx, &js_WeakMapClass, proto, global);
+    if (!obj) return NULL;
+    JS_PUSH_TEMP_ROOT_OBJECT(cx, obj, &root);
+    ok = InitializeWeakData(cx, obj);
+    JS_POP_TEMP_ROOT(cx, &root);
+    return ok ? obj : NULL;
+}
+
+static JSWeakCollection *
+NativeWeakMapData(JSContext *cx, JSObject *map, JSObject *key)
+{
+    JSWeakCollection *data = NULL;
+    if (map && key && OBJ_GET_CLASS(cx, map) == &js_WeakMapClass)
+        data = (JSWeakCollection *)JS_GetPrivate(cx, map);
+    if (!data)
+        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
+                             JSMSG_INCOMPATIBLE_PROTO, "WeakMap", "native method",
+                             "receiver or key");
+    return data;
+}
+
+JSBool
+js_GetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key,
+                   jsval *value, JSBool *found)
+{
+    JSWeakCollection *data = NativeWeakMapData(cx, map, key);
+    if (!data) return JS_FALSE;
+    JS_LOCK_OBJ(cx, map);
+    *found = js_CollectionGet(data->table, OBJECT_TO_JSVAL(key), value);
+    if (!*found) *value = JSVAL_VOID;
+    JS_UNLOCK_OBJ(cx, map);
+    return JS_TRUE;
+}
+
+JSBool
+js_SetWeakMapEntry(JSContext *cx, JSObject *map, JSObject *key, jsval value)
+{
+    JSWeakCollection *data = NativeWeakMapData(cx, map, key);
+    JSBool ok;
+    if (!data) return JS_FALSE;
+    JS_LOCK_OBJ(cx, map);
+    ok = js_CollectionPut(data->table, OBJECT_TO_JSVAL(key), value);
+    JS_UNLOCK_OBJ(cx, map);
+    if (!ok) JS_ReportOutOfMemory(cx);
+    return ok;
+}
+
 static JSBool WeakMapConstructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 { return WeakConstruct(cx, obj, argc, argv, rval, JS_FALSE); }
 static JSBool WeakSetConstructor(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
