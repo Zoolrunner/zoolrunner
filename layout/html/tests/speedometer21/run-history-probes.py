@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Suite History API fixtures over HTTP."""
+"""Run History API fixtures over HTTP in an application runtime."""
 import argparse
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -19,6 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--reports', type=Path, required=True)
+    parser.add_argument('--application', choices=['suite', 'browser', 'calendar', 'xulrunner'], default='suite')
     args = parser.parse_args()
     here = Path(__file__).resolve().parent
     root = here.parents[3]
@@ -36,10 +37,13 @@ def main():
                 report = args.reports / (name + '.json')
                 report.unlink(missing_ok=True)
                 url = 'http://127.0.0.1:%d/%s.html' % (server.server_port, name)
+                runner = 'run-suite.py' if args.application == 'suite' else 'run-toolkit.py'
                 command = ['sh', str(root / 'build/linux/with-display.sh'),
-                           sys.executable, str(here / 'run-suite.py'),
+                           sys.executable, str(here / runner),
                            '--runtime', str(args.runtime.resolve()), '--mode', 'probe',
                            '--url', url, '--timeout', '60', '--report', str(report.resolve())]
+                if args.application != 'suite':
+                    command += ['--application', args.application]
                 with report.with_suffix('.stdout').open('w') as output:
                     status = subprocess.run(command, stdout=output, stderr=subprocess.STDOUT)
                 data = json.loads(report.read_text()) if report.exists() else {}

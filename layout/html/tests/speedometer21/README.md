@@ -54,6 +54,30 @@ Relevant specifications are [Selectors API](https://www.w3.org/TR/selectors-api/
 [Selectors Level 3](https://www.w3.org/TR/selectors-3/), and
 [ECMAScript 2015](https://262.ecma-international.org/6.0/).
 
+After the Suite benchmark gate, the same content runner can be used in Toolkit
+applications without changing their sources:
+
+```sh
+sh build/linux/with-display.sh python3 layout/html/tests/speedometer21/run-toolkit.py \
+  --application browser --runtime obj-browser/dist/bin \
+  --url "file://$PWD/layout/html/tests/style/css-set-property.html" \
+  --report artifacts/browser-css.json
+```
+
+`--application` also accepts `calendar` and `xulrunner`. The launcher copies the
+runtime into a disposable directory, registers test chrome there, and uses a
+private HOME and profile. Calendar uses the existing test-only command-line
+component; XULRunner uses a test application manifest. Neither installed runtime
+files nor user profiles are modified. `--restart-url` adds another probe in a
+new process using the same disposable profile. Both HTTP fixture drivers accept
+`--application`, defaulting to the unchanged Suite launcher. Other application
+results are recorded separately from successful Suite tests.
+The first native Browser GTK2 run passes all 985 content, 300 History and
+159 storage/XHR assertions. Its package/application gate is still running;
+Calendar and XULRunner launcher execution has not yet been verified. These
+reports are `browser-gtk2-content.json`, `browser-gtk2-history/` and
+`browser-gtk2-http/` under `artifacts/speedometer21/`.
+
 Remaining work includes the complete benchmark and original results UI,
 remaining DOM behavior and CSS layout/painting features, followed by the other
 application builds and runtime tests. The native ES2015 workload, animation

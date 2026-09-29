@@ -317,6 +317,13 @@ legacy calls. Cross-document events and other History behavior remain
 incomplete. See the Speedometer test guide for limitations and the separate
 full benchmark status.
 
+For the other native applications, add `--application browser`, `calendar` or
+`xulrunner` to the History and HTTP probe drivers. Individual content fixtures
+use `layout/html/tests/speedometer21/run-toolkit.py`; it registers the test chrome
+only in a disposable runtime copy and uses a private HOME/profile. This supplements
+the relocated-package checks, including Calendar's unchanged unit and four-view
+tests; content probes alone are not application compatibility validation.
+
 The first complete Speedometer 2.1 native LoongArch GTK2 Suite run passed on
 2026-09-29: 16 enabled workloads, ten iterations, all 480 workload checks and
 the original completion callback. The frozen initial History-binding runtime
