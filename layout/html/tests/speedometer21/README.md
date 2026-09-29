@@ -165,3 +165,13 @@ Suite. A small hidden-iframe fixture passes eight assertions both from file
 and HTTP, including synchronous insertion during parsing; Backbone's nested
 case still needs diagnosis. `--debug-errors FILE_SUBSTRING` enables debugger
 throw-stack diagnostics; do not use its timings as benchmark measurements.
+
+The Backbone iframe failure was recursive navigation, not missing frame
+creation: after `document.open/close`, assigning the hidden frame's hash
+reloaded the original application and repeated until the frame-depth limit.
+Anchor recognition now compares the public URL of generated documents and
+runs before the optional presentation-shell scrolling step. The extended
+hidden-iframe probe reproduces two failures before this correction and passes
+all ten checks afterward. The Suite lifecycle runner also passes all 24 checks
+again, including Composer, Address Book, Inspector and Venkman. The frame-depth
+limit and LiveConnect support remain unchanged.

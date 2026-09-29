@@ -7367,20 +7367,20 @@ nsDocShell::ScrollIfAnchor(nsIURI * aURI, PRBool * aWasAnchor,
         return NS_OK;
     }
 
-    nsCOMPtr<nsIPresShell> shell;
-    nsresult rv = GetPresShell(getter_AddRefs(shell));
-    if (NS_FAILED(rv) || !shell) {
-        // If we failed to get the shell, or if there is no shell,
-        // nothing left to do here.
-        
-        return rv;
-    }
-
     // NOTE: we assume URIs are absolute for comparison purposes
 
+    nsCOMPtr<nsIURI> currentURI = mCurrentURI;
+    PRBool isWyciwyg = PR_FALSE;
+    nsresult rv = currentURI->SchemeIs("wyciwyg", &isWyciwyg);
+    NS_ENSURE_SUCCESS(rv, rv);
+    if (isWyciwyg && sURIFixup) {
+        // location exposes the underlying document URL, not its private
+        // document.write cache key. Compare against that same URL.
+        rv = sURIFixup->CreateExposableURI(mCurrentURI, getter_AddRefs(currentURI));
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
     nsCAutoString currentSpec;
-    NS_ENSURE_SUCCESS(mCurrentURI->GetSpec(currentSpec),
-                      NS_ERROR_FAILURE);
+    NS_ENSURE_SUCCESS(currentURI->GetSpec(currentSpec), NS_ERROR_FAILURE);
 
     nsCAutoString newSpec;
     NS_ENSURE_SUCCESS(aURI->GetSpec(newSpec), NS_ERROR_FAILURE);
@@ -7461,6 +7461,15 @@ nsDocShell::ScrollIfAnchor(nsIURI * aURI, PRBool * aWasAnchor,
 
     // Now we know we are dealing with an anchor
     *aWasAnchor = PR_TRUE;
+
+    // Fragment navigation is still same-document when a hidden frame has no
+    // presentation shell. Only scrolling depends on having a presentation.
+    *cx = *cy = 0;
+    nsCOMPtr<nsIPresShell> shell;
+    rv = GetPresShell(getter_AddRefs(shell));
+    NS_ENSURE_SUCCESS(rv, rv);
+    if (!shell)
+        return NS_OK;
 
     // Both the new and current URIs refer to the same page. We can now
     // browse to the hash stored in the new URI.
