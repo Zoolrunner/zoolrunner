@@ -122,3 +122,10 @@ passes 139 focused JavaScript fixtures, 83 native probes and the complete
 workloads (15 steps), then Ember requires `createHTMLDocument`; the subsequent
 benchmark run with that implementation is pending. No other application has
 been tested during this Suite-first stage.
+
+With inert HTML documents available, Ember next requires `insertAdjacentHTML`.
+The native fragment-parser binding passes 21 Suite assertions covering all four
+positions, conversion order, existing node identity, inert scripts, table and
+XML contexts, malformed XML and standard exceptions. Historical XPCOM exception
+names remain unchanged; the new API supplies its standard exception name.
+Full benchmark completion remains pending.

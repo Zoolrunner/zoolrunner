@@ -116,6 +116,7 @@
 // DOM core includes
 #include "nsDOMError.h"
 #include "nsIDOMDOMException.h"
+#include "nsDOMException.h"
 #include "nsIDOMNode.h"
 #include "nsIDOM3Node.h"
 #include "nsIDOMNodeList.h"
@@ -308,6 +309,7 @@
 #include "nsIDOMCSSValueList.h"
 #include "nsIDOMRange.h"
 #include "nsIDOMNSRange.h"
+#include "nsIScriptLoader.h"
 #include "nsIDOMRangeException.h"
 #include "nsIDOMTreeWalker.h"
 #include "nsIDOMXULDocument.h"
@@ -7932,6 +7934,101 @@ GetElementsByClassName(JSContext* cx, JSObject* obj, uintN argc,
   return JS_TRUE;
 }
 
+// New Web-facing methods use standard names without changing the exception
+// names exposed by historical XPCOM entry points.
+static void
+ThrowNamedDOMException(JSContext* cx, nsresult code, const char* name)
+{
+  nsCOMPtr<nsIException> exception;
+  nsresult rv = NS_NewDOMException(code, nsnull, getter_AddRefs(exception));
+  nsCOMPtr<nsIBaseDOMException> base = do_QueryInterface(exception);
+  if (NS_SUCCEEDED(rv) && base)
+    rv = base->Init(code, name, name, nsnull);
+  jsval value = JSVAL_NULL;
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  if (NS_SUCCEEDED(rv))
+    rv = nsDOMClassInfo::WrapNative(cx, JS_GetGlobalObject(cx), exception,
+      NS_GET_IID(nsIException), &value, getter_AddRefs(holder));
+  if (NS_SUCCEEDED(rv) && !JSVAL_IS_NULL(value))
+    JS_SetPendingException(cx, value);
+  else
+    nsDOMClassInfo::ThrowJSException(cx, code);
+}
+
+static JSBool
+ElementInsertAdjacentHTML(JSContext* cx, JSObject* obj, uintN argc,
+                          jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIContent> content = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIDOMNode> node = do_QueryInterface(content);
+  if (!content || !content->IsContentOfType(nsIContent::eELEMENT) || argc < 2) {
+    DOMConstructorTypeError(cx, "insertAdjacentHTML requires an Element and two arguments");
+    return JS_FALSE;
+  }
+  if (!nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  JSString* position = JS_ValueToString(cx, argv[0]);
+  if (!position) return JS_FALSE;
+  argv[0] = STRING_TO_JSVAL(position);
+  JSString* markup = JS_ValueToString(cx, argv[1]);
+  if (!markup) return JS_FALSE;
+  argv[1] = STRING_TO_JSVAL(markup);
+  nsAutoString where((nsDependentJSString(position)));
+  for (PRUint32 i = 0; i < where.Length(); ++i) {
+    PRUnichar c = where.CharAt(i);
+    if (c >= 'A' && c <= 'Z') where.SetCharAt(c + ('a' - 'A'), i);
+  }
+  PRBool before = where.EqualsLiteral("beforebegin");
+  PRBool after = where.EqualsLiteral("afterend");
+  PRBool start = where.EqualsLiteral("afterbegin");
+  if (!before && !after && !start && !where.EqualsLiteral("beforeend")) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SYNTAX_ERR);
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIDOMNode> parent = node, reference;
+  if (before || after) {
+    node->GetParentNode(getter_AddRefs(parent));
+    PRUint16 type = 0;
+    if (parent) parent->GetNodeType(&type);
+    if (!parent || type == nsIDOMNode::DOCUMENT_NODE) {
+      ThrowNamedDOMException(cx, NS_ERROR_DOM_NO_MODIFICATION_ALLOWED_ERR,
+                             "NoModificationAllowedError");
+      return JS_FALSE;
+    }
+    if (before) reference = node;
+    else node->GetNextSibling(getter_AddRefs(reference));
+  } else if (start) {
+    node->GetFirstChild(getter_AddRefs(reference));
+  }
+  nsCOMPtr<nsIDocument> document = content->GetOwnerDoc();
+  nsCOMPtr<nsIDOMDocumentRange> ranges = do_QueryInterface(document);
+  nsCOMPtr<nsIDOMRange> range;
+  nsresult rv = ranges ? ranges->CreateRange(getter_AddRefs(range)) : NS_ERROR_FAILURE;
+  if (NS_SUCCEEDED(rv)) rv = range->SelectNodeContents(parent);
+  nsCOMPtr<nsIDOMNSRange> parser = do_QueryInterface(range);
+  nsCOMPtr<nsIScriptLoader> loader = document ? document->GetScriptLoader() : nsnull;
+  PRBool enabled = PR_FALSE;
+  if (loader) loader->GetEnabled(&enabled);
+  if (enabled) loader->SetEnabled(PR_FALSE);
+  nsCOMPtr<nsIDOMDocumentFragment> fragment;
+  if (NS_SUCCEEDED(rv))
+    rv = parser->CreateContextualFragment(nsDependentJSString(markup), getter_AddRefs(fragment));
+  nsCOMPtr<nsIDOMNode> inserted;
+  if (NS_SUCCEEDED(rv)) rv = parent->InsertBefore(fragment, reference, getter_AddRefs(inserted));
+  if (enabled) loader->SetEnabled(PR_TRUE);
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
 static JSBool
 ElementClientGeometry(JSContext* cx, JSObject* obj, jsval* rval, PRBool aAll)
 {
@@ -8002,6 +8099,13 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   if (JSVAL_IS_STRING(id) && !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *name = JSVAL_TO_STRING(id);
     nsDependentJSString methodName(name);
+    if (methodName.EqualsLiteral("insertAdjacentHTML")) {
+      if (!JS_DefineFunction(cx, obj, "insertAdjacentHTML",
+                             ElementInsertAdjacentHTML, 2, JSPROP_ENUMERATE))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
     if (methodName.EqualsLiteral("getElementsByClassName")) {
       if (!JS_DefineFunction(cx, obj, "getElementsByClassName",
                              GetElementsByClassName, 1, JSPROP_ENUMERATE))

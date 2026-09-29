@@ -1,0 +1,42 @@
+<!doctype html><html><head><title>Adjacent HTML regression</title></head><body>
+<script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+function raises(fn,name,label){var caught;try{fn();}catch(e){caught=e.name;}check(caught,name,label);}
+window.onload=function(){try{
+ var host=document.createElement('div');document.body.appendChild(host);
+ host.innerHTML='<div id="target"><b>old</b></div>';
+ var target=host.firstChild,old=target.firstChild;
+ check(target.insertAdjacentHTML.length,2,'method arity');
+ check(target.insertAdjacentHTML('BeFoReBeGiN','<i>before</i>'),undefined,'undefined return and ASCII case');
+ target.insertAdjacentHTML('afterend','<i>after</i>');
+ target.insertAdjacentHTML('afterbegin','<span>first</span>');
+ target.insertAdjacentHTML('beforeend','<span>last</span>');
+ check(host.firstChild.textContent,'before','beforebegin position');
+ check(host.lastChild.textContent,'after','afterend position');
+ check(target.firstChild.textContent,'first','afterbegin position');
+ check(target.lastChild.textContent,'last','beforeend position');
+ check(target.childNodes[1],old,'existing node identity');
+ raises(function(){target.insertAdjacentHTML('invalid','');},'SyntaxError','invalid position');
+ raises(function(){target.insertAdjacentHTML(' beforeend','');},'SyntaxError','position whitespace is significant');
+ raises(function(){target.insertAdjacentHTML('beforeend');},'TypeError','missing argument');
+ raises(function(){document.createElement('div').insertAdjacentHTML('beforebegin','');},'NoModificationAllowedError','detached outer insertion');
+ raises(function(){document.documentElement.insertAdjacentHTML('afterend','');},'NoModificationAllowedError','document parent');
+ var order=[];target.insertAdjacentHTML({toString:function(){order.push(1);return 'beforeend';}},{toString:function(){order.push(2);return 'text';}});
+ check(order.join(','),'1,2','argument conversion order');
+ check(target.lastChild.nodeValue,'text','text insertion');
+ var sentinel={},caught;try{target.insertAdjacentHTML('beforeend',{toString:function(){throw sentinel;}});}catch(e){caught=e;}
+ check(caught,sentinel,'conversion exception preserved');
+ window.adjacentScriptRan=false;target.insertAdjacentHTML('beforeend','<script>window.adjacentScriptRan=true;<\/script>');
+ check(window.adjacentScriptRan,false,'inserted script inert');
+ var inert=document.implementation.createHTMLDocument();inert.body.insertAdjacentHTML('beforeend','<p>new</p>');
+ check(inert.body.firstChild.namespaceURI,'http://www.w3.org/1999/xhtml','inert HTML namespace');
+ var table=document.createElement('table');table.innerHTML='<tbody></tbody>';table.firstChild.insertAdjacentHTML('beforeend','<tr><td>cell</td></tr>');
+ check(table.rows.length,1,'table context');check(table.rows[0].cells[0].textContent,'cell','table cell');
+ var xml=(new DOMParser()).parseFromString('<root xmlns="urn:test"><child/></root>','text/xml');
+ xml.documentElement.insertAdjacentHTML('beforeend','<new/>');
+ check(xml.documentElement.lastChild.namespaceURI,'urn:test','XML context namespace');
+ raises(function(){xml.documentElement.insertAdjacentHTML('beforeend','<bad>');},'SyntaxError','malformed XML fragment');
+
+ }catch(e){check(String(e),'no exception','unexpected exception');}testDone=true;};
+</script></body></html>
