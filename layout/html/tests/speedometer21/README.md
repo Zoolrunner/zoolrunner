@@ -1005,3 +1005,21 @@ the latter applications' explicit storage-denial policy. Unchanged standalone
 ChatZilla passes twelve checks in both XULRunner backends. Reports are
 `dataset-content-*`, `dataset-frame-gc-*`, `dataset-matrix-*` and
 `dataset-chatzilla-*`. Full package gates remain tracked separately.
+
+The complete dataset package matrix is now green for all eight native LoongArch
+Linux application/backend combinations: Suite, Browser, Calendar and XULRunner
+on GTK2 and Xlib. Every package passes 11,540 required-mode ES5.1 cases,
+28,582 historical ES2015 modes, 139 focused shell runs and 86 native probes
+(five internal), with zero recorded language failures, unsupported cases,
+timeouts, crashes or harness errors. Both suites pass lifecycle and ChatZilla;
+both browsers pass thirty preference checks; both calendars pass their eight
+unit tests and startup/four-view checks. Application and window-bootstrap
+checks pass throughout. Aggregate counts and engine hashes are in
+`artifacts/speedometer21/dataset-complete-native-matrix.json`; original reports
+remain under `dataset-package-APP-BACKEND/logs`. These frozen packages contain
+the dataset binding from 46bd462d and precede the CSS attribute correction.
+
+The CSS correction (539c1bc3) separately passes 1,170 content, 300 History,
+274 HTTP, fifteen dataset GC and 24 Suite lifecycle assertions on **both**
+backends (`css-attribute-suite-{gtk2,xlib}-*`). Follow-up application builds
+and layout/chrome checks are in progress. No application sources were changed.
