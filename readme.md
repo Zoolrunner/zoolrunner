@@ -1198,9 +1198,12 @@ priorities correctly and rejects embedded declaration delimiters atomically.
 Computed-style prototype initialization also tolerates replacement of the
 public CSSStyleDeclaration constructor; its 15 focused assertions pass on both
 LoongArch Suite backends.
-The final Speedometer UI now passes its synthetic callback diagnostic with
-native History state bindings. A fresh complete run is pending; 480 successful
-workload checks alone were not a complete run.
+The full Speedometer 2.1 benchmark now passes in native LoongArch GTK2 Suite:
+16 enabled workloads, ten iterations, all 480 workload checks and the original
+completion callback. This first pass used a frozen initial History-binding
+runtime; a current Xlib package rerun and the other application builds/tests
+are in progress. Missing CSS rendering features and broader DOM conformance
+remain unfinished, independently of successful benchmark execution.
 
 History-state work now includes an immutable native graph serializer, preserving
 cycles and shared binary buffers without retaining source windows. Its 63

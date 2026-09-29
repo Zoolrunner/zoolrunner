@@ -7,11 +7,15 @@ upstream-disabled FlightJS mail client is not one of the 16 enabled workloads.
 Language additions are limited to ES2015. Preserve historical JavaScript
 modes, embedding interfaces and unchanged Mozilla/XULRunner applications.
 
-Status: implementation and validation in progress. No full benchmark pass or
-complete standards conformance is claimed. Existing developer binaries may
-predate the source; use a fresh build and record the compiler and architecture.
-Test native LoongArch Linux Suite first. Browser, Calendar and XULRunner testing
-follows only after the complete benchmark runs in Suite.
+Status: the first complete native LoongArch GTK2 Suite run passed on
+2026-09-29: **16 enabled workloads, ten iterations, 480 workload checks and the
+original completion callback**, with process exit zero. This clears the
+Suite-first gate for Browser, Calendar and XULRunner validation, which is now
+in progress. Complete standards conformance and rendering are still unfinished.
+The pass used the frozen initial History-binding build, not every later commit;
+a full Xlib rerun uses the relocated package built at `989aaa00`. See the final
+result/provenance section below. Earlier progress records retain their original
+failure and pending statuses; they do not supersede this current summary.
 
 The Suite runner uses a temporary profile and profile-local chrome registration.
 It observes the original benchmark's completion callback, retains console errors
@@ -540,12 +544,11 @@ backends pass all 24 Suite lifecycle checks. Reports are under
 `history-{suite,xlib}-lifecycle.stdout`. File-URL state restrictions also pass.
 
 The original benchmark results callback and summary/details navigation now
-pass a four-check diagnostic with explicitly synthetic input. A fresh complete
-benchmark is running against a frozen earlier binding build; no successful
-full-run result is claimed yet. The state snapshot facility still lacks DOM-specific
+pass a four-check diagnostic with explicitly synthetic input. The subsequent
+complete run against the frozen earlier binding build also passed, as recorded
+below. The state snapshot facility still lacks DOM-specific
 serialized types. These are partial History improvements, not full API
-conformance. Other applications remain deferred until Suite completes the
-unmodified benchmark.
+conformance. Other application validation has now started.
 
 ### Same-document history traversal
 
@@ -578,3 +581,35 @@ This does not finish the History API: fragment/hashchange integration,
 cross-document/BFcache event behavior, ancestor activity checks and DOM
 constructor shadowing still need work. No broader application or complete
 specification result follows from these focused tests.
+
+### Complete GTK2 Suite benchmark result and remaining work
+
+`artifacts/speedometer21/benchmark-history-full.json` records a successful full
+run, finished at **2026-09-29 07:53:14 UTC**, with all 480 workload postconditions,
+16 suites in each of ten result sets, and exit zero. The observer sets its
+completion flag only after the original benchmark completion callback returns;
+the earlier final-UI exception is therefore no longer present. Upstream workload
+sources, iteration counts and enabled-suite selection were unchanged. This is
+functional execution evidence, not a visual conformance or performance claim.
+
+The tested runtime is `artifacts/speedometer21/benchmark-history-runtime`, frozen
+after `aa2e08c8` plus the initial uncommitted native History bindings. Its
+`libmozjs.so` SHA-256 is
+`6e24a6fba4c8b3410929eebe1b3c6992f33575e804cfd384f4c26a97b6f25bd6`.
+It predates the later history/PopStateEvent fixes and `989aaa00` CSS bootstrap
+fix. Those changes have their separate focused/regression results above. The
+current Xlib package is running a fresh complete benchmark; do not label it
+passed until its completion report exists. Browser GTK2 compilation has started;
+Browser, Calendar and XULRunner runtime compatibility is still unverified for
+these changes.
+
+An additional diagnostic extracted 284 distinct standard-property declarations
+from the 31 CSS files requested by the benchmark. Native GTK2 accepts 263 and
+rejects 21. One rejection is the upstream typo `background-repat` and must remain
+rejected. The other 20 declarations expose missing appearance, box shadows,
+transforms/origins, transitions/durations/properties and word-break support.
+Parser acceptance does not establish correct painting: text shadows, rounded
+transparency and other existing rendering gaps still require visual checks.
+The diagnostic files are `loaded-css-paths.txt`, `loaded-css-declarations.json`
+and `loaded-css-parser-gtk2.json` under `artifacts/speedometer21/`; it excludes
+vendor-prefixed declarations and is not an exhaustive standards inventory.

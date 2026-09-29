@@ -316,3 +316,11 @@ same-document and child traversal, event-state lifetime, reload and explicit
 legacy calls. Cross-document events and other History behavior remain
 incomplete. See the Speedometer test guide for limitations and the separate
 full benchmark status.
+
+The first complete Speedometer 2.1 native LoongArch GTK2 Suite run passed on
+2026-09-29: 16 enabled workloads, ten iterations, all 480 workload checks and
+the original completion callback. The frozen initial History-binding runtime
+predates subsequent fixes; see `layout/html/tests/speedometer21/README.md` for
+its exact provenance. A current Xlib package rerun and Browser/Calendar/XULRunner
+validation are in progress. Missing rendering features remain unfinished, so
+benchmark execution is not a full standards or application compatibility claim.
