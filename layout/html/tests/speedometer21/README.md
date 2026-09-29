@@ -715,3 +715,26 @@ Both Browser backends now pass twelve direct font checks and thirty preferences
 checks, including actual font-menu population; Xlib Suite passes the font
 fixture too. Package validation is rerunning after this fix. See the
 [font regression notes](../../../../gfx/tests/README-font-enumeration.md).
+
+### Synthetic XHR dispatch diagnostic (known failures)
+
+`../style/xhr-synthetic-events.html` exercises the
+[DOM dispatch algorithm](https://dom.spec.whatwg.org/#concept-event-dispatch)
+on [XMLHttpRequestEventTarget](https://xhr.spec.whatwg.org/#xmlhttprequesteventtarget):
+initialization, target/currentTarget, cancellation, listener identity/capture,
+handler activation order, removal/readdition, nested dispatch and propagation.
+It is a pending conformance target, not part of the passing 985-check batch.
+The GTK2 Suite baseline records 22 failures in 27 reached assertions because
+synthetic callbacks never run and custom event types cannot be registered.
+The native `DispatchEvent` stub also returns success without initializing its
+boolean out-parameter. Full expected execution reaches 43 assertions.
+
+The separate Chromium 148.0.7778.180 comparison reaches all 43 but fails three:
+capture ordering, clearing propagation flags, and redispatch after an immediate
+stop. The DOM algorithm specifies separate capture/bubble invocations and
+clearing both propagation flags after dispatch; the fixture retains those
+requirements rather than copying that reference browser's behavior. Reports
+are `xhr-synthetic-before-gtk2.json` and `xhr-synthetic-chromium.json`. These
+results reinforce that benchmark completion and browser comparisons alone are
+not evidence of complete conformance. Native dispatch implementation remains
+unfinished.

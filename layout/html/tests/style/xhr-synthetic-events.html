@@ -1,0 +1,120 @@
+<!doctype html><meta charset="utf-8"><title>XHR synthetic event-target behavior</title>
+<pre id="result"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;
+ testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(actual)+' expected='+String(expected));}
+function scenario(label,fn){try{fn();}catch(e){check(String(e),'no exception',label+' unexpected exception');}}
+function invalidState(fn,label){var error=null;try{fn();}catch(e){error=e;}
+ check(error&&error.name,'InvalidStateError',label+' exception name');
+ check(error&&error.code,11,label+' exception code');}
+
+scenario('empty target',function(){
+ var x=new XMLHttpRequest(),e=new Event('custom');
+ check(x.dispatchEvent(e),true,'no listeners allows default');
+ check(e.target,x,'target retained after dispatch');
+ check(e.currentTarget,null,'currentTarget cleared');
+ check(e.eventPhase,0,'phase reset');
+ check(e.isTrusted,false,'synthetic event untrusted');
+});
+scenario('initialization',function(){
+ var x=new XMLHttpRequest(),e=document.createEvent('Event');
+ invalidState(function(){x.dispatchEvent(e);},'uninitialized event');
+ e.initEvent('',false,false);
+ check(x.dispatchEvent(e),true,'initialized empty type dispatches');
+ check(e.target,x,'empty type sets target');
+});
+scenario('load listener',function(){
+ var x=new XMLHttpRequest(),e=new Event('load'),calls=0;
+ x.addEventListener('load',function(received){++calls;
+  check(this,x,'function callback receiver');check(received,e,'original event identity');
+  check(e.currentTarget,x,'currentTarget inside callback');check(e.eventPhase,2,'target phase');
+ });
+ check(x.dispatchEvent(e),true,'load dispatch return');check(calls,1,'load callback called once');
+});
+scenario('duplicates and capture',function(){
+ var x=new XMLHttpRequest(),order=[];
+ function same(){order.push('same');}
+ x.addEventListener('custom',same);x.addEventListener('custom',same,false);
+ x.addEventListener('custom',function(){order.push('capture');},true);
+ x.addEventListener('custom',same,true);
+ x.dispatchEvent(new Event('custom'));
+ check(order.join(','),'capture,same,same','capture precedes non-capture; duplicate suppressed');
+ x.removeEventListener('custom',same,false);order=[];
+ x.dispatchEvent(new Event('custom'));
+ check(order.join(','),'capture,same','removal matches capture flag');
+});
+scenario('property handler ordering',function(){
+ var x=new XMLHttpRequest(),order=[];
+ x.addEventListener('load',function(){order.push('first');});
+ x.onload=function(){order.push('old');};
+ x.addEventListener('load',function(){order.push('last');});
+ x.onload=function(){order.push('new');};
+ x.dispatchEvent(new Event('load'));
+ check(order.join(','),'first,new,last','handler reassignment keeps activation position');
+ x.onload=null;x.onload=function(){order.push('reactivated');};order=[];
+ x.dispatchEvent(new Event('load'));
+ check(order.join(','),'first,last,reactivated','handler reactivation appends');
+});
+scenario('listener mutation',function(){
+ var x=new XMLHttpRequest(),order=[],changed=false;
+ function second(){order.push('second');}
+ x.addEventListener('custom',function(){order.push('first');if(!changed){changed=true;
+  x.removeEventListener('custom',second);x.addEventListener('custom',second);}});
+ x.addEventListener('custom',second);x.dispatchEvent(new Event('custom'));
+ check(order.join(','),'first','removed registration skipped; readded registration deferred');
+ order=[];x.dispatchEvent(new Event('custom'));
+ check(order.join(','),'first,second','readded registration used on next dispatch');
+});
+scenario('object listener',function(){
+ var x=new XMLHttpRequest(),calls=0,listener={handleEvent:function(e){++calls;
+  check(this,listener,'object callback receiver');check(e.target,x,'object callback event');}};
+ x.addEventListener('custom',listener);x.dispatchEvent(new Event('custom'));
+ listener.handleEvent=function(){calls+=10;};x.dispatchEvent(new Event('custom'));
+ check(calls,11,'handleEvent fetched for each invocation');
+ x.removeEventListener('custom',listener);x.dispatchEvent(new Event('custom'));
+ check(calls,11,'object listener removed');
+});
+scenario('cancellation',function(){
+ var x=new XMLHttpRequest();x.addEventListener('load',function(e){e.preventDefault();});
+ var cancelable=new Event('load',{cancelable:true});
+ check(x.dispatchEvent(cancelable),false,'canceled event dispatch return');
+ check(cancelable.defaultPrevented,true,'canceled state retained');
+ var ordinary=new Event('load');check(x.dispatchEvent(ordinary),true,'noncancelable return');
+ check(ordinary.defaultPrevented,false,'noncancelable state');
+ var prior=new Event('custom',{cancelable:true});prior.preventDefault();
+ check(x.dispatchEvent(prior),false,'cancellation before dispatch preserved');
+});
+scenario('propagation',function(){
+ var x=new XMLHttpRequest(),calls=0;
+ function first(e){++calls;e.stopImmediatePropagation();}
+ x.addEventListener('custom',first);x.addEventListener('custom',function(){calls+=10;});
+ var e=new Event('custom');x.dispatchEvent(e);check(calls,1,'immediate stop suppresses later listener');
+ check(e.cancelBubble,false,'propagation flags cleared after dispatch');
+ x.removeEventListener('custom',first);x.dispatchEvent(e);
+ check(calls,11,'redispatch is not stopped');
+});
+scenario('ordinary stop',function(){
+ var x=new XMLHttpRequest(),calls=0;
+ x.addEventListener('custom',function(e){++calls;e.stopPropagation();});
+ x.addEventListener('custom',function(){++calls;});
+ x.dispatchEvent(new Event('custom'));check(calls,2,'stopPropagation keeps same-target listeners');
+});
+scenario('nested dispatch',function(){
+ var x=new XMLHttpRequest(),outer=new Event('outer'),calls=0;
+ x.addEventListener('outer',function(e){++calls;
+  invalidState(function(){x.dispatchEvent(e);},'recursive same-event dispatch');
+  check(x.dispatchEvent(new Event('inner')),true,'nested distinct event dispatch');
+  check(e.currentTarget,x,'outer currentTarget retained through nested dispatch');
+  check(e.eventPhase,2,'outer phase retained through nested dispatch');
+ });
+ x.addEventListener('inner',function(){++calls;});x.dispatchEvent(outer);
+ check(calls,2,'both nested callbacks invoked');
+});
+scenario('retargeting',function(){
+ var a=new XMLHttpRequest(),b=new XMLHttpRequest(),e=new Event('load');
+ a.dispatchEvent(e);check(e.target,a,'first target');b.dispatchEvent(e);
+ check(e.target,b,'subsequent target');check(e.currentTarget,null,'subsequent currentTarget cleared');
+});
+testDone=true;
+document.getElementById('result').textContent=JSON.stringify({failures:testFailures,results:testResults});
+</script>
