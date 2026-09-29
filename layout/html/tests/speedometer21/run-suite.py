@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a content probe or unmodified Speedometer 2.1 in a disposable Suite profile."""
+"""Run content probes or unmodified Speedometer 2.1 with a private HOME/profile."""
 import argparse
 import json
 import os
@@ -30,6 +30,9 @@ def main():
     with tempfile.TemporaryDirectory(prefix='zool-speedometer-') as temporary:
         base = Path(temporary)
         name = base.name
+        home = base / 'home'
+        home.mkdir()
+        environment['HOME'] = str(home)
 
         def shell(source):
             script = base / 'profile.js'
@@ -40,11 +43,13 @@ def main():
         info = None
         try:
             output = shell('''var p=Components.classes['@mozilla.org/profile/manager;1'].getService(Components.interfaces.nsIProfile);
+p.createNewProfile('baseline',HOME,null,false);
+p.currentProfile='baseline';
 var old=p.currentProfile;
 if(p.profileExists(NAME))throw Error('Test profile already exists');
 p.createNewProfile(NAME,BASE,null,false);
 print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.interfaces.nsIProfileInternal).getProfileDir(NAME).path}));
-'''.replace('NAME', json.dumps(name)).replace('BASE', json.dumps(str(base))))
+'''.replace('NAME', json.dumps(name)).replace('BASE', json.dumps(str(base))).replace('HOME', json.dumps(str(home))))
             info = json.loads(next(line[8:] for line in output.splitlines() if line.startswith('PROFILE=')))
             profile = Path(info['path'])
             preferences = {

@@ -17,7 +17,9 @@ a full Xlib rerun uses the relocated package built at `989aaa00`. See the final
 result/provenance section below. Earlier progress records retain their original
 failure and pending statuses; they do not supersede this current summary.
 
-The Suite runner uses a temporary profile and profile-local chrome registration.
+The Suite runner uses a private HOME, temporary profile and profile-local chrome
+registration, including a private legacy profile registry. Simultaneous runs do
+not edit the caller's application profiles.
 It observes the original benchmark's completion callback, retains console errors
 and results, and requires 16 workloads, ten iterations and all expected steps.
 Missing result markers, crashes and timeouts fail. It does not change measured
@@ -32,8 +34,7 @@ sh build/linux/with-display.sh python3 layout/html/tests/speedometer21/run-suite
 
 Serve an unchanged external benchmark copy with its complete resource tree.
 Keep upstream assets outside tracked source files and record their hashes.
-For long runs, keep the HTTP server owned by the launcher and isolate the Suite
-profile registry as well as its test profile:
+For long runs, keep the HTTP server owned by the launcher:
 
 ```sh
 sh build/linux/with-display.sh python3 layout/html/tests/speedometer21/run-local-benchmark.py \
@@ -807,3 +808,11 @@ Chromium 148 passes all fifteen. This pending sequence fix is kept separate
 from the passing callback-dispatch batch; baseline reports are
 `xhr-state-baseline-gtk2-xhr-ready-state.json` and
 `xhr-ready-state-chromium.json`.
+
+The private-HOME Suite launcher passes simultaneous GTK2/Xlib synthetic-event
+and callback-identity sequences (71 checks each), leaving the caller HOME
+unchanged. Its 300-check History run, including multi-process persistence,
+also passes. The X server is launched outside the caller-HOME isolation test:
+Xvfb's own font cache is separate from Suite's profile isolation. Reports are
+`private-home-isolation.json`, `private-home-{gtk2,xlib}.json` and
+`private-home-history/summary.json`.
