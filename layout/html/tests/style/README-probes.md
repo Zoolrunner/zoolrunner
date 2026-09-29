@@ -312,3 +312,16 @@ checks also green. `html-attribute-case.html` and
 `html-attribute-selectors.html` are now included in the default
 `layout-probes.xul` sequence, so the DOM and CSS attribute-name distinction
 remains part of routine layout regression coverage.
+
+The six follow-up Browser/Calendar/XULRunner builds also pass 890 content/layout
+assertions each after the attribute-case correction, together with Browser
+preferences, Calendar's four views and unchanged standalone ChatZilla checks.
+See `artifacts/speedometer21/css-attribute-APP-BACKEND-*`.
+
+`text-shadow-parser.html` records 72 grammar, atomic rejection, CSS2 property
+and serialization checks for the next rendering feature. Chromium 148 passes
+all 72; the preceding native Suite build fails seventeen. Its initial 65-case
+version failed twelve; the added keyword spelling/clone assertions are retained.
+`text-shadow-quirks.html` separately checks thirteen compound-value and legacy
+length-quirk cases. Chromium passes thirteen. Parser acceptance alone will not
+establish text-shadow support: computed style and painting are still absent.

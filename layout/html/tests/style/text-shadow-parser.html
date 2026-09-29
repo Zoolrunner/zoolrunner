@@ -1,0 +1,36 @@
+<!doctype html><title>Text shadow grammar and CSSOM round trips</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+try{
+ var element=document.createElement('div'),copy=document.createElement('div');
+ var valid=['none','inherit','initial','unset','0 0','1px 2px','-1px -2px 3px','red 1px 2px','1px 2px blue','currentColor 1px 2px','1px 2px currentColor','transparent 1px 2px','1px 2px transparent','rgba(255, 255, 255, 0.5) 0 1px 0','0 1px 0 hsla(0, 0%, 100%, .5)','1em -2em .5em red','red 1px 2px, blue 3px 4px','1px 2px, 3px 4px 5px','1px 2px 3px, 4px 5px','1px 2px -0px red','1px 2px 0 red'];
+ for(var i=0;i<valid.length;++i){
+  element.style.cssText='';element.style.setProperty('text-shadow',valid[i],'');
+  var value=element.style.getPropertyValue('text-shadow');
+  check(value.length>0,true,'accept '+valid[i]);
+  copy.style.cssText='';copy.style.setProperty('text-shadow',value,'');
+  check(copy.style.getPropertyValue('text-shadow'),value,'round trip '+valid[i]);
+ }
+ element.style.textShadow='initial';
+ check(element.style.textShadow,'initial','standard initial spelling through CSS2 property');
+ element.style.textShadow='inherit';
+ check(element.style.textShadow,'inherit','inherit spelling through CSS2 property');
+ element.style.textShadow='unset';
+ check(element.style.textShadow,'unset','unset replaces inherit spelling');
+ copy.style.cssText=element.style.cssText;
+ check(copy.style.textShadow,'unset','CSS text clone retains unset');
+ element.style.textShadow='initial';copy.style.cssText=element.style.cssText;
+ check(copy.style.textShadow,'initial','CSS text clone retains initial');
+ element.style.setProperty('text-shadow','unset','important');
+ check(element.style.getPropertyPriority('text-shadow'),'important','CSS-wide keyword priority');
+ element.style.textShadow='none';
+ check(element.style.textShadow,'none','ordinary value resets CSS-wide spelling');
+ var invalid=['1px','red','currentColor','transparent','1px 2px -1px','1px 2px -.1em','1px 2px 3px 4px','1% 2px','1px 2%','1px 2px 3%','red blue 1px 2px','red 1px 2px blue','1px red 2px','1px 2px red 3px','inset 1px 2px','1px 2px inset','none, 1px 2px','1px 2px, none','inherit, 1px 2px','1px 2px,',' , 1px 2px','1px 2px,,3px 4px','1px 2px, 3px 4px -5px'];
+ for(i=0;i<invalid.length;++i){
+  element.style.cssText='';element.style.setProperty('text-shadow','none','');
+  element.style.setProperty('text-shadow',invalid[i],'');
+  check(element.style.getPropertyValue('text-shadow'),'none','reject atomically '+invalid[i]);
+ }
+}catch(e){check(String(e),'no exception','unexpected exception');}
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>

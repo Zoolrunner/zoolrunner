@@ -1023,3 +1023,11 @@ The CSS correction (539c1bc3) separately passes 1,170 content, 300 History,
 274 HTTP, fifteen dataset GC and 24 Suite lifecycle assertions on **both**
 backends (`css-attribute-suite-{gtk2,xlib}-*`). Follow-up application builds
 and layout/chrome checks are in progress. No application sources were changed.
+
+The CSS attribute correction now passes the six follow-up application runs as
+well: 890 content/layout assertions in each Browser, Calendar and XULRunner
+backend, plus thirty Browser preference assertions, Calendar startup/four views,
+or twelve unchanged standalone ChatZilla assertions as applicable. Reports are
+`css-attribute-APP-BACKEND-{content,application}.json` and
+`css-attribute-applications-summary.json`. These runs exercise the changed CSS
+parser; the complete unchanged-engine language gates are recorded above.

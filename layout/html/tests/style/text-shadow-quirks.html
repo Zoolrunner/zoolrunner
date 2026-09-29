@@ -1,0 +1,15 @@
+<title>Text shadow grammar in quirks mode</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+try{
+ check(document.compatMode,'BackCompat','fixture uses quirks mode');
+ var e=document.createElement('div');document.body.appendChild(e);
+ var bad=['1 2','1px 2','1 2px','ff0000 1px 2px','1px 2px ff0000','1px 2px -1px','1px 2px 3'];
+ for(var i=0;i<bad.length;++i){e.style.textShadow='none';e.style.textShadow=bad[i];check(e.style.textShadow,'none','quirks rejects '+bad[i]);}
+ e.style.textShadow='0 0';check(e.style.textShadow.length>0,true,'unitless zeros remain valid');
+ e.style.width='10';check(e.style.width,'10px','ordinary width length quirk preserved');
+ e.style.textShadow='bad';e.style.height='12';check(e.style.height,'12px','rejected shadow preserves following length quirk');
+ e.style.cssText='text-shadow: 1 2; width: 14;';check(e.style.textShadow,'','invalid shadow absent from declaration');check(e.offsetWidth,14,'following declaration retains quirks parsing');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>
