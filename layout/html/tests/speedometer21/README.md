@@ -32,6 +32,21 @@ sh build/linux/with-display.sh python3 layout/html/tests/speedometer21/run-suite
 
 Serve an unchanged external benchmark copy with its complete resource tree.
 Keep upstream assets outside tracked source files and record their hashes.
+For long runs, keep the HTTP server owned by the launcher and isolate the Suite
+profile registry as well as its test profile:
+
+```sh
+sh build/linux/with-display.sh python3 layout/html/tests/speedometer21/run-local-benchmark.py \
+  --runtime obj-speedometer21-suite/dist/bin \
+  --serve-root artifacts/speedometer21/upstream \
+  --report artifacts/speedometer21/suite-local.json
+```
+
+This wrapper serves the files unchanged, records HTTP requests in a sibling
+`.http.log`, and defaults to a three-hour deadline. The observer still requires
+the complete result; losing the server never counts as a benchmark pass. The
+first current-Xlib rerun stopped at 111 checks after its independent server
+exited; its incomplete report is retained separately from the owned-server run.
 The runner emits JSON plus a sibling `.log` file. A benchmark completion is
 separate from visual rendering validation and focused specification tests.
 
@@ -660,9 +675,10 @@ Native Browser GTK2 compilation and the complete relocated-package gate now
 pass, including both pinned language suites, native/embedding checks and real
 Browser navigation/window checks (`browser-package-gtk2/`). Its separate
 preferences compatibility probe passes 28 assertions with the documented
-pre-existing default-localization limitation. Calendar GTK2 compilation passes;
-its unit/four-view and full package gate is running, and XULRunner GTK2 is
-compiling. The three other applications' Xlib builds remain untested.
+pre-existing default-localization limitation. Calendar GTK2 compilation and its
+complete package gate now pass, including eight unit-test groups, startup and
+all four views. XULRunner GTK2 compilation passes and its full package gate is
+running. The three other applications' Xlib validation remains in progress.
 
 Calendar GTK2 passes 985 content and 300 History assertions. The shared CSS
 fixtures retain all assertions but now use ordinary linked stylesheet/image
@@ -675,3 +691,12 @@ legacy denial checks and 69 unchanged XHR assertions pass in
 `calendar-gtk2-http-policy/`. The driver defaults to the full allowed-storage
 checks and never switches policy implicitly. Application code and build feature
 selections were not changed to obtain these results.
+
+XULRunner GTK2 also passes 985 content and 300 History assertions. Its existing
+extension list omits the permission-manager extension despite enabling Necko
+cookies. A real chrome-global diagnostic confirms that the permission-manager
+contract is absent, with storage enabled and cookie preferences at their normal
+defaults. Accordingly its initial allowed-storage reports in
+`xulrunner-gtk2-http/` record security denial, not storage conformance. Explicit
+denial-policy validation passes nine checks plus all 69 XHR assertions in
+`xulrunner-gtk2-http-policy/`. No application or build configuration was changed.

@@ -1204,6 +1204,12 @@ completion callback. This first pass used a frozen initial History-binding
 runtime; a current Xlib package rerun and the other application builds/tests
 are in progress. Missing CSS rendering features and broader DOM conformance
 remain unfinished, independently of successful benchmark execution.
+Browser and Calendar GTK2 now pass their complete relocated-package gates;
+Calendar includes its eight unit-test groups and all four views. XULRunner
+GTK2 builds and passes the content/History probes while its full package gate
+runs. Calendar and XULRunner preserve their existing storage permission-service
+omissions; explicit denial-policy checks are recorded separately from storage
+conformance. The remaining Xlib application validation is in progress.
 
 History-state work now includes an immutable native graph serializer, preserving
 cycles and shared binary buffers without retaining source windows. Its 63
