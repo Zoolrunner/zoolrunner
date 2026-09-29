@@ -7,15 +7,17 @@ upstream-disabled FlightJS mail client is not one of the 16 enabled workloads.
 Language additions are limited to ES2015. Preserve historical JavaScript
 modes, embedding interfaces and unchanged Mozilla/XULRunner applications.
 
-Status: the first complete native LoongArch GTK2 Suite run passed on
-2026-09-29: **16 enabled workloads, ten iterations, 480 workload checks and the
-original completion callback**, with process exit zero. This clears the
-Suite-first gate for Browser, Calendar and XULRunner validation, which is now
-in progress. Complete standards conformance and rendering are still unfinished.
-The pass used the frozen initial History-binding build, not every later commit;
-a full Xlib rerun uses the relocated package built at `989aaa00`. See the final
-result/provenance section below. Earlier progress records retain their original
-failure and pending statuses; they do not supersede this current summary.
+Status (2026-09-29): complete native LoongArch Suite runs pass on **GTK2 and
+Xlib**, each with 16 enabled workloads, ten iterations, all 480 workload checks,
+the original completion callback and process exit zero. The GTK2 pass used the
+frozen initial History-binding build; Xlib used the relocated package from
+`989aaa00`. Both are preserved baselines, not claims about every later commit.
+All eight application/backend package gates passed before the subsequent XHR
+changes. The XHR implementation and state-notification correction pass focused
+checks across all eight current native builds, with a separate GTK2 full run
+using the dispatch implementation still in progress. Complete standards
+conformance and rendering remain unfinished. See the result/provenance sections
+below; earlier progress entries retain their historical status.
 
 The Suite runner uses a private HOME, temporary profile and profile-local chrome
 registration, including a private legacy profile registry. Simultaneous runs do
@@ -830,3 +832,35 @@ includes the new sequence fixture. Remaining applications are being rechecked
 with the corrected native component; the earlier package results remain a
 separate baseline. JavaScript library SHA-256 remains
 `1d29abb799a6522dc58735d5274b00304a10a48b3cbe79a67ffa3b5a3e360782`.
+
+### Completed Xlib benchmark and corrected XHR matrix
+
+`benchmark-current-xlib-owned.json` records a complete pass: 16 suites, ten
+iterations, 480/480 checked steps and exit zero. It uses the frozen `989aaa00`
+Suite Xlib package and JavaScript SHA-256
+`1d29abb799a6522dc58735d5274b00304a10a48b3cbe79a67ffa3b5a3e360782`.
+The launcher served the unchanged benchmark tree throughout the run. Background
+builds/tests were active, so timings are not controlled performance comparisons.
+The separate `benchmark-xhr-modern-gtk2` run contains the newer dispatch fix
+`79c97eb5`, preceding the state-notification correction `0d546a61`.
+
+The corrected component passes 184 XHR assertions and fourteen GC checks on
+both Suite backends. Browser passes the expanded 274-check HTTP batch; Calendar
+and XULRunner pass 193 checks with their explicit storage-denial policy, on
+both backends. All six toolkit runs also pass fourteen GC assertions. Reports
+are `xhr-state-APP-BACKEND-http/summary.json` and the corresponding GC JSON.
+Browser preferences (30 checks) and standalone unchanged ChatZilla (12 checks)
+pass on both corrected backends. Suite lifecycle remains at 24 passes.
+
+The first incremental XULRunner check loaded stale `libxul.so`: rebuilding
+`content/base/src` and `layout/build` updated archives without relinking the
+aggregate runtime. Those four old sequencing failures remain recorded in
+`xhr-state-xulrunner-gtk2-http-stale-library`. Relinking `toolkit/library` for
+`MOZ_ENABLE_LIBXUL` builds and rerunning resolves them; they are not excluded or
+counted as passes. The other applications use the shared layout component.
+
+Calendar startup and all four views also pass with the corrected component on
+GTK2 and Xlib (`xhr-state-calendar-{gtk2,xlib}-views.log`). The shared window
+runner now accepts `--runtime` for native Linux, copying the runtime and using
+a private HOME/profile; its existing macOS archive mode is retained. See
+[Calendar compatibility checks](../../../../calendar/test/README-compatibility.md).

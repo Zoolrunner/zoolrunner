@@ -355,3 +355,12 @@ so the default read fails and the old restore handler clears the homepage.
 The test preserves that legacy null-to-empty conversion; it does not claim
 the application's default-localization mismatch was fixed. Application sources
 and the frozen preference interfaces remain unchanged.
+
+Calendar's standalone four-view runner also accepts a native runtime through
+`calendar/test/run-window-compatibility.py --runtime DIST_BIN --report LOG`.
+Run it under `with-display.sh`; it copies the runtime and uses a private HOME
+and profile. See [the Calendar test guide](../../calendar/test/README-compatibility.md).
+The corrected XHR component passes this check on both native LoongArch backends.
+Full Speedometer 2.1 runs now pass on GTK2 and Xlib Suite frozen baselines;
+[the benchmark notes](../../layout/html/tests/speedometer21/README.md) record the
+exact revisions and distinguish these from later focused XHR checks.

@@ -1,32 +1,42 @@
 #!/usr/bin/env python3
-"""Test a packaged macOS Calendar in a temporary profile (requires a desktop)."""
+"""Test Calendar in a private HOME/profile (requires a desktop)."""
 import argparse
 import os
 from pathlib import Path
 import plistlib
 import signal
+import shutil
 import subprocess
 import tarfile
 import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--archive', type=Path, required=True)
+source = parser.add_mutually_exclusive_group(required=True)
+source.add_argument('--archive', type=Path, help='Packaged macOS Calendar archive')
+source.add_argument('--runtime', type=Path, help='Native Linux Calendar runtime directory')
 parser.add_argument('--report', type=Path, required=True)
 args = parser.parse_args()
 with tempfile.TemporaryDirectory(prefix='zool-calendar-window-') as temporary:
     base = Path(temporary)
-    with tarfile.open(args.archive) as archive:
-        # Development packages contain dereferenced files, never links.
-        for member in archive.getmembers():
-            path = Path(member.name)
-            if path.is_absolute() or '..' in path.parts or not (member.isfile() or member.isdir()):
-                raise ValueError('Unsafe archive member: ' + member.name)
-        archive.extractall(base)
-    bundle, = base.glob('*/Calendar.app')
-    with (bundle / 'Contents/Info.plist').open('rb') as info:
-        program = plistlib.load(info)['CFBundleExecutable']
-    runtime = bundle / 'Contents/MacOS'
-    executable = runtime / program
+    if args.runtime:
+        runtime = base / 'runtime'
+        shutil.copytree(args.runtime.resolve(), runtime, symlinks=False)
+        executable = runtime / 'sunbird-bin'
+        if not executable.exists():
+            executable = runtime / 'sunbird'
+    else:
+        with tarfile.open(args.archive) as archive:
+            # Development packages contain dereferenced files, never links.
+            for member in archive.getmembers():
+                path = Path(member.name)
+                if path.is_absolute() or '..' in path.parts or not (member.isfile() or member.isdir()):
+                    raise ValueError('Unsafe archive member: ' + member.name)
+            archive.extractall(base)
+        bundle, = base.glob('*/Calendar.app')
+        with (bundle / 'Contents/Info.plist').open('rb') as info:
+            program = plistlib.load(info)['CFBundleExecutable']
+        runtime = bundle / 'Contents/MacOS'
+        executable = runtime / program
     profile = base / 'profile'
     profile.mkdir()
     (profile / 'user.js').write_text('user_pref("browser.dom.window.dump.enabled", true);\n')
@@ -36,7 +46,11 @@ with tempfile.TemporaryDirectory(prefix='zool-calendar-window-') as temporary:
         manifest.write('\ncontent calendarcompat ' + base.as_uri() + '/\n'
                        'overlay chrome://calendar/content/calendar.xul '
                        'chrome://calendarcompat/content/compatibility-overlay.xul\n')
-    environment = dict(os.environ, MOZ_NO_REMOTE='1')
+    home = base / 'home'
+    home.mkdir()
+    environment = dict(os.environ, HOME=str(home), MOZ_NO_REMOTE='1')
+    if args.runtime:
+        environment.update(LD_LIBRARY_PATH=str(runtime), MOZILLA_FIVE_HOME=str(runtime))
     environment.pop('DYLD_LIBRARY_PATH', None)
     process = subprocess.Popen([str(executable), '-profile', str(profile)],
                                env=environment, stdout=subprocess.PIPE,

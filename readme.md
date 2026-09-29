@@ -1198,10 +1198,11 @@ priorities correctly and rejects embedded declaration delimiters atomically.
 Computed-style prototype initialization also tolerates replacement of the
 public CSSStyleDeclaration constructor; its 15 focused assertions pass on both
 LoongArch Suite backends.
-The full Speedometer 2.1 benchmark now passes in native LoongArch GTK2 Suite:
+The full Speedometer 2.1 benchmark now passes in native LoongArch GTK2 and Xlib Suite:
 16 enabled workloads, ten iterations, all 480 workload checks and the original
 completion callback. This first pass used a frozen initial History-binding
-runtime; a current frozen Xlib package benchmark rerun remains in progress.
+runtime; the Xlib pass used the frozen package from `989aaa00`, preceding the
+subsequent XHR changes.
 All eight native application/backend package gates have since passed. Missing CSS rendering features and broader DOM conformance
 remain unfinished, independently of successful benchmark execution.
 Browser and Calendar GTK2 now pass their complete relocated-package gates;
