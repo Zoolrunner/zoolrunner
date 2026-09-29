@@ -883,3 +883,9 @@ requires rejecting non-data descriptors. Keep these assertions; the comparison
 browser is not the specification. Reports are `dataset-descriptors-chromium.json`
 and `dataset-baseline-gtk2-dataset-descriptors.json`. Both dataset fixtures
 remain known-failing diagnostics, outside the passing content batch.
+
+The native host-object foundation (`f643a168`) now passes complete Suite GTK2
+and Xlib package checks, including 11,540 ES5.1 and 28,582 selected ES2015 cases
+on each backend, 35 new native host-object assertions, and existing application
+checks. Reports are `host-package-suite-{gtk2,xlib}/logs`; these packages precede
+the live DOM dataset binding and do not resolve its conformance gaps.

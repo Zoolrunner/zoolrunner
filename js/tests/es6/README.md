@@ -4472,8 +4472,13 @@ backing object.
 collection during callbacks, live keys and descriptors, attribute-order
 numeric keys, symbols, prototypes, rejected extensibility, and paired Proxy
 invariant checks. It is included in the shared native package fixture table.
-Both Suite backends rebuild and pass all 11,540 pinned ES5.1 cases; the
-remaining package checks, including ES2015, are in progress in
-`artifacts/speedometer21/host-package-suite-{gtk2,xlib}`. The DOM dataset binding still
+Both Suite backends pass their complete native package gates: all 11,540
+pinned ES5.1 cases, all 28,582 selected ES2015 cases, 139 focused scripts,
+86 native probes (five internal), embedding/window and Suite lifecycle checks.
+Reports are in `artifacts/speedometer21/host-package-suite-{gtk2,xlib}`;
+the engine SHA-256 is
+`f2a6f04353be06ab29e621b59417789a1db10292e00215c8f7150646e85458b2`.
+These frozen packages contain the engine support committed as `f643a168`,
+before the live dataset binding. Their DOM dataset binding still
 uses its old snapshot implementation; this engine support alone does not fix
 the known dataset failures or establish Web IDL compliance.
