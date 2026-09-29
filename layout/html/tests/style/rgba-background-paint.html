@@ -1,0 +1,20 @@
+<!doctype html><html><head><title>RGBA background painting</title><style>
+html,body{margin:0;padding:0;background:white}
+#anchor{position:absolute;left:10px;top:10px;width:10px;height:10px;background:#ff00ff}
+.box{position:absolute;top:40px;width:80px;height:60px}
+#half{left:20px;background:rgba(0,0,0,.5)}
+#faint{left:120px;background:rgba(0,0,0,.003)}
+#clear{left:220px;background:rgba(255,0,0,0);border-radius:20px}
+#opaque{left:320px;background:rgba(20,80,160,1)}
+#parent{position:absolute;left:20px;top:130px;width:180px;height:100px;background:rgb(40,80,120)}
+#red{position:absolute;left:20px;top:20px;width:140px;height:60px;background:rgba(255,0,0,.5)}
+#blue{position:absolute;left:30px;top:10px;width:80px;height:40px;background:rgba(0,0,255,.5)}
+#clip{position:absolute;left:240px;top:130px;width:100px;height:80px;overflow:hidden;background:rgb(0,160,0)}
+#clipped{position:absolute;left:20px;top:20px;width:160px;height:100px;background:rgba(255,255,255,.5)}
+#left-edge{position:absolute;left:-20px;top:250px;width:80px;height:80px;background:rgba(0,0,255,.5)}
+#top-edge{position:absolute;left:420px;top:-20px;width:20px;height:60px;background:rgba(0,255,0,.5)}
+</style></head><body><div id="anchor"></div><div id="half" class="box"></div><div id="faint" class="box"></div><div id="clear" class="box"></div><div id="opaque" class="box"></div><div id="parent"><div id="red"><div id="blue"></div></div></div><div id="clip"><div id="clipped"></div></div><script>
+var testDone=false,testFailures=0,testResults=[];
+document.write('<div id="left-edge"></div><div id="top-edge"></div>');
+window.onload=function(){setTimeout(function(){testResults.push('PASS painting fixture loaded');testDone=true;},10000);};
+</script></body></html>

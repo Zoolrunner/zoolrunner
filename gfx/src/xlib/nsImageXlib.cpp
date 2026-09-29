@@ -46,6 +46,7 @@
 #include "nsRect.h"
 #include "drawers.h"
 #include "imgScaler.h"
+#include "nsImageCompositing.h"
 
 #define IsFlagSet(a,b) ((a) & (b))
 
@@ -735,9 +736,9 @@ void nsImageXlib::DrawComposited32(PRBool isLSB, PRBool flipBytes,
          i++, baseRow+=4, targetRow+=3, imageRow+=3, alphaRow++)
     {
       unsigned alpha = *alphaRow;
-      MOZ_BLEND(targetRow[0], baseRow[redIndex],   imageRow[0], alpha);
-      MOZ_BLEND(targetRow[1], baseRow[greenIndex], imageRow[1], alpha);
-      MOZ_BLEND(targetRow[2], baseRow[blueIndex],  imageRow[2], alpha);
+      targetRow[0] = nsBlendImageChannel( baseRow[redIndex],   imageRow[0], alpha);
+      targetRow[1] = nsBlendImageChannel( baseRow[greenIndex], imageRow[1], alpha);
+      targetRow[2] = nsBlendImageChannel( baseRow[blueIndex],  imageRow[2], alpha);
     }
   }
 }
@@ -771,9 +772,9 @@ nsImageXlib::DrawComposited24(PRBool isLSB, PRBool flipBytes,
     for (unsigned i=0; i<width;
          i++, baseRow+=3, targetRow+=3, imageRow+=3, alphaRow++) {
       unsigned alpha = *alphaRow;
-      MOZ_BLEND(targetRow[0], baseRow[redIndex],   imageRow[0], alpha);
-      MOZ_BLEND(targetRow[1], baseRow[greenIndex], imageRow[1], alpha);
-      MOZ_BLEND(targetRow[2], baseRow[blueIndex],  imageRow[2], alpha);
+      targetRow[0] = nsBlendImageChannel( baseRow[redIndex],   imageRow[0], alpha);
+      targetRow[1] = nsBlendImageChannel( baseRow[greenIndex], imageRow[1], alpha);
+      targetRow[2] = nsBlendImageChannel( baseRow[blueIndex],  imageRow[2], alpha);
     }
   }
 }
@@ -828,13 +829,13 @@ nsImageXlib::DrawComposited16(PRBool isLSB, PRBool flipBytes,
       } else
         pix = *((short *)baseRow);
       unsigned alpha = *alphaRow;
-      MOZ_BLEND(targetRow[0],
+      targetRow[0] = nsBlendImageChannel(
                 redScale[(pix&visual->red_mask) >> redShift], 
                 imageRow[0], alpha);
-      MOZ_BLEND(targetRow[1],
+      targetRow[1] = nsBlendImageChannel(
                 greenScale[(pix&visual->green_mask) >> greenShift], 
                 imageRow[1], alpha);
-      MOZ_BLEND(targetRow[2],
+      targetRow[2] = nsBlendImageChannel(
                 blueScale[(pix&visual->blue_mask) >> blueShift], 
                 imageRow[2], alpha);
     }
@@ -959,9 +960,9 @@ nsImageXlib::DrawCompositedGeneral(PRBool isLSB, PRBool flipBytes,
     unsigned char *alphaRow  = alphaOrigin  +y*alphaStride;
     for (unsigned i=0; i<width; i++) {
       unsigned alpha = alphaRow[i];
-      MOZ_BLEND(targetRow[3*i],   targetRow[3*i],   imageRow[3*i],   alpha);
-      MOZ_BLEND(targetRow[3*i+1], targetRow[3*i+1], imageRow[3*i+1], alpha);
-      MOZ_BLEND(targetRow[3*i+2], targetRow[3*i+2], imageRow[3*i+2], alpha);
+      targetRow[3*i] = nsBlendImageChannel(   targetRow[3*i],   imageRow[3*i],   alpha);
+      targetRow[3*i+1] = nsBlendImageChannel( targetRow[3*i+1], imageRow[3*i+1], alpha);
+      targetRow[3*i+2] = nsBlendImageChannel( targetRow[3*i+2], imageRow[3*i+2], alpha);
     }
   }
 }
@@ -974,51 +975,31 @@ nsImageXlib::DrawComposited(nsIRenderingContext &aContext,
                             PRInt32 aDX, PRInt32 aDY,
                             PRInt32 aDWidth, PRInt32 aDHeight)
 {
-  if ((aDWidth==0) || (aDHeight==0))
+  if (aSWidth <= 0 || aSHeight <= 0 || aDWidth <= 0 || aDHeight <= 0 ||
+      aSX < 0 || aSY < 0 || aSX > mWidth || aSY > mHeight ||
+      aSWidth > mWidth - aSX || aSHeight > mHeight - aSY)
     return;
 
   nsIDrawingSurfaceXlib *drawing = NS_STATIC_CAST(nsIDrawingSurfaceXlib *, aSurface);
   Drawable drawable; drawing->GetDrawable(drawable);
-  Visual  *visual   = xxlib_rgb_get_visual(mXlibRgbHandle);
-
-  // I hate clipping... too!
+  Visual *visual = xxlib_rgb_get_visual(mXlibRgbHandle);
   PRUint32 surfaceWidth, surfaceHeight;
   drawing->GetDimensions(&surfaceWidth, &surfaceHeight);
 
-  int readX, readY;
-  unsigned readWidth, readHeight, destX, destY;
-
-  if ((aDY >= (int)surfaceHeight) || (aDX >= (int)surfaceWidth) ||
-      (aDY + aDHeight <= 0) || (aDX + aDWidth <= 0)) {
-    // This should never happen if the layout engine is sane,
-    // as it means we're trying to draw an image which is outside
-    // the drawing surface.  Bulletproof gfx for now...
+  // Clip in destination coordinates. Source offsets are applied only when
+  // addressing the original RGB/alpha planes, not added to scaled offsets.
+  PRInt64 right = PR_MIN(PRInt64(aDX) + aDWidth, PRInt64(surfaceWidth));
+  PRInt64 bottom = PR_MIN(PRInt64(aDY) + aDHeight, PRInt64(surfaceHeight));
+  PRInt32 readX = PR_MAX(aDX, 0), readY = PR_MAX(aDY, 0);
+  if (right <= readX || bottom <= readY)
     return;
-  }
-
-  if (aDX < 0) {
-    readX = 0;   readWidth = aDWidth + aDX;    destX = aSX - aDX;
-  } else {
-    readX = aDX;  readWidth = aDWidth;       destX = aSX;
-  }
-  if (aDY < 0) {
-    readY = 0;   readHeight = aDHeight + aDY;  destY = aSY - aDY;
-  } else { 
-    readY = aDY;  readHeight = aDHeight;     destY = aSY;
-  }
-
-  if (readX+readWidth > surfaceWidth)
-  readWidth = surfaceWidth-readX;                                             
-  if (readY+readHeight > surfaceHeight)
-    readHeight = surfaceHeight-readY;
-
-  if ((readHeight <= 0) || (readWidth <= 0))
+  PRUint32 readWidth = PRUint32(right - readX);
+  PRUint32 readHeight = PRUint32(bottom - readY);
+  PRUint32 destX = PRUint32(PRInt64(readX) - aDX);
+  PRUint32 destY = PRUint32(PRInt64(readY) - aDY);
+  if (PRUint64(readWidth) * readHeight > PRUint32(-1) / 3)
     return;
-
-  //  fprintf(stderr, "aX=%d aY=%d, aWidth=%u aHeight=%u\n", aX, aY, aWidth, aHeight);
-  //  fprintf(stderr, "surfaceWidth=%u surfaceHeight=%u\n", surfaceWidth, surfaceHeight);
-  //  fprintf(stderr, "readX=%u readY=%u readWidth=%u readHeight=%u destX=%u destY=%u\n\n",
-  //          readX, readY, readWidth, readHeight, destX, destY);
+  PRUint32 pixelCount = readWidth * readHeight;
 
   XImage *ximage = XGetImage(mDisplay, drawable,
                              readX, readY, readWidth, readHeight,
@@ -1029,7 +1010,11 @@ nsImageXlib::DrawComposited(nsIRenderingContext &aContext,
     return;
 
   unsigned char *readData = 
-    (unsigned char *)nsMemory::Alloc(3*readWidth*readHeight);
+    (unsigned char *)nsMemory::Alloc(3 * pixelCount);
+  if (!readData) {
+    XDestroyImage(ximage);
+    return;
+  }
 
   PRUint8 *scaledImage = 0;
   PRUint8 *scaledAlpha = 0;
@@ -1038,14 +1023,8 @@ nsImageXlib::DrawComposited(nsIRenderingContext &aContext,
 
   /* image needs to be scaled */
   if ((aSWidth!=aDWidth) || (aSHeight!=aDHeight)) {
-    PRUint32 x1, y1, x2, y2;
-    x1 = (destX*aSWidth)/aDWidth;
-    y1 = (destY*aSHeight)/aDHeight;
-    x2 = ((destX+readWidth)*aSWidth)/aDWidth;
-    y2 = ((destY+readHeight)*aSHeight)/aDHeight;
-
-    scaledImage = (PRUint8 *)nsMemory::Alloc(3*aDWidth*aDHeight);
-    scaledAlpha = (PRUint8 *)nsMemory::Alloc(aDWidth*aDHeight);
+    scaledImage = (PRUint8 *)nsMemory::Alloc(3 * pixelCount);
+    scaledAlpha = (PRUint8 *)nsMemory::Alloc(pixelCount);
     if (!scaledImage || !scaledAlpha) {
       XDestroyImage(ximage);
       nsMemory::Free(readData);
@@ -1056,19 +1035,21 @@ nsImageXlib::DrawComposited(nsIRenderingContext &aContext,
       return;
     }
     RectStretch(aSWidth, aSHeight, aDWidth, aDHeight,
-                0, 0, aDWidth-1, aDHeight-1,
-                mImageBits, mRowBytes, scaledImage, 3*readWidth, 24);
-    RectStretch(x1, y1, x2-1, y2-1,
-                0, 0, aDWidth-1, aDHeight-1,
-                mAlphaBits, mAlphaRowBytes, scaledAlpha, readWidth, 8);
+                destX, destY, destX + readWidth - 1, destY + readHeight - 1,
+                mImageBits + aSY * mRowBytes + 3 * aSX, mRowBytes,
+                scaledImage, 3 * readWidth, 24);
+    RectStretch(aSWidth, aSHeight, aDWidth, aDHeight,
+                destX, destY, destX + readWidth - 1, destY + readHeight - 1,
+                mAlphaBits + aSY * mAlphaRowBytes + aSX, mAlphaRowBytes,
+                scaledAlpha, readWidth, 8);
     imageOrigin = scaledImage;
     imageStride = 3*readWidth;
     alphaOrigin = scaledAlpha;
     alphaStride = readWidth;
   } else {
-    imageOrigin = mImageBits + destY*mRowBytes + 3*destX;
+    imageOrigin = mImageBits + (aSY + destY)*mRowBytes + 3*(aSX + destX);
     imageStride = mRowBytes;
-    alphaOrigin = mAlphaBits + destY*mAlphaRowBytes + destX;
+    alphaOrigin = mAlphaBits + (aSY + destY)*mAlphaRowBytes + aSX + destX;
     alphaStride = mAlphaRowBytes;
   }
 
@@ -1234,7 +1215,7 @@ nsImageXlib::Draw(nsIRenderingContext &aContext,
 
   if ((mAlphaDepth == 8) && mAlphaValid) {
     DrawComposited(aContext, aSurface,
-        0, 0, aWidth, aHeight,
+        0, 0, mWidth, mHeight,
         aX, aY, aWidth, aHeight);
     return NS_OK;
   }

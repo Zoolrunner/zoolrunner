@@ -41,6 +41,7 @@
 #include <gdk/gdkx.h>
 
 #include "imgScaler.h"
+#include "nsImageCompositing.h"
 
 #include "nsImageGTK.h"
 #include "nsRenderingContextGTK.h"
@@ -1054,9 +1055,9 @@ nsImageGTK::DrawComposited32(PRBool isLSB, PRBool flipBytes,
     for (unsigned i=0; i<width;
          i++, baseRow+=4, targetRow+=3, imageRow+=3, alphaRow++) {
       unsigned alpha = *alphaRow;
-      MOZ_BLEND(targetRow[0], baseRow[redIndex],   imageRow[0], alpha);
-      MOZ_BLEND(targetRow[1], baseRow[greenIndex], imageRow[1], alpha);
-      MOZ_BLEND(targetRow[2], baseRow[blueIndex],  imageRow[2], alpha);
+      targetRow[0] = nsBlendImageChannel( baseRow[redIndex],   imageRow[0], alpha);
+      targetRow[1] = nsBlendImageChannel( baseRow[greenIndex], imageRow[1], alpha);
+      targetRow[2] = nsBlendImageChannel( baseRow[blueIndex],  imageRow[2], alpha);
     }
   }
 }
@@ -1089,9 +1090,9 @@ nsImageGTK::DrawComposited24(PRBool isLSB, PRBool flipBytes,
     for (unsigned i=0; i<width;
          i++, baseRow+=3, targetRow+=3, imageRow+=3, alphaRow++) {
       unsigned alpha = *alphaRow;
-      MOZ_BLEND(targetRow[0], baseRow[redIndex],   imageRow[0], alpha);
-      MOZ_BLEND(targetRow[1], baseRow[greenIndex], imageRow[1], alpha);
-      MOZ_BLEND(targetRow[2], baseRow[blueIndex],  imageRow[2], alpha);
+      targetRow[0] = nsBlendImageChannel( baseRow[redIndex],   imageRow[0], alpha);
+      targetRow[1] = nsBlendImageChannel( baseRow[greenIndex], imageRow[1], alpha);
+      targetRow[2] = nsBlendImageChannel( baseRow[blueIndex],  imageRow[2], alpha);
     }
   }
 }
@@ -1139,13 +1140,13 @@ nsImageGTK::DrawComposited16(PRBool isLSB, PRBool flipBytes,
       } else
         pix = *((short *)baseRow);
       unsigned alpha = *alphaRow;
-      MOZ_BLEND(targetRow[0],
+      targetRow[0] = nsBlendImageChannel(
                 redScale[(pix&visual->red_mask)>>visual->red_shift], 
                 imageRow[0], alpha);
-      MOZ_BLEND(targetRow[1],
+      targetRow[1] = nsBlendImageChannel(
                 greenScale[(pix&visual->green_mask)>>visual->green_shift], 
                 imageRow[1], alpha);
-      MOZ_BLEND(targetRow[2],
+      targetRow[2] = nsBlendImageChannel(
                 blueScale[(pix&visual->blue_mask)>>visual->blue_shift], 
                 imageRow[2], alpha);
     }
@@ -1287,9 +1288,9 @@ nsImageGTK::DrawCompositedGeneral(PRBool isLSB, PRBool flipBytes,
     
     for (unsigned i=0; i<width; i++) {
       unsigned alpha = alphaRow[i];
-      MOZ_BLEND(targetRow[3*i],   targetRow[3*i],   imageRow[3*i],   alpha);
-      MOZ_BLEND(targetRow[3*i+1], targetRow[3*i+1], imageRow[3*i+1], alpha);
-      MOZ_BLEND(targetRow[3*i+2], targetRow[3*i+2], imageRow[3*i+2], alpha);
+      targetRow[3*i] = nsBlendImageChannel(   targetRow[3*i],   imageRow[3*i],   alpha);
+      targetRow[3*i+1] = nsBlendImageChannel( targetRow[3*i+1], imageRow[3*i+1], alpha);
+      targetRow[3*i+2] = nsBlendImageChannel( targetRow[3*i+2], imageRow[3*i+2], alpha);
     }
   }
 }

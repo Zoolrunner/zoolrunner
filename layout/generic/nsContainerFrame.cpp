@@ -500,6 +500,7 @@ SyncFrameViewGeometryDependentProperties(nsPresContext*  aPresContext,
   // color is actually not relevant.
   PRBool  viewHasTransparentContent =
     !(hasBG && !(bg->mBackgroundFlags & NS_STYLE_BG_COLOR_TRANSPARENT) &&
+      NS_GET_A(bg->mBackgroundColor) == 255 &&
       !display->mAppearance && bg->mBackgroundClip == NS_STYLE_BG_CLIP_BORDER &&
       aFrame->CanPaintBackground() &&
       !HasNonZeroBorderRadius(aStyleContext));
@@ -524,6 +525,7 @@ SyncFrameViewGeometryDependentProperties(nsPresContext*  aPresContext,
     const nsStyleDisplay* bgDisplay = scrollFrame->GetStyleDisplay();
     drawnOnUniformField = scrollFrameHasBG &&
       !(scrollFrameBG->mBackgroundFlags & NS_STYLE_BG_COLOR_TRANSPARENT) &&
+      NS_GET_A(scrollFrameBG->mBackgroundColor) == 255 &&
       (scrollFrameBG->mBackgroundFlags & NS_STYLE_BG_IMAGE_NONE) &&
       !HasNonZeroBorderRadius(scrollFrame->GetStyleContext()) &&
       !(bgDisplay->IsAbsolutelyPositioned()
@@ -552,7 +554,9 @@ SyncFrameViewGeometryDependentProperties(nsPresContext*  aPresContext,
         // don't proceed unless this is the root view
         // (sometimes the non-root-view is a canvas)
         if (aView->HasWidget() && aView == rootView) {
-          viewHasTransparentContent = hasBG && (bg->mBackgroundFlags & NS_STYLE_BG_COLOR_TRANSPARENT);
+          viewHasTransparentContent = hasBG &&
+            ((bg->mBackgroundFlags & NS_STYLE_BG_COLOR_TRANSPARENT) ||
+             NS_GET_A(bg->mBackgroundColor) != 255);
           aView->GetWidget()->SetWindowTranslucency(viewHasTransparentContent);
         }
       }

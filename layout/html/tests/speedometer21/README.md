@@ -471,3 +471,20 @@ of load listeners. It reproduced three failures before the correction. Native
 LoongArch GTK2 passes all 159 HTTP assertions after correcting the error-listener
 array and enabling channel progress notifications when a handler is added after
 open, while preserving unrelated channel flags.
+
+The full themed ten-iteration run completed all 480 workload checks successfully,
+then failed in the original results callback: `style.setProperty(name, value)`
+incorrectly requires a third priority argument in the historical binding.
+Therefore this is still **not a full benchmark pass**. The blocked run and a
+newer run sharing that binding were stopped; their logs and blocker reports are
+retained. Other applications remain deferred until the original results UI also
+completes.
+
+Painting inspection exposed opaque rendering of RGBA backgrounds. Rectangular
+backgrounds now composite through native image alpha, with corrected transparent
+view classification and rounded output channels in GTK2/Xlib. The strict
+132,000-pixel fixture passes on both backends, including viewport clipping.
+Xlib initially crashed in its alpha scaler; correcting dimensions, source offsets
+and clipped buffer strides resolves that crash. Both backends pass all 24 Suite
+lifecycle checks afterward. Rounded translucent fills, borders, text and canvas
+propagation remain unverified/incomplete; see the layout probe guide.

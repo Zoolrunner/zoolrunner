@@ -218,3 +218,32 @@ is retained as required by the
 coordinates, all-empty lists and degenerate lines. The existing 33 content
 geometry checks and 24 Suite lifecycle checks also pass on native LoongArch
 GTK2. SVG/transformed geometry and other layout gaps remain outside this result.
+
+`rgba-background-paint.html` checks rectangular background compositing, including
+alpha zero/one, very faint colors, overlapping translucent colors and overflow
+clipping. Backgrounds use the existing native image compositor when the primitive
+renderer cannot retain alpha. Translucent views are no longer classified as
+opaque or safe uniform scrolling backgrounds. GTK2/Xlib image channel composition
+rounds at the output; the public historical truncating blending macro is unchanged.
+
+After taking a screenshot at 1x scale, run:
+
+```sh
+python3 layout/html/tests/style/check-rgba-background.py screenshot.png \
+  --report artifacts/rgba-background.json
+```
+
+The optional checker requires Pillow and aligns the 440-by-300 content region
+using the magenta marker. Its independently composited reference matches Chromium
+148 exactly. Native LoongArch GTK2 also matches all 132,000 pixels exactly; the
+original rendering differed at 27,600 pixels. This tests the
+[CSS Color alpha-compositing rule](https://www.w3.org/TR/css-color-3/#alpha),
+not full color conformance. Translucent rounded fills, borders, text and canvas
+background propagation need additional implementation and painting coverage.
+
+The final fixture also places translucent backgrounds partly outside the top
+and left viewport edges. Xlib now matches all 132,000 reference pixels as well.
+This exposed and corrected its image scaler's alpha-plane argument mismatch,
+cropped buffer dimensions and source/destination offset confusion. The earlier
+Xlib capture crashed in `Stretch8`; the corrected scaled image path passes the
+strict pixel comparison. Fully transparent rounded backgrounds are also skipped.

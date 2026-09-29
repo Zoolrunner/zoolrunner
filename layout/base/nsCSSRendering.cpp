@@ -3341,7 +3341,8 @@ nsCSSRendering::PaintBackgroundColor(nsPresContext* aPresContext,
                                      const nsStylePadding& aPadding,
                                      PRBool aCanPaintNonWhite)
 {
-  if (aColor.mBackgroundFlags & NS_STYLE_BG_COLOR_TRANSPARENT) {
+  if ((aColor.mBackgroundFlags & NS_STYLE_BG_COLOR_TRANSPARENT) ||
+      !NS_GET_A(aColor.mBackgroundColor)) {
     // nothing to paint
     return;
   }
@@ -3395,6 +3396,24 @@ nsCSSRendering::PaintBackgroundColor(nsPresContext* aPresContext,
   nscolor color = aColor.mBackgroundColor;
   if (!aCanPaintNonWhite) {
     color = NS_RGB(255, 255, 255);
+  }
+  if (NS_GET_A(color) != 255) {
+    if (!NS_GET_A(color) || bgClipArea.IsEmpty())
+      return;
+    // Several historical rendering contexts discard SetColor's alpha byte.
+    // Their image compositors already support a separate alpha plane. A flat
+    // one-pixel gradient supplies that image without allocating a box-sized
+    // bitmap, and DrawImage preserves the context's transform and clipping.
+    nsCOMPtr<nsStyleGradient> solid = new nsStyleGradient();
+    if (!solid || !solid->mStops.SetLength(2))
+      return;
+    solid->mStops[0].mColor = solid->mStops[1].mColor = color;
+    imgIContainer* image = solid->GetImage(nsSize(1, 1), 1);
+    if (image) {
+      nscoord pixel = NSToCoordRound(aPresContext->PixelsToTwips());
+      aRenderingContext.DrawImage(image, nsRect(0, 0, pixel, pixel), bgClipArea);
+    }
+    return;
   }
   aRenderingContext.SetColor(color);
   aRenderingContext.FillRect(bgClipArea);
@@ -4526,4 +4545,3 @@ nsCSSRendering::DrawTableBorderSegment(nsIRenderingContext&     aContext,
 }
 
 // End table border-collapsing section
-

@@ -1185,3 +1185,9 @@ NULs without changing ordinary-key hashes. Legacy domain-based storage events
 retain their initializer signatures and expose the shared event state methods.
 Current Suite validation and remaining
 DOM/CSS gaps are recorded in the [Speedometer notes](layout/html/tests/speedometer21/README.md).
+
+Translucent rectangular CSS backgrounds now use native image compositing on
+historical graphics backends, and their views retain the content behind them.
+The focused GTK2 and Xlib painting fixture matches all 132,000 reference pixels. Rounded
+fills, borders, text and canvas transparency remain separate rendering gaps;
+see the [layout probes](layout/html/tests/style/README-probes.md).
