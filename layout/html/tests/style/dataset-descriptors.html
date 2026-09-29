@@ -1,0 +1,60 @@
+<!doctype html><title>Dataset property descriptors and receivers</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+function test(name,fn){try{fn();}catch(e){check(String(e),'no exception',name+' exception');}}
+function exception(fn){try{fn();return null;}catch(e){return e;}}
+function fresh(){return document.createElement('div');}
+test('named descriptors',function(){
+ var e=fresh(),d=e.dataset;
+ check(Reflect.defineProperty(d,'item',{value:12,configurable:false,writable:false,enumerable:false}),true,'named setter accepts data descriptor');
+ check(e.getAttribute('data-item'),'12','descriptor value converted and reflected');
+ var desc=Object.getOwnPropertyDescriptor(d,'item');
+ check(desc.value,'12','descriptor reads string');check(desc.configurable,true,'named property remains configurable');
+ check(desc.writable,true,'named property remains writable');check(desc.enumerable,true,'named property remains enumerable');
+ e.removeAttribute('data-item');check(Object.getOwnPropertyDescriptor(d,'item'),undefined,'attribute removal removes descriptor');
+ check(Reflect.defineProperty(d,'item',{writable:true}),true,'writable-only descriptor invokes setter');
+ check(e.getAttribute('data-item'),'undefined','missing descriptor value converts undefined');
+ check(Reflect.defineProperty(d,'item',{}),false,'generic descriptor rejected');
+ check(Reflect.defineProperty(d,'item',{get:function(){return 4;}}),false,'named accessor descriptor rejected');
+ check(e.getAttribute('data-item'),'undefined','rejected descriptor leaves value');
+});
+test('receiver semantics',function(){
+ var e=fresh(),d=e.dataset,receiver={},value={};e.setAttribute('data-item','original');
+ check(Reflect.set(d,'item',value,receiver),true,'different receiver assignment succeeds');
+ check(receiver.item,value,'different receiver receives unconverted value');
+ check(e.getAttribute('data-item'),'original','different receiver does not mutate attribute');
+ var proto={};Object.defineProperty(proto,'probe',{get:function(){return this;}});
+ Object.setPrototypeOf(d,proto);check(Reflect.get(d,'probe',receiver),receiver,'prototype getter observes receiver');
+ check(Reflect.set(d,'newName',value,receiver),true,'new property uses different receiver');
+ check(receiver.newName,value,'new receiver value remains object');
+ check(e.hasAttribute('data-new-name'),false,'new receiver property not reflected');
+ check(Reflect.setPrototypeOf(d,d),false,'self prototype cycle rejected');
+});
+test('symbol properties',function(){
+ var e=fresh(),d=e.dataset,key=Symbol('dataset'),value={};
+ d[key]=value;check(d[key],value,'symbol value not converted');check(e.attributes.length,0,'symbol does not create attribute');
+ check(Object.getOwnPropertySymbols(d)[0],key,'symbol listed');
+ check(Reflect.defineProperty(d,key,{get:function(){return this;},configurable:true}),true,'symbol accessor descriptor accepted');
+ check(d[key],d,'symbol getter receiver');check(delete d[key],true,'symbol deletion');
+ check(Object.getOwnPropertySymbols(d).length,0,'deleted symbol removed');
+});
+test('extensibility',function(){
+ var d=fresh().dataset;check(Object.isExtensible(d),true,'dataset initially extensible');
+ check(Reflect.preventExtensions(d),false,'dataset refuses preventExtensions');
+ check(Object.isExtensible(d),true,'dataset remains extensible');
+ check(exception(function(){Object.preventExtensions(d);}) instanceof TypeError,true,'Object.preventExtensions throws');
+});
+test('interface',function(){
+ var d=fresh().dataset;
+ check(typeof DOMStringMap,'function','interface constructor exposed');
+ check(Object.getPrototypeOf(d),DOMStringMap.prototype,'shared interface prototype');
+ check(d instanceof DOMStringMap,true,'instanceof interface');
+ check(Object.prototype.toString.call(d),'[object DOMStringMap]','interface string tag');
+ check(exception(function(){new DOMStringMap();}) instanceof TypeError,true,'interface constructor cannot be called');
+ var descriptor=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'dataset');
+ check(typeof descriptor.get,'function','dataset accessor on HTMLElement prototype');
+ check(descriptor.set,undefined,'dataset has no setter');
+ check(exception(function(){descriptor.get.call({});}) instanceof TypeError,true,'dataset getter receiver checked');
+});
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>

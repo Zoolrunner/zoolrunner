@@ -864,3 +864,22 @@ GTK2 and Xlib (`xhr-state-calendar-{gtk2,xlib}-views.log`). The shared window
 runner now accepts `--runtime` for native Linux, copying the runtime and using
 a private HOME/profile; its existing macOS archive mode is retained. See
 [Calendar compatibility checks](../../../../calendar/test/README-compatibility.md).
+
+### Dispatch package gates and descriptor baseline
+
+All eight `xhr-package-APP-BACKEND/logs/runtime-result.txt` reports now pass
+with dispatch revision `79c97eb5`. Each includes all 11,540 pinned ES5.1 cases
+and 28,582 selected ES2015 cases. These package results precede the subsequent
+`0d546a61` state-notification correction; the focused HTTP, GC and application
+checks above validate that later component separately.
+
+`../style/dataset-descriptors.html` adds 39 planned descriptor, receiver,
+symbol, extensibility and interface assertions. The snapshot implementation
+fails 15 of the 33 assertions reached (some test groups terminate on an
+exception). Chromium 148 reaches all 39 and fails two: it accepts generic and
+accessor descriptors on named properties, although
+[Web IDL's named-property definition algorithm](https://webidl.spec.whatwg.org/#legacy-platform-object-defineownproperty)
+requires rejecting non-data descriptors. Keep these assertions; the comparison
+browser is not the specification. Reports are `dataset-descriptors-chromium.json`
+and `dataset-baseline-gtk2-dataset-descriptors.json`. Both dataset fixtures
+remain known-failing diagnostics, outside the passing content batch.
