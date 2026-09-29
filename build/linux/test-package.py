@@ -117,6 +117,12 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
                 '-L' + str(runtime), xpcom_library, '-lnspr4', '-o', str(base / 'string-keys')]
     run(command, 'string-keys-build')
     run([base / 'string-keys'], 'string-keys', 'STRING-KEY-LENGTH checks=19 failures=0')
+    command = ['g++', '-std=gnu++98'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
+    command += ['-I' + str(root / 'content/base/src'),
+                str(root / 'layout/html/tests/style/TestClientRectBounds.cpp'),
+                '-o', str(base / 'client-rect-bounds')]
+    run(command, 'client-rect-bounds-build')
+    run([base / 'client-rect-bounds'], 'client-rect-bounds', 'CLIENT-RECT-BOUNDS checks=10 failures=0')
     expat = base / 'expat'
     command = ['gcc'] + (['-m32', '-march=i686'] if a.arch == 'i686' else [])
     command += ['-DXP_UNIX', '-I' + str(includes / 'nspr'),

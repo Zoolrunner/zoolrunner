@@ -401,3 +401,13 @@ Xlib development runtime passes the same 927 assertions across 31 content
 fixtures as GTK2. Its 400-by-300 box-sizing painting region matches the same
 Chromium reference with zero differing pixels. Other applications remain untested
 in this Speedometer effort, pending the full themed Suite benchmark.
+
+Client rectangle bounds now keep the first fragment separately from the union
+of nonzero extents. An initial zero-size point no longer enlarges a later
+nonempty box; when every fragment has zero width or height, the first fragment
+is retained as required by the
+[CSSOM View bounding-box algorithm](https://drafts.csswg.org/cssom-view/#dom-element-getboundingclientrect).
+`TestClientRectBounds.cpp` passes 10 direct boundary cases, including fractional
+coordinates, all-empty lists and degenerate lines. The existing 33 content
+geometry checks and 24 Suite lifecycle checks also pass on native LoongArch
+GTK2. SVG/transformed geometry and other layout gaps remain outside this result.

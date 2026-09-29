@@ -1,5 +1,6 @@
 /* CSSOM View geometry. License: MPL 1.1/GPL 2.0/LGPL 2.1. */
 #include "nsDOMGeometry.h"
+#include "nsClientRectBounds.h"
 #include "nsContentUtils.h"
 #include "nsIContent.h"
 #include "nsIDocument.h"
@@ -81,21 +82,15 @@ nsresult nsDOMGeometryRectList::Append(const nsRect& aRect, double aScale)
 
 nsresult nsDOMGeometryRectList::BoundingRect(nsIDOMDOMRect** aResult)
 {
-  double left = 0, top = 0, right = 0, bottom = 0;
-  PRBool found = PR_FALSE;
+  nsClientRectBounds bounds;
   for (PRInt32 i = 0; i < mRects.Count(); ++i) {
     double x, y, width, height;
     mRects[i]->GetX(&x); mRects[i]->GetY(&y);
     mRects[i]->GetWidth(&width); mRects[i]->GetHeight(&height);
-    if (!found) {
-      left = x; top = y; right = x + width; bottom = y + height;
-      found = PR_TRUE;
-    } else if (width != 0 || height != 0) {
-      left = PR_MIN(left, x); top = PR_MIN(top, y);
-      right = PR_MAX(right, x + width); bottom = PR_MAX(bottom, y + height);
-    }
+    bounds.Add(x, y, width, height);
   }
-  *aResult = new nsDOMGeometryRect(left, top, right - left, bottom - top);
+  nsClientRectBounds::Rect rect = bounds.Get();
+  *aResult = new nsDOMGeometryRect(rect.x, rect.y, rect.width, rect.height);
   NS_ENSURE_TRUE(*aResult, NS_ERROR_OUT_OF_MEMORY);
   NS_ADDREF(*aResult);
   return NS_OK;

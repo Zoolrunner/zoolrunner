@@ -208,3 +208,13 @@ The latest native LoongArch Xlib Suite also passes the 927 content assertions.
 The 400-by-300 box-sizing painting region matches the Chromium reference with
 zero differing pixels on both GTK2 and Xlib. This remains bounded painting
 coverage; shadows, transforms and other required workload styles are incomplete.
+
+Client rectangle bounds now keep the first fragment separately from the union
+of nonzero extents. An initial zero-size point no longer enlarges a later
+nonempty box; when every fragment has zero width or height, the first fragment
+is retained as required by the
+[CSSOM View bounding-box algorithm](https://drafts.csswg.org/cssom-view/#dom-element-getboundingclientrect).
+`TestClientRectBounds.cpp` passes 10 direct boundary cases, including fractional
+coordinates, all-empty lists and degenerate lines. The existing 33 content
+geometry checks and 24 Suite lifecycle checks also pass on native LoongArch
+GTK2. SVG/transformed geometry and other layout gaps remain outside this result.
