@@ -76,6 +76,11 @@ function panes(){try{
    check(pane.loaded,'pane loaded: '+pane.id);
    check(root.lastSelected===pane.id,'pane selected: '+pane.id);
    check(pane.boxObject.width>0&&pane.boxObject.height>0,'pane layout: '+pane.id);
+   if(pane.id==='paneContent'){
+    var fonts=d.getElementById('defaultFont');
+    check(fonts&&fonts.getElementsByTagName('menuitem').length>0,'font menu contains installed fonts');
+    check(preferencesWindow.FontBuilder._allFonts&&preferencesWindow.FontBuilder._allFonts.length>0,'font enumeration completed');
+   }
    next();
   }catch(e){check(false,'pane verification: '+e);finish();}},200);
  }catch(e){check(false,'pane selection: '+e);finish();}}

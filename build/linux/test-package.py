@@ -167,14 +167,16 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     executable = runtime / (metadata['appname'] + '-bin')
     if not executable.exists():
         executable = runtime / metadata['appname']
-    cases = [('application', code, 'APPLICATION PASS:'),
+    cases = [('fonts', (root / 'gfx/tests/font-enumeration.xul').read_text(),
+              'FONT-ENUMERATION checks=12 failures=0'),
+             ('application', code, 'APPLICATION PASS:'),
              ('window', window, 'WINDOW-BOOTSTRAP checks=19 failures=0')]
     if a.app == 'suite':
         cases += [('lifecycle', (root / 'editor/composer/tests/platform-lifecycle.xul').read_text(), 'PLATFORM-LIFECYCLE checks=24 failures=0'),
                   ('chatzilla', (tests / 'modern-chatzilla.xul').read_text(), 'SUITE-CHATZILLA initialized=true')]
     if a.app == 'browser':
         cases += [('preferences', (root / 'browser/components/preferences/tests/lifecycle.xul').read_text(),
-                   'BROWSER-PREFERENCES checks=28 failures=0')]
+                   'BROWSER-PREFERENCES checks=30 failures=0')]
     for label, content, marker in cases:
         (fixture / 'early-application.xul').write_text(content)
         command = [executable]

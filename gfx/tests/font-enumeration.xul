@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        width="300" height="100" onload="finish()">
+<script><![CDATA[
+// Run during parsing, before this window's initial layout or font lookup.
+var results = [], failures = 0;
+function check(value, label) {
+  if (!value) ++failures;
+  results.push((value ? 'PASS ' : 'FAIL ') + label);
+}
+function sorted(names) {
+  // GTK's historical fontconfig backend prepends CSS generic families before
+  // its sorted installed-font names. Preserve that application-facing policy.
+  var start = 0;
+  while (start < names.length && /^(serif|sans-serif|monospace)$/.test(names[start])) ++start;
+  for (var i = start + 1; i < names.length; ++i)
+    if (names[i-1] > names[i]) return false;
+  return true;
+}
+try {
+  var C = Components.classes, I = Components.interfaces;
+  var enumerator = C['@mozilla.org/gfx/fontenumerator;1'].getService(I.nsIFontEnumerator);
+  var count = {}, all = enumerator.EnumerateAllFonts(count);
+  check(count.value == all.length, 'all-font count matches returned array');
+  check(all.length > 0, 'display has enumerable fonts');
+  check(sorted(all), 'installed names sorted after legacy generic prefix');
+  var saved = all.join('\n');
+  var any = enumerator.EnumerateFonts(null, null, count);
+  check(count.value == any.length, 'unfiltered count matches returned array');
+  check(any.join('\n') == saved, 'null language enumerates all fonts');
+  var empty = enumerator.EnumerateFonts('', '', count);
+  check(empty.join('\n') == saved, 'empty language enumerates all fonts');
+  var western = enumerator.EnumerateFonts('x-western', 'serif', count);
+  check(count.value == western.length, 'language-filtered count matches array');
+  check(western.length > 0, 'western language has fonts');
+  check(sorted(western), 'filtered installed names sorted after legacy generic prefix');
+  var subset = true;
+  for (var i = 0; i < western.length; ++i)
+    if (all.indexOf(western[i]) < 0) subset = false;
+  check(subset, 'filtered fonts belong to all-font list');
+  check(all.join('\n') == saved, 'later enumeration preserves earlier results');
+  var again = enumerator.EnumerateAllFonts(count);
+  check(again.join('\n') == saved, 'repeated enumeration stable');
+} catch (e) { check(false, 'unexpected exception: ' + e); }
+function finish() {
+  dump('FONT-ENUMERATION checks=' + results.length + ' failures=' + failures + '\n');
+  dump('SPEEDOMETER-RESULT ' + JSON.stringify({pass:failures===0,
+       detail:{failures:failures, results:results}}) + '\n');
+  Components.classes['@mozilla.org/toolkit/app-startup;1']
+    .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+]]></script></window>

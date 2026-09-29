@@ -21,6 +21,7 @@ def main():
     parser.add_argument('--mode', choices=['probe'], default='probe')
     parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
     parser.add_argument('--timeout', type=int, default=60)
+    parser.add_argument('--gdb', action='store_true', help='Record a native crash backtrace in the probe log')
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
     if args.chrome_probe and args.restart_url:
@@ -67,6 +68,9 @@ def main():
             command.append('-zoolrunner-test')
         elif args.application == 'browser':
             command += ['-chrome', 'chrome://zooltest/content/early-application.xul']
+        if args.gdb:
+            command = ['gdb', '--batch', '-ex', 'set pagination off', '-ex', 'run',
+                       '-ex', 'thread apply all bt full', '--args'] + command
         environment = dict(os.environ, HOME=str(home), LD_LIBRARY_PATH=str(runtime),
                            MOZILLA_FIVE_HOME=str(runtime), MOZ_NO_REMOTE='1')
         preferences = {

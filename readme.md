@@ -1206,10 +1206,15 @@ are in progress. Missing CSS rendering features and broader DOM conformance
 remain unfinished, independently of successful benchmark execution.
 Browser and Calendar GTK2 now pass their complete relocated-package gates;
 Calendar includes its eight unit-test groups and all four views. XULRunner
-GTK2 builds and passes the content/History probes while its full package gate
-runs. Calendar and XULRunner preserve their existing storage permission-service
+GTK2 now also passes its complete package gate and standalone ChatZilla startup
+and XBL input checks. Calendar and XULRunner preserve their existing storage permission-service
 omissions; explicit denial-policy checks are recorded separately from storage
 conformance. The remaining Xlib application validation is in progress.
+That validation exposed a native Browser preferences crash in Xlib font
+enumeration. The fix holds a live screen device while copying font names;
+both Browser backends pass the expanded thirty preference checks and twelve
+font-enumeration checks. Xlib Suite passes the font fixture, with remaining
+application/package validation continuing.
 
 History-state work now includes an immutable native graph serializer, preserving
 cycles and shared binary buffers without retaining source windows. Its 63

@@ -8,8 +8,10 @@ metadata from `/usr/lib/pkgconfig`.
 
 Both architectures have GTK2 and Xlib mozconfigs for Suite, Browser, Calendar and
 XULRunner. All four x86 Suite configurations pass the complete local workflow;
-the full sixteen-entry x86 application matrix remains unverified. The additional LoongArch Calendar and Xlib
-application profiles have not been runtime-tested on this host.
+the full sixteen-entry x86 application matrix remains unverified. Native
+LoongArch Suite passes both backends, and Browser, Calendar and XULRunner pass
+GTK2 package/runtime checks. Their remaining Xlib validation is in progress;
+see the Speedometer work notes.
 
 The native LoongArch GCC profiles also preserve `-flifetime-dse=1` and
 `-fno-strict-aliasing`. A GCC 15 Suite lifecycle run exposed an invalid frame
@@ -45,6 +47,10 @@ Packages dereference build-tree symlinks and omit host utilities. Validation
 checks ELF class/machine, dynamic dependencies, generated SpiderMonkey ABI
 metadata, JavaScript regressions, native JSAPI/Expat probes, and GTK2/Xlib windows
 under Xvfb. Suite also exercises application lifecycle and ChatZilla fixtures.
+All applications exercise native font enumeration. Browser preferences checks
+also require populated font menus, since the original font builder catches
+enumeration errors. These checks exposed an Xlib font-context crash during the
+native LoongArch matrix; see [font regression coverage](../../gfx/tests/README-font-enumeration.md).
 
 The relocated-package runner sets both `LD_LIBRARY_PATH` and
 `MOZILLA_FIVE_HOME` to the extracted runtime. Unix XPCOM uses the latter to

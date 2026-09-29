@@ -1196,9 +1196,6 @@ FreeNodeArray(nsHashKey* aKey, void* aData, void* aClosure)
   return PR_TRUE;
 }
 
-/* This is only required for the main display */
-static nsFontMetricsXlibContext *global_fmctx = nsnull;
-
 nsFontMetricsXlibContext::~nsFontMetricsXlibContext()
 {
   PR_LOG(FontMetricsXlibLM, PR_LOG_DEBUG, ("# nsFontMetricsXlibContext destroy()\n"));
@@ -5177,10 +5174,6 @@ FindFamily(nsFontMetricsXlibContext *aFmctx, nsCString* aName)
 nsresult
 nsFontMetricsXlib::FamilyExists(nsFontMetricsXlibContext *aFontMetricsContext, const nsString& aName)
 {
-  if (!global_fmctx) {
-    global_fmctx = aFontMetricsContext;
-  }
-
   if (!IsASCIIFontName(aName)) {
     return NS_ERROR_FAILURE;
   }
@@ -5937,7 +5930,7 @@ EnumerateNode(void* aElement, void* aData)
   nsFontNodeXlib* node = (nsFontNodeXlib*) aElement;
   EnumerateNodeInfo* info = (EnumerateNodeInfo*) aData;
   nsFontMetricsXlibContext *aFmctx = info->mFontMetricsContext;
-  if (info->mLangGroup != aFmctx->mUserDefined) {
+  if (info->mLangGroup && info->mLangGroup != aFmctx->mUserDefined) {
     if (node->mCharSetInfo == aFmctx->mUnknown) {
       return PR_TRUE; // continue
     }
@@ -5998,15 +5991,38 @@ CompareFontNames(const void* aArg1, const void* aArg2, void* aClosure)
 PR_END_EXTERN_C
 
 static nsresult
-EnumFonts(nsFontMetricsXlibContext *aFmctx, nsIAtom* aLangGroup, const char* aGeneric, PRUint32* aCount,
+EnumFonts(nsIAtom* aLangGroup, const char* aGeneric, PRUint32* aCount,
   PRUnichar*** aResult)
 {
+  // The old global_fmctx depended on an earlier FamilyExists call and could
+  // outlive its device context. Use the screen device's shared font context,
+  // keeping a device alive until all returned names are copied.
+  // This also initializes the context when enumeration precedes window layout.
+  nsFontMetricsXlibContext* aFmctx = nsnull;
+#ifdef MOZ_XLIB_SCREEN_CONTEXT
+  // The device constructor requires an initialized application display.
+  NS_ENSURE_TRUE(xxlib_find_handle(XXLIBRGB_DEFAULT_HANDLE),
+                 NS_ERROR_NOT_AVAILABLE);
+  nsDeviceContextXlib* screenDevice = new nsDeviceContextXlib();
+  NS_ENSURE_TRUE(screenDevice, NS_ERROR_OUT_OF_MEMORY);
+  nsCOMPtr<nsIDeviceContext> device = screenDevice;
+  nsresult rv = device->Init(nsnull);
+  NS_ENSURE_SUCCESS(rv, rv);
+  screenDevice->GetFontMetricsContext(aFmctx);
+#endif
+  // Xprint shares this source but does not register a screen font enumerator.
+  NS_ENSURE_TRUE(aFmctx, NS_ERROR_NOT_AVAILABLE);
   nsresult res = GetAllFontNames(aFmctx);
   if (NS_FAILED(res))
     return res;
 
+  PRInt32 count = aFmctx->mGlobalList.Count();
+  if (!count)
+    return NS_OK;
+  if (PRUint32(count) > PR_UINT32_MAX / sizeof(PRUnichar*))
+    return NS_ERROR_OUT_OF_MEMORY;
   PRUnichar** array =
-    (PRUnichar**) nsMemory::Alloc(aFmctx->mGlobalList.Count() * sizeof(PRUnichar*));
+    (PRUnichar**) nsMemory::Alloc(count * sizeof(PRUnichar*));
   if (!array)
     return NS_ERROR_OUT_OF_MEMORY;
 
@@ -6038,7 +6054,7 @@ nsFontEnumeratorXlib::EnumerateAllFonts(PRUint32* aCount, PRUnichar*** aResult)
   NS_ENSURE_ARG_POINTER(aCount);
   *aCount = 0;
 
-  return EnumFonts(global_fmctx, nsnull, nsnull, aCount, aResult);
+  return EnumFonts(nsnull, nsnull, aCount, aResult);
 }
 
 NS_IMETHODIMP
@@ -6060,7 +6076,7 @@ nsFontEnumeratorXlib::EnumerateFonts(const char* aLangGroup,
     generic = aGeneric;
 
   // XXX still need to implement aLangGroup and aGeneric
-  return EnumFonts(global_fmctx, langGroup, generic, aCount, aResult);
+  return EnumFonts(langGroup, generic, aCount, aResult);
 }
 
 NS_IMETHODIMP

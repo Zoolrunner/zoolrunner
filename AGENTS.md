@@ -188,7 +188,11 @@ Browser preference changes and platform bootstrap regressions should also run
 `browser/components/preferences/tests/lifecycle.xul`; Linux package checks run
 it automatically. It opens the unchanged Browser and preferences windows,
 visits every configured pane and acknowledges the original restore-default
-alert. Keep its explicit limitation reporting for the pre-existing literal
+alert. Verify that the font menu actually contains fonts: its builder catches
+enumeration errors, so a visible pane alone does not establish success. Keep
+`gfx/tests/font-enumeration.xul` in native package coverage, including Xlib's
+screen-context lifetime and unfiltered enumeration. Keep the preferences
+probe's explicit limitation reporting for the pre-existing literal
 homepage/localized-string mismatch; do not silently change frozen preference
 semantics or application defaults to hide it.
 

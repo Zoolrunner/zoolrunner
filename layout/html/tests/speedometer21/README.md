@@ -704,3 +704,14 @@ The unchanged built ChatZilla extension also passes twelve startup and XBL
 input assertions as a standalone XULRunner application
 (`xulrunner-gtk2-chatzilla.json`); see the
 [standalone test instructions](../../../../extensions/irc/tests/README.md).
+
+XULRunner GTK2's complete relocated-package gate now passes, including both
+pinned language suites and native embedding/window checks. Browser Xlib builds
+and passes 985 content, 300 History and 159 HTTP assertions, but its first
+package run found a native crash in font enumeration while opening preferences.
+The retained debugger trace is `browser-xlib-preferences-gdb.log`. The fix uses
+an owned screen device instead of an unowned cached font-context pointer.
+Both Browser backends now pass twelve direct font checks and thirty preferences
+checks, including actual font-menu population; Xlib Suite passes the font
+fixture too. Package validation is rerunning after this fix. See the
+[font regression notes](../../../../gfx/tests/README-font-enumeration.md).

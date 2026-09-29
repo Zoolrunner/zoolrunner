@@ -49,6 +49,8 @@ LIBRARY_NAME	= gfx_xlib
 EXPORT_LIBRARY = 1
 IS_COMPONENT	= 1
 MODULE_NAME	= nsGfxXlibModule
+# nsFontMetricsXlib.cpp is also compiled into Xprint, without a screen device.
+DEFINES += -DMOZ_XLIB_SCREEN_CONTEXT
 GRE_MODULE	= 1
 LIBXUL_LIBRARY = 1
 
