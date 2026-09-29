@@ -85,3 +85,11 @@ XULRunner and Suite each passed the 169 HTML/CSS assertions after the opacity
 changes; the Suite also passed the live Basilisk structural check. Pale Moon's
 menu and download link now paint in the native comparison, but flexbox sizing
 and alignment, shadows, and subpage background layers remain unfinished.
+
+The Suite-first Speedometer probes also cover `Event`, animation-frame
+callbacks, client geometry, live class-name collections, inert HTML documents
+and contextual HTML insertion. `custom-event.html` additionally requests forced
+GC from the [Suite probe runner](../speedometer21/run-suite.py); run that fixture
+through the runner rather than opening it directly. Its rooted detail data
+survives GC, but collection of detail cycles remains unvalidated. These tests
+exercise native APIs and do not establish exhaustive DOM or CSS conformance.

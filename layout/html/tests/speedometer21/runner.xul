@@ -12,7 +12,9 @@ var listener = { observe: function(message) {
     var e = message.QueryInterface(I.nsIScriptError);
     if (!(e.flags & I.nsIScriptError.warningFlag))
       dump('SPEEDOMETER-CONSOLE ' + e.errorMessage + ' ' + e.sourceName + ':' + e.lineNumber + '\n');
-  } catch (ignored) {}
+  } catch (ignored) {
+    dump('SPEEDOMETER-CONSOLE ' + message.message + '\n');
+  }
 }};
 function finish(ok, detail) {
   if (done) return;
@@ -79,8 +81,35 @@ function poll() {
       return;
     }
     if (Date.now() > deadline) {
+      var frames = [];
+      for (var frameIndex = 0; frameIndex < w.frames.length; ++frameIndex) {
+        var frame = w.frames[frameIndex];
+        frames.push({url:String(frame.location), readyState:frame.document.readyState,
+          body:frame.document.body ? frame.document.body.innerHTML.substr(0,12000) : null});
+        var fw = frame.wrappedJSObject || frame;
+        if (fw.Ember) {
+          var apps = fw.Ember.Namespace.NAMESPACES, appInfo = [];
+          for (var appIndex = 0; appIndex < apps.length; ++appIndex) {
+            var app = apps[appIndex], boot = app._bootPromise;
+            appInfo.push({name:String(app),booted:app._booted,
+              ready:app._readinessDeferrals,bootState:boot ? boot._state : null,
+              bootResult:boot ? String(boot._result) : null,
+              bootStack:boot && boot._result ? boot._result.stack : null});
+          }
+          frames[frames.length-1].ember = appInfo;
+          frames[frames.length-1].jqueryReady = fw.jQuery ? fw.jQuery.isReady : null;
+          var bb=fw.Ember.run.backburner, queueInfo={};
+          if(bb.currentInstance) for(var q in bb.currentInstance.queues) {
+            var queue=bb.currentInstance.queues[q];
+            queueInfo[q]={length:queue._queue ? queue._queue.length : null,
+              flushing:queue._queueBeingFlushed ? queue._queueBeingFlushed.length : null};
+          }
+          frames[frames.length-1].runLoop={autorun:bb._autorun,queues:queueInfo,
+            stack:bb.instanceStack.length};
+        }
+      }
       finish(false, {error:'timeout', url:String(w.location), started:started,
-        steps:w.benchmarkClient ? w.benchmarkClient._finishedTestCount : null});
+        steps:w.benchmarkClient ? w.benchmarkClient._finishedTestCount : null, frames:frames});
       return;
     }
   } catch (e) {

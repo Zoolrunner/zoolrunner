@@ -171,6 +171,13 @@ JavaPackage_resolve(JSContext *cx, JSObject *obj, jsval id)
 
     jsj_env = jsj_EnterJava(cx, &jEnv);
     if (!jEnv) {
+        /* A missing JVM is an ordinary, catchable embedding failure. Returning
+         * false without an exception aborts the entire script, bypassing even
+         * its catch/finally handlers (for example during global inspection).
+         * Preserve a more specific exception raised by the Java bridge.
+         */
+        if (!JS_IsExceptionPending(cx))
+            JS_ReportError(cx, "Java runtime is not available");
         ok = JS_FALSE;
         goto out;
     }

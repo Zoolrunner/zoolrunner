@@ -1,0 +1,13 @@
+<!doctype html><html><head><title>Unavailable LiveConnect runtime regression</title></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+window.onload=function(){
+ var caught=false,finalized=false;
+ try { Packages.isNamespace; }
+ catch(e){caught=true;check(String(e).indexOf('Java runtime')>=0,true,'missing runtime error');}
+ finally{finalized=true;}
+ check(caught,true,'unavailable JVM failure is catchable');
+ check(finalized,true,'finally executes');
+ check(1+1,2,'script continues after failure');testDone=true;
+};
+</script></body></html>

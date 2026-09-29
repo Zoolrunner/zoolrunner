@@ -137,3 +137,14 @@ reinitialization during/after dispatch and survival through forced garbage
 collection. Its GC step uses the Suite debugger service through the probe
 runner. Native roots preserve event data, but collection of cycles involving
 `detail` has not been validated and remains a lifecycle limitation to resolve.
+
+Ember startup also exposed an independent LiveConnect failure: inspecting
+`Packages` with no usable Java VM returned false from a native resolver without
+setting an exception. The script then stopped without running catch/finally.
+`liveconnect-unavailable.html` reproduces the timeout before the fix and passes
+four checks afterward on this host. The resolver now supplies a catchable error
+if the Java bridge did not already set one. LiveConnect and its historical APIs
+remain available; no benchmark or application source changes are required.
+This fixture requires a host without a usable Java VM and is not in the generic
+layout probe list. Timeout reports now include frame DOM and Ember boot/queue
+state, and the runner captures plain console messages as well as script errors.
