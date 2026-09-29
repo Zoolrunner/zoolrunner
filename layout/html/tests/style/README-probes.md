@@ -283,3 +283,16 @@ checks nine legacy denial/child-window behaviors; it is not a substitute for
 the 90 allowed-storage/event assertions in Browser and Suite. Run the HTTP
 driver with explicit `--storage-policy deny` for this configuration. Its four
 XHR groups still run unchanged and pass all 69 assertions in Calendar GTK2.
+
+`html-attribute-selectors.html` checks ASCII-only folding of HTML attribute
+names in selectors and generated `attr()` content, including layout changes
+after attribute mutation and case-sensitive XML selectors. The initial native
+LoongArch GTK2 Suite run (46bd462d) fails nine of nineteen checks; Chromium
+148 passes nineteen. Reports are `html-attribute-selectors-gtk2-*` and
+`html-attribute-selectors-chromium.json` under `artifacts/speedometer21`.
+The parser still applies Unicode case folding here, despite the corrected
+HTML DOM attribute APIs. This fixture records the remaining defect and is not
+yet included in the default passing probe sequence. The expected distinction
+follows [Selectors case sensitivity](https://www.w3.org/TR/selectors-3/#casesens)
+and HTML's ASCII case rules; generated-content assertions measure layout,
+not only parser acceptance.

@@ -1,0 +1,43 @@
+<!doctype html><title>HTML selector attribute ASCII case folding</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+try{
+ var e=document.createElement('div');e.id='subject';document.body.appendChild(e);
+ e.setAttribute('DATA-\u00c9','upper');
+ check(document.querySelector('[data-\u00c9]'),e,'non ASCII uppercase attribute selector');
+ check(document.querySelector('[DATA-\u00c9]'),e,'ASCII attribute alias selector');
+ check(document.querySelector('[data-\u00e9]'),null,'non ASCII lowercase selector remains distinct');
+ check(document.querySelector('[data-\\c9]'),e,'CSS escape preserves non ASCII uppercase');
+ check(document.querySelector('[data-\\e9]'),null,'CSS escape preserves non ASCII lowercase');
+ e.setAttribute('data-\u00e9','lower');
+ check(document.querySelector('[data-\u00c9="upper"]'),e,'distinct uppercase attribute value');
+ check(document.querySelector('[data-\u00e9="lower"]'),e,'distinct lowercase attribute value');
+ check(document.querySelector('[data-\u00c9="lower"]'),null,'uppercase selector does not use lowercase value');
+ var style=document.createElement('style');style.type='text/css';
+ style.textContent='#subject { width: 10px; height: 10px; } #subject[data-\\c9="upper"] { width: 20px; } #subject[data-\\e9="lower"] { height: 30px; }';
+ document.getElementsByTagName('head')[0].appendChild(style);
+ check(e.offsetWidth,20,'uppercase selector affects layout');
+ check(e.offsetHeight,30,'lowercase selector affects layout');
+ e.removeAttribute('data-\u00e9');
+ check(e.offsetWidth,20,'removing lowercase attribute preserves uppercase style');
+ check(e.offsetHeight,10,'removing lowercase attribute invalidates its style');
+ e.removeAttribute('data-\u00c9');
+ check(e.offsetWidth,10,'removing uppercase attribute invalidates its style');
+ var generated=document.createElement('span'),reference=document.createElement('span');
+ generated.id='generated';reference.id='reference';reference.textContent='MMMM';
+ generated.setAttribute('data-\u00c9','MMMM');generated.setAttribute('data-\u00e9','M');
+ document.body.appendChild(generated);document.body.appendChild(reference);
+ style.textContent+=' #generated, #reference { display: inline-block; font: 20px monospace; } #generated:before { content: attr(DATA-\\c9); }';
+ check(generated.offsetWidth,reference.offsetWidth,'attr() preserves non ASCII uppercase and folds ASCII');
+ generated.setAttribute('data-\u00e9','MMMMMMMM');
+ check(generated.offsetWidth,reference.offsetWidth,'attr() ignores distinct lowercase mutation');
+ generated.setAttribute('data-\u00c9','MMMMMMMM');reference.textContent='MMMMMMMM';
+ check(generated.offsetWidth,reference.offsetWidth,'attr() updates for uppercase mutation');
+ var xml=document.implementation.createDocument('http://www.w3.org/1999/xhtml','div',null);
+ xml.documentElement.setAttribute('DATA-\u00c9','upper');
+ check(xml.querySelector('[DATA-\u00c9]'),xml.documentElement,'XML attribute selector preserves ASCII case');
+ check(xml.querySelector('[data-\u00c9]'),null,'XML attribute selector distinguishes ASCII case');
+ check(xml.querySelector('[DATA-\u00e9]'),null,'XML attribute selector distinguishes Unicode case');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>
