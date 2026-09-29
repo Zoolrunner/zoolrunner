@@ -198,7 +198,7 @@ inline
 const nsQueryInterface
 do_QueryWrappedNative(nsIXPConnectWrappedNative *aWrappedNative)
 {
-    return nsQueryInterface(aWrappedNative->Native());
+    return nsQueryInterface(aWrappedNative ? aWrappedNative->Native() : nsnull);
 }
 
 inline
@@ -207,7 +207,8 @@ do_QueryWrappedNative(nsIXPConnectWrappedNative *aWrappedNative,
                       nsresult *aError)
 
 {
-    return nsQueryInterfaceWithError(aWrappedNative->Native(), aError);
+    return nsQueryInterfaceWithError(aWrappedNative ? aWrappedNative->Native() : nsnull,
+                                     aError);
 }
 
 %}

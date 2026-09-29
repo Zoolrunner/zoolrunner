@@ -104,3 +104,8 @@ dispatch and batch deletion from a static NodeList. `input-handler.html` covers
 handler detection, null defaults, assignment, inline handlers and removal.
 `event-redispatch.html` covers reuse, propagation reset, persistent cancellation,
 concurrent-dispatch rejection and bubbling in detached subtrees.
+
+`dom-invalid-receivers.html` checks that the new native DOM methods reject
+ordinary objects as receivers without dereferencing a missing XPConnect
+wrapper. Six assertions pass in native LoongArch Suite; the unchanged Suite
+lifecycle fixture also passes all 24 checks after the shared null-query fix.
