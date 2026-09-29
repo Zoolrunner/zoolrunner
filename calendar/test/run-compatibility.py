@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -38,7 +39,14 @@ function do_check_false(value){if(value)do_throw('expected falsy value');}
             command += ['-f', str(source)]
         environment = dict(os.environ)
         if args.library_path:
-            environment["DYLD_LIBRARY_PATH"] = str(args.library_path.absolute())
+            variable = 'DYLD_LIBRARY_PATH' if sys.platform == 'darwin' else 'LD_LIBRARY_PATH'
+            if os.name == 'nt':
+                variable = 'PATH'
+            if variable == 'LD_LIBRARY_PATH':
+                environment['MOZILLA_FIVE_HOME'] = str(args.library_path.absolute())
+            previous = environment.get(variable)
+            environment[variable] = str(args.library_path.absolute()) + (
+                os.pathsep + previous if previous else '')
         try:
             result = subprocess.run(command, env=environment, stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, universal_newlines=True, timeout=60)

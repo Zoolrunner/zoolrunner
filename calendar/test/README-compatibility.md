@@ -2,7 +2,10 @@
 
 Run the historical unit groups with `run-compatibility.py --shell PATH
 --report-dir DIRECTORY`. For an uninstalled developer shell, pass its library
-directory with `--library-path`.
+directory with `--library-path`. The runner selects the platform library search
+variable and, on non-Darwin Unix, sets `MOZILLA_FIVE_HOME` to that directory so
+classic XPCOM can also find its components. Existing library search entries
+are retained after the supplied directory.
 
 Test startup and all four views from a native Linux build:
 
@@ -23,3 +26,9 @@ instead of `--runtime`. Native Linux uses the historical `sunbird-bin` program
 name. The native LoongArch GTK2 and Xlib checks pass with the XHR state correction
 `0d546a61`; this change does not claim new macOS runtime validation. These checks
 cover startup and view switching, not every calendar provider or editing action.
+
+The native LoongArch GTK2 package at 3c8c0eac passes all eight unit groups through
+this direct invocation, plus startup and all four views. The corresponding
+Xlib follow-up remains pending. Initial direct-run loader/component-path
+failures are retained under `artifacts/speedometer21/` separately from the
+successful `text-shadow-fractional-calendar-gtk2-units` results.
