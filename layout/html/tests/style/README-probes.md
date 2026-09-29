@@ -384,3 +384,12 @@ ownership convention. The failed run and crash trace are retained as
 lifecycle checks pass. Computed lists are independently owned and shared
 immutably through inheritance. **Shadow painting remains unimplemented**;
 computed-style success is not rendering conformance.
+
+The separate chrome fixture `../speedometer21/text-shadow-paint.xul` compares
+captured pixels against independently positioned text. At 6873bdbf, its no-shadow
+control and scrollable-area check pass, while positive/negative offsets, list
+painting order, translucency and default shadow color fail (five of seven).
+`text-shadow-paint-baseline.log` retains the pixel counts. This deliberately
+failing rendering target is not part of the passing default probe sequence;
+blur, selection and decoration coverage must be added when painting is
+implemented. Do not use computed-style passes as a substitute for these pixels.

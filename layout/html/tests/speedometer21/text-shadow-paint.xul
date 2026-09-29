@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        xmlns:html="http://www.w3.org/1999/xhtml" width="520" height="220" onload="start()">
+<vbox flex="1"><browser id="page" type="content" flex="1"/><html:canvas id="capture" width="480" height="100" style="display:none"/></vbox>
+<script type="application/javascript;version=2015"><![CDATA[
+var checks=[],failures=0;
+function check(ok,label){if(!ok)++failures;checks.push((ok?'PASS ':'FAIL ')+label);}
+function finish(){
+ dump('TEXT-SHADOW-PAINT checks='+checks.length+' failures='+failures+'\n');
+ dump('SPEEDOMETER-RESULT '+JSON.stringify({pass:failures===0,detail:{failures:failures,results:checks}})+'\n');
+ Components.classes['@mozilla.org/toolkit/app-startup;1'].getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+function start(){
+ var page=document.getElementById('page');
+ page.addEventListener('load',function loaded(){page.removeEventListener('load',loaded,true);setTimeout(run,50);},true);
+ page.setAttribute('src','about:blank');
+}
+function run(){
+ try{
+  var win=document.getElementById('page').contentWindow,doc=win.document;
+  doc.body.style.cssText='margin:0;background:white;font:32px monospace;line-height:50px';
+  var actual=doc.createElement('div'),reference=doc.createElement('div');
+  actual.style.cssText='position:absolute;left:20px;top:10px;width:180px;height:70px';
+  reference.style.cssText='position:absolute;left:260px;top:10px;width:180px;height:70px';
+  doc.body.appendChild(actual);doc.body.appendChild(reference);
+  var canvas=document.getElementById('capture'),ctx=canvas.getContext('2d');
+  function layer(color,x,y,opacity){
+   var e=doc.createElement('span');e.textContent='Ab';
+   e.style.cssText='position:absolute;left:'+x+'px;top:'+y+'px;color:'+color+';opacity:'+opacity;
+   reference.appendChild(e);
+  }
+  function compare(shadow,color,layers,label){
+   actual.textContent='Ab';actual.style.color=color;actual.style.textShadow=shadow;
+   while(reference.firstChild)reference.removeChild(reference.firstChild);
+   for(var i=0;i<layers.length;i++)layer.apply(null,layers[i]);
+   layer(color,0,0,1);
+   doc.body.offsetHeight;
+   ctx.clearRect(0,0,480,100);ctx.drawWindow(win,0,0,480,100,'white');
+   var pixels=ctx.getImageData(0,0,480,100).data,bad=0,ink=0;
+   for(var y=0;y<100;y++)for(var x=0;x<220;x++){
+    var a=(y*480+x)*4,b=(y*480+x+240)*4;
+    if(pixels[b]<240||pixels[b+1]<240||pixels[b+2]<240)++ink;
+    if(Math.abs(pixels[a]-pixels[b])>3||Math.abs(pixels[a+1]-pixels[b+1])>3||Math.abs(pixels[a+2]-pixels[b+2])>3)++bad;
+   }
+   check(ink>30&&bad===0,label+' differing pixels='+bad+' reference ink='+ink);
+  }
+  compare('none','black',[],'no shadow baseline');
+  compare('red 90px 5px','black',[['red',90,5,1]],'positive offset');
+  compare('blue -10px 30px','black',[['blue',-10,30,1]],'negative offset');
+  compare('red 90px 5px, blue 90px 5px','black',[['blue',90,5,1],['red',90,5,1]],'first shadow paints above later shadow');
+  compare('rgba(255,0,0,0.5) 90px 5px','black',[['red',90,5,0.5]],'translucent shadow');
+  compare('90px 5px','blue',[['blue',90,5,1]],'omitted color uses element color');
+  actual.style.textShadow='none';var width=doc.documentElement.scrollWidth,height=doc.documentElement.scrollHeight;
+  actual.style.textShadow='red 1000px 1000px';doc.body.offsetHeight;
+  check(doc.documentElement.scrollWidth===width&&doc.documentElement.scrollHeight===height,'shadow ink does not enlarge scrollable area');
+ }catch(e){check(false,'unexpected exception '+e);}
+ finish();
+}
+]]></script></window>
