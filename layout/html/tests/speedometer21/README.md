@@ -265,3 +265,31 @@ checks pass after XPConnect stops replacing exceptions thrown by script with
 generic conversion errors. Suite lifecycle passes 24 checks and the unchanged
 legacy-application JavaScript fixture passes 58. The title algorithm is specified
 in [HTML document tree accessors](https://html.spec.whatwg.org/multipage/dom.html#document.title).
+
+Storage methods now live on the shared prototype and select the correct native
+behavior for their receiver: localStorage returns strings/null, while historical
+globalStorage/sessionStorage retain StorageItem results and range errors. The
+HTTP storage fixture passes 54 assertions, including borrowed methods, legacy
+key enumeration and conversion exceptions. All 24 Suite lifecycle checks pass;
+Flight's isolated three-operation workload also passes on this implementation.
+Historical prototype methods remain non-enumerable; complete modern property
+metadata/descriptor conformance and storage-event delivery remain unfinished.
+
+The probe runner accepts repeated `--restart-url URL` arguments to launch new
+processes with the same disposable profile. This option is restricted to probe
+mode and requires every stage to pass. Each restart has a separate log. Serve
+`style/storage-persistence.html` on two loopback ports and run:
+
+```sh
+sh build/linux/with-display.sh python3 layout/html/tests/speedometer21/run-suite.py \
+  --runtime obj-speedometer21-suite-merged/dist/bin --mode probe --timeout 30 \
+  --url 'http://127.0.0.1:18762/storage-persistence.html?write' \
+  --restart-url 'http://127.0.0.1:18763/storage-persistence.html?isolation' \
+  --restart-url 'http://127.0.0.1:18762/storage-persistence.html?read' \
+  --report artifacts/speedometer21/storage-persistence.json
+```
+
+All 15 assertions across three separate Suite processes pass, including
+persistent NUL/lone-surrogate keys and values, empty keys, isolation by port,
+and unchanged legacy domain storage shared across ports. This does not yet
+validate quota boundaries, opaque origins or shutdown memory accounting.

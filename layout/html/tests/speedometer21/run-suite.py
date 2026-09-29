@@ -13,12 +13,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--url', required=True)
+    parser.add_argument('--restart-url', action='append', default=[],
+                        help='Probe another URL in a new process using the same test profile')
     parser.add_argument('--mode', choices=['probe', 'benchmark'], default='benchmark')
     parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
     parser.add_argument('--debug-errors', default='', help='Diagnostic throw-stack filename filter')
     parser.add_argument('--timeout', type=int, default=1800)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
+    if args.restart_url and args.mode != 'probe':
+        parser.error('--restart-url is only supported for content probes')
     runtime = args.runtime.resolve()
     environment = dict(os.environ, LD_LIBRARY_PATH=str(runtime),
                        MOZILLA_FIVE_HOME=str(runtime), MOZ_NO_REMOTE='1')
@@ -59,9 +63,6 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 # Keep interactive slow-script dialogs out of unattended runs.
                 # The parent process still enforces the hard timeout.
                 preferences['dom.max_script_run_time'] = 0
-            (profile / 'user.js').write_text(''.join(
-                'user_pref(' + json.dumps(k) + ',' + json.dumps(v) + ');\n'
-                for k, v in preferences.items()))
             chrome = profile / 'chrome'
             chrome.mkdir(exist_ok=True)
             fixture = Path(__file__).resolve().parent.as_uri() + '/'
@@ -73,27 +74,42 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
 '''.replace('BASE', quoteattr(fixture)))
             command = [str(runtime / 'zoolrunner-bin'), '-P', name,
                        '-chrome', 'chrome://speedometer21/content/runner.xul']
-            with args.report.with_suffix('.log').open('w') as log:
-                try:
-                    result = subprocess.run(command, env=environment, stdout=log,
-                                            stderr=subprocess.STDOUT, timeout=args.timeout + 60)
-                    exit_code = result.returncode
-                except subprocess.TimeoutExpired:
-                    exit_code = 'timeout'
-            output = args.report.with_suffix('.log').read_text(errors='replace')
-            markers = [line[len('SPEEDOMETER-RESULT '):] for line in output.splitlines()
-                       if line.startswith('SPEEDOMETER-RESULT ')]
-            report = {'pass': False, 'exit': exit_code, 'runtime': str(runtime),
-                      'url': args.url, 'mode': args.mode,
-                      'contentEdition': args.content_edition}
-            if len(markers) == 1:
-                try:
-                    report['result'] = json.loads(markers[0])
-                    report['pass'] = exit_code == 0 and report['result']['pass'] is True
-                except (ValueError, KeyError, TypeError) as error:
-                    report['error'] = 'Invalid result marker: ' + str(error)
+            urls = [args.url] + args.restart_url
+            reports = []
+            for index, url in enumerate(urls):
+                preferences['zoolrunner.speedometer.url'] = url
+                (profile / 'user.js').write_text(''.join(
+                    'user_pref(' + json.dumps(k) + ',' + json.dumps(v) + ');\n'
+                    for k, v in preferences.items()))
+                log_path = (args.report.with_suffix('.log') if index == 0 else
+                            args.report.with_name(args.report.stem + '.restart-' + str(index) + '.log'))
+                with log_path.open('w') as log:
+                    try:
+                        result = subprocess.run(command, env=environment, stdout=log,
+                                                stderr=subprocess.STDOUT, timeout=args.timeout + 60)
+                        exit_code = result.returncode
+                    except subprocess.TimeoutExpired:
+                        exit_code = 'timeout'
+                output = log_path.read_text(errors='replace')
+                markers = [line[len('SPEEDOMETER-RESULT '):] for line in output.splitlines()
+                           if line.startswith('SPEEDOMETER-RESULT ')]
+                report = {'pass': False, 'exit': exit_code, 'runtime': str(runtime),
+                          'url': url, 'mode': args.mode,
+                          'contentEdition': args.content_edition}
+                if len(markers) == 1:
+                    try:
+                        report['result'] = json.loads(markers[0])
+                        report['pass'] = exit_code == 0 and report['result']['pass'] is True
+                    except (ValueError, KeyError, TypeError) as error:
+                        report['error'] = 'Invalid result marker: ' + str(error)
+                reports.append(report)
+                print(output, flush=True)
+                if not report['pass']:
+                    break
+            if args.restart_url:
+                report = {'pass': len(reports) == len(urls) and all(r['pass'] for r in reports),
+                          'mode': 'probe-sequence', 'runtime': str(runtime), 'runs': reports}
             args.report.write_text(json.dumps(report, indent=2) + '\n')
-            print(output)
             return 0 if report['pass'] else 1
         finally:
             if info:

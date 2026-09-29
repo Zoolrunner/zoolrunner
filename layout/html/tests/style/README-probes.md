@@ -125,3 +125,9 @@ Historical parsed documents keep their existing title path. The additional
 25-assertion `dom-conversion-exceptions.html` verifies that XPConnect preserves
 script-thrown argument-conversion exceptions, including reentrant conversions,
 without running the outer native mutation or suppressing ordinary type errors.
+
+The HTTP-only `local-storage.html` and `storage-persistence.html` fixtures cover
+modern and legacy storage separately. The former passes 54 assertions; the
+latter passes 15 across three processes and two origins. See the
+[restart-probe instructions](../speedometer21/README.md) for serving and running
+them. They are not in the file-URL layout list.

@@ -1522,6 +1522,8 @@ JSClass nsDOMClassInfo::sDOMConstructorProtoClass = {
 };
 
 
+static JSBool DefineStorageMethods(JSContext* cx, JSObject* proto);
+
 static const char *
 CutPrefix(const char *aName) {
   static const char prefix_nsIDOM[] = "nsIDOM";
@@ -6060,6 +6062,10 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
                                      obj);
       NS_ENSURE_TRUE(dot_prototype, NS_ERROR_OUT_OF_MEMORY);
     }
+
+    if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_Storage_id] &&
+        !DefineStorageMethods(cx, dot_prototype))
+      return NS_ERROR_OUT_OF_MEMORY;
 
     v = OBJECT_TO_JSVAL(dot_prototype);
 
@@ -11478,42 +11484,67 @@ LocalStorageMethod(JSContext* cx, JSObject* obj, uintN argc,
                                                         getter_AddRefs(wrapper));
   nsCOMPtr<nsPIDOMLocalStorage> local = do_QueryWrappedNative(wrapper);
   nsCOMPtr<nsIDOMStorage> storage = do_QueryWrappedNative(wrapper);
-  if (!local || !local->IsLocalStorage()) {
-    DOMConstructorTypeError(cx, "Storage method requires a localStorage object");
+  if (!local || !storage || (operation == LocalClear && !local->IsLocalStorage())) {
+    DOMConstructorTypeError(cx, "Storage method requires a storage object");
     return JS_FALSE;
   }
+  PRBool modern = local->IsLocalStorage();
   uintN required = operation == LocalClear ? 0 : operation == LocalSet ? 2 : 1;
   if (argc < required) {
-    DOMConstructorTypeError(cx, "Not enough arguments to Storage method");
+    if (modern) DOMConstructorTypeError(cx, "Not enough arguments to Storage method");
+    else nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
     return JS_FALSE;
   }
   nsresult rv = NS_OK;
   nsAutoString value;
+  nsCOMPtr<nsIDOMStorageItem> legacyItem;
   if (operation == LocalClear) {
     rv = local->Clear();
   } else if (operation == LocalKey) {
     uint32 index;
     if (!JS_ValueToECMAUint32(cx, argv[0], &index)) return JS_FALSE;
     rv = storage->Key(index, value);
-    if (rv == NS_ERROR_DOM_INDEX_SIZE_ERR) {
+    if (modern && rv == NS_ERROR_DOM_INDEX_SIZE_ERR) {
       value.SetIsVoid(PR_TRUE);
       rv = NS_OK;
     }
   } else {
-    JSString* key = JS_ValueToString(cx, argv[0]);
-    if (!key) return JS_FALSE;
-    argv[0] = STRING_TO_JSVAL(key);
-    nsDependentJSString name(key);
+    nsAutoString name;
+    if (!modern && JSVAL_IS_NULL(argv[0])) {
+      name.SetIsVoid(PR_TRUE);
+    } else {
+      JSString* key = JS_ValueToString(cx, argv[0]);
+      if (!key) return JS_FALSE;
+      argv[0] = STRING_TO_JSVAL(key);
+      name.Assign(nsDependentJSString(key));
+    }
     if (operation == LocalGet) {
-      rv = local->GetValue(name, value);
+      rv = modern ? local->GetValue(name, value) :
+                    storage->GetItem(name, getter_AddRefs(legacyItem));
     } else if (operation == LocalRemove) {
       rv = storage->RemoveItem(name);
     } else {
-      JSString* data = JS_ValueToString(cx, argv[1]);
-      if (!data) return JS_FALSE;
-      argv[1] = STRING_TO_JSVAL(data);
-      rv = storage->SetItem(name, nsDependentJSString(data));
+      nsAutoString data;
+      if (!modern && JSVAL_IS_NULL(argv[1])) {
+        data.SetIsVoid(PR_TRUE);
+      } else {
+        JSString* str = JS_ValueToString(cx, argv[1]);
+        if (!str) return JS_FALSE;
+        argv[1] = STRING_TO_JSVAL(str);
+        data.Assign(nsDependentJSString(str));
+      }
+      rv = storage->SetItem(name, data);
     }
+  }
+  if (NS_SUCCEEDED(rv) && !modern && operation == LocalGet) {
+    if (!legacyItem) {
+      *rval = JSVAL_NULL;
+      return JS_TRUE;
+    }
+    nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+    rv = nsDOMClassInfo::WrapNative(cx, obj, legacyItem,
+              NS_GET_IID(nsIDOMStorageItem), rval, getter_AddRefs(holder));
+    if (NS_SUCCEEDED(rv)) return JS_TRUE;
   }
   if (NS_FAILED(rv)) {
     nsDOMClassInfo::ThrowJSException(cx, rv);
@@ -11540,6 +11571,19 @@ LOCAL_STORAGE_METHOD(LocalStorageRemove, LocalRemove)
 LOCAL_STORAGE_METHOD(LocalStorageKey, LocalKey)
 LOCAL_STORAGE_METHOD(LocalStorageClear, LocalClear)
 #undef LOCAL_STORAGE_METHOD
+
+static JSBool
+DefineStorageMethods(JSContext* cx, JSObject* proto)
+{
+  // Keep the historical non-enumerable methods: old applications enumerate
+  // globalStorage/sessionStorage for keys. Dispatch preserves StorageItem
+  // results for those objects while localStorage returns DOMStrings.
+  return JS_DefineFunction(cx, proto, "getItem", LocalStorageGet, 1, 0) &&
+         JS_DefineFunction(cx, proto, "setItem", LocalStorageSet, 2, 0) &&
+         JS_DefineFunction(cx, proto, "removeItem", LocalStorageRemove, 1, 0) &&
+         JS_DefineFunction(cx, proto, "key", LocalStorageKey, 1, 0) &&
+         JS_DefineFunction(cx, proto, "clear", LocalStorageClear, 0, 0);
+}
 
 NS_IMETHODIMP
 nsStorageSH::GetProperty(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
@@ -11588,25 +11632,6 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 {
   if (JSVAL_IS_SYMBOL(id))
     return NS_OK;
-
-  nsCOMPtr<nsPIDOMLocalStorage> local = do_QueryWrappedNative(wrapper);
-  if (local && local->IsLocalStorage() && JSVAL_IS_STRING(id)) {
-    nsDependentJSString name(id);
-    JSNative method = nsnull;
-    uintN nargs = 1;
-    if (name.EqualsLiteral("getItem")) method = LocalStorageGet;
-    else if (name.EqualsLiteral("setItem")) { method = LocalStorageSet; nargs = 2; }
-    else if (name.EqualsLiteral("removeItem")) method = LocalStorageRemove;
-    else if (name.EqualsLiteral("key")) method = LocalStorageKey;
-    else if (name.EqualsLiteral("clear")) { method = LocalStorageClear; nargs = 0; }
-    if (method) {
-      JSFunction* function = JS_DefineUCFunction(cx, obj, name.get(),
-                                                name.Length(), method, nargs, 0);
-      if (!function) return NS_ERROR_OUT_OF_MEMORY;
-      *objp = obj;
-      return NS_OK;
-    }
-  }
 
   JSObject *realObj;
   wrapper->GetJSObject(&realObj);

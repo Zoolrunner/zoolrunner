@@ -6,6 +6,15 @@ window.onload=function(){try {
   var store=localStorage;
   check(store,localStorage,'stable window storage identity');
   check(store instanceof Storage,true,'Storage interface');
+  check(store.getItem,Storage.prototype.getItem,'shared prototype getItem');
+  check(store.setItem,Storage.prototype.setItem,'shared prototype setItem');
+  check(store.clear,Storage.prototype.clear,'shared prototype clear');
+  check(Object.prototype.hasOwnProperty.call(store,'getItem'),false,'methods are inherited');
+  Storage.prototype.setItem.call(store,'prototype','value');
+  check(Storage.prototype.getItem.call(store,'prototype'),'value','borrowed getItem returns primitive string');
+  Storage.prototype.removeItem.call(store,'prototype');
+  check(store.getItem('prototype'),null,'borrowed removeItem');
+
   store.clear();check(store.length,0,'empty length');check(store.getItem('missing'),null,'missing item null');
   check(store.key(0),null,'out of range key null');
   check(store.setItem('one','first'),undefined,'setItem return');check(store.getItem('one'),'first','stored string');
@@ -19,6 +28,10 @@ window.onload=function(){try {
   check(order.join(','),'key,value','conversion order');check(store.getItem('coerce'),'converted','object conversion');
   var caught,sentinel={};try{store.setItem('one',{toString:function(){throw sentinel;}});}catch(e){caught=e;}
   check(caught,sentinel,'conversion exception identity');check(store.getItem('one'),'changed','conversion failure atomicity');
+  caught=null;try{store.one={toString:function(){throw sentinel;}};}catch(e){caught=e;}
+  check(caught,sentinel,'named setter conversion exception identity');
+  check(store.getItem('one'),'changed','named setter conversion failure atomicity');
+
   caught=null;try{store.setItem('one');}catch(e){caught=e;}check(caught instanceof TypeError,true,'missing setItem argument');
   caught=null;try{store.getItem();}catch(e){caught=e;}check(caught instanceof TypeError,true,'missing getItem argument');
   caught=null;try{store.getItem.call({},'one');}catch(e){caught=e;}check(caught instanceof TypeError,true,'method receiver check');
@@ -37,6 +50,14 @@ window.onload=function(){try {
   legacy.setItem('compat','legacy');var item=legacy.getItem('compat');
   check(typeof item,'object','legacy StorageItem remains an object');
   check(item.value,'legacy','legacy StorageItem value');
+  check(Storage.prototype.getItem.call(legacy,'compat').value,'legacy','borrowed legacy getItem returns StorageItem');
+  check(legacy.getItem(null),null,'legacy null key remains empty');
+  var rangeError=null;try{Storage.prototype.key.call(legacy,4294967295);}catch(e){rangeError=e;}
+  check(rangeError!==null,true,'legacy key range error retained');
+  check(Storage.prototype.key.call(store,4294967295),null,'modern key out of range returns null');
+  var legacyKeys=[];for(var legacyKey in legacy)legacyKeys.push(legacyKey);
+  check(legacyKeys.join(','),'compat','legacy key enumeration excludes prototype methods');
+
   check(store.getItem('compat'),null,'local and global storage separated');
   store.setItem('compat','modern');check(legacy.getItem('compat').value,'legacy','modern writes preserve legacy data');
   sessionStorage.setItem('compat','session');

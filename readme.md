@@ -1138,3 +1138,9 @@ including SVG document elements; historical parsed-document title behavior is
 preserved. Focused title and native argument-conversion regressions pass 31 and
 25 assertions, alongside the existing 31 createHTMLDocument assertions and 24
 Suite lifecycle checks. Full benchmark and CSS validation remain in progress.
+
+Local-storage prototype calls and legacy StorageItem compatibility pass 54
+focused Suite assertions. Fifteen additional checks across three processes
+verify persistence of UTF-16 data and isolation by port while preserving legacy
+domain storage. Storage events, modern property descriptors and remaining
+boundary/lifecycle checks are still incomplete.

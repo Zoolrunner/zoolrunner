@@ -1,0 +1,24 @@
+<!doctype html><html><head><title>Storage persistence across processes</title></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n);}
+try {
+ var store=localStorage,legacy=globalStorage[location.hostname],mode=location.search.substr(1),key='nul\u0000key\ud800',value='value\u0000\udfff\u03a9';
+ if(mode==='write') {
+  store.clear();store.setItem(key,value);store.setItem('','empty key');store.setItem('normal','persistent');
+  legacy.setItem('zoolrunner-persistence','legacy persistent');
+  check(store.length,3,'write distinct keys');check(store.getItem(key),value,'write lossless UTF16');
+  check(store.getItem(''),'empty key','write empty key');check(legacy.getItem('zoolrunner-persistence').value,'legacy persistent','write legacy storage');
+ } else if(mode==='isolation') {
+  check(store.length,0,'different port has independent local storage');check(store.getItem(key),null,'different port cannot read original key');
+  check(legacy.getItem('zoolrunner-persistence').value,'legacy persistent','legacy domain storage remains shared across ports');
+  store.setItem('isolation','other origin');check(store.length,1,'other origin write');
+ } else if(mode==='read') {
+  check(store.length,3,'persistent key count after process restart');check(store.getItem(key),value,'persistent NUL and lone-surrogate key/value');
+  check(store.getItem(''),'empty key','persistent empty key');check(store.getItem('normal'),'persistent','persistent ordinary key');
+  check(store.getItem('isolation'),null,'other origin write remains separate');
+  check(legacy.getItem('zoolrunner-persistence').value,'legacy persistent','legacy persistence unchanged');
+  store.clear();legacy.removeItem('zoolrunner-persistence');check(store.length,0,'persistent clear');
+ } else check(mode,'write, isolation or read','unknown stage');
+}catch(e){check(String(e),'no exception','unexpected exception: '+e);}
+testDone=true;
+</script></body></html>
