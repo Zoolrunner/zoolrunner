@@ -1,0 +1,12 @@
+/* Session-history state storage. MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsISupports.idl"
+
+/** Additive storage for immutable serialized History API data.
+ * Existing nsISHEntry interfaces and their UUIDs remain unchanged.
+ * The data must not retain a document, a window or live JavaScript values.
+ */
+[scriptable, uuid(1e99791c-1674-4a36-96ef-d89645437c9d)]
+interface nsISHEntryState : nsISupports
+{
+  attribute nsISupports historyState;
+};

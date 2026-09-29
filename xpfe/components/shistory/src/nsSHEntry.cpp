@@ -98,6 +98,7 @@ nsSHEntry::nsSHEntry(const nsSHEntry &other)
   , mParent(other.mParent)
   , mViewerBounds(0, 0, 0, 0)
   , mOwner(other.mOwner)
+  , mHistoryState(other.mHistoryState)
 {
 }
 
@@ -125,7 +126,8 @@ nsSHEntry::~nsSHEntry()
 //    nsSHEntry: nsISupports
 //*****************************************************************************
 
-NS_IMPL_ISUPPORTS6(nsSHEntry, nsISHContainer, nsISHEntry,
+NS_IMPL_ISUPPORTS7(nsSHEntry, nsISHContainer, nsISHEntry,
+                   nsISHEntryState,
                    nsISHEntry_MOZILLA_1_8_BRANCH,
                    nsISHEntry_MOZILLA_1_8_BRANCH2,
                    nsIHistoryEntry,
@@ -134,6 +136,19 @@ NS_IMPL_ISUPPORTS6(nsSHEntry, nsISHContainer, nsISHEntry,
 //*****************************************************************************
 //    nsSHEntry: nsISHEntry
 //*****************************************************************************
+
+NS_IMETHODIMP nsSHEntry::GetHistoryState(nsISupports** aState)
+{
+  NS_ENSURE_ARG_POINTER(aState);
+  NS_IF_ADDREF(*aState = mHistoryState);
+  return NS_OK;
+}
+
+NS_IMETHODIMP nsSHEntry::SetHistoryState(nsISupports* aState)
+{
+  mHistoryState = aState;
+  return NS_OK;
+}
 
 NS_IMETHODIMP nsSHEntry::SetScrollPosition(PRInt32 x, PRInt32 y)
 {

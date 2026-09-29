@@ -53,6 +53,7 @@
 #include "nsISHEntry.h"
 #include "nsISHContainer.h"
 #include "nsIURI.h"
+#include "nsISHEntryState.h"
 #include "nsIEnumerator.h"
 #include "nsIHistoryEntry.h"
 #include "nsRect.h"
@@ -61,6 +62,7 @@
 
 class nsSHEntry : public nsISHEntry_MOZILLA_1_8_BRANCH2,
                   public nsISHContainer,
+                  public nsISHEntryState,
                   public nsIDocumentObserver
 {
 public: 
@@ -72,6 +74,7 @@ public:
   NS_DECL_NSISHENTRY
   NS_DECL_NSISHENTRY_MOZILLA_1_8_BRANCH
   NS_DECL_NSISHENTRY_MOZILLA_1_8_BRANCH2
+  NS_DECL_NSISHENTRYSTATE
   NS_DECL_NSISHCONTAINER
   NS_DECL_NSIDOCUMENTOBSERVER
 
@@ -107,6 +110,7 @@ private:
   nsCOMArray<nsIDocShellTreeItem> mChildShells;
   nsCOMPtr<nsISupportsArray>      mRefreshURIList;
   nsCOMPtr<nsISupports>           mOwner;
+  nsCOMPtr<nsISupports>           mHistoryState;
 };
 
 #endif /* nsSHEntry_h */

@@ -53,6 +53,7 @@ SDK_XPIDLSRCS   = \
 
 XPIDLSRCS	= \
 		  nsISHEntry.idl        \
+                  nsISHEntryState.idl   \
                   nsISHContainer.idl    \
                   nsISHTransaction.idl  \
                   nsISHistoryInternal.idl \

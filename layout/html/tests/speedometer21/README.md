@@ -496,3 +496,10 @@ results callback with explicitly synthetic input then reaches another blocker:
 benchmark result. Session-history implementation and a fresh complete run remain
 required. A separate constructor-shadowing probe reproduces an older computed-
 style bootstrap failure; it remains recorded in the layout guide.
+
+The first history-state change adds an independent `nsISHEntryState` interface
+without altering any historical session-entry vtable. Entry clones retain the
+immutable serialized payload independently of later replacement or clearing.
+Its ten native xpcshell assertions pass in GTK2 and Xlib Suite builds and are
+included in the Linux package runner. This storage foundation does not yet
+expose pushState/replaceState or establish traversal/serialization support.

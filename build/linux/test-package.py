@@ -66,6 +66,8 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     for case in ['object-reflection', 'object-descriptors', 'json-bind-string', 'array-date',
                  'library-edge-cases', 'strict-mode', 'legacy-application', 'debugger-lifecycle']:
         run([shell, '-f', root / 'js/tests/es5' / (case + '.js')], case, 'failures=0')
+    run([shell, '-f', root / 'docshell/test/history-entry-state.js'],
+        'history-entry-state', 'HISTORY-ENTRY-STATE checks=10 failures=0')
     run([shell, '-e', 'print("INLINE-PASS")'], 'inline', 'INLINE-PASS')
     run([shell, '-f', '-'], 'stdin', 'STDIN-PASS', data='print("STDIN-PASS");\n')
     run([shell, '-e', 'quit(7)'], 'exit-status', expected=7)

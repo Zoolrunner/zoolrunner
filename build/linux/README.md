@@ -298,3 +298,9 @@ package includes event propagation fixes but predates the string-key correction.
 The later Xlib build passes all 927 content assertions and its 400-by-300
 box-sizing painting region matches the Chromium reference pixel-for-pixel.
 These are Suite results, not a completed four-application/backend matrix.
+
+Session-history validation also runs `docshell/test/history-entry-state.js`
+against the packaged xpcshell. The ten assertions check additive payload storage,
+clone retention/replacement and preservation of historical entry identifiers,
+URI and title. Native LoongArch Suite development builds pass on both backends;
+packaged validation of this new check is pending the next package run.
