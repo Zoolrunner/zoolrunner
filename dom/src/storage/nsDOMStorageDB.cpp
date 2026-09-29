@@ -47,6 +47,57 @@
 #include "mozIStorageService.h"
 #include "mozIStorageValueArray.h"
 
+// The legacy table is UTF-8. Encode modern Storage DOMStrings as ASCII UTF-16
+// code units so lone surrogates and embedded NULs survive SQLite conversion.
+// A distinct namespace leaves all historical globalStorage records unchanged.
+static PRBool
+UsesDOMStringEncoding(const nsAString& aDomain)
+{
+  return StringBeginsWith(aDomain, NS_LITERAL_STRING("localStorage-v1:"));
+}
+
+static nsresult
+EncodeDOMString(const nsAString& aInput, nsAString& aOutput)
+{
+  if (aInput.Length() > PR_INT32_MAX / 4) return NS_ERROR_DOM_QUOTA_REACHED;
+  nsAutoString result;
+  PRUint32 length = aInput.Length() * 4;
+  result.SetLength(length);
+  if (result.Length() != length) return NS_ERROR_OUT_OF_MEMORY;
+  const char digits[] = "0123456789abcdef";
+  const nsPromiseFlatString& input = PromiseFlatString(aInput);
+  for (PRUint32 i = 0; i < input.Length(); ++i) {
+    PRUnichar c = input.CharAt(i);
+    for (PRUint32 j = 0; j < 4; ++j)
+      result.SetCharAt(digits[(c >> ((3 - j) * 4)) & 15], i * 4 + j);
+  }
+  aOutput.Assign(result);
+  return NS_OK;
+}
+
+static nsresult
+DecodeDOMString(nsAString& aValue)
+{
+  const nsPromiseFlatString& input = PromiseFlatString(aValue);
+  if (input.Length() % 4) return NS_ERROR_FILE_CORRUPTED;
+  nsAutoString result;
+  result.SetLength(input.Length() / 4);
+  if (result.Length() != input.Length() / 4) return NS_ERROR_OUT_OF_MEMORY;
+  for (PRUint32 i = 0; i < result.Length(); ++i) {
+    PRUnichar c = 0;
+    for (PRUint32 j = 0; j < 4; ++j) {
+      PRUnichar digit = input.CharAt(i * 4 + j);
+      if (digit >= '0' && digit <= '9') digit -= '0';
+      else if (digit >= 'a' && digit <= 'f') digit = digit - 'a' + 10;
+      else return NS_ERROR_FILE_CORRUPTED;
+      c = (c << 4) | digit;
+    }
+    result.SetCharAt(c, i);
+  }
+  aValue.Assign(result);
+  return NS_OK;
+}
+
 nsresult
 nsDOMStorageDB::Init()
 {
@@ -203,6 +254,11 @@ nsDOMStorageDB::GetAllKeys(const nsAString& aDomain,
     rv = mGetAllKeysStatement->GetString(0, key);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    if (UsesDOMStringEncoding(aDomain)) {
+      rv = DecodeDOMString(key);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+
     PRInt32 secureInt = 0;
     rv = mGetAllKeysStatement->GetInt32(1, &secureInt);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -227,11 +283,17 @@ nsDOMStorageDB::GetKeyValue(const nsAString& aDomain,
                             PRBool* aSecure,
                             nsAString& aOwner)
 {
+  nsAutoString encodedKey;
+  if (UsesDOMStringEncoding(aDomain)) {
+    nsresult encodeRv = EncodeDOMString(aKey, encodedKey);
+    NS_ENSURE_SUCCESS(encodeRv, encodeRv);
+  } else encodedKey.Assign(aKey);
+
   mozStorageStatementScoper scope(mGetKeyValueStatement);
 
   nsresult rv = mGetKeyValueStatement->BindStringParameter(0, aDomain);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = mGetKeyValueStatement->BindStringParameter(1, aKey);
+  rv = mGetKeyValueStatement->BindStringParameter(1, encodedKey);
   NS_ENSURE_SUCCESS(rv, rv);
 
   PRBool exists;
@@ -243,6 +305,10 @@ nsDOMStorageDB::GetKeyValue(const nsAString& aDomain,
     rv = mGetKeyValueStatement->GetString(0, aValue);
     NS_ENSURE_SUCCESS(rv, rv);
 
+    if (UsesDOMStringEncoding(aDomain)) {
+      rv = DecodeDOMString(aValue);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
     rv = mGetKeyValueStatement->GetInt32(1, &secureInt);
     NS_ENSURE_SUCCESS(rv, rv);
 
@@ -266,24 +332,39 @@ nsDOMStorageDB::SetKey(const nsAString& aDomain,
                        const nsAString& aOwner,
                        PRInt32 aQuota)
 {
+  nsAutoString encodedKey;
+  if (UsesDOMStringEncoding(aDomain)) {
+    nsresult encodeRv = EncodeDOMString(aKey, encodedKey);
+    NS_ENSURE_SUCCESS(encodeRv, encodeRv);
+  } else encodedKey.Assign(aKey);
+
+  nsAutoString encodedValue;
+  if (UsesDOMStringEncoding(aDomain)) {
+    nsresult encodeRv = EncodeDOMString(aValue, encodedValue);
+    NS_ENSURE_SUCCESS(encodeRv, encodeRv);
+  } else encodedValue.Assign(aValue);
+  if (encodedKey.Length() > PR_INT32_MAX - encodedValue.Length())
+    return NS_ERROR_DOM_QUOTA_REACHED;
   mozStorageStatementScoper scope(mGetKeyValueStatement);
  
-  PRInt32 usage = 0;
+  PRInt64 usage = 0;
   nsresult rv;
   if (!aOwner.IsEmpty()) {
     if (aOwner == mCachedOwner) {
       usage = mCachedUsage;
     } else {
-      rv = GetUsage(aOwner, &usage);
+      PRInt32 storedUsage;
+      rv = GetUsage(aOwner, &storedUsage);
       NS_ENSURE_SUCCESS(rv, rv);
+      usage = storedUsage;
     }
   }
 
-  usage += aKey.Length() + aValue.Length();
+  usage += encodedKey.Length() + encodedValue.Length();
 
   rv = mGetKeyValueStatement->BindStringParameter(0, aDomain);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = mGetKeyValueStatement->BindStringParameter(1, aKey);
+  rv = mGetKeyValueStatement->BindStringParameter(1, encodedKey);
   NS_ENSURE_SUCCESS(rv, rv);
 
   PRBool exists;
@@ -307,7 +388,7 @@ nsDOMStorageDB::SetKey(const nsAString& aDomain,
       nsAutoString previousValue;
       rv = mGetKeyValueStatement->GetString(0, previousValue);
       NS_ENSURE_SUCCESS(rv, rv);
-      usage -= aKey.Length() + previousValue.Length();
+      usage -= encodedKey.Length() + previousValue.Length();
     }
 
     mGetKeyValueStatement->Reset();
@@ -318,7 +399,7 @@ nsDOMStorageDB::SetKey(const nsAString& aDomain,
 
     mozStorageStatementScoper scopeupdate(mUpdateKeyStatement);
 
-    rv = mUpdateKeyStatement->BindStringParameter(0, aValue);
+    rv = mUpdateKeyStatement->BindStringParameter(0, encodedValue);
     NS_ENSURE_SUCCESS(rv, rv);
     rv = mUpdateKeyStatement->BindInt32Parameter(1, aSecure);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -326,7 +407,7 @@ nsDOMStorageDB::SetKey(const nsAString& aDomain,
     NS_ENSURE_SUCCESS(rv, rv);
     rv = mUpdateKeyStatement->BindStringParameter(3, aDomain);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = mUpdateKeyStatement->BindStringParameter(4, aKey);
+    rv = mUpdateKeyStatement->BindStringParameter(4, encodedKey);
     NS_ENSURE_SUCCESS(rv, rv);
 
     rv = mUpdateKeyStatement->Execute();
@@ -341,9 +422,9 @@ nsDOMStorageDB::SetKey(const nsAString& aDomain,
     
     rv = mInsertKeyStatement->BindStringParameter(0, aDomain);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = mInsertKeyStatement->BindStringParameter(1, aKey);
+    rv = mInsertKeyStatement->BindStringParameter(1, encodedKey);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = mInsertKeyStatement->BindStringParameter(2, aValue);
+    rv = mInsertKeyStatement->BindStringParameter(2, encodedValue);
     NS_ENSURE_SUCCESS(rv, rv);
     rv = mInsertKeyStatement->BindInt32Parameter(3, aSecure);
     NS_ENSURE_SUCCESS(rv, rv);
@@ -356,7 +437,7 @@ nsDOMStorageDB::SetKey(const nsAString& aDomain,
 
   if (!aOwner.IsEmpty()) {
     mCachedOwner = aOwner;
-    mCachedUsage = usage;
+    mCachedUsage = PRInt32(usage);
   }
 
   return NS_OK;
@@ -367,11 +448,17 @@ nsDOMStorageDB::SetSecure(const nsAString& aDomain,
                           const nsAString& aKey,
                           const PRBool aSecure)
 {
+  nsAutoString encodedKey;
+  if (UsesDOMStringEncoding(aDomain)) {
+    nsresult encodeRv = EncodeDOMString(aKey, encodedKey);
+    NS_ENSURE_SUCCESS(encodeRv, encodeRv);
+  } else encodedKey.Assign(aKey);
+
   mozStorageStatementScoper scope(mGetKeyValueStatement);
 
   nsresult rv = mGetKeyValueStatement->BindStringParameter(0, aDomain);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = mGetKeyValueStatement->BindStringParameter(1, aKey);
+  rv = mGetKeyValueStatement->BindStringParameter(1, encodedKey);
   NS_ENSURE_SUCCESS(rv, rv);
 
   PRBool exists;
@@ -387,7 +474,7 @@ nsDOMStorageDB::SetSecure(const nsAString& aDomain,
     NS_ENSURE_SUCCESS(rv, rv);
     rv = mSetSecureStatement->BindStringParameter(1, aDomain);
     NS_ENSURE_SUCCESS(rv, rv);
-    rv = mSetSecureStatement->BindStringParameter(2, aKey);
+    rv = mSetSecureStatement->BindStringParameter(2, encodedKey);
     NS_ENSURE_SUCCESS(rv, rv);
 
     return mSetSecureStatement->Execute();
@@ -402,15 +489,22 @@ nsDOMStorageDB::RemoveKey(const nsAString& aDomain,
                           const nsAString& aOwner,
                           PRInt32 aKeyUsage)
 {
+  nsAutoString encodedKey;
+  if (UsesDOMStringEncoding(aDomain)) {
+    nsresult encodeRv = EncodeDOMString(aKey, encodedKey);
+    NS_ENSURE_SUCCESS(encodeRv, encodeRv);
+  } else encodedKey.Assign(aKey);
+
   mozStorageStatementScoper scope(mRemoveKeyStatement);
 
   if (aOwner == mCachedOwner) {
-    mCachedUsage -= aKeyUsage;
+    if (UsesDOMStringEncoding(aDomain)) mCachedOwner.Truncate();
+    else mCachedUsage -= aKeyUsage;
   }
 
   nsresult rv = mRemoveKeyStatement->BindStringParameter(0, aDomain);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = mRemoveKeyStatement->BindStringParameter(1, aKey);
+  rv = mRemoveKeyStatement->BindStringParameter(1, encodedKey);
   NS_ENSURE_SUCCESS(rv, rv);
 
   return mRemoveKeyStatement->Execute();
@@ -441,4 +535,19 @@ nsDOMStorageDB::GetUsage(const nsAString &aOwner, PRInt32 *aUsage)
   }
   
   return mGetUsageStatement->GetInt32(0, aUsage);
+}
+
+nsresult
+nsDOMStorageDB::RemoveDomain(const nsAString& aDomain)
+{
+  nsCOMPtr<mozIStorageStatement> statement;
+  nsresult rv = mConnection->CreateStatement(
+      NS_LITERAL_CSTRING("DELETE FROM webappsstore WHERE domain = ?1"),
+      getter_AddRefs(statement));
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = statement->BindStringParameter(0, aDomain);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = statement->Execute();
+  if (NS_SUCCEEDED(rv)) mCachedOwner.Truncate();
+  return rv;
 }

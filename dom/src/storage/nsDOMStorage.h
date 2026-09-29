@@ -58,6 +58,7 @@
 
 class nsDOMStorage;
 class nsDOMStorageItem;
+class nsIPrincipal;
 
 class nsDOMStorageEntry : public nsVoidPtrHashKey
 {
@@ -94,6 +95,8 @@ public:
 
   nsresult ClearAllStorages();
 
+  nsresult GetLocalStorage(nsIPrincipal* aPrincipal, nsIDOMStorage** aResult);
+
   static nsresult Initialize();
   static void Shutdown();
 
@@ -102,10 +105,12 @@ public:
 protected:
 
   nsTHashtable<nsDOMStorageEntry> mStorages;
+  nsInterfaceHashtable<nsStringHashKey, nsIDOMStorage> mLocalStorages;
 };
 
 class nsDOMStorage : public nsIDOMStorage,
-                     public nsPIDOMStorage
+                     public nsPIDOMStorage,
+                     public nsPIDOMLocalStorage
 {
 public:
   nsDOMStorage();
@@ -123,6 +128,10 @@ public:
   virtual already_AddRefed<nsIDOMStorage> Clone(nsIURI* aURI);
   virtual nsTArray<nsString> *GetKeys();
 
+  virtual PRBool IsLocalStorage() { return mIsLocalStorage; }
+  virtual nsresult GetValue(const nsAString& aKey, nsAString& aValue);
+  virtual nsresult Clear();
+
   PRBool UseDB() { return mUseDB && !mSessionOnly; }
 
   // cache whether storage may be used by aURI, and whether it is session
@@ -132,10 +141,7 @@ public:
   CanUseStorage(nsIURI* aURI, PRPackedBool* aSessionOnly);
 
   PRBool
-  CacheStoragePermissions()
-  {
-    return CanUseStorage(mURI, &mSessionOnly);
-  }
+  CacheStoragePermissions();
 
   // retrieve the value and secure state corresponding to a key out of storage.
   nsresult
@@ -172,6 +178,7 @@ protected:
 
   // true if the storage database should be used for values
   PRPackedBool mUseDB;
+  PRPackedBool mIsLocalStorage;
 
   // true if the preferences indicates that this storage should be session only
   PRPackedBool mSessionOnly;

@@ -87,8 +87,11 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                       'url': args.url, 'mode': args.mode,
                       'contentEdition': args.content_edition}
             if len(markers) == 1:
-                report['result'] = json.loads(markers[0])
-                report['pass'] = exit_code == 0 and report['result']['pass'] is True
+                try:
+                    report['result'] = json.loads(markers[0])
+                    report['pass'] = exit_code == 0 and report['result']['pass'] is True
+                except (ValueError, KeyError, TypeError) as error:
+                    report['error'] = 'Invalid result marker: ' + str(error)
             args.report.write_text(json.dumps(report, indent=2) + '\n')
             print(output)
             return 0 if report['pass'] else 1

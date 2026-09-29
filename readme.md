@@ -1120,3 +1120,9 @@ The Suite-first Speedometer runner also validates actual TodoMVC item counts
 and completion states after every measured step. Native event regressions
 cover cross-frame identity, programmatic click targets, handler bindings and
 redispatch; completed step counters alone are not treated as workload success.
+
+Native local storage is under development for Speedometer's Flight workload.
+The isolated workload passes add/complete/delete item checks; the complete
+benchmark is still pending, including Angular 2 deletion. Storage events,
+prototype semantics and boundary/persistence validation remain incomplete;
+see the [Suite-first validation notes](layout/html/tests/speedometer21/README.md).

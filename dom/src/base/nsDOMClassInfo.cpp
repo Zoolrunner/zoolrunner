@@ -408,6 +408,7 @@
 // Storage includes
 #include "nsIDOMStorage.h"
 #include "nsPIDOMStorage.h"
+#include "nsDOMStorage.h"
 #include "nsIDOMStorageList.h"
 #include "nsIDOMStorageItem.h"
 #include "nsIDOMStorageEvent.h"
@@ -6134,6 +6135,27 @@ AnimationWindow(JSContext* cx, JSObject* obj)
 }
 
 static JSBool JS_DLL_CALLBACK
+LocalStorageGetter(JSContext* cx, JSObject* obj, jsval id, jsval* rval)
+{
+  nsRefPtr<nsGlobalWindow> window = AnimationWindow(cx, obj);
+  if (!window) return JS_FALSE;
+  nsDOMStorageManager* manager = nsDOMStorageManager::gStorageManager;
+  nsCOMPtr<nsIDOMStorage> storage;
+  nsresult rv = manager ? manager->GetLocalStorage(window->GetPrincipal(),
+                                                   getter_AddRefs(storage)) :
+                          NS_ERROR_NOT_AVAILABLE;
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  if (NS_SUCCEEDED(rv))
+    rv = nsDOMClassInfo::WrapNative(cx, obj, storage,
+             NS_GET_IID(nsIDOMStorage), rval, getter_AddRefs(holder));
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
+
+static JSBool JS_DLL_CALLBACK
 RequestAnimationFrame(JSContext* cx, JSObject* obj, uintN argc,
                        jsval* argv, jsval* rval)
 {
@@ -6402,6 +6424,14 @@ nsWindowSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
       }
     }
 
+    return NS_OK;
+  }
+
+  if (nsDependentJSString(id).EqualsLiteral("localStorage")) {
+    *_retval = JS_DefineProperty(cx, obj, "localStorage", JSVAL_VOID,
+                                 LocalStorageGetter, nsnull,
+                                 JSPROP_ENUMERATE | JSPROP_READONLY);
+    if (*_retval) *objp = obj;
     return NS_OK;
   }
 
@@ -11323,6 +11353,113 @@ nsTreeColumnsSH::GetNamedItem(nsISupports *aNative,
 #endif
 
 
+enum LocalStorageOperation { LocalGet, LocalSet, LocalRemove, LocalKey, LocalClear };
+
+static JSBool
+LocalStorageMethod(JSContext* cx, JSObject* obj, uintN argc,
+                    jsval* argv, jsval* rval, LocalStorageOperation operation)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsPIDOMLocalStorage> local = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIDOMStorage> storage = do_QueryWrappedNative(wrapper);
+  if (!local || !local->IsLocalStorage()) {
+    DOMConstructorTypeError(cx, "Storage method requires a localStorage object");
+    return JS_FALSE;
+  }
+  uintN required = operation == LocalClear ? 0 : operation == LocalSet ? 2 : 1;
+  if (argc < required) {
+    DOMConstructorTypeError(cx, "Not enough arguments to Storage method");
+    return JS_FALSE;
+  }
+  nsresult rv = NS_OK;
+  nsAutoString value;
+  if (operation == LocalClear) {
+    rv = local->Clear();
+  } else if (operation == LocalKey) {
+    uint32 index;
+    if (!JS_ValueToECMAUint32(cx, argv[0], &index)) return JS_FALSE;
+    rv = storage->Key(index, value);
+    if (rv == NS_ERROR_DOM_INDEX_SIZE_ERR) {
+      value.SetIsVoid(PR_TRUE);
+      rv = NS_OK;
+    }
+  } else {
+    JSString* key = JS_ValueToString(cx, argv[0]);
+    if (!key) return JS_FALSE;
+    argv[0] = STRING_TO_JSVAL(key);
+    nsDependentJSString name(key);
+    if (operation == LocalGet) {
+      rv = local->GetValue(name, value);
+    } else if (operation == LocalRemove) {
+      rv = storage->RemoveItem(name);
+    } else {
+      JSString* data = JS_ValueToString(cx, argv[1]);
+      if (!data) return JS_FALSE;
+      argv[1] = STRING_TO_JSVAL(data);
+      rv = storage->SetItem(name, nsDependentJSString(data));
+    }
+  }
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *rval = JSVAL_VOID;
+  if (operation == LocalGet || operation == LocalKey) {
+    if (value.IsVoid()) *rval = JSVAL_NULL;
+    else {
+      JSString* result = JS_NewUCStringCopyN(cx, value.get(), value.Length());
+      if (!result) return JS_FALSE;
+      *rval = STRING_TO_JSVAL(result);
+    }
+  }
+  return JS_TRUE;
+}
+#define LOCAL_STORAGE_METHOD(Name, Operation) \
+static JSBool JS_DLL_CALLBACK \
+Name(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval) \
+{ return LocalStorageMethod(cx, obj, argc, argv, rval, Operation); }
+LOCAL_STORAGE_METHOD(LocalStorageGet, LocalGet)
+LOCAL_STORAGE_METHOD(LocalStorageSet, LocalSet)
+LOCAL_STORAGE_METHOD(LocalStorageRemove, LocalRemove)
+LOCAL_STORAGE_METHOD(LocalStorageKey, LocalKey)
+LOCAL_STORAGE_METHOD(LocalStorageClear, LocalClear)
+#undef LOCAL_STORAGE_METHOD
+
+NS_IMETHODIMP
+nsStorageSH::GetProperty(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
+                          JSObject* obj, jsval id, jsval* vp, PRBool* retval)
+{
+  nsCOMPtr<nsPIDOMLocalStorage> local = do_QueryWrappedNative(wrapper);
+  if (!local || !local->IsLocalStorage())
+    return nsNamedArraySH::GetProperty(wrapper, cx, obj, id, vp, retval);
+  if (JSVAL_IS_SYMBOL(id)) return NS_OK;
+  JSString* name = JS_ValueToString(cx, id);
+  if (!name) return NS_ERROR_FAILURE;
+  nsAutoString key;
+  key.Assign(nsDependentJSString(name));
+  if (key.EqualsLiteral("getItem") || key.EqualsLiteral("setItem") ||
+      key.EqualsLiteral("removeItem") || key.EqualsLiteral("key") ||
+      key.EqualsLiteral("clear") || key.EqualsLiteral("length"))
+    return NS_OK;
+  JSObject* proto = JS_GetPrototype(cx, obj);
+  JSBool found;
+  if (proto && JS_HasUCProperty(cx, proto, key.get(), key.Length(), &found) && found)
+    return NS_OK;
+  nsAutoString value;
+  nsresult rv = local->GetValue(key, value);
+  NS_ENSURE_SUCCESS(rv, rv);
+  *vp = JSVAL_VOID;
+  if (!value.IsVoid()) {
+    JSString* result = JS_NewUCStringCopyN(cx, value.get(), value.Length());
+    if (!result) return NS_ERROR_OUT_OF_MEMORY;
+    *vp = STRING_TO_JSVAL(result);
+  }
+  return NS_SUCCESS_I_DID_SOMETHING;
+}
+
+
 // Storage scriptable helper
 
 // One reason we need a newResolve hook is that in order for
@@ -11338,6 +11475,25 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   if (JSVAL_IS_SYMBOL(id))
     return NS_OK;
 
+  nsCOMPtr<nsPIDOMLocalStorage> local = do_QueryWrappedNative(wrapper);
+  if (local && local->IsLocalStorage() && JSVAL_IS_STRING(id)) {
+    nsDependentJSString name(id);
+    JSNative method = nsnull;
+    uintN nargs = 1;
+    if (name.EqualsLiteral("getItem")) method = LocalStorageGet;
+    else if (name.EqualsLiteral("setItem")) { method = LocalStorageSet; nargs = 2; }
+    else if (name.EqualsLiteral("removeItem")) method = LocalStorageRemove;
+    else if (name.EqualsLiteral("key")) method = LocalStorageKey;
+    else if (name.EqualsLiteral("clear")) { method = LocalStorageClear; nargs = 0; }
+    if (method) {
+      JSFunction* function = JS_DefineUCFunction(cx, obj, name.get(),
+                                                name.Length(), method, nargs, 0);
+      if (!function) return NS_ERROR_OUT_OF_MEMORY;
+      *objp = obj;
+      return NS_OK;
+    }
+  }
+
   JSObject *realObj;
   wrapper->GetJSObject(&realObj);
 
@@ -11349,12 +11505,14 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     return JS_FALSE;
   }
 
+  nsAutoString keyValue;
+  keyValue.Assign(nsDependentJSString(jsstr));
   JSObject *proto = ::JS_GetPrototype(cx, realObj);
   JSBool hasProp;
 
   if (proto &&
-      (::JS_HasUCProperty(cx, proto, ::JS_GetStringChars(jsstr),
-                          ::JS_GetStringLength(jsstr), &hasProp) &&
+      (::JS_HasUCProperty(cx, proto, keyValue.get(),
+                          keyValue.Length(), &hasProp) &&
        hasProp)) {
     // We found the property we're resolving on the prototype,
     // nothing left to do here then.
@@ -11370,13 +11528,13 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   // GetItem() will return null if the caller can't access the session
   // storage item.
   nsCOMPtr<nsIDOMStorageItem> item;
-  nsresult rv = storage->GetItem(nsDependentJSString(jsstr),
+  nsresult rv = storage->GetItem(keyValue,
                                  getter_AddRefs(item));
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (item) {
-    if (!::JS_DefineUCProperty(cx, realObj, ::JS_GetStringChars(jsstr),
-                               ::JS_GetStringLength(jsstr), JSVAL_VOID, nsnull,
+    if (!::JS_DefineUCProperty(cx, realObj, keyValue.get(),
+                               keyValue.Length(), JSVAL_VOID, nsnull,
                                nsnull, 0)) {
       return NS_ERROR_FAILURE;
     }
@@ -11417,10 +11575,12 @@ nsStorageSH::SetProperty(nsIXPConnectWrappedNative *wrapper,
   JSString *key = ::JS_ValueToString(cx, id);
   NS_ENSURE_TRUE(key, NS_ERROR_UNEXPECTED);
 
+  nsAutoString keyValue;
+  keyValue.Assign(nsDependentJSString(key));
   JSString *value = ::JS_ValueToString(cx, *vp);
   NS_ENSURE_TRUE(value, NS_ERROR_UNEXPECTED);
 
-  nsresult rv = storage->SetItem(nsDependentJSString(key),
+  nsresult rv = storage->SetItem(keyValue,
                                  nsDependentJSString(value));
   if (NS_SUCCEEDED(rv)) {
     rv = NS_SUCCESS_I_DID_SOMETHING;

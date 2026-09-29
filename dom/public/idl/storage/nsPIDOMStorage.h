@@ -62,4 +62,16 @@ public:
   virtual nsTArray<nsString> *GetKeys() = 0;
 };
 
+// Additive interface: the original storage embedding ABI remains unchanged.
+#define NS_PIDOMLOCALSTORAGE_IID \
+  { 0x0640c798, 0x6b2b, 0x4c9c, { 0xa9, 0x41, 0x76, 0x01, 0x99, 0xa3, 0x4e, 0x07 } }
+class nsPIDOMLocalStorage : public nsISupports
+{
+public:
+  NS_DEFINE_STATIC_IID_ACCESSOR(NS_PIDOMLOCALSTORAGE_IID)
+  virtual PRBool IsLocalStorage() = 0;
+  virtual nsresult GetValue(const nsAString& aKey, nsAString& aValue) = 0;
+  virtual nsresult Clear() = 0;
+};
+
 #endif // __nsPIDOMStorage_h_

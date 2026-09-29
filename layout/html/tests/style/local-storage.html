@@ -1,0 +1,47 @@
+<!doctype html><html><head><title>Native localStorage regression (HTTP)</title></head>
+<body><iframe id="child" src="about:blank"></iframe><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));console.log(testResults[testResults.length-1]);}
+window.onload=function(){try {
+  var store=localStorage;
+  check(store,localStorage,'stable window storage identity');
+  check(store instanceof Storage,true,'Storage interface');
+  store.clear();check(store.length,0,'empty length');check(store.getItem('missing'),null,'missing item null');
+  check(store.key(0),null,'out of range key null');
+  check(store.setItem('one','first'),undefined,'setItem return');check(store.getItem('one'),'first','stored string');
+  check(store.length,1,'insert length');store.setItem('one','changed');check(store.length,1,'overwrite length');
+  check(store.getItem('one'),'changed','overwrite value');check(store.key(0),'one','key enumeration');
+  store.setItem('','empty key');check(store.getItem(''),'empty key','empty key accepted');
+  store.setItem('unicode','\u03a9\u4e2d\u0000\ud800');check(store.getItem('unicode'),'\u03a9\u4e2d\u0000\ud800','UTF16 value including NUL and lone surrogate');
+  store.setItem('nil',null);check(store.getItem('nil'),'null','null string conversion');
+  store.setItem('unset',undefined);check(store.getItem('unset'),'undefined','undefined string conversion');
+  var order=[];store.setItem({toString:function(){order.push('key');return 'coerce';}}, {toString:function(){order.push('value');return 'converted';}});
+  check(order.join(','),'key,value','conversion order');check(store.getItem('coerce'),'converted','object conversion');
+  var caught,sentinel={};try{store.setItem('one',{toString:function(){throw sentinel;}});}catch(e){caught=e;}
+  check(caught,sentinel,'conversion exception identity');check(store.getItem('one'),'changed','conversion failure atomicity');
+  caught=null;try{store.setItem('one');}catch(e){caught=e;}check(caught instanceof TypeError,true,'missing setItem argument');
+  caught=null;try{store.getItem();}catch(e){caught=e;}check(caught instanceof TypeError,true,'missing getItem argument');
+  caught=null;try{store.getItem.call({},'one');}catch(e){caught=e;}check(caught instanceof TypeError,true,'method receiver check');
+  store.named='property';check(store.named,'property','named property string');check(store.getItem('named'),'property','named setter stored');
+  delete store.named;check(store.getItem('named'),null,'named deletion');check(store.named,undefined,'missing named property');
+  store.setItem('getItem','reserved key');check(typeof store.getItem,'function','prototype method visibility');check(store.getItem('getItem'),'reserved key','reserved key storage');
+  var child=document.getElementById('child').contentWindow;
+  check(child.localStorage.getItem('one'),'changed','same-origin shared storage');
+  child.localStorage.setItem('other','frame');check(store.getItem('other'),'frame','cross-frame writes visible');
+  child.localStorage.removeItem('one');check(store.getItem('one'),null,'cross-frame removal visible');
+  check(store.removeItem('missing'),undefined,'missing removal return');
+  store.clear();check(store.length,0,'clear length');check(child.localStorage.getItem('other'),null,'clear shared state');
+  store.setItem('a','1');store.setItem('b','2');var keys=Object.keys(store);keys.sort();check(keys.join(','),'a,b','own enumerable storage keys');
+  store.clear();
+  var legacy=globalStorage[location.hostname];
+  legacy.setItem('compat','legacy');var item=legacy.getItem('compat');
+  check(typeof item,'object','legacy StorageItem remains an object');
+  check(item.value,'legacy','legacy StorageItem value');
+  check(store.getItem('compat'),null,'local and global storage separated');
+  store.setItem('compat','modern');check(legacy.getItem('compat').value,'legacy','modern writes preserve legacy data');
+  sessionStorage.setItem('compat','session');
+  check(sessionStorage.getItem('compat').value,'session','legacy session StorageItem preserved');
+  check(store.getItem('compat'),'modern','session and local storage separated');
+  legacy.removeItem('compat');sessionStorage.removeItem('compat');store.clear();
+}catch(e){check(String(e),'no exception','unexpected exception: '+e);}testDone=true;};
+</script></body></html>

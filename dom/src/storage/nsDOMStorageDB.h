@@ -109,6 +109,8 @@ public:
   nsresult
   RemoveAll();
 
+  nsresult RemoveDomain(const nsAString& aDomain);
+
 protected:
 
   nsresult GetUsage(const nsAString &aOwner, PRInt32 *aUsage);

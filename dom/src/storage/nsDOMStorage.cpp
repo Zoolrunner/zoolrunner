@@ -146,7 +146,8 @@ nsDOMStorageManager::Initialize()
   if (!gStorageManager)
     return NS_ERROR_OUT_OF_MEMORY;
 
-  if (!gStorageManager->mStorages.Init()) {
+  if (!gStorageManager->mStorages.Init() ||
+      !gStorageManager->mLocalStorages.Init()) {
     delete gStorageManager;
     gStorageManager = nsnull;
     return NS_ERROR_OUT_OF_MEMORY;
@@ -165,6 +166,7 @@ nsDOMStorageManager::Initialize()
 void
 nsDOMStorageManager::Shutdown()
 {
+  if (gStorageManager) gStorageManager->mLocalStorages.Clear();
   NS_IF_RELEASE(gStorageManager);
   gStorageManager = nsnull;
 }
@@ -237,6 +239,7 @@ NS_INTERFACE_MAP_BEGIN(nsDOMStorage)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMStorage)
   NS_INTERFACE_MAP_ENTRY(nsIDOMStorage)
   NS_INTERFACE_MAP_ENTRY(nsPIDOMStorage)
+  NS_INTERFACE_MAP_ENTRY(nsPIDOMLocalStorage)
   NS_DOM_INTERFACE_MAP_ENTRY_CLASSINFO(Storage)
 NS_INTERFACE_MAP_END
 
@@ -257,7 +260,7 @@ NS_NewDOMStorage(nsISupports* aOuter, REFNSIID aIID, void** aResult)
 }
 
 nsDOMStorage::nsDOMStorage()
-  : mUseDB(PR_FALSE), mSessionOnly(PR_TRUE), mItemsCached(PR_FALSE)
+  : mUseDB(PR_FALSE), mIsLocalStorage(PR_FALSE), mSessionOnly(PR_TRUE), mItemsCached(PR_FALSE)
 {
   mItems.Init(8);
   if (nsDOMStorageManager::gStorageManager)
@@ -266,6 +269,7 @@ nsDOMStorage::nsDOMStorage()
 
 nsDOMStorage::nsDOMStorage(nsIURI* aURI, const nsAString& aDomain, PRBool aUseDB)
   : mUseDB(aUseDB),
+    mIsLocalStorage(PR_FALSE),
     mSessionOnly(PR_TRUE),
     mItemsCached(PR_FALSE),
     mURI(aURI),
@@ -296,6 +300,94 @@ nsDOMStorage::Init(nsIURI* aURI, const nsAString& aDomain, PRBool aUseDB)
 #else
   mUseDB = PR_FALSE;
 #endif
+}
+
+nsresult
+nsDOMStorageManager::GetLocalStorage(nsIPrincipal* aPrincipal,
+                                      nsIDOMStorage** aResult)
+{
+  *aResult = nsnull;
+  NS_ENSURE_TRUE(aPrincipal, NS_ERROR_DOM_SECURITY_ERR);
+  nsCOMPtr<nsIURI> uri;
+  aPrincipal->GetURI(getter_AddRefs(uri));
+  NS_ENSURE_TRUE(uri, NS_ERROR_DOM_SECURITY_ERR);
+  nsCAutoString host;
+  uri->GetAsciiHost(host);
+  NS_ENSURE_TRUE(!host.IsEmpty(), NS_ERROR_DOM_SECURITY_ERR);
+  nsXPIDLCString origin;
+  nsresult rv = aPrincipal->GetOrigin(getter_Copies(origin));
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsAutoString key(NS_LITERAL_STRING("localStorage-v1:"));
+  AppendUTF8toUTF16(origin, key);
+  nsCOMPtr<nsIDOMStorage> storage;
+  mLocalStorages.Get(key, getter_AddRefs(storage));
+  if (!storage) {
+    nsRefPtr<nsDOMStorage> native = new nsDOMStorage(uri, key, PR_TRUE);
+    NS_ENSURE_TRUE(native, NS_ERROR_OUT_OF_MEMORY);
+    native->mIsLocalStorage = PR_TRUE;
+    if (!native->CacheStoragePermissions()) return NS_ERROR_DOM_SECURITY_ERR;
+    storage = native;
+    if (!mLocalStorages.Put(key, storage)) return NS_ERROR_OUT_OF_MEMORY;
+  }
+  nsIDOMStorage* raw = storage;
+  if (!NS_STATIC_CAST(nsDOMStorage*, raw)->CacheStoragePermissions())
+    return NS_ERROR_DOM_SECURITY_ERR;
+  storage.swap(*aResult);
+  return NS_OK;
+}
+
+PRBool
+nsDOMStorage::CacheStoragePermissions()
+{
+  if (mIsLocalStorage) {
+    nsIScriptSecurityManager* security = nsContentUtils::GetSecurityManager();
+    nsCOMPtr<nsIPrincipal> subject;
+    security->GetSubjectPrincipal(getter_AddRefs(subject));
+    if (subject && !nsContentUtils::IsCallerChrome()) {
+      nsCOMPtr<nsIURI> uri;
+      subject->GetURI(getter_AddRefs(uri));
+      if (!uri || NS_FAILED(security->CheckSameOriginURI(mURI, uri)))
+        return PR_FALSE;
+    }
+  }
+  return CanUseStorage(mURI, &mSessionOnly);
+}
+
+nsresult
+nsDOMStorage::GetValue(const nsAString& aKey, nsAString& aValue)
+{
+  if (!CacheStoragePermissions()) return NS_ERROR_DOM_SECURITY_ERR;
+  if (UseDB()) {
+    PRBool secure;
+    nsAutoString owner;
+    nsresult rv = GetDBValue(aKey, aValue, &secure, owner);
+    if (rv == NS_ERROR_DOM_NOT_FOUND_ERR) {
+      aValue.SetIsVoid(PR_TRUE);
+      return NS_OK;
+    }
+    return rv;
+  }
+  nsSessionStorageEntry* entry = mItems.GetEntry(aKey);
+  if (!entry) { aValue.SetIsVoid(PR_TRUE); return NS_OK; }
+  return entry->mItem->GetValue(aValue);
+}
+
+nsresult
+nsDOMStorage::Clear()
+{
+  if (!CacheStoragePermissions()) return NS_ERROR_DOM_SECURITY_ERR;
+#ifdef MOZ_STORAGE
+  if (UseDB()) {
+    nsresult rv = InitDB();
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = gStorageDB->RemoveDomain(mDomain);
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+#endif
+  mItems.Clear();
+  mItemsCached = PR_FALSE;
+  BroadcastChangeNotification();
+  return NS_OK;
 }
 
 //static
@@ -458,7 +550,7 @@ nsDOMStorage::GetItem(const nsAString& aKey, nsIDOMStorageItem **aItem)
   if (!CacheStoragePermissions())
     return NS_ERROR_DOM_SECURITY_ERR;
 
-  if (aKey.IsEmpty())
+  if (aKey.IsEmpty() && !mIsLocalStorage)
     return NS_OK;
 
   nsSessionStorageEntry *entry = mItems.GetEntry(aKey);
@@ -500,7 +592,7 @@ nsDOMStorage::SetItem(const nsAString& aKey, const nsAString& aData)
   if (!CacheStoragePermissions())
     return NS_ERROR_DOM_SECURITY_ERR;
 
-  if (aKey.IsEmpty())
+  if (aKey.IsEmpty() && !mIsLocalStorage)
     return NS_OK;
 
   nsresult rv;
@@ -546,7 +638,7 @@ NS_IMETHODIMP nsDOMStorage::RemoveItem(const nsAString& aKey)
   if (!CacheStoragePermissions())
     return NS_ERROR_DOM_SECURITY_ERR;
 
-  if (aKey.IsEmpty())
+  if (aKey.IsEmpty() && !mIsLocalStorage)
     return NS_OK;
 
   nsSessionStorageEntry *entry = mItems.GetEntry(aKey);

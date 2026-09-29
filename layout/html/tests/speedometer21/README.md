@@ -209,3 +209,29 @@ a slow-script modal during Elm startup; it is not a benchmark pass.
 
 The Suite window bootstrap also passes all 19 checks, including unchanged
 legacy XUL accessor/regexp syntax and chrome/content global initialization.
+
+The next first-iteration diagnostic reached 45 measured steps: 44 passed the
+item-count checks, while Angular 2 deletion left 100 items. All three Elm steps
+completed with the unattended profile. Flight initially stopped on missing AMD
+resources in the external mirror; after fetching unchanged upstream resources,
+it exposed the missing `localStorage` API.
+
+Native local storage now uses origin-separated persistent storage with lossless
+UTF-16 key/value transport, including NUL and lone surrogates. Its initial
+HTTP-only regression is `style/local-storage.html`; serve it over loopback HTTP
+and use the probe command above. Historical `globalStorage` and `sessionStorage`
+retain StorageItem results and separate data. Flight's isolated one-iteration
+workload passes its add/complete/delete item checks. This is not a full benchmark
+pass. Storage event delivery, prototype method dispatch, modern exception
+mapping, process-restart persistence and quota boundaries remain unvalidated or
+incomplete. Encoded local strings currently consume four quota units per UTF-16
+code unit. The native DB encoding is private to the new local-storage namespace.
+
+The runner escapes UTF-16 report strings to ASCII before native console output,
+so NUL and lone-surrogate regression results survive the historical output
+transport. Invalid result JSON fails validation rather than aborting reporting.
+
+The local-storage HTTP fixture passes all 41 assertions on native LoongArch
+GTK2 Suite, including six legacy storage compatibility assertions. Suite window
+bootstrap passes all 19 checks. Invalid DOM method receivers also pass six
+focused checks after a null-safe wrapped-native query correction.
