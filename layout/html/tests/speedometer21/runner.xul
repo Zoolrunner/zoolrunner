@@ -52,6 +52,7 @@ function run() {
 // keep the workload code and its timing interval unchanged.
 function installWorkloadChecks() {
   window.zoolrunnerWorkloadChecks = [];
+  window.zoolrunnerReportedChecks = 0;
   var originalFrame = benchmarkClient.willAddTestFrame;
   benchmarkClient.willAddTestFrame = function(frame) {
     window.zoolrunnerActiveFrame = frame;
@@ -112,6 +113,10 @@ function poll() {
       var info = w.document.getElementById('info');
       dump('SPEEDOMETER-PROGRESS ' + lastStep + ' ' +
            (info ? info.textContent : '') + '\n');
+    }
+    if (mode == 'benchmark' && w.zoolrunnerWorkloadChecks) {
+      while (w.zoolrunnerReportedChecks < w.zoolrunnerWorkloadChecks.length)
+        dump('SPEEDOMETER-CHECK ' + JSON.stringify(w.zoolrunnerWorkloadChecks[w.zoolrunnerReportedChecks++]) + '\n');
     }
     if (mode == 'benchmark' && w.zoolrunnerBenchmarkDone) {
       var client = w.benchmarkClient;

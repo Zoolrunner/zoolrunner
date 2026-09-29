@@ -2244,8 +2244,9 @@ nsGenericElement::HandleDOMEvent(nsPresContext* aPresContext,
     }
   }
 
-  //Bubbling stage
-  if (NS_EVENT_FLAG_BUBBLE & aFlags && IsInDoc() &&
+  // Bubble to the retained parent even if a listener removed this node, or
+  // the event began in a detached subtree.
+  if (NS_EVENT_FLAG_BUBBLE & aFlags &&
       aEvent->message != NS_PAGE_LOAD && aEvent->message != NS_SCRIPT_LOAD &&
       aEvent->message != NS_IMAGE_ERROR && aEvent->message != NS_IMAGE_LOAD &&
       // scroll events fired at elements don't bubble (although scroll events

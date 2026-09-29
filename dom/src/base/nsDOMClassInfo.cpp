@@ -1182,6 +1182,7 @@ jsval nsDOMClassInfo::sOnblur_id          = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnsubmit_id        = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnreset_id         = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnchange_id        = JSVAL_VOID;
+jsval nsDOMClassInfo::sOninput_id         = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnselect_id        = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnload_id          = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnbeforeunload_id  = JSVAL_VOID;
@@ -1373,6 +1374,7 @@ nsDOMClassInfo::DefineStaticJSVals(JSContext *cx)
   SET_JSVAL_TO_STRING(sOnsubmit_id,        cx, "onsubmit");
   SET_JSVAL_TO_STRING(sOnreset_id,         cx, "onreset");
   SET_JSVAL_TO_STRING(sOnchange_id,        cx, "onchange");
+  SET_JSVAL_TO_STRING(sOninput_id,         cx, "oninput");
   SET_JSVAL_TO_STRING(sOnselect_id,        cx, "onselect");
   SET_JSVAL_TO_STRING(sOnload_id,          cx, "onload");
   SET_JSVAL_TO_STRING(sOnbeforeunload_id,  cx, "onbeforeunload");
@@ -3696,6 +3698,7 @@ nsDOMClassInfo::ShutDown()
   sOnsubmit_id        = JSVAL_VOID;
   sOnreset_id         = JSVAL_VOID;
   sOnchange_id        = JSVAL_VOID;
+  sOninput_id         = JSVAL_VOID;
   sOnselect_id        = JSVAL_VOID;
   sOnload_id          = JSVAL_VOID;
   sOnbeforeunload_id  = JSVAL_VOID;
@@ -7194,6 +7197,8 @@ nsEventReceiverSH::ReallyIsEventName(jsval id, jschar aFirstChar)
     return id == sOnerror_id;
   case 'f' :
     return id == sOnfocus_id;
+  case 'i' :
+    return id == sOninput_id;
   case 'c' :
     return (id == sOnchange_id       ||
             id == sOnclick_id        ||
@@ -7477,6 +7482,13 @@ nsEventReceiverSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
                                        &did_define);
   NS_ENSURE_SUCCESS(rv, rv);
 
+  if (!did_define && IsEventName(id)) {
+    if (!JS_DefineUCProperty(cx, obj, JS_GetStringChars(JSVAL_TO_STRING(id)),
+                            JS_GetStringLength(JSVAL_TO_STRING(id)),
+                            JSVAL_NULL, nsnull, nsnull, JSPROP_ENUMERATE))
+      return NS_ERROR_OUT_OF_MEMORY;
+    did_define = PR_TRUE;
+  }
   if (did_define) {
     *objp = obj;
   }

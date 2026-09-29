@@ -364,6 +364,7 @@ protected:
   static jsval sOnsubmit_id;
   static jsval sOnreset_id;
   static jsval sOnchange_id;
+  static jsval sOninput_id;
   static jsval sOnselect_id;
   static jsval sOnload_id;
   static jsval sOnbeforeunload_id;

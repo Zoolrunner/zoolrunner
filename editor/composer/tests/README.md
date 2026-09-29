@@ -42,3 +42,12 @@ reference-counted wrappers before invoking callers; a raw iterator cannot safely
 survive those callbacks. Native macOS packaging runs this regression for all
 four application runtimes. The GUI lifecycle check requires a desktop session
 and is separate from hosted CI.
+
+For another Suite chrome regression, `--fixture PATH --expect TEXT` uses the
+same disposable-profile registration and cleanup, loading the named XUL file
+from its own directory. For example, use `build/macosx/tests/modern-chatzilla.xul`
+with `SUITE-CHATZILLA initialized=true`, or `js/tests/es5/window-bootstrap.xul`
+with `WINDOW-BOOTSTRAP checks=19 failures=0`. These remain Suite tests and do
+not substitute for running the corresponding XULRunner application.
+On Linux, set `LD_LIBRARY_PATH` and `MOZILLA_FIVE_HOME` to the runtime directory
+and invoke the driver through `build/linux/with-display.sh`.

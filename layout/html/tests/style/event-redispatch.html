@@ -1,0 +1,28 @@
+<!doctype html><html><head><title>Event redispatch</title></head><body>
+<div id="parent"><span id="first"></span><span id="second"></span></div><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n);}
+window.onload=function(){try {
+  var first=document.getElementById('first'),second=document.getElementById('second');
+  var parent=document.getElementById('parent'),calls=0,bubbles=0;
+  parent.addEventListener('sample',function(){++bubbles;});
+  first.addEventListener('sample',function(e){++calls;e.stopPropagation();});
+  second.addEventListener('sample',function(e){++calls;});
+  var event=new Event('sample',{bubbles:true,cancelable:true});
+  first.dispatchEvent(event);check(calls,1,'first dispatch');check(bubbles,0,'first propagation stopped');
+  second.dispatchEvent(event);check(calls,2,'redispatch invokes listener');
+  check(bubbles,1,'redispatch clears propagation state');check(event.target,second,'redispatch target');
+  var rejected=false;
+  second.addEventListener('nested',function(e){try {first.dispatchEvent(e);}catch(ex){rejected=true;}});
+  second.dispatchEvent(new Event('nested'));check(rejected,true,'concurrent redispatch rejected');
+  function cancel(e){e.preventDefault();}
+  first.addEventListener('cancel',cancel);
+  event=new Event('cancel',{cancelable:true});
+  check(first.dispatchEvent(event),false,'first dispatch cancellation');
+  check(second.dispatchEvent(event),false,'cancellation persists across dispatches');
+  var detached=document.createElement('div'), child=document.createElement('span'), count=0;
+  detached.appendChild(child);detached.addEventListener('sample',function(){++count;});
+  child.dispatchEvent(new Event('sample',{bubbles:true}));
+  check(count,1,'detached subtree bubbles');
+}catch(e){check(String(e),'no exception','unexpected exception: '+e);}testDone=true;};
+</script></body></html>

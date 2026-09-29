@@ -1115,3 +1115,8 @@ Linux driver's 139 focused ES2015 fixtures, 83 native probes and all 28,582
 pinned modes. Speedometer framework integration and complete CSS painting
 validation remain in progress; these results do not establish a full benchmark
 pass or validation of the remaining applications.
+
+The Suite-first Speedometer runner also validates actual TodoMVC item counts
+and completion states after every measured step. Native event regressions
+cover cross-frame identity, programmatic click targets, handler bindings and
+redispatch; completed step counters alone are not treated as workload success.

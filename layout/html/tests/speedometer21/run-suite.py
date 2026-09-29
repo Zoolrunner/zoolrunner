@@ -55,6 +55,10 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 'zoolrunner.speedometer.debugErrors': args.debug_errors,
                 'zoolrunner.speedometer.timeout': args.timeout,
             }
+            if args.mode == 'benchmark':
+                # Keep interactive slow-script dialogs out of unattended runs.
+                # The parent process still enforces the hard timeout.
+                preferences['dom.max_script_run_time'] = 0
             (profile / 'user.js').write_text(''.join(
                 'user_pref(' + json.dumps(k) + ',' + json.dumps(v) + ');\n'
                 for k, v in preferences.items()))

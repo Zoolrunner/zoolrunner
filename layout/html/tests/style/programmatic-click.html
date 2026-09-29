@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><title>Programmatic click targeting</title></head><body>
+<iframe id="child"></iframe><div id="host"></div><script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name + (ok ? '' : ': ' + actual + ' expected ' + expected));
+}
+window.onload = function() {
+  try {
+    var w = document.getElementById('child').contentWindow;
+    w.document.body.innerHTML = '<button id="button" style="display:none">delete</button><input id="checkbox" type="checkbox">';
+    w.eval("window.clickCalls=0;window.clickTarget=null;document.body.addEventListener('click',function(e){window.clickCalls++;window.clickTarget=e.target;});");
+    var button = w.document.getElementById('button');
+    button.click();
+    check(w.clickCalls, 1, 'cross-frame hidden button click bubbles');
+    check(w.clickTarget, button, 'cross-frame button target');
+    var box = w.document.getElementById('checkbox');
+    box.click();
+    check(w.clickCalls, 2, 'cross-frame input click bubbles');
+    check(w.clickTarget, box, 'cross-frame input target');
+    check(box.checked, true, 'checkbox default action');
+    button.disabled = true; button.click();
+    check(w.clickCalls, 2, 'disabled button does not click');
+    box.disabled = true; box.click();
+    check(w.clickCalls, 2, 'disabled input does not click');
+    check(box.checked, true, 'disabled checkbox retains state');
+
+    var host = document.getElementById('host');
+    host.innerHTML = '<button>delete</button><input type="checkbox">';
+    button = host.firstChild; box = host.lastChild;
+    var calls = 0, saved;
+    function delegate(e) { ++calls; saved = e; }
+    host.addEventListener('click', delegate);
+    button.addEventListener('click', function() { button.click(); });
+    button.click();
+    check(calls, 1, 'recursive click suppressed');
+    check(saved.target, button, 'retained click target');
+    check(saved.isTrusted, false, 'content click is untrusted');
+    box.addEventListener('click', function(e) { e.preventDefault(); });
+    box.click();
+    check(saved.target, box, 'checkbox target in delegated handler');
+    check(box.checked, false, 'cancelled checkbox restores state');
+    button.addEventListener('click', function() { host.removeChild(button); });
+    button.click();
+    check(button.parentNode, null, 'target removal during click');
+    check(saved.target, button, 'removed target identity retained');
+    check(calls, 3, 'removal retains bubbling path');
+    host.removeEventListener('click', delegate);
+    host.innerHTML = '<button class="remove">one</button><button class="remove">two</button><button class="remove">three</button>';
+    host.addEventListener('click', function(e) { if (e.target.parentNode === host) host.removeChild(e.target); });
+    var buttons = host.querySelectorAll('.remove');
+    check(buttons.length, 3, 'static selector initial length');
+    check(buttons[0] === buttons[1], false, 'distinct selector elements');
+    for (var i = 0; i < buttons.length; ++i) {
+      var current = buttons[i], hit;
+      current.addEventListener('click', function(e) { hit = e.target; });
+      current.click();
+      check(hit, current, 'batch click target ' + i);
+      check(current.parentNode, null, 'batch removal ' + i);
+    }
+    check(host.childNodes.length, 0, 'batch button deletion');
+    check(buttons.length, 3, 'selector length remains static');
+  } catch (e) { check(String(e), 'no exception', 'unexpected exception: ' + e); }
+  testDone = true;
+};
+</script></body></html>

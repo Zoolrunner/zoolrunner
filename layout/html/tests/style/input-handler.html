@@ -1,0 +1,28 @@
+<!doctype html><html><head><title>Input event handler binding</title></head>
+<body><input id="input"><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n);}
+window.onload=function(){try {
+  var input=document.getElementById('input'), calls=0, receiver, seen;
+  check('onkeydown' in input,true,'keyboard handler detection');
+  check(input.onkeydown,null,'initial keyboard handler null');
+  check('onclick' in input,true,'click handler detection');
+  check(input.onclick,null,'initial click handler null');
+  check('oninput' in input,true,'input handler detection');
+  check('oninput' in document,true,'document handler detection');
+  check('oninput' in window,true,'window handler detection');
+  check(input.oninput,null,'initial handler null');
+  function handler(e){++calls;receiver=this;seen=e;}
+  input.oninput=handler;
+  check(input.oninput,handler,'handler identity');
+  var event=new Event('input',{bubbles:true});input.dispatchEvent(event);
+  check(calls,1,'assigned input handler invoked');
+  check(receiver,input,'input handler receiver');check(seen,event,'input handler event');
+  input.oninput=null;input.dispatchEvent(event);check(calls,1,'null removes input handler');
+  input.setAttribute('oninput','this.setAttribute("data-input", "yes");');
+  input.dispatchEvent(event);check(input.getAttribute('data-input'),'yes','inline input handler invoked');
+  check(typeof input.oninput,'function','inline handler reflected as function');
+  input.removeAttribute('oninput');input.removeAttribute('data-input');input.dispatchEvent(event);
+  check(input.hasAttribute('data-input'),false,'inline handler removal');
+}catch(e){check(String(e),'no exception','unexpected exception: '+e);}testDone=true;};
+</script></body></html>

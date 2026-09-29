@@ -4743,10 +4743,10 @@ nsEventStateManager::DispatchNewEvent(nsISupports* aTarget,
     NS_ENSURE_TRUE(!NS_IS_EVENT_IN_DISPATCH(innerEvent),
                    NS_ERROR_ILLEGAL_VALUE);
 
-    // And make sure this event wasn't already dispatched w/o being
-    // re-initialized in between.
-    NS_ENSURE_TRUE(!(innerEvent->flags & NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY),
-                   NS_ERROR_ILLEGAL_VALUE);
+    // Completed events may be dispatched again. Clear propagation state from
+    // the earlier dispatch, while retaining the event's canceled flag.
+    innerEvent->flags &= ~(NS_EVENT_FLAG_STOP_DISPATCH |
+                           NS_EVENT_FLAG_STOP_DISPATCH_IMMEDIATELY);
 
     // Mark this event as dispatched now that we're this far along.
     NS_MARK_EVENT_DISPATCH_STARTED(innerEvent);

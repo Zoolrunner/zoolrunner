@@ -1405,8 +1405,7 @@ nsHTMLInputElement::Click()
 
         SET_BOOLBIT(mBitField, BF_HANDLING_CLICK, PR_TRUE);
 
-        rv = HandleDOMEvent(context, &event, nsnull, NS_EVENT_FLAG_INIT,
-                            &status);
+        rv = DispatchEvent(context, &event, this, PR_FALSE, &status);
 
         SET_BOOLBIT(mBitField, BF_HANDLING_CLICK, PR_FALSE);
       }

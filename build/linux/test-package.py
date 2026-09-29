@@ -147,7 +147,7 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     if not executable.exists():
         executable = runtime / metadata['appname']
     cases = [('application', code, 'APPLICATION PASS:'),
-             ('window', window, 'WINDOW-BOOTSTRAP checks=17 failures=0')]
+             ('window', window, 'WINDOW-BOOTSTRAP checks=19 failures=0')]
     if a.app == 'suite':
         cases += [('lifecycle', (root / 'editor/composer/tests/platform-lifecycle.xul').read_text(), 'PLATFORM-LIFECYCLE checks=24 failures=0'),
                   ('chatzilla', (tests / 'modern-chatzilla.xul').read_text(), 'SUITE-CHATZILLA initialized=true')]

@@ -54,6 +54,8 @@
 
 #define PL_ARENA_CONST_ALIGN_MASK 3
 
+#include "nsIPrivateDOMEvent.h"
+#include "nsIEventListenerManager.h"
 #include "nsIPresShell.h"
 #include "nsPresContext.h"
 #include "nsIContent.h"
@@ -6632,6 +6634,7 @@ NS_IMETHODIMP
 PresShell::HandleDOMEventWithTarget(nsIContent* aTargetContent, nsEvent* aEvent, nsEventStatus* aStatus)
 {
   PushCurrentEventInfo(nsnull, aTargetContent);
+  nsresult rv = NS_OK;
 
   // Bug 41013: Check if the event should be dispatched to content.
   // It's possible that we are in the middle of destroying the window
@@ -6641,13 +6644,36 @@ PresShell::HandleDOMEventWithTarget(nsIContent* aTargetContent, nsEvent* aEvent,
   nsCOMPtr<nsISupports> container = mPresContext->GetContainer();
   if (container) {
 
-    // Dispatch event to content
-    aTargetContent->HandleDOMEvent(mPresContext, aEvent, nsnull,
-                                   NS_EVENT_FLAG_INIT, aStatus);
+    // Set the DOM target explicitly. The event-state manager can still hold
+    // a target from an enclosing or preceding event; synthesized clicks must
+    // not inherit it, including when that target has since been removed.
+    nsCOMPtr<nsIEventListenerManager> manager;
+    nsCOMPtr<nsIDOMEvent> domEvent;
+    aTargetContent->GetListenerManager(getter_AddRefs(manager));
+    rv = manager ? manager->CreateEvent(mPresContext, aEvent,
+                                                EmptyString(),
+                                                getter_AddRefs(domEvent)) :
+                            NS_ERROR_OUT_OF_MEMORY;
+    if (NS_SUCCEEDED(rv)) {
+      nsCOMPtr<nsIPrivateDOMEvent> privateEvent = do_QueryInterface(domEvent);
+      nsCOMPtr<nsIDOMEventTarget> target = do_QueryInterface(aTargetContent);
+      if (privateEvent) {
+        privateEvent->SetTarget(target);
+        nsIDOMEvent* event = domEvent;
+        rv = aTargetContent->HandleDOMEvent(mPresContext, aEvent, &event,
+                                            NS_EVENT_FLAG_INIT, aStatus);
+        // A script may retain the wrapper after the caller's native stack
+        // event expires. External DOM events are not copied by HandleDOMEvent.
+        nsresult copyRv = privateEvent->DuplicatePrivateData();
+        if (NS_SUCCEEDED(rv)) rv = copyRv;
+      } else {
+        rv = NS_ERROR_FAILURE;
+      }
+    }
   }
 
   PopCurrentEventInfo();
-  return NS_OK;
+  return rv;
 }
 
 NS_IMETHODIMP

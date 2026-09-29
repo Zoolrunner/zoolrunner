@@ -97,3 +97,10 @@ exercise native APIs and do not establish exhaustive DOM or CSS conformance.
 `cross-frame-event.html` checks generic event dispatch for built-in event names,
 same-origin cross-frame identity/expandos, capture, cancellation, listener
 removal and nested dispatch. It passes 50 assertions in native LoongArch Suite.
+
+`programmatic-click.html` covers button/input targets, cross-frame delegation,
+hidden and disabled controls, cancellation, recursive clicks, removal during
+dispatch and batch deletion from a static NodeList. `input-handler.html` covers
+handler detection, null defaults, assignment, inline handlers and removal.
+`event-redispatch.html` covers reuse, propagation reset, persistent cancellation,
+concurrent-dispatch rejection and bubbling in detached subtrees.

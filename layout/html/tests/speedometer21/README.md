@@ -190,3 +190,22 @@ operations succeeded. Validation currently finds failures in deletion and
 React/Ember item creation; full benchmark compatibility remains incomplete.
 The local mirror also needed Angular's dynamically loaded, unchanged upstream
 `todomvc-index.html`, now recorded in its SHA-256 manifest.
+
+Programmatic button/input clicks now use explicit targets, including successive
+clicks after a prior target was removed. Native dispatch retains event data for
+script-held wrappers; detached/removed nodes can bubble to their retained
+parent. Completed event objects can be dispatched again, while simultaneous
+redispatch is rejected and cancellation is retained. Existing event handler
+properties resolve to null before assignment, and `oninput` uses the native
+handler machinery. Suite passes 26 click assertions, 16 handler assertions,
+nine redispatch assertions, and the existing Event/CustomEvent/cross-frame
+probes (23/29/50). The Suite lifecycle checks pass all 24 assertions, and
+unchanged ChatZilla initializes successfully.
+
+Unattended benchmark profiles disable the interactive content slow-script
+prompt; the runner's external hard timeout still applies. Per-step item checks
+are logged as they become available. The previous run reached 42 steps before
+a slow-script modal during Elm startup; it is not a benchmark pass.
+
+The Suite window bootstrap also passes all 19 checks, including unchanged
+legacy XUL accessor/regexp syntax and chrome/content global initialization.

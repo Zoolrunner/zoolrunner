@@ -212,8 +212,7 @@ nsHTMLButtonElement::Click()
                            NS_MOUSE_LEFT_CLICK, nsnull,
                            nsMouseEvent::eReal);
         nsEventStatus status = nsEventStatus_eIgnore;
-        HandleDOMEvent(context, &event, nsnull,
-                       NS_EVENT_FLAG_INIT, &status);
+        DispatchEvent(context, &event, this, PR_FALSE, &status);
       }
     }
   }
