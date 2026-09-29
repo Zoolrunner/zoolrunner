@@ -1,0 +1,27 @@
+<!doctype html><title>XHR ready state event sequence</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+function finish(){document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;}
+try {
+ var sync=new XMLHttpRequest(),states=[],valid=true;
+ sync.onreadystatechange=function(e){states.push(sync.readyState);valid=valid&&e&&e.type==='readystatechange'&&e.target===sync&&e.currentTarget===sync&&e.eventPhase===2;};
+ sync.open('GET','xhr-ready-state.html?sync=1',false);
+ check(sync.readyState,1,'synchronous open state');check(states.join(','),'1','synchronous open dispatch');
+ sync.send(null);check(sync.readyState,4,'synchronous send completes');
+ check(states.join(','),'1,4','synchronous state event sequence');check(valid,true,'synchronous callback event fields');
+ var asyncRequest=new XMLHttpRequest(),asyncStates=[],listenerStates=[],asyncValid=true;
+ asyncRequest.addEventListener('readystatechange',function(e){listenerStates.push(asyncRequest.readyState);asyncValid=asyncValid&&e.currentTarget===asyncRequest&&e.eventPhase===2;});
+ asyncRequest.onreadystatechange=function(e){asyncStates.push(asyncRequest.readyState);asyncValid=asyncValid&&e&&e.type==='readystatechange'&&e.target===asyncRequest;};
+ asyncRequest.onload=function(){
+  check(asyncStates[0],1,'asynchronous sequence starts OPENED');check(asyncStates[asyncStates.length-1],4,'asynchronous sequence ends DONE');
+  check(asyncStates.filter(function(n){return n===1;}).length,1,'OPENED notified once');
+  check(asyncStates.filter(function(n){return n===4;}).length,1,'DONE notified once');
+  check(asyncStates.indexOf(2)>=0,true,'response headers notified');check(asyncStates.indexOf(3)>=0,true,'body loading notified');
+  check(asyncStates.join(','),listenerStates.join(','),'handler and listener same transitions');check(asyncValid,true,'asynchronous callback event fields');finish();
+ };
+ asyncRequest.onerror=function(){check('error','load','asynchronous request');finish();};
+ asyncRequest.open('GET','xhr-ready-state.html?async=1',true);
+ check(asyncStates.join(','),'1','asynchronous open dispatch');
+ asyncRequest.send(null);check(asyncStates.join(','),'1','send does not repeat OPENED');
+} catch(e){check(String(e),'no exception','ready state exception');finish();}
+</script>

@@ -799,3 +799,11 @@ XHR focused validation now also passes on Xlib Suite: the same 181 content,
 ten collection/reentrancy and 24 application-lifecycle assertions as GTK2.
 Current Browser GTK2 passes the expanded 271-check HTTP batch and ten XHR GC
 checks. Package checks and the remaining application rebuilds are in progress.
+
+`../style/xhr-ready-state.html` separately checks fifteen synchronous/asynchronous
+state-notification assertions. The current Suite baseline fails four: it omits
+synchronous OPENED/DONE events and duplicates asynchronous OPENED at send.
+Chromium 148 passes all fifteen. This pending sequence fix is kept separate
+from the passing callback-dispatch batch; baseline reports are
+`xhr-state-baseline-gtk2-xhr-ready-state.json` and
+`xhr-ready-state-chromium.json`.
