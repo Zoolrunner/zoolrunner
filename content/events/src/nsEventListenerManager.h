@@ -99,6 +99,7 @@ enum EventArrayType {
   eEventArrayType_SVG = 16,
   eEventArrayType_SVGZoom = 17,
 #endif // MOZ_SVG
+  eEventArrayType_History,
   eEventArrayType_Hash,
   eEventArrayType_None
 };
@@ -376,6 +377,8 @@ protected:
 #define NS_EVENT_BITS_PAGETRANSITION_NONE 0x00
 #define NS_EVENT_BITS_PAGETRANSITION_SHOW 0x01
 #define NS_EVENT_BITS_PAGETRANSITION_HIDE 0x02
+
+#define NS_EVENT_BITS_HISTORY_POPSTATE 0x01
 
 #ifdef MOZ_SVG
 // nsIDOMSVGEventListener

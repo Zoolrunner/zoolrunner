@@ -310,6 +310,7 @@ protected:
                                          PRInt32 aChildIndex, void *aData);
 
     nsresult GetRootSessionHistory(nsISHistory ** aReturn);
+    nsresult RestoreHistoryState(nsISHEntry* aEntry, nsIURI* aURI);
     nsresult GetHttpChannel(nsIChannel * aChannel, nsIHttpChannel ** aReturn);
     PRBool ShouldDiscardLayoutState(nsIHttpChannel * aChannel);
 

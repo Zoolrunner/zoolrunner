@@ -66,6 +66,7 @@ public:
   NS_DECL_NSIDOMNSHISTORY
 
   virtual nsresult GetHistoryDocShell(nsIDocShell** aResult);
+  virtual nsresult LegacyGo(PRInt32 aDelta);
 
   void SetDocShell(nsIDocShell *aDocShell);
 

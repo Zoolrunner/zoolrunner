@@ -1,0 +1,7 @@
+/* PopStateEvent identity; JavaScript state is held in traced weak-key storage.
+ * MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsIDOMEvent.idl"
+[scriptable, uuid(79c88c3a-514f-48a1-b85f-9e08a345c109)]
+interface nsIDOMPopStateEvent : nsIDOMEvent
+{
+};

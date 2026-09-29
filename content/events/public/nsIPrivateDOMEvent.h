@@ -83,6 +83,7 @@ public:
 };
 
 nsresult NS_NewDOMCustomEvent(nsIDOMEvent** aResult);
+nsresult NS_NewDOMPopStateEvent(nsIDOMEvent** aResult);
 
 nsresult
 NS_NewDOMEvent(nsIDOMEvent** aInstancePtrResult, nsPresContext* aPresContext, nsEvent *aEvent);

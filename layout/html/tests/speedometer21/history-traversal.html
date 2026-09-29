@@ -1,0 +1,47 @@
+<!doctype html><title>Same-document history traversal</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+String(a)+' expected='+String(b));}
+function later(fn){setTimeout(function(){try{fn();}catch(e){check(String(e),'no exception','scheduled exception');testDone=true;}},50);}
+try {
+ if(window.name==='history-traversal-running')throw Error('same-document traversal reloaded the page');
+ var savedName=window.name;window.name='history-traversal-running';
+ var doc=document,base=location.href.split('#')[0].split('?')[0],length=history.length;
+ var phase=0,events=0,properties=0,retainedEvent,oldState;
+ window.onpopstate=function(e){++properties;check(e.state,history.state,'handler property state identity');};
+ window.addEventListener('popstate',function(e){try{
+  ++events;
+  check(properties,events,'onpopstate property fires before later listener');
+  check(e instanceof PopStateEvent,true,'native PopStateEvent class');
+  check(e instanceof Event,true,'native event base class');
+  check(e.isTrusted,true,'traversal event is trusted');
+  check(e.target,window,'event target');check(e.currentTarget,window,'event current target');
+  check(e.eventPhase,2,'event at target');check(e.bubbles,false,'event does not bubble');check(e.cancelable,false,'event not cancelable');
+  check(e.state,history.state,'event and history share state');
+  check(document,doc,'original document retained');
+  check(document.body.getAttribute('data-history-marker'),'alive','DOM retained');
+  if(phase===0){
+   check(e.state.n,1,'back selects previous state');check(location.search,'?history-one','back restores URL');
+   check(history.length,length+2,'traversal preserves length');retainedEvent=e;phase=1;
+   later(function(){check(history.forward(),undefined,'forward returns undefined');check(history.state.n,1,'forward is asynchronous');});
+  }else if(phase===1){
+   check(e.state.n,2,'forward restores serialized state');check(e.state===oldState,false,'forward creates fresh state object');
+   check(location.search,'?history-two','forward restores URL');check(retainedEvent.state.n,1,'retained event state is independent of active entry');phase=2;
+   later(function(){var order=[];history.go({valueOf:function(){order.push('delta');return -2;}});check(order.join(','),'delta','go converts delta synchronously');check(history.state.n,2,'go is asynchronous');});
+  }else if(phase===2){
+   check(e.state.n,0,'go delta selects original entry');check(location.href,base,'go restores original URL');phase=3;
+   history.pushState({n:3},'','?history-three');check(history.length,length+1,'push after back discards forward entries');
+   check(history.state.n,3,'new state after forward truncation');
+   later(function(){var before=events;history.forward();history.go(2147483647);history.go(-2147483648);later(function(){check(events,before,'out-of-range traversals do nothing');check(history.state.n,3,'out-of-range traversal keeps state');history.back();check(history.state.n,3,'final back is asynchronous');});});
+  }else if(phase===3){
+   check(e.state.n,0,'back after truncation restores base');check(history.length,length+1,'truncated history length retained');
+   window.onpopstate=null;window.name=savedName;testDone=true;
+  }else{check(phase,'known phase','unexpected event');testDone=true;}
+ }catch(x){check(String(x),'no exception','popstate callback exception');testDone=true;}},false);
+ document.body.setAttribute('data-history-marker','alive');
+ history.replaceState({n:0},'',base);history.pushState({n:1},'','?history-one');history.pushState({n:2},'','?history-two');
+ oldState=history.state;oldState.n=22;
+ check(history.back.length,0,'back arity');check(history.forward.length,0,'forward arity');check(history.go.length,0,'go arity');
+ var caught;try{history.go(Symbol('delta'));}catch(e){caught=e;}check(caught&&caught.name,'TypeError','symbol delta rejected');
+ later(function(){check(events,0,'push and replace do not fire popstate');check(history.back(),undefined,'back returns undefined');check(history.state.n,22,'back is asynchronous');check(location.search,'?history-two','back leaves URL until traversal task');});
+}catch(error){check(String(error),'no exception','unexpected exception');testDone=true;}
+</script></body>

@@ -371,6 +371,7 @@ protected:
   static jsval sOnunload_id;
   static jsval sOnpageshow_id;
   static jsval sOnpagehide_id;
+  static jsval sOnpopstate_id;
   static jsval sOnabort_id;
   static jsval sOnerror_id;
   static jsval sOnpaint_id;

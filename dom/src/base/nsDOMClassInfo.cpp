@@ -61,6 +61,7 @@
 
 // JavaScript includes
 #include "jsapi.h"
+#include "jsfun.h"
 #include "jsnum.h"
 #include "jsdbgapi.h"
 #include "jscntxt.h"
@@ -229,6 +230,7 @@
 #include "nsIDOMXULCommandEvent.h"
 #include "nsIDOMPageTransitionEvent.h"
 #include "nsIDOMCustomEvent2.h"
+#include "nsIDOMPopStateEvent.h"
 #include "nsIDOMNSDocumentStyle.h"
 #include "nsIDOMDocumentRange.h"
 #include "nsIDOMDocumentTraversal.h"
@@ -1124,6 +1126,8 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            ARRAY_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(CustomEvent, nsCustomEventSH,
                            DOM_DEFAULT_SCRIPTABLE_FLAGS | nsIXPCScriptable::WANT_NEWRESOLVE)
+  NS_DEFINE_CLASSINFO_DATA(PopStateEvent, nsDOMEventSH,
+                           DOM_DEFAULT_SCRIPTABLE_FLAGS)
 };
 
 // Objects that shuld be constructable through |new Name();|
@@ -1197,6 +1201,7 @@ jsval nsDOMClassInfo::sOnbeforeunload_id  = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnunload_id        = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnpageshow_id      = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnpagehide_id      = JSVAL_VOID;
+jsval nsDOMClassInfo::sOnpopstate_id      = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnabort_id         = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnerror_id         = JSVAL_VOID;
 jsval nsDOMClassInfo::sOnpaint_id         = JSVAL_VOID;
@@ -1389,6 +1394,7 @@ nsDOMClassInfo::DefineStaticJSVals(JSContext *cx)
   SET_JSVAL_TO_STRING(sOnunload_id,        cx, "onunload");
   SET_JSVAL_TO_STRING(sOnpageshow_id,      cx, "onpageshow");
   SET_JSVAL_TO_STRING(sOnpagehide_id,      cx, "onpagehide");
+  SET_JSVAL_TO_STRING(sOnpopstate_id,      cx, "onpopstate");
   SET_JSVAL_TO_STRING(sOnabort_id,         cx, "onabort");
   SET_JSVAL_TO_STRING(sOnerror_id,         cx, "onerror");
   SET_JSVAL_TO_STRING(sOnpaint_id,         cx, "onpaint");
@@ -1532,6 +1538,7 @@ JSClass nsDOMClassInfo::sDOMConstructorProtoClass = {
 static JSBool DefineStorageMethods(JSContext* cx, JSObject* proto);
 static JSBool DefineCSSStyleMethods(JSContext* cx, JSObject* proto);
 static JSBool DefineHistoryMethods(JSContext* cx, JSObject* proto);
+static JSBool DefinePopStateMethods(JSContext* cx, JSObject* proto);
 
 static const char *
 CutPrefix(const char *aName) {
@@ -2994,6 +3001,11 @@ nsDOMClassInfo::Init()
      DOM_CLASSINFO_EVENT_MAP_ENTRIES
    DOM_CLASSINFO_MAP_END
  
+   DOM_CLASSINFO_MAP_BEGIN(PopStateEvent, nsIDOMPopStateEvent)
+     DOM_CLASSINFO_MAP_ENTRY(nsIDOMPopStateEvent)
+     DOM_CLASSINFO_EVENT_MAP_ENTRIES
+   DOM_CLASSINFO_MAP_END
+
    DOM_CLASSINFO_MAP_BEGIN(CustomEvent, nsIDOMCustomEvent2)
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMCustomEvent2)
      DOM_CLASSINFO_EVENT_MAP_ENTRIES
@@ -3723,6 +3735,7 @@ nsDOMClassInfo::ShutDown()
   sOnunload_id        = JSVAL_VOID;
   sOnpageshow_id      = JSVAL_VOID;
   sOnpagehide_id      = JSVAL_VOID;
+  sOnpopstate_id      = JSVAL_VOID;
   sOnabort_id         = JSVAL_VOID;
   sOnerror_id         = JSVAL_VOID;
   sOnpaint_id         = JSVAL_VOID;
@@ -4665,7 +4678,7 @@ nsCustomEventSH::NewResolve(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
 static nsresult
 ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
                   uintN argc, jsval* argv, jsval* rval, PRBool* aOK,
-                  PRBool aCustom = PR_FALSE)
+                  PRUint32 aKind = 0)
 {
   *aOK = PR_FALSE;
   if (!argc) {
@@ -4691,8 +4704,8 @@ ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
         !JS_GetProperty(cx, options, "cancelable", &value) ||
         !JS_ValueToBoolean(cx, value, &cancelable))
       return NS_OK;
-    if (aCustom) {
-      if (!JS_GetProperty(cx, options, "detail", &value))
+    if (aKind) {
+      if (!JS_GetProperty(cx, options, aKind == 2 ? "state" : "detail", &value))
         return NS_OK;
       if (JSVAL_IS_VOID(value)) value = JSVAL_NULL;
       detail = value;
@@ -4704,10 +4717,11 @@ ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
   nsCOMPtr<nsIScriptGlobalObject> owner = do_QueryReferent(aWeakOwner);
   NS_ENSURE_STATE(owner && owner->GetGlobalJSObject());
   nsCOMPtr<nsIDOMEvent> event;
-  nsresult rv = aCustom ? NS_NewDOMCustomEvent(getter_AddRefs(event)) :
-                         NS_NewDOMEvent(getter_AddRefs(event), nsnull, nsnull);
+  nsresult rv = aKind == 2 ? NS_NewDOMPopStateEvent(getter_AddRefs(event)) :
+                aKind == 1 ? NS_NewDOMCustomEvent(getter_AddRefs(event)) :
+                             NS_NewDOMEvent(getter_AddRefs(event), nsnull, nsnull);
   NS_ENSURE_SUCCESS(rv, rv);
-  if (aCustom) {
+  if (aKind == 1) {
     nsCOMPtr<nsIDOMCustomEvent2> custom = do_QueryInterface(event);
     rv = custom->InitCustomEventValue(nsDependentJSString(type), bubbles, cancelable, detail);
   } else {
@@ -4718,6 +4732,16 @@ ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
   rv = nsDOMGenericSH::WrapNative(cx, owner->GetGlobalJSObject(), event,
                                   NS_GET_IID(nsIDOMEvent), rval,
                                   getter_AddRefs(holder));
+  if (NS_SUCCEEDED(rv) && aKind == 2) {
+    nsCOMPtr<nsPIDOMWindow> nativeWindow = do_QueryInterface(owner);
+    NS_ENSURE_TRUE(nativeWindow, NS_ERROR_UNEXPECTED);
+    nsPIDOMWindow* pointer = nativeWindow;
+    nsGlobalWindow* window = NS_STATIC_CAST(nsGlobalWindow*, pointer);
+    if (window->IsOuterWindow()) window = window->GetCurrentInnerWindowInternal();
+    NS_ENSURE_TRUE(window, NS_ERROR_UNEXPECTED);
+    if (!window->SetEventState(cx, JSVAL_TO_OBJECT(*rval), detail))
+      return NS_OK; // Preserve the pending JavaScript exception.
+  }
   *aOK = NS_SUCCEEDED(rv);
   return rv;
 }
@@ -4970,6 +4994,9 @@ nsDOMConstructor::Construct(nsIXPConnectWrappedNative *wrapper, JSContext * cx,
     NS_ERROR("Name isn't in hash.");
     return NS_ERROR_UNEXPECTED;
   }
+
+  if (nsDependentString(mClassName).EqualsLiteral("PopStateEvent"))
+    return ConstructDOMEvent(mWeakOwner, cx, argc, argv, vp, _retval, 2);
 
   if (nsDependentString(mClassName).EqualsLiteral("CustomEvent"))
     return ConstructDOMEvent(mWeakOwner, cx, argc, argv, vp, _retval, PR_TRUE);
@@ -6075,6 +6102,22 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
       dot_prototype = ::JS_NewObject(cx, &sDOMConstructorProtoClass, proto,
                                      obj);
       NS_ENSURE_TRUE(dot_prototype, NS_ERROR_OUT_OF_MEMORY);
+    }
+
+    if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_PopStateEvent_id]) {
+      JSString* name = JS_InternString(cx, "PopStateEvent");
+      jsval parent;
+      if (!name || !DefinePopStateMethods(cx, dot_prototype) ||
+          !JS_DefineProperty(cx, class_obj, "name", STRING_TO_JSVAL(name),
+                             nsnull, nsnull, JSPROP_READONLY) ||
+          !JS_DefineProperty(cx, class_obj, "length", INT_TO_JSVAL(1),
+                             nsnull, nsnull, JSPROP_READONLY) ||
+          !JS_DefineProperty(cx, dot_prototype, "constructor", OBJECT_TO_JSVAL(class_obj),
+                             nsnull, nsnull, 0) ||
+          !JS_GetProperty(cx, obj, "Event", &parent) ||
+          JSVAL_IS_PRIMITIVE(parent) ||
+          !JS_SetPrototype(cx, class_obj, JSVAL_TO_OBJECT(parent)))
+        return NS_ERROR_FAILURE;
     }
 
     if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_History_id] &&
@@ -7354,7 +7397,8 @@ nsEventReceiverSH::ReallyIsEventName(jsval id, jschar aFirstChar)
   case 'p' :
     return (id == sOnpaint_id        ||
             id == sOnpageshow_id     ||
-            id == sOnpagehide_id);
+            id == sOnpagehide_id     ||
+            id == sOnpopstate_id);
   case 'k' :
     return (id == sOnkeydown_id      ||
             id == sOnkeypress_id     ||
@@ -11499,6 +11543,45 @@ nsCSSValueListSH::GetItemAt(nsISupports *aNative, PRUint32 aIndex,
 }
 
 
+static JSBool JS_DLL_CALLBACK
+PopStateGetter(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMPopStateEvent> event = do_QueryWrappedNative(wrapper);
+  if (!event) {
+    DOMConstructorTypeError(cx, "PopStateEvent state requires a PopStateEvent");
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsPIDOMWindow> native = do_QueryInterface(
+      nsJSUtils::GetStaticScriptGlobal(cx, obj));
+  nsPIDOMWindow* pointer = native;
+  nsGlobalWindow* window = pointer ? NS_STATIC_CAST(nsGlobalWindow*, pointer) : nsnull;
+  if (window && window->IsOuterWindow())
+    window = window->GetCurrentInnerWindowInternal();
+  if (!window || !nsContentUtils::CanCallerAccess(window)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_STANDARD_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  return window->GetEventState(cx, obj, rval);
+}
+
+static JSBool
+DefinePopStateMethods(JSContext* cx, JSObject* proto)
+{
+  JSFunction* getter = JS_NewFunction(cx, PopStateGetter, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
+                                      JS_GetParent(cx, proto), "get state");
+  if (!getter) return JS_FALSE;
+  JSObject* getterObject = JS_GetFunctionObject(getter);
+  nsresult rv;
+  nsAutoGCRoot root(&getterObject, &rv);
+  if (NS_FAILED(rv)) return JS_FALSE;
+  return JS_DefineProperty(cx, proto, "state", JSVAL_VOID,
+                           (JSPropertyOp)getterObject, nsnull,
+                           JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_GETTER);
+}
+
 // History's modern JavaScript surface is additive: the legacy nsIDOMHistory
 // and nsIDOMNSHistory signatures remain unchanged for embedding clients.
 static nsGlobalWindow*
@@ -11617,19 +11700,68 @@ HistoryStateGetter(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval*
   return window->ReadHistoryState(cx, data, rval);
 }
 static JSBool
+HistoryTraverse(JSContext* cx, JSObject* obj, uintN argc, jsval* argv,
+                 jsval* rval, PRInt32 delta, PRBool isGo)
+{
+  nsCOMPtr<nsIDocShell> shell;
+  nsRefPtr<nsGlobalWindow> window = HistoryWindow(cx, obj, getter_AddRefs(shell), PR_FALSE);
+  if (!window) return JS_FALSE;
+  JSVersion version = JS_GetVersion(cx);
+  PRBool legacy = version != JSVERSION_DEFAULT && version != JSVERSION_ECMA_2015;
+  if (isGo && argc) {
+    if (legacy) {
+      if (!JSVAL_IS_INT(argv[0])) { *rval = JSVAL_VOID; return JS_TRUE; }
+      delta = JSVAL_TO_INT(argv[0]);
+    } else if (!JS_ValueToECMAInt32(cx, argv[0], &delta)) {
+      return JS_FALSE;
+    }
+  }
+  if (!HistoryWindow(cx, obj, getter_AddRefs(shell))) return JS_FALSE;
+  nsresult rv;
+  if (legacy) {
+    // Explicit legacy JavaScript versions keep classic invocation/resize rules.
+    nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+    nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj, getter_AddRefs(wrapper));
+    nsCOMPtr<nsIDOMHistory> history = do_QueryWrappedNative(wrapper);
+    nsCOMPtr<nsIHistoryStateOwner> owner = do_QueryWrappedNative(wrapper);
+    rv = isGo ? owner->LegacyGo(delta) : delta < 0 ? history->Back() : history->Forward();
+  } else {
+    rv = window->QueueHistoryTraversal(delta);
+  }
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+static JSBool JS_DLL_CALLBACK
+HistoryBack(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{ return HistoryTraverse(cx, obj, argc, argv, rval, -1, PR_FALSE); }
+static JSBool JS_DLL_CALLBACK
+HistoryForward(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{ return HistoryTraverse(cx, obj, argc, argv, rval, 1, PR_FALSE); }
+static JSBool JS_DLL_CALLBACK
+HistoryGo(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval)
+{ return HistoryTraverse(cx, obj, argc, argv, rval, 0, PR_TRUE); }
+
+static JSBool
 DefineHistoryMethods(JSContext* cx, JSObject* proto)
 {
-  JSFunction* getter = JS_NewFunction(cx, HistoryStateGetter, 0, 0,
+  JSFunction* getter = JS_NewFunction(cx, HistoryStateGetter, 0, JSFUN_STRICT | JSFUN_NO_CONSTRUCT,
                                       JS_GetParent(cx, proto), "get state");
   if (!getter) return JS_FALSE;
   JSObject* getterObject = JS_GetFunctionObject(getter);
   nsresult rv;
   nsAutoGCRoot root(&getterObject, &rv);
   if (NS_FAILED(rv)) return JS_FALSE;
-  return JS_DefineFunction(cx, proto, "pushState", HistoryPushState, 2,
-                           JSPROP_ENUMERATE) &&
+  return JS_DefineFunction(cx, proto, "back", HistoryBack, 0, JSPROP_ENUMERATE | JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
+         JS_DefineFunction(cx, proto, "forward", HistoryForward, 0, JSPROP_ENUMERATE | JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
+         JS_DefineFunction(cx, proto, "go", HistoryGo, 0, JSPROP_ENUMERATE | JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
+         JS_DefineFunction(cx, proto, "pushState", HistoryPushState, 2,
+                           JSPROP_ENUMERATE | JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
          JS_DefineFunction(cx, proto, "replaceState", HistoryReplaceState, 2,
-                           JSPROP_ENUMERATE) &&
+                           JSPROP_ENUMERATE | JSFUN_STRICT | JSFUN_NO_CONSTRUCT) &&
          JS_DefineProperty(cx, proto, "state", JSVAL_VOID,
                             (JSPropertyOp)getterObject, nsnull,
                             JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_GETTER);

@@ -218,6 +218,7 @@ LAYOUT_ATOM(onDOMCharacterDataModified, "onDOMCharacterDataModified")
 // pagetransition events
 LAYOUT_ATOM(onpageshow, "onpageshow")
 LAYOUT_ATOM(onpagehide, "onpagehide")
+LAYOUT_ATOM(onpopstate, "onpopstate")
 
 #ifdef MOZ_SVG
 // Note: the attribute name for the 'SVGLoad' event is actually 'onload' etc.

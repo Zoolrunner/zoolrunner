@@ -1,0 +1,25 @@
+<!doctype html><title>History reload retains serialized state</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+String(a)+' expected='+String(b));}
+var frame=document.createElement('iframe'),phase=0,previousDocument,previousState,length;
+frame.onload=function(){try{
+ var w=frame.contentWindow,h=w.history;
+ w.addEventListener('popstate',function(){check(true,false,'reload does not fire popstate');},false);
+ if(phase===0){
+  h.replaceState({saved:7},'');previousState=h.state;previousState.saved=99;
+  previousDocument=w.document;length=history.length;phase=1;
+  h.go();check(w.document,previousDocument,'omitted go queues reload');return;
+ }
+ check(w.document===previousDocument,false,'reload creates a new document');
+ check(h.state.saved,7,'reload restores the serialized snapshot');
+ check(h.state===previousState,false,'reload gives a fresh state object');
+ check(h.state,h.state,'reloaded state keeps getter identity');
+ check(history.length,length,'reload preserves joint history length');
+ if(phase===1){
+  previousDocument=w.document;previousState=h.state;previousState.saved=100;phase=2;
+  h.go(undefined);check(w.document,previousDocument,'undefined go queues reload');return;
+ }
+ frame.onload=null;frame.parentNode.removeChild(frame);testDone=true;
+}catch(e){check(String(e),'no exception','reload callback exception');testDone=true;}};
+frame.src='history-child.html';document.body.appendChild(frame);
+</script></body>

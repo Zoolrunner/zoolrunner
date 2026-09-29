@@ -441,6 +441,13 @@ Event-prototype changes must exercise `layout/html/tests/style/event-prototype.h
 including Window initialization, frame realms, document fragments and historical
 named-property lookup, alongside Suite lifecycle and chrome/content bootstrap.
 Do not link Window's legacy global-scope polluter into a shared DOM prototype.
+History state and traversal changes must run
+`layout/html/tests/speedometer21/run-history-probes.py`, the session-entry shell
+probe and Suite lifecycle checks. Preserve explicit legacy History invocation
+rules and existing XPCOM interfaces. Retained events must retain their state
+after frame teardown without unconditional GC roots; exercise callback-driven
+frame removal and collection. Keep same-document results separate from still
+incomplete cross-document/fragment event behavior and full benchmark results.
 
 Full ECMAScript 2015 (ES6) compliance is the next required modernization target.
 Track the conformance corpus, failures and implementation status in

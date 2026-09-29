@@ -310,5 +310,9 @@ Suite History state checks can be run separately with
 The runner serves the unchanged fixtures locally and uses disposable Suite
 profiles. Native LoongArch GTK2 and Xlib each pass 120 assertions and all 24
 Suite lifecycle checks for the initial pushState/replaceState/state integration.
-Traversal/popstate coverage remains pending. See the Speedometer test guide
-for limitations and the separate full benchmark status.
+The expanded traversal/popstate fixtures pass 300 assertions on GTK2 over HTTP
+and on Xlib with HTTP plus file reload/legacy checks. They cover queued
+same-document and child traversal, event-state lifetime, reload and explicit
+legacy calls. Cross-document events and other History behavior remain
+incomplete. See the Speedometer test guide for limitations and the separate
+full benchmark status.

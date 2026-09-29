@@ -61,6 +61,7 @@ XPIDLSRCS =					\
 	nsIDOMConstructor.idl			\
 	nsIDOMCRMFObject.idl			\
 	nsIDOMCrypto.idl			\
+	nsIHistoryStateWindow.idl		\
 	nsIDOMHistory.idl			\
 	nsIDOMLocation.idl			\
 	nsIDOMMimeType.idl			\

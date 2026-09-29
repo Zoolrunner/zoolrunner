@@ -94,6 +94,7 @@
 #include "nsIDOMStorage.h"
 #include "nsIDOMStorageList.h"
 #include "nsIDOMStorageWindow.h"
+#include "nsIHistoryStateWindow.h"
 #include "nsIDOMGCParticipant.h"
 
 #define DEFAULT_HOME_PAGE "www.mozilla.org"
@@ -145,6 +146,7 @@ class nsGlobalWindow : public nsPIDOMWindow_MOZILLA_1_8_BRANCH2,
                        public nsIDOMNSEventTarget,
                        public nsIDOMViewCSS,
                        public nsIDOMStorageWindow,
+                       public nsIHistoryStateWindow,
                        public nsSupportsWeakReference,
                        public nsIInterfaceRequestor,
                        public nsIObserver,
@@ -182,6 +184,9 @@ public:
   JSBool ReadHistoryState(JSContext* cx, nsISupports* aData, jsval* aResult);
   void MarkHistoryState(JSContext* cx, void* aArg);
   void ClearHistoryState();
+  nsresult QueueHistoryTraversal(PRInt32 aDelta);
+  JSBool GetEventState(JSContext* cx, JSObject* aEvent, jsval* aResult);
+  JSBool SetEventState(JSContext* cx, JSObject* aEvent, jsval aValue);
   virtual void SetScriptsEnabled(PRBool aEnabled, PRBool aFireTimeouts);
   virtual nsresult SetNewArguments(PRUint32 aArgc, void* aArgv);
 
@@ -263,6 +268,7 @@ public:
 
   // nsIDOMStorageWindow
   NS_DECL_NSIDOMSTORAGEWINDOW
+  NS_DECL_NSIHISTORYSTATEWINDOW
 
   // nsIInterfaceRequestor
   NS_DECL_NSIINTERFACEREQUESTOR
@@ -566,6 +572,7 @@ protected:
   // Traced through the inner window wrapper, never an unconditional GC root.
   nsCOMPtr<nsISupports> mHistoryStateData;
   jsval mHistoryStateValue;
+  JSObject* mEventStateMap;
 
   nsDataHashtable<nsStringHashKey, PRBool> *mPendingStorageEvents;
 

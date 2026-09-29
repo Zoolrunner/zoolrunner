@@ -237,9 +237,9 @@ nsHistory::Go(PRInt32 aDelta)
   nsresult rv = session_history->GetIndex(&curIndex);  
   rv = session_history->GetCount(&len);
   
-  PRInt32 index = curIndex + aDelta;
-  if (index > -1  &&  index < len)
-    webnav->GotoIndex(index);
+  if (curIndex >= 0 && curIndex < len && aDelta >= -curIndex &&
+      aDelta < len - curIndex)
+    webnav->GotoIndex(curIndex + aDelta);
   // We always want to return a NS_OK, since returning errors 
   // from GotoIndex() can lead to exceptions and a possible leak
   // of history length
@@ -277,6 +277,12 @@ nsHistory::Go()
     delta = JSVAL_TO_INT(argv[0]);
   }
 
+  return LegacyGo(delta);
+}
+
+nsresult
+nsHistory::LegacyGo(PRInt32 delta)
+{
   if (delta == 0) {
     nsCOMPtr<nsPIDOMWindow> window(do_GetInterface(mDocShell));
 

@@ -345,6 +345,7 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mTimeoutFiringDepth(0),
     mJSObject(nsnull),
     mHistoryStateValue(JSVAL_NULL),
+    mEventStateMap(nsnull),
     mPendingStorageEvents(nsnull)
 #ifdef DEBUG
     , mSetOpenerWindowCalled(PR_FALSE)
@@ -588,6 +589,7 @@ NS_INTERFACE_MAP_BEGIN(nsGlobalWindow)
   NS_INTERFACE_MAP_ENTRY(nsIDOMViewCSS)
   NS_INTERFACE_MAP_ENTRY(nsIDOMAbstractView)
   NS_INTERFACE_MAP_ENTRY(nsIDOMStorageWindow)
+  NS_INTERFACE_MAP_ENTRY(nsIHistoryStateWindow)
   NS_INTERFACE_MAP_ENTRY(nsISupportsWeakReference)
   NS_INTERFACE_MAP_ENTRY(nsIInterfaceRequestor)
   NS_INTERFACE_MAP_ENTRY(nsIObserver)
@@ -1855,6 +1857,7 @@ nsGlobalWindow::OnFinalize(JSObject *aJSObject)
 {
   if (aJSObject == mJSObject) {
     ClearHistoryState();
+    mEventStateMap = nsnull;
     mJSObject = nsnull;
   } else if (mJSObject) {
     NS_ERROR("Huh? XPConnect created more than one wrapper for this global!");

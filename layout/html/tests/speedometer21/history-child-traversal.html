@@ -1,0 +1,34 @@
+<!doctype html><title>Joint history child traversal</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+String(a)+' expected='+String(b));}
+function later(fn){setTimeout(function(){try{fn();}catch(e){check(String(e),'no exception','scheduled exception');testDone=true;}},40);}
+var frame=document.createElement('iframe'),parentEvents=0;
+window.addEventListener('popstate',function(){++parentEvents;},false);
+frame.onload=function(){try{
+ frame.onload=function(){check(true,false,'child traversal must not reload');testDone=true;};
+ var w=frame.contentWindow,h=w.history,doc=w.document,n=history.length,phase=0;
+ w.onpopstate=function(e){try{
+  check(e.target,w,'child event target');check(e.state,h.state,'child event state identity');
+  check(w.document,doc,'child document retained');check(parentEvents,0,'parent gets no child popstate');
+  if(phase===0){
+   check(e.state,undefined,'back restores undefined state');check(w.location.search,'?child-one','child first URL');phase=1;
+   later(function(){h.go(-1);check(h.state,undefined,'child go is asynchronous');});
+  }else if(phase===1){
+   check(e.state,null,'back restores original entry without serialized state');check(w.location.search,'','child original URL');phase=2;
+   later(function(){h.forward();check(h.state,null,'child forward is asynchronous');});
+  }else if(phase===2){
+   check(e.state,undefined,'forward restores undefined state');phase=3;
+   later(function(){history.forward();check(h.state,undefined,'parent forward remains asynchronous');});
+  }else{
+   check(e.state.n,2,'parent forward restores child snapshot');check(history.length,n+2,'joint length preserved');
+   window.retainedChildTraversal=e;frame.parentNode.removeChild(frame);
+   testRequestGC=true;testGCDone=false;
+   setTimeout(function wait(){if(!testGCDone){setTimeout(wait,30);return;}try{check(retainedChildTraversal.state.n,2,'trusted event state survives detachment and GC');check(parentEvents,0,'parent remains unaffected');}catch(x){check(String(x),'no exception','retained event exception');}testDone=true;},30);
+  }
+ }catch(e){check(String(e),'no exception','child callback exception');testDone=true;}};
+ check(h.state,null,'initial child state');h.pushState(undefined,'','?child-one');h.pushState({n:2},'','?child-two');
+ h.state.n=22;check(history.length,n+2,'child pushes add joint entries');check(history.state,null,'parent state remains null');
+ later(function(){history.back();check(h.state.n,22,'parent back leaves child state until queued traversal');});
+}catch(e){check(String(e),'no exception','child setup exception');testDone=true;}};
+frame.src='history-child.html';document.body.appendChild(frame);
+</script></body>

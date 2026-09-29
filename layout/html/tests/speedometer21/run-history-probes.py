@@ -29,7 +29,10 @@ def main():
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
-            for name in ('history-state', 'history-realm', 'history-initial', 'history-gc', 'history-reuse'):
+            for name in ('history-state', 'history-realm', 'history-initial',
+                         'history-gc', 'history-reuse', 'popstate-event',
+                         'history-traversal', 'history-child-traversal',
+                         'history-reload', 'history-legacy'):
                 report = args.reports / (name + '.json')
                 report.unlink(missing_ok=True)
                 url = 'http://127.0.0.1:%d/%s.html' % (server.server_port, name)

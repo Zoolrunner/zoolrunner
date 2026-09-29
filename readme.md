@@ -1208,6 +1208,8 @@ see the [ES2015 test guide](js/tests/es6/README.md).
 
 Native History pushState/replaceState/state bindings pass 120 HTTP assertions
 and 24 Suite lifecycle checks on both LoongArch GTK2 and Xlib. Same-document
-traversal and popstate are still pending; the
+traversal and native PopStateEvent now pass an expanded 300-check fixture set
+on both backends (GTK2 over HTTP; Xlib uses HTTP plus file reload/legacy checks).
+Cross-document events and other History behavior remain incomplete; the
 [Speedometer notes](layout/html/tests/speedometer21/README.md) separate these
 partial results from complete benchmark and application validation.

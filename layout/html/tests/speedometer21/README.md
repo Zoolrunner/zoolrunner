@@ -50,10 +50,12 @@ Relevant specifications are [Selectors API](https://www.w3.org/TR/selectors-api/
 [Selectors Level 3](https://www.w3.org/TR/selectors-3/), and
 [ECMAScript 2015](https://262.ecma-international.org/6.0/).
 
-Remaining work includes validating the native ES2015 workload, animation frame
-callbacks and event constructors, further framework dependencies, and
-CSS layout/painting features. Re-evaluate this list against actual benchmark
-failures as support progresses. Preserve the full pinned ES5.1 run and the
+Remaining work includes the complete benchmark and original results UI,
+remaining DOM behavior and CSS layout/painting features, followed by the other
+application builds and runtime tests. The native ES2015 workload, animation
+frame callbacks and basic event constructors have passed focused checks and
+workload iterations; those results do not establish exhaustive conformance.
+Preserve the full pinned ES5.1 run and the
 existing embedding, chrome/content, application lifecycle and layout probes.
 
 Pre-merge native LoongArch Suite results (GCC 15.3.0, 2026-09-28): the first
@@ -540,8 +542,39 @@ backends pass all 24 Suite lifecycle checks. Reports are under
 The original benchmark results callback and summary/details navigation now
 pass a four-check diagnostic with explicitly synthetic input. A fresh complete
 benchmark is running against a frozen earlier binding build; no successful
-full-run result is claimed yet. Same-document traversal and `popstate` remain
-unimplemented, and the state snapshot facility still lacks DOM-specific
+full-run result is claimed yet. The state snapshot facility still lacks DOM-specific
 serialized types. These are partial History improvements, not full API
 conformance. Other applications remain deferred until Suite completes the
 unmodified benchmark.
+
+### Same-document history traversal
+
+Modern `back`, `forward` and `go` calls now queue traversal, restore a fresh
+serialized state and dispatch a trusted `PopStateEvent` without reloading a
+same-document entry. Child traversal uses the joint session history. Reloading
+with `go()` retains serialized state, while explicit legacy JavaScript keeps
+its original noninteger-argument handling. Historical XPCOM History interfaces
+retain their signatures. Event state uses the owning realm's native weak map,
+including retained events after frame teardown, without invoking mutable
+JavaScript WeakMap methods.
+
+The expanded history runner covers state bindings (82), realm checks (16),
+initial documents (11), GC (10), entry replacement (7), PopStateEvent (44),
+top-level traversal (80), child traversal (32), reload (12) and explicit legacy
+calls (6). GTK2 passes all **300 HTTP assertions**. Xlib passes the first 282
+over HTTP and the 18 reload/legacy assertions over file URLs. Reports are in
+`artifacts/speedometer21/history-traversal-http-{gtk2,xlib}/`,
+`history-reload-xlib.json` and `history-legacy-xlib.json`.
+Both updated Suite backends also pass 970 existing content assertions, 159
+networking/storage HTTP assertions, all 24 lifecycle checks and ten native
+session-entry checks. Their identical JavaScript library hash remains
+`1d29abb799a6522dc58735d5274b00304a10a48b3cbe79a67ffa3b5a3e360782`,
+the library from the complete 11,540-case ES5.1 and 28,582-case ES2015 passes.
+These DOM changes therefore did not require repeating unchanged engine gates.
+Artifacts use `history-{gtk2,xlib}-content-probes.json`,
+`history-{gtk2,xlib}-http/` and `history-traversal-*-lifecycle.stdout`.
+
+This does not finish the History API: fragment/hashchange integration,
+cross-document/BFcache event behavior, ancestor activity checks and DOM
+constructor shadowing still need work. No broader application or complete
+specification result follows from these focused tests.

@@ -77,6 +77,9 @@ try {
  check(descriptor.set,undefined,'state has no setter');
  check(descriptor.enumerable,true,'state is enumerable');
  check(descriptor.configurable,true,'state is configurable');
+ [h.pushState,h.replaceState,h.back,h.forward,h.go,descriptor.get].forEach(function(method,index){
+  throws(function(){Reflect.construct(function(){},[],method);},'TypeError',null,'History operation is not a constructor '+index);
+ });
  throws(function(){descriptor.get.call({});},'TypeError',null,'state getter brand');
  if(location.protocol==='http:') {
   var origin=location.protocol+'//'+location.host;

@@ -1,0 +1,74 @@
+<!doctype html><title>PopStateEvent values and lifetime</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function show(v){try{return String(v);}catch(e){return '<unprintable>';}}
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+show(a)+' expected='+show(b));}
+function typeError(fn,s){var e;try{fn();}catch(x){e=x;}check(e&&e.name,'TypeError',s);}
+function collect(next){testGCDone=false;testRequestGC=true;setTimeout(function wait(){if(!testGCDone){setTimeout(wait,30);return;}try{next();}catch(e){check(String(e),'no exception','GC callback exception');testDone=true;}},30);}
+try {
+ check(typeof PopStateEvent,'function','constructor is callable interface object');
+ check(PopStateEvent.length,1,'constructor arity');
+ check(PopStateEvent.name,'PopStateEvent','constructor name');
+ check(PopStateEvent.prototype.constructor,PopStateEvent,'prototype constructor link');
+ check(Object.getPrototypeOf(PopStateEvent),Event,'constructor inheritance');
+ typeError(function(){PopStateEvent('x');},'constructor requires new');
+ var e=new PopStateEvent('popstate');
+ check(e.type,'popstate','event type');check(e.state,null,'default state');
+ check(e.bubbles,false,'default bubbles');check(e.cancelable,false,'default cancelable');
+ check(e.isTrusted,false,'constructed event is untrusted');
+ check(e instanceof PopStateEvent,true,'PopStateEvent prototype');
+ check(e instanceof Event,true,'Event prototype');
+ check(e.hasOwnProperty('state'),false,'state is inherited accessor');
+ var d=Object.getOwnPropertyDescriptor(PopStateEvent.prototype,'state');
+ check(typeof d.get,'function','state getter');check(d.set,undefined,'no state setter');
+ typeError(function(){Reflect.construct(function(){},[],d.get);},'state getter is not a constructor');
+ check(d.enumerable,true,'enumerable state');check(d.configurable,true,'configurable state');
+ typeError(function(){d.get.call({});},'getter brand');
+ typeError(function(){new PopStateEvent();},'required type');
+ typeError(function(){new PopStateEvent(Symbol('type'));},'symbol type rejected');
+ typeError(function(){new PopStateEvent('x',1);},'dictionary required');
+ check(new PopStateEvent('x',null).state,null,'null dictionary');
+ check(new PopStateEvent('x',{state:undefined}).state,null,'undefined dictionary state defaults to null');
+ var object={n:7};e=new PopStateEvent('x',{state:object,bubbles:true,cancelable:true});
+ check(e.state,object,'state identity retained without cloning');check(e.bubbles,true,'bubbles option');check(e.cancelable,true,'cancelable option');
+ var fn=function(){};check(new PopStateEvent('x',{state:fn}).state,fn,'function state supported');
+ var sym=Symbol('state');check(new PopStateEvent('x',{state:sym}).state,sym,'symbol state supported');
+ check(new PopStateEvent('x',{state:false}).state,false,'false state');
+ check(new PopStateEvent('x',{state:0}).state,0,'zero state');
+ var order=[];
+ e=new PopStateEvent({toString:function(){order.push('type');return 'x';}},{get bubbles(){order.push('bubbles');return false;},get cancelable(){order.push('cancelable');return true;},get state(){order.push('state');return object;}});
+ check(order.join(','),'type,bubbles,cancelable,state','dictionary conversion order');
+ var sentinel={},caught;
+ try{new PopStateEvent('x',{get state(){throw sentinel;}});}catch(x){caught=x;}
+ check(caught,sentinel,'state getter exception preserved');
+ var received;
+ function listener(event){received=event;check(event.state,object,'state during dispatch');}
+ window.addEventListener('x',listener,false);window.dispatchEvent(e);window.removeEventListener('x',listener,false);
+ check(received,e,'dispatched object identity');check(e.state,object,'state after dispatch');
+ var legacy=document.createEvent('PopStateEvent');check(legacy.state,null,'createEvent default state');
+ legacy.initEvent('legacy',false,false);check(legacy.type,'legacy','base initializer');
+ var oldWeakMap=WeakMap,oldGet=WeakMap.prototype.get,oldSet=WeakMap.prototype.set;
+ WeakMap.prototype.get=WeakMap.prototype.set=function(){throw sentinel;};WeakMap=function(){throw sentinel;};
+ check(new PopStateEvent('x',{state:object}).state,object,'mutable weak-map API cannot intercept native event storage');
+ WeakMap=oldWeakMap;WeakMap.prototype.get=oldGet;WeakMap.prototype.set=oldSet;
+ window.retainedPopStateEvent=new PopStateEvent('gc',{state:{value:99}});
+ window.retainedPopStateEvent.state.event=window.retainedPopStateEvent;
+ collect(function(){
+  check(retainedPopStateEvent.state.value,99,'state survives forced GC');
+  check(retainedPopStateEvent.state.event,retainedPopStateEvent,'cyclic state identity survives GC');
+  var frame=document.createElement('iframe');
+  frame.onload=function(){try{
+   frame.onload=null;
+   var child=frame.contentWindow;
+   window.childEvent=new child.PopStateEvent('child',{state:{value:100}});
+   check(childEvent.state.value,100,'child realm state readable');
+   frame.parentNode.removeChild(frame);
+   collect(function(){
+    check(childEvent.state.value,100,'retained event state survives realm teardown and GC');
+    childEvent=null;retainedPopStateEvent=null;
+    collect(function(){testDone=true;});
+   });
+  }catch(x){check(String(x),'no exception','child event exception');testDone=true;}};
+  frame.src='history-child.html';document.body.appendChild(frame);
+ });
+}catch(error){check(String(error),'no exception','unexpected exception');testDone=true;}
+</script></body>

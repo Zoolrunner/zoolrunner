@@ -1,0 +1,23 @@
+<!doctype html><title>Explicit legacy History invocation</title><body>
+<script type="application/javascript;version=1.7">
+function legacyGo(h,value){return h.go(value);}
+</script>
+<script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+String(a)+' expected='+String(b));}
+var frame=document.createElement('iframe');
+frame.onload=function(){try{
+ var w=frame.contentWindow,doc=w.document,h=w.history,coercions=0;
+ frame.onload=function(){check(true,false,'legacy noninteger go must not reload');testDone=true;};
+ check(legacyGo(h,'0'),undefined,'legacy string argument ignored');
+ check(legacyGo(h,undefined),undefined,'legacy explicit undefined ignored');
+ check(legacyGo(h,null),undefined,'legacy null ignored');
+ check(legacyGo(h,{valueOf:function(){++coercions;return 0;}}),undefined,'legacy object ignored');
+ check(coercions,0,'legacy object conversion not invoked');
+ setTimeout(function(){try{
+  check(w.document,doc,'legacy noninteger calls leave document intact');
+  frame.onload=null;frame.parentNode.removeChild(frame);testDone=true;
+ }catch(e){check(String(e),'no exception','delayed legacy exception');testDone=true;}},100);
+}catch(e){check(String(e),'no exception','legacy exception');testDone=true;}};
+frame.src='history-child.html';document.body.appendChild(frame);
+</script></body>

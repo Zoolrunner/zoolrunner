@@ -15,6 +15,7 @@ class nsIHistoryStateOwner : public nsISupports
 public:
   NS_DEFINE_STATIC_IID_ACCESSOR(NS_IHISTORYSTATEOWNER_IID)
   virtual nsresult GetHistoryDocShell(nsIDocShell** aResult) = 0;
+  virtual nsresult LegacyGo(PRInt32 aDelta) = 0;
 };
 
 class nsIHistoryStateData : public nsISupports

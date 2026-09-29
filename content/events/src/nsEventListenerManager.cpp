@@ -356,6 +356,13 @@ static const EventDispatchData sSVGZoomEvents[] = {
 };
 #endif // MOZ_SVG
 
+// History events use ordinary nsEvent storage and generic listeners. Keeping
+// an identified listener group also enables script handler properties without
+// assigning a type-specific native event structure or changing old event IDs.
+static const EventDispatchData sHistoryEvents[] = {
+  { NS_USER_DEFINED_EVENT, nsnull, NS_EVENT_BITS_HISTORY_POPSTATE }
+};
+
 #define IMPL_EVENTTYPEDATA(type) \
 { \
   s##type##Events, \
@@ -387,6 +394,8 @@ static const EventTypeData sEventTypes[] = {
   IMPL_EVENTTYPEDATA(SVG),
   IMPL_EVENTTYPEDATA(SVGZoom)
 #endif // MOZ_SVG
+ ,
+  { sHistoryEvents, NS_ARRAY_LENGTH(sHistoryEvents), nsnull }
 };
 
 // Strong references to event groups
@@ -1037,6 +1046,10 @@ nsEventListenerManager::GetIdentifiersForType(nsIAtom* aType,
   else if (aType == nsLayoutAtoms::ontext) {
     *aArrayType = eEventArrayType_Text;
     *aFlags = NS_EVENT_BITS_TEXT_TEXT;
+  }
+  else if (aType == nsLayoutAtoms::onpopstate) {
+    *aArrayType = eEventArrayType_History;
+    *aFlags = NS_EVENT_BITS_HISTORY_POPSTATE;
   }
   else if (aType == nsLayoutAtoms::onpageshow) {
     *aArrayType = eEventArrayType_PageTransition;
@@ -1768,7 +1781,7 @@ nsEventListenerManager::HandleEvent(nsPresContext* aPresContext,
           if (eventListener) {
             // Try the type-specific listener interface
             PRBool hasInterface = PR_FALSE;
-            if (typeData) {
+            if (typeData && typeData->iid) {
               pusher.Pop(); 
               DispatchToInterface(*aDOMEvent, eventListener,
                                   dispData->method, *typeData->iid,
@@ -1864,6 +1877,9 @@ nsEventListenerManager::CreateEvent(nsPresContext* aPresContext,
   }
 
   // And if we didn't get an event, check the type argument.
+  if (aEventType.LowerCaseEqualsLiteral("popstateevent"))
+    return NS_NewDOMPopStateEvent(aDOMEvent);
+
   if (aEventType.LowerCaseEqualsLiteral("customevent"))
     return NS_NewDOMCustomEvent(aDOMEvent);
 

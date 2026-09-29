@@ -123,6 +123,7 @@
 #include "nsITimer.h"
 #include "nsISHistoryInternal.h"
 #include "nsISHEntryState.h"
+#include "nsIHistoryStateWindow.h"
 #include "nsIURL.h"
 #include "nsIPrincipal.h"
 #include "nsIHistoryEntry.h"
@@ -6738,6 +6739,16 @@ nsDocShell::InternalLoad(nsIURI * aURI,
 #endif
     }
     
+    if (aLoadType == LOAD_HISTORY && allowScroll && mOSHE && aSHEntry) {
+        nsCOMPtr<nsISHEntryState> oldState = do_QueryInterface(mOSHE);
+        nsCOMPtr<nsISHEntryState> newState = do_QueryInterface(aSHEntry);
+        nsCOMPtr<nsISupports> oldData, newData;
+        if (oldState) oldState->GetHistoryState(getter_AddRefs(oldData));
+        if (newState) newState->GetHistoryState(getter_AddRefs(newData));
+        if (oldData || newData)
+            return RestoreHistoryState(aSHEntry, aURI);
+    }
+
     if ((aLoadType == LOAD_NORMAL ||
          aLoadType == LOAD_STOP_CONTENT ||
          LOAD_TYPE_HAS_FLAGS(aLoadType, LOAD_FLAGS_REPLACE_HISTORY) ||
@@ -8551,6 +8562,55 @@ nsDocShell::UpdateHistoryState(nsIDOMDocument* aDocument,
         document->SetBaseURI(uri);
     document->SetDocumentURI(uri);
     SetCurrentURI(uri, nsnull, PR_TRUE);
+    return NS_OK;
+}
+
+nsresult
+nsDocShell::RestoreHistoryState(nsISHEntry* aEntry, nsIURI* aURI)
+{
+    nsCOMPtr<nsIDocShell> kungFuDeathGrip(this);
+    NS_ENSURE_TRUE(mContentViewer && !mIsBeingDestroyed, NS_ERROR_NOT_AVAILABLE);
+    nsCOMPtr<nsIDOMDocument> domDocument;
+    mContentViewer->GetDOMDocument(getter_AddRefs(domDocument));
+    nsCOMPtr<nsIDocument> document = do_QueryInterface(domDocument);
+    NS_ENSURE_TRUE(document && mOSHE, NS_ERROR_NOT_AVAILABLE);
+    nsCOMPtr<nsISHEntry> oldEntry = mOSHE, entry = aEntry;
+    nsCOMPtr<nsISHEntryState> state = do_QueryInterface(entry);
+    nsCOMPtr<nsISupports> data;
+    if (state) state->GetHistoryState(getter_AddRefs(data));
+    nscoord x = 0, y = 0;
+    GetCurScrollPos(ScrollOrientation_X, &x);
+    GetCurScrollPos(ScrollOrientation_Y, &y);
+    oldEntry->SetScrollPosition(x, y);
+    if (mSessionHistory) {
+        SwapEntriesData swapData = { this, entry, entry };
+        nsresult rv = WalkHistoryEntries(oldEntry, this, SetChildHistoryEntry, &swapData);
+        NS_ENSURE_SUCCESS(rv, rv);
+    }
+    SetHistoryEntry(&mLSHE, entry);
+    SetHistoryEntry(&mOSHE, entry);
+    mLoadType = LOAD_HISTORY;
+    mURIResultedInDocument = PR_TRUE;
+    nsCOMPtr<nsPIDOMWindow> window = do_GetInterface(NS_STATIC_CAST(nsIDocShell*, this));
+    nsCOMPtr<nsIHistoryStateWindow> stateWindow = do_QueryInterface(window);
+    if (stateWindow) stateWindow->ResetHistoryState();
+    nsCOMPtr<nsIURI> oldURI = document->GetDocumentURI();
+    if (document->GetBaseURI() == oldURI)
+        document->SetBaseURI(aURI);
+    document->SetDocumentURI(aURI);
+    OnNewURI(aURI, nsnull, mLoadType, PR_TRUE);
+    // A native progress listener may have navigated or destroyed the docshell.
+    if (mIsBeingDestroyed || !mContentViewer || mOSHE != entry) return NS_OK;
+    nsCOMPtr<nsIDOMDocument> current;
+    mContentViewer->GetDOMDocument(getter_AddRefs(current));
+    if (current != domDocument) return NS_OK;
+    SetHistoryEntry(&mLSHE, nsnull);
+    if (stateWindow) stateWindow->DispatchHistoryState(data);
+    if (mIsBeingDestroyed || !mContentViewer || mOSHE != entry) return NS_OK;
+    mContentViewer->GetDOMDocument(getter_AddRefs(current));
+    if (current != domDocument) return NS_OK;
+    entry->GetScrollPosition(&x, &y);
+    SetCurScrollPosEx(x, y);
     return NS_OK;
 }
 

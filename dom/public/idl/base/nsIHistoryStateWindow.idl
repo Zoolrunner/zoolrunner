@@ -1,0 +1,8 @@
+/* Private additive docshell/window bridge. MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsISupports.idl"
+[uuid(26c179ef-3116-41cf-9eab-c17651081e67)]
+interface nsIHistoryStateWindow : nsISupports
+{
+  void resetHistoryState();
+  void dispatchHistoryState(in nsISupports aData);
+};
