@@ -1,11 +1,25 @@
-<!doctype html><title>CSS constructor shadowing</title><body><div></div><script>
-var testDone=false,testFailures=0,testResults=[];
-var original=window.CSSStyleDeclaration,sentinel={};
-try {
- var s=document.body.style;
- window.CSSStyleDeclaration={get prototype(){throw sentinel;}};
- var computed=getComputedStyle(document.body,null);
- testResults.push('PASS computed declaration created with shadowed global constructor');
-} catch(e) {++testFailures;testResults.push('FAIL computed declaration with shadowed constructor: '+e);}
-finally {window.CSSStyleDeclaration=original;testDone=true;}
+<!doctype html><title>CSS constructor shadowing</title><body><script>
+var testDone=false,testFailures=0,testResults=[],nextCase=0;
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+String(a)+' expected='+String(b));}
+function runNext(){
+ if(nextCase===3){testDone=true;return;}
+ var mode=nextCase++,frame=document.createElement('iframe');
+ frame.onload=function(){try{
+  var w=frame.contentWindow,original=w.CSSStyleDeclaration,reads=0,sentinel={};
+  var inline=w.document.body.style;
+  if(mode===0)w.CSSStyleDeclaration={get prototype(){++reads;throw sentinel;}};
+  else if(mode===1)Object.defineProperty(w,'CSSStyleDeclaration',{configurable:true,get:function(){++reads;throw sentinel;}});
+  else w.CSSStyleDeclaration=null;
+  var computed=w.getComputedStyle(w.document.body,null);
+  check(reads,0,'case '+mode+' ignores public constructor getters');
+  check(computed.getPropertyValue('display'),'block','case '+mode+' computed value');
+  check(computed instanceof original,true,'case '+mode+' original interface identity');
+  check(Object.getPrototypeOf(Object.getPrototypeOf(computed)),original.prototype,'case '+mode+' native prototype inheritance');
+  check(computed.setProperty.length,2,'case '+mode+' optional priority binding');
+ }catch(e){check(String(e),'no exception','case '+mode+' constructor shadowing');}
+ frame.onload=null;frame.parentNode.removeChild(frame);setTimeout(runNext,0);
+ };
+ frame.src='../speedometer21/history-child.html';document.body.appendChild(frame);
+}
+runNext();
 </script></body>

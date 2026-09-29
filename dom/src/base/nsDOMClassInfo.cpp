@@ -5995,7 +5995,19 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
 
     JSObject *proto = nsnull;
 
-    if (class_parent_name) {
+    nsCOMPtr<nsIXPConnectJSObjectHolder> cssParentHolder;
+    if (ci_data == &sClassInfoData[eDOMClassInfo_ComputedCSSStyleDeclaration_id]) {
+      // The public constructor is replaceable. Native prototype inheritance
+      // must use this realm's XPConnect prototype, without reading script's
+      // CSSStyleDeclaration or its possibly accessor-backed prototype field.
+      nsCOMPtr<nsIClassInfo> styleInfo =
+        GetClassInfoInstance(eDOMClassInfo_CSSStyleDeclaration_id);
+      rv = sXPConnect->GetWrappedNativePrototype(cx, obj, styleInfo,
+                                                 getter_AddRefs(cssParentHolder));
+      NS_ENSURE_SUCCESS(rv, rv);
+      rv = cssParentHolder->GetJSObject(&proto);
+      NS_ENSURE_SUCCESS(rv, rv);
+    } else if (class_parent_name) {
       jsval val;
 
       if (!::JS_GetProperty(cx, obj, CutPrefix(class_parent_name), &val)) {

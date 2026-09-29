@@ -1195,6 +1195,9 @@ see the [layout probes](layout/html/tests/style/README-probes.md).
 CSSStyleDeclaration.setProperty now supplies the optional priority in JavaScript
 while preserving its historical native interface. Its CSSOM parser replaces
 priorities correctly and rejects embedded declaration delimiters atomically.
+Computed-style prototype initialization also tolerates replacement of the
+public CSSStyleDeclaration constructor; its 15 focused assertions pass on both
+LoongArch Suite backends.
 The final Speedometer UI now passes its synthetic callback diagnostic with
 native History state bindings. A fresh complete run is pending; 480 successful
 workload checks alone were not a complete run.

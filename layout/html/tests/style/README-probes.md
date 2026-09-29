@@ -256,7 +256,15 @@ declarations, and read-only computed styles. The frozen three-string XPCOM
 interface remains unchanged; CSSOM parsing uses the existing additive parser
 interface instead of concatenating a declaration string.
 
-The separate `css-constructor-shadowing.html` diagnostic currently fails: replacing
-the global CSSStyleDeclaration constructor prevents the legacy computed-style
-wrapper from initializing. This also reproduces in the pre-setter snapshot and
-remains an open prototype-bootstrap gap, outside the passing setter total.
+`css-constructor-shadowing.html` now passes 15 assertions in native LoongArch
+Suite on GTK2 and Xlib and is included in the layout probe list. Computed-style
+inheritance uses the realm's cached native CSSStyleDeclaration prototype rather
+than reading the replaceable global constructor. A throwing constructor getter,
+a throwing public prototype getter, and a null constructor leave computed values,
+interface identity and the optional-priority binding intact. Before this fix,
+the expanded fixture reported five failures. The complete content regression
+set now passes 985 assertions on each backend, and both unchanged Suite lifecycle
+runners pass all 24 checks. Artifacts are under
+`artifacts/speedometer21/css-shadowing-{gtk2,xlib}-content-probes.json` and
+`css-shadowing-{gtk2,xlib}-lifecycle.stdout`. This bounded fix does not
+establish that all DOM constructors are independent of public property changes.
