@@ -243,6 +243,8 @@ nsDOMUIEvent::GetDetail(PRInt32* aDetail)
 NS_IMETHODIMP
 nsDOMUIEvent::InitUIEvent(const nsAString & typeArg, PRBool canBubbleArg, PRBool cancelableArg, nsIDOMAbstractView *viewArg, PRInt32 detailArg)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   nsresult rv = nsDOMEvent::InitEvent(typeArg, canBubbleArg, cancelableArg);
   NS_ENSURE_SUCCESS(rv, rv);
   

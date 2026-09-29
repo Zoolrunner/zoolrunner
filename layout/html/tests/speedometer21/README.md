@@ -347,3 +347,21 @@ LoongArch GTK2 Suite passes 821 checks across 28 content fixtures, and the full
 400-by-300 box-sizing painting fixture matches Chromium pixel-for-pixel. Earlier
 benchmark runs using the unthemed harness remain functional workload evidence,
 not evidence of on-screen painting or comparable performance.
+
+`event-reinitialization.html` exercises 36 assertions across Event, UIEvent, MouseEvent
+and CustomEvent. Reinitialization replaces the bubbling/cancelable flags, clears
+cancellation and the target, and does nothing during dispatch (including each
+derived initializer's own fields). `defaultPrevented` is exposed through an
+additive interface, preserving existing event interface vtables. The focused
+fixture and 24 Suite lifecycle checks pass on native LoongArch GTK2. Dispatch
+propagation reset and stopImmediatePropagation still require separate work;
+this is not a claim of complete Event conformance. MouseEvent initialization
+also retains its relatedTarget argument. Chromium 148 passes 34 of the 36
+assertions, retaining the old target in two reinitialization cases; those two
+expectations follow the explicit target-reset step in the
+[DOM event initialization algorithm](https://dom.spec.whatwg.org/#concept-event-initialize).
+
+The previous long benchmark stopped at 408 successful workload checks when its
+local HTTP server exited. Its retained log is incomplete and is not a benchmark
+pass. A fresh full run uses the themed harness and a frozen runtime; other
+application testing remains deferred until Suite completes the benchmark.

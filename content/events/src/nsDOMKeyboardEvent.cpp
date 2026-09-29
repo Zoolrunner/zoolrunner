@@ -173,6 +173,8 @@ nsDOMKeyboardEvent::InitKeyEvent(const nsAString& aType, PRBool aCanBubble, PRBo
                                  PRBool aShiftKey, PRBool aMetaKey,
                                  PRUint32 aKeyCode, PRUint32 aCharCode)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   nsresult rv = nsDOMUIEvent::InitUIEvent(aType, aCanBubble, aCancelable, aView, 0);
   NS_ENSURE_SUCCESS(rv, rv);
 

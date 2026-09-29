@@ -66,6 +66,7 @@ public:
 protected:
   // These are used for internal data for user created events
   PRInt16 mButton;
+  nsCOMPtr<nsIDOMEventTarget> mRelatedTarget;
 };
 
 #endif // nsDOMMouseEvent_h__

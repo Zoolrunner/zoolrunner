@@ -40,6 +40,7 @@
 
 #include "nsIDOMEvent.h"
 #include "nsIDOMNSEvent.h"
+#include "nsIDOMEventState.h"
 #include "nsISupports.h"
 #include "nsIPrivateDOMEvent.h"
 #include "nsCOMPtr.h"
@@ -61,6 +62,7 @@ class nsIScrollableView;
  
 class nsDOMEvent : public nsIDOMEvent,
                    public nsIDOMNSEvent,
+                   public nsIDOMEventState,
                    public nsIPrivateDOMEvent,
                    public nsIPrivateDOMEvent2,
                    public nsRecycledSingle<nsDOMEvent>
@@ -151,6 +153,7 @@ public:
 
   // nsIDOMNSEvent Interface
   NS_DECL_NSIDOMNSEVENT
+  NS_DECL_NSIDOMEVENTSTATE
 
   // nsIPrivateDOMEvent interface
   NS_IMETHOD    DuplicatePrivateData();
@@ -186,6 +189,7 @@ protected:
   nsCOMPtr<nsIDOMEventTarget> mExplicitOriginalTarget;
   nsCOMPtr<nsIDOMEventTarget> mTmpRealOriginalTarget;
   PRPackedBool mEventIsInternal;
+  PRPackedBool mInitialized;
 
   nsWeakPtr mEventGlobal;
   void* mScriptObject;

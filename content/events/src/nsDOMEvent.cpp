@@ -85,6 +85,7 @@ static char *sPopupAllowedEvents;
 nsDOMEvent::nsDOMEvent(nsPresContext* aPresContext, nsEvent* aEvent)
 {
   mPresContext = aPresContext;
+  mInitialized = PR_FALSE;
 
   if (aEvent) {
     mEvent = aEvent;
@@ -168,6 +169,7 @@ NS_INTERFACE_MAP_BEGIN(nsDOMEvent)
   NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNSEvent)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMEventState)
   NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent)
   NS_INTERFACE_MAP_ENTRY(nsIPrivateDOMEvent2)
   NS_INTERFACE_MAP_ENTRY_CONTENT_CLASSINFO(Event)
@@ -194,9 +196,9 @@ NS_METHOD nsDOMEvent::GetType(nsAString& aType)
 
 NS_METHOD nsDOMEvent::GetTarget(nsIDOMEventTarget** aTarget)
 {
-  if (nsnull != mTarget) {
+  if (mTarget || mInitialized) {
     *aTarget = mTarget;
-    NS_ADDREF(*aTarget);
+    NS_IF_ADDREF(*aTarget);
     return NS_OK;
   }
   
@@ -359,6 +361,13 @@ NS_IMETHODIMP
 nsDOMEvent::GetTimeStamp(PRUint64* aTimeStamp)
 {
   LL_UI2L(*aTimeStamp, mEvent->time);
+  return NS_OK;
+}
+
+NS_IMETHODIMP
+nsDOMEvent::GetDefaultPrevented(PRBool* aDefaultPrevented)
+{
+  *aDefaultPrevented = !!(mEvent->flags & NS_EVENT_FLAG_NO_DEFAULT);
   return NS_OK;
 }
 
@@ -554,8 +563,9 @@ nsDOMEvent::SetEventType(const nsAString& aEventTypeArg)
 NS_IMETHODIMP
 nsDOMEvent::InitEvent(const nsAString& aEventTypeArg, PRBool aCanBubbleArg, PRBool aCancelableArg)
 {
-  // Make sure this event isn't already being dispatched.
-  NS_ENSURE_TRUE(!NS_IS_EVENT_IN_DISPATCH(mEvent), NS_ERROR_INVALID_ARG);
+  // Legacy initializers are inert while listeners are handling the event.
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
 
   if (NS_IS_TRUSTED_EVENT(mEvent)) {
     // Ensure the caller is permitted to dispatch trusted DOM events.
@@ -571,6 +581,10 @@ nsDOMEvent::InitEvent(const nsAString& aEventTypeArg, PRBool aCanBubbleArg, PRBo
 
   NS_ENSURE_SUCCESS(SetEventType(aEventTypeArg), NS_ERROR_FAILURE);
 
+  mEvent->flags &= ~(NS_EVENT_FLAG_CANT_BUBBLE | NS_EVENT_FLAG_CANT_CANCEL |
+                     NS_EVENT_FLAG_STOP_DISPATCH | NS_EVENT_FLAG_NO_DEFAULT);
+  mTarget = nsnull;
+  mInitialized = PR_TRUE;
   mEvent->flags |=
     aCanBubbleArg ? NS_EVENT_FLAG_NONE : NS_EVENT_FLAG_CANT_BUBBLE;
   mEvent->flags |=

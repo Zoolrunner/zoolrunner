@@ -1,0 +1,9 @@
+/* Additive DOM event state; preserves the historical event interface ABI.
+ * License: MPL 1.1/GPL 2.0/LGPL 2.1. */
+#include "nsISupports.idl"
+
+[scriptable, uuid(0e5a9aa7-d2aa-458a-b1bf-dad7467c63c2)]
+interface nsIDOMEventState : nsISupports
+{
+  readonly attribute boolean defaultPrevented;
+};

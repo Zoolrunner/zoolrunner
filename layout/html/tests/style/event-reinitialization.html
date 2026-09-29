@@ -1,0 +1,77 @@
+<!doctype html><title>Event reinitialization</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+try {
+ var e=document.createEvent('Event');
+ e.initEvent('first',false,false);
+ e.initEvent('second',true,true);
+ check(e.type,'second','reinitialization replaces type');
+ check(e.bubbles,true,'reinitialization enables bubbling');
+ check(e.cancelable,true,'reinitialization enables cancellation');
+ e.preventDefault();
+ check(e.defaultPrevented,true,'cancelable event can be canceled');
+ e.initEvent('third',true,true);
+ check(e.defaultPrevented,false,'reinitialization clears cancellation');
+ var target=document.createElement('div'),calls=0;
+ target.addEventListener('third',function(ev){
+  ++calls;
+  var threw=false;
+  try{ev.initEvent('ignored',false,false);}catch(x){threw=true;}
+  check(threw,false,'initialization during dispatch does not throw');
+  check(ev.type,'third','initialization during dispatch preserves type');
+  check(ev.bubbles,true,'initialization during dispatch preserves bubbles');
+  check(ev.cancelable,true,'initialization during dispatch preserves cancelable');
+  check(ev.target,target,'initialization during dispatch preserves target');
+ });
+ target.dispatchEvent(e);
+ check(calls,1,'initialized event is delivered');
+ check(e.target,target,'completed event retains target');
+ e.initEvent('fourth',false,false);
+ check(e.target,null,'reinitialization clears target');
+ check(e.currentTarget,null,'reinitialization leaves current target null');
+ check(e.bubbles,false,'reinitialization disables bubbling');
+ check(e.cancelable,false,'reinitialization disables cancellation');
+ var ui=document.createEvent('UIEvents');
+ ui.initUIEvent('one',false,false,window,3);
+ ui.initUIEvent('two',true,true,window,4);
+ check(ui.bubbles,true,'UI initialization enables bubbling');
+ check(ui.cancelable,true,'UI initialization enables cancellation');
+ check(ui.detail,4,'UI initialization replaces detail');
+ target.addEventListener('two',function(ev){
+  ev.initUIEvent('ignored-ui',false,false,null,99);
+  check(ev.type,'two','UI initializer is ignored during dispatch');
+  check(ev.detail,4,'UI initializer preserves detail during dispatch');
+  check(ev.view,window,'UI initializer preserves view during dispatch');
+ });
+ target.dispatchEvent(ui);
+ var custom=new CustomEvent('custom',{detail:7,bubbles:true,cancelable:true});
+ target.addEventListener('custom',function(ev){
+  ev.initCustomEvent('ignored-custom',false,false,99);
+  check(ev.type,'custom','custom initializer is ignored during dispatch');
+  check(ev.detail,7,'custom initializer preserves detail during dispatch');
+ });
+ target.dispatchEvent(custom);
+ custom.preventDefault();
+ custom.initCustomEvent('custom-again',false,false,8);
+ check(custom.detail,8,'custom reinitialization replaces detail');
+ check(custom.defaultPrevented,false,'custom reinitialization clears cancellation');
+ check(custom.target,null,'custom reinitialization clears target');
+ var related=document.createElement('div');
+ var mouse=document.createEvent('MouseEvents');
+ mouse.initMouseEvent('mouse',true,true,window,2,11,12,13,14,true,false,true,false,1,related);
+ target.addEventListener('mouse',function(ev){
+  ev.initMouseEvent('ignored-mouse',false,false,null,9,21,22,23,24,false,true,false,true,2,null);
+  check(ev.type,'mouse','mouse initializer preserves type during dispatch');
+  check(ev.detail,2,'mouse initializer preserves detail during dispatch');
+  check(ev.screenX,11,'mouse initializer preserves screen position during dispatch');
+  check(ev.clientX,13,'mouse initializer preserves client position during dispatch');
+  check(ev.ctrlKey,true,'mouse initializer preserves control state during dispatch');
+  check(ev.altKey,false,'mouse initializer preserves alt state during dispatch');
+  check(ev.button,1,'mouse initializer preserves button during dispatch');
+  check(ev.relatedTarget,related,'mouse initializer preserves related target during dispatch');
+ });
+ target.dispatchEvent(mouse);
+ check(testResults.length,35,'all event assertions executed');
+}catch(error){check(String(error),'no exception','unexpected exception');}
+testDone=true;
+</script>

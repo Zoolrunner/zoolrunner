@@ -185,3 +185,10 @@ LoongArch GTK2 Suite passes 821 checks across 28 content fixtures, and the full
 400-by-300 box-sizing painting fixture matches Chromium pixel-for-pixel. Earlier
 benchmark runs using the unthemed harness remain functional workload evidence,
 not evidence of on-screen painting or comparable performance.
+
+`event-reinitialization.html` passes 36 native Suite assertions covering flag
+replacement, cancellation state, target reset, inert initializers during dispatch,
+and MouseEvent relatedTarget retention. `defaultPrevented` uses an additive
+interface, preserving legacy event interface layouts. Suite's 24 lifecycle
+checks pass after these changes. Chromium 148 differs on two target-reset
+assertions; the fixture retains the DOM specification's required null target.

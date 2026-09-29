@@ -91,8 +91,11 @@ nsDOMMouseEvent::InitMouseEvent(const nsAString & aType, PRBool aCanBubble, PRBo
                                 PRBool aCtrlKey, PRBool aAltKey, PRBool aShiftKey, 
                                 PRBool aMetaKey, PRUint16 aButton, nsIDOMEventTarget *aRelatedTarget)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   nsresult rv = nsDOMUIEvent::InitUIEvent(aType, aCanBubble, aCancelable, aView, aDetail);
   NS_ENSURE_SUCCESS(rv, rv);
+  mRelatedTarget = aRelatedTarget;
   
   switch(mEvent->eventStructType)
   {
@@ -193,6 +196,10 @@ nsDOMMouseEvent::GetRelatedTarget(nsIDOMEventTarget** aRelatedTarget)
 {
   NS_ENSURE_ARG_POINTER(aRelatedTarget);
   *aRelatedTarget = nsnull;
+  if (mInitialized) {
+    NS_IF_ADDREF(*aRelatedTarget = mRelatedTarget);
+    return NS_OK;
+  }
 
   if (!mPresContext) {
     return NS_OK;

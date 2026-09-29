@@ -120,6 +120,8 @@ nsDOMXULCommandEvent::InitCommandEvent(const nsAString& aType,
                                        PRBool aShiftKey, PRBool aMetaKey,
                                        nsIDOMEvent* aSourceEvent)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   nsresult rv = nsDOMUIEvent::InitUIEvent(aType, aCanBubble, aCancelable,
                                           aView, aDetail);
   NS_ENSURE_SUCCESS(rv, rv);

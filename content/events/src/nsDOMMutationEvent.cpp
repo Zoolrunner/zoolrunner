@@ -126,6 +126,8 @@ nsDOMMutationEvent::GetAttrChange(PRUint16* aAttrChange)
 NS_IMETHODIMP
 nsDOMMutationEvent::InitMutationEvent(const nsAString& aTypeArg, PRBool aCanBubbleArg, PRBool aCancelableArg, nsIDOMNode* aRelatedNodeArg, const nsAString& aPrevValueArg, const nsAString& aNewValueArg, const nsAString& aAttrNameArg, PRUint16 aAttrChangeArg)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   nsresult rv = nsDOMEvent::InitEvent(aTypeArg, aCanBubbleArg, aCancelableArg);
   NS_ENSURE_SUCCESS(rv, rv);
   
