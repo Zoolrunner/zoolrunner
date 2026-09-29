@@ -964,3 +964,10 @@ across actual iframe document navigation and removal, plus inert-document
 identity and writes. GTK2 Suite and Chromium 148 pass all twelve; reports are
 `dataset-navigation-gtk2-*` and `dataset-navigation-chromium.json`. The fixture
 uses `dataset-navigation-child.html` to force a document replacement.
+
+The navigation fixture also passes twelve checks on Xlib.
+`../style/dataset-frame-gc.html` retains only the dataset after removing its
+iframe, then requests forced GC through the Suite probe runner. Both native
+backends pass ten post-collection read/write, descriptor, enumeration, symbol
+and interface checks (`dataset-frame-gc-{gtk2,xlib}-*`). This fixture requires
+the runner's GC handshake; opening it alone does not complete the test.

@@ -1,0 +1,33 @@
+<!doctype html><title>Dataset lifetime after frame removal and collection</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[],testRequestGC=false,testGCDone=false;
+var retained,frame=document.createElement('iframe');
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label);}
+function finish(){document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;}
+frame.onload=function(){
+ try{
+  var element=frame.contentDocument.createElement('div');
+  retained=element.dataset;retained.item='before';
+  retained[Symbol.for('dataset-retained')]='symbol';
+  frame.parentNode.removeChild(frame);frame=null;element=null;
+  testRequestGC=true;
+  setTimeout(afterCollection,10);
+ }catch(e){check(String(e),'no exception','setup exception: '+String(e));finish();}
+};
+function afterCollection(){
+ if(!testGCDone){setTimeout(afterCollection,10);return;}
+ try{
+  check(retained.item,'before','named value survives frame collection');
+  retained.item='after';check(retained.item,'after','named write after frame collection');
+  check(Object.getOwnPropertyDescriptor(retained,'item').value,'after','descriptor after frame collection');
+  check(Object.keys(retained).join(','),'item','live enumeration after frame collection');
+  check(retained[Symbol.for('dataset-retained')],'symbol','symbol survives frame collection');
+  check(Object.prototype.toString.call(retained),'[object DOMStringMap]','interface tag survives frame collection');
+  check(retained instanceof retained.constructor,true,'interface prototype survives frame collection');
+  delete retained.item;check('item' in retained,false,'deletion after frame collection');
+  check(Object.keys(retained).length,0,'enumeration reflects deletion');
+  retained.last='still alive';check(retained.last,'still alive','new attribute after frame collection');
+ }catch(e){check(String(e),'no exception','post-collection exception: '+String(e));}
+ finish();
+}
+frame.src='about:blank';document.body.appendChild(frame);
+</script>
