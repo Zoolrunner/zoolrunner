@@ -1540,6 +1540,8 @@ static JSBool DefineStorageMethods(JSContext* cx, JSObject* proto);
 static JSBool DefineCSSStyleMethods(JSContext* cx, JSObject* proto);
 static JSBool DefineHistoryMethods(JSContext* cx, JSObject* proto);
 static JSBool DefinePopStateMethods(JSContext* cx, JSObject* proto);
+static JSBool DefineHTMLDatasetAccessor(JSContext* cx, JSObject* proto);
+static JSObject* DOMDatasetPrototype(JSContext* cx, nsGlobalWindow* window);
 
 static const char *
 CutPrefix(const char *aName) {
@@ -4575,6 +4577,11 @@ nsWindowSH::DelProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
     // exception, we must make sure that exception is propagated.
 
     *_retval = PR_FALSE;
+  } else if (JSVAL_IS_STRING(id) &&
+             nsDependentJSString(JSVAL_TO_STRING(id)).EqualsLiteral("DOMStringMap")) {
+    nsGlobalWindow* owner = win->IsOuterWindow() ?
+      win->GetCurrentInnerWindowInternal() : win;
+    if (owner) owner->SetDOMStringMapDeleted();
   }
 
   return NS_OK;
@@ -4595,16 +4602,18 @@ FindConstructorContractID(PRInt32 aDOMClassInfoID)
 // Web IDL constructor failures must be JavaScript TypeErrors, rather than
 // XPConnect conversion exceptions. Preserve exceptions raised by user getters.
 static void
-DOMConstructorTypeError(JSContext* cx, const char* aMessage)
+DOMConstructorTypeError(JSContext* cx, const char* aMessage,
+                         JSObject* aGlobal = nsnull)
 {
   if (!JS_EnterLocalRootScope(cx))
     return;
+  JSObject* global = aGlobal ? aGlobal : JS_GetGlobalObject(cx);
   JSObject* constructor = nsnull;
   JSString* message = JS_NewStringCopyZ(cx, aMessage);
-  if (message && JS_GetClassObject(cx, JS_GetGlobalObject(cx),
+  if (message && JS_GetClassObject(cx, global,
                                   JSProto_TypeError, &constructor) && constructor) {
     jsval argument = STRING_TO_JSVAL(message), exception;
-    if (JS_CallFunctionValue(cx, JS_GetGlobalObject(cx),
+    if (JS_CallFunctionValue(cx, global,
                              OBJECT_TO_JSVAL(constructor), 1, &argument,
                              &exception))
       JS_SetPendingException(cx, exception);
@@ -5775,6 +5784,19 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
 
   nsDependentJSString name(str);
 
+  if (name.EqualsLiteral("DOMStringMap")) {
+    nsGlobalWindow* owner = aWin->IsOuterWindow() ?
+      aWin->GetCurrentInnerWindowInternal() : aWin;
+    if (owner && owner->IsDOMStringMapDeleted()) return NS_OK;
+    JSObject* prototype = DOMDatasetPrototype(cx, owner);
+    jsval constructor;
+    if (!prototype || !JS_GetReservedSlot(cx, prototype, 1, &constructor) ||
+        !JS_DefineProperty(cx, obj, "DOMStringMap", constructor, nsnull, nsnull, 0))
+      return NS_ERROR_FAILURE;
+    *did_resolve = PR_TRUE;
+    return NS_OK;
+  }
+
   const nsGlobalNameStruct *name_struct = nsnull;
   const PRUnichar *class_name = nsnull;
 
@@ -6117,6 +6139,11 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
       NS_ENSURE_TRUE(dot_prototype, NS_ERROR_OUT_OF_MEMORY);
     }
 
+    // Interface-only prototypes have no XPConnect holder. Keep them rooted
+    // while installing allocating native accessors before constructor linkage.
+    nsAutoGCRoot prototypeRoot(&dot_prototype, &rv);
+    NS_ENSURE_SUCCESS(rv, rv);
+
     if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_PopStateEvent_id]) {
       JSString* name = JS_InternString(cx, "PopStateEvent");
       jsval parent;
@@ -6132,6 +6159,10 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
           !JS_SetPrototype(cx, class_obj, JSVAL_TO_OBJECT(parent)))
         return NS_ERROR_FAILURE;
     }
+
+    if (nsDependentJSString(str).EqualsLiteral("HTMLElement") &&
+        !DefineHTMLDatasetAccessor(cx, dot_prototype))
+      return NS_ERROR_FAILURE;
 
     if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_History_id] &&
         !DefineHistoryMethods(cx, dot_prototype))
@@ -7052,6 +7083,7 @@ nsWindowSH::Mark(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
                   JSObject* obj, void* arg, PRUint32* retval)
 {
   nsGlobalWindow::FromWrapper(wrapper)->MarkHistoryState(cx, arg);
+  nsGlobalWindow::FromWrapper(wrapper)->MarkDOMStringMap(cx, arg);
   return nsEventReceiverSH::Mark(wrapper, cx, obj, arg, retval);
 }
 
@@ -8564,21 +8596,163 @@ static JSFunctionSpec sDOMDatasetFunctions[] = {
   { 0, 0, 0, 0, 0 }
 };
 
+static JSClass sDOMDatasetPrototypeClass = {
+  "Object", JSCLASS_HAS_RESERVED_SLOTS(2),
+  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+  JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+static JSBool
+DOMDatasetConstructor(JSContext* cx, JSObject* obj, uintN argc,
+                      jsval* argv, jsval* rval)
+{
+  DOMConstructorTypeError(cx, "DOMStringMap is not constructible",
+                            JS_GetParent(cx, JSVAL_TO_OBJECT(argv[-2])));
+  return JS_FALSE;
+}
+
+static nsGlobalWindow*
+DOMDatasetWindow(JSContext* cx, JSObject* element)
+{
+  nsCOMPtr<nsPIDOMWindow> native = do_QueryInterface(
+    nsJSUtils::GetStaticScriptGlobal(cx, element));
+  nsPIDOMWindow* pointer = native;
+  nsGlobalWindow* window = pointer ? NS_STATIC_CAST(nsGlobalWindow*, pointer) : nsnull;
+  if (window && window->IsOuterWindow())
+    window = window->GetCurrentInnerWindowInternal();
+  return window;
+}
+
+static JSObject*
+DOMDatasetPrototype(JSContext* cx, nsGlobalWindow* window)
+{
+  if (window && window->IsOuterWindow())
+    window = window->GetCurrentInnerWindowInternal();
+  if (!window) return nsnull;
+  JSObject* prototype = window->GetDOMStringMapPrototype();
+  if (prototype) return prototype;
+  if (!JS_EnterLocalRootScope(cx)) return nsnull;
+  JSObject* global = window->GetGlobalJSObject();
+  JSObject* objectConstructor = nsnull;
+  JSObject* symbolConstructor = nsnull;
+  JSObject* map = nsnull;
+  JSFunction* constructor = nsnull;
+  jsval objectPrototype = JSVAL_VOID, tagKey = JSVAL_VOID;
+  JSString* tag = nsnull;
+  jsid id;
+  if (!JS_GetClassObject(cx, global, JSProto_Object, &objectConstructor) ||
+      !JS_GetProperty(cx, objectConstructor, "prototype", &objectPrototype) ||
+      JSVAL_IS_PRIMITIVE(objectPrototype)) goto out;
+  prototype = JS_NewObject(cx, &sDOMDatasetPrototypeClass,
+                           JSVAL_TO_OBJECT(objectPrototype), global);
+  if (!prototype) goto out;
+  map = JS_NewWeakMapObject(cx, global);
+  {
+    // Web IDL function metadata is independent of the caller's legacy script
+    // edition. Restore the context before returning to application code.
+    JSVersion savedVersion = JS_SetVersion(cx, JSVERSION_ECMA_2015);
+    constructor = JS_NewFunction(cx, DOMDatasetConstructor, 0, JSFUN_STRICT,
+                                  global, "DOMStringMap");
+    JS_SetVersion(cx, savedVersion);
+  }
+  tag = JS_NewStringCopyZ(cx, "DOMStringMap");
+  if (!map || !constructor || !tag ||
+      !JS_GetClassObject(cx, global, JSProto_Symbol, &symbolConstructor) ||
+      !JS_GetProperty(cx, symbolConstructor, "toStringTag", &tagKey) ||
+      !JS_ValueToId(cx, tagKey, &id) ||
+      !OBJ_DEFINE_PROPERTY(cx, prototype, id, STRING_TO_JSVAL(tag), nsnull,
+                            nsnull, JSPROP_READONLY, nsnull) ||
+      !JS_SetReservedSlot(cx, prototype, 0, OBJECT_TO_JSVAL(map)) ||
+      !JS_SetReservedSlot(cx, prototype, 1, OBJECT_TO_JSVAL(JS_GetFunctionObject(constructor))) ||
+      !JS_DefineProperty(cx, prototype, "constructor",
+                          OBJECT_TO_JSVAL(JS_GetFunctionObject(constructor)), nsnull, nsnull, 0) ||
+      !JS_DefineProperty(cx, JS_GetFunctionObject(constructor), "name",
+                          STRING_TO_JSVAL(tag), nsnull, nsnull, JSPROP_READONLY) ||
+      !JS_DefineProperty(cx, JS_GetFunctionObject(constructor), "length",
+                          JSVAL_ZERO, nsnull, nsnull, JSPROP_READONLY) ||
+      !JS_DefineProperty(cx, JS_GetFunctionObject(constructor), "prototype",
+                          OBJECT_TO_JSVAL(prototype), nsnull, nsnull,
+                          JSPROP_READONLY | JSPROP_PERMANENT)) {
+    prototype = nsnull;
+    goto out;
+  }
+  window->SetDOMStringMapPrototype(prototype);
+out:
+  JS_LeaveLocalRootScopeWithResult(cx, OBJECT_TO_JSVAL(prototype));
+  return prototype;
+}
+
 static JSObject*
 DOMCreateDataset(JSContext* cx, JSObject* parent, JSObject* element)
 {
   if (!JS_EnterLocalRootScope(cx)) return nsnull;
   JSObject* dataset = nsnull;
-  JSObject* backing = JS_NewObject(cx, nsnull, nsnull, parent);
-  JSObject* handler = JS_NewObject(cx, &sDOMDatasetHandlerClass, nsnull, parent);
-  if (backing && handler && JS_SetPrototype(cx, handler, nsnull) &&
-      JS_SetReservedSlot(cx, handler, 0, OBJECT_TO_JSVAL(element)) &&
-      JS_DefineFunctions(cx, handler, sDOMDatasetFunctions)) {
-    dataset = JS_NewHostObject(cx, &sDOMDatasetClass, backing, handler, parent);
-    if (dataset && !JS_SetReservedSlot(cx, handler, 1, OBJECT_TO_JSVAL(dataset))) dataset = nsnull;
+  nsGlobalWindow* window = DOMDatasetWindow(cx, element);
+  JSObject* prototype = DOMDatasetPrototype(cx, window);
+  jsval map = JSVAL_VOID, cached = JSVAL_VOID;
+  JSBool found;
+  if (!prototype || !JS_GetReservedSlot(cx, prototype, 0, &map) ||
+      !JS_GetWeakMapEntry(cx, JSVAL_TO_OBJECT(map), element, &cached, &found)) goto out;
+  if (found) { dataset = JSVAL_TO_OBJECT(cached); goto out; }
+  {
+    JSObject* backing = JS_NewObject(cx, nsnull, prototype, parent);
+    JSObject* handler = JS_NewObject(cx, &sDOMDatasetHandlerClass, nsnull, parent);
+    if (backing && handler && JS_SetPrototype(cx, handler, nsnull) &&
+        JS_SetReservedSlot(cx, handler, 0, OBJECT_TO_JSVAL(element)) &&
+        JS_DefineFunctions(cx, handler, sDOMDatasetFunctions)) {
+      dataset = JS_NewHostObject(cx, &sDOMDatasetClass, backing, handler, parent);
+      if (dataset && (!JS_SetReservedSlot(cx, handler, 1, OBJECT_TO_JSVAL(dataset)) ||
+                      !JS_SetWeakMapEntry(cx, JSVAL_TO_OBJECT(map), element,
+                                          OBJECT_TO_JSVAL(dataset)))) dataset = nsnull;
+    }
   }
+out:
   JS_LeaveLocalRootScopeWithResult(cx, OBJECT_TO_JSVAL(dataset));
   return dataset;
+}
+
+static JSBool
+HTMLDatasetGetter(JSContext* cx, JSObject* obj, uintN argc,
+                   jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  if (!JSVAL_IS_PRIMITIVE(argv[-1]))
+    nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(
+      cx, JSVAL_TO_OBJECT(argv[-1]), getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMHTMLElement> element = do_QueryWrappedNative(wrapper);
+  if (!element) {
+    DOMConstructorTypeError(cx, "dataset getter requires an HTMLElement",
+                              JS_GetParent(cx, JSVAL_TO_OBJECT(argv[-2])));
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIDOMNode> node = do_QueryInterface(element);
+  if (!nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  JSObject* receiver = JSVAL_TO_OBJECT(argv[-1]);
+  JSObject* dataset = DOMCreateDataset(cx, JS_GetParent(cx, receiver), receiver);
+  if (!dataset) return JS_FALSE;
+  *rval = OBJECT_TO_JSVAL(dataset);
+  return JS_TRUE;
+}
+
+static JSBool
+DefineHTMLDatasetAccessor(JSContext* cx, JSObject* proto)
+{
+  JSVersion savedVersion = JS_SetVersion(cx, JSVERSION_ECMA_2015);
+  JSFunction* getter = JS_NewFunction(cx, HTMLDatasetGetter, 0,
+    JSFUN_STRICT | JSFUN_NO_CONSTRUCT, JS_GetParent(cx, proto), "get dataset");
+  JS_SetVersion(cx, savedVersion);
+  if (!getter) return JS_FALSE;
+  JSObject* getterObject = JS_GetFunctionObject(getter);
+  nsresult rv;
+  nsAutoGCRoot root(&getterObject, &rv);
+  if (NS_FAILED(rv)) return JS_FALSE;
+  return JS_DefineProperty(cx, proto, "dataset", JSVAL_VOID,
+    (JSPropertyOp)getterObject, nsnull,
+    JSPROP_ENUMERATE | JSPROP_SHARED | JSPROP_GETTER);
 }
 
 static JSBool JS_DLL_CALLBACK
@@ -8952,6 +9126,8 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 
       nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper));
       NS_ENSURE_TRUE(content, NS_ERROR_UNEXPECTED);
+      nsCOMPtr<nsIDOMHTMLElement> htmlElement = do_QueryInterface(content);
+      if (htmlElement) return NS_OK;
       JSObject *dataset = DOMCreateDataset(cx, JS_GetParent(cx, obj), obj);
       if (!dataset) return NS_ERROR_OUT_OF_MEMORY;
       if (!JS_DefineProperty(cx, obj, "dataset", OBJECT_TO_JSVAL(dataset),

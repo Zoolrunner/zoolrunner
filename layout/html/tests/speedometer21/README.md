@@ -921,3 +921,35 @@ are retained in `dataset-initial-build-failure`, not counted as validation of
 the new binding. After the compile correction, two remaining liveness failures
 exposed Unicode attribute-name folding; those reports are retained separately
 in `dataset-before-ascii-attribute-fix`. No assertions were removed.
+
+### Dataset interface and realm checks
+
+The next GTK2 Suite build passes all 47 liveness, 39 descriptor, sixteen
+attribute-case and 42 interface/realm assertions, plus fifteen GC assertions.
+The interface fixture also passes all 42 with ES5 content enabled; Chromium
+148 passes the same 42. Reports are `dataset-native-gtk2-*`,
+`dataset-interface-es5-gtk2-*` and `dataset-interface-chromium.json`.
+
+HTMLElement.prototype now has a checked, readonly dataset accessor. Its
+per-window weak cache preserves SameObject identity after deleting an absent
+own property, removing a shadow property, changing the dataset prototype, or
+replacing the public constructor. DOMStringMap has a shared interface prototype
+and Symbol.toStringTag. Its native constructor cannot be called or constructed.
+Borrowed getters preserve the element's realm and cached identity; TypeErrors
+use the native function's realm. Deleting the global constructor no longer
+recreates it. Newly introduced Web IDL functions receive ES2015 metadata while
+restoring the caller's script edition afterwards. Existing legacy functions
+are not changed. Interface prototypes are rooted during native accessor setup.
+
+The earlier live-binding snapshot also passes 300 History, 274 HTTP, fifteen
+dataset GC and 24 Suite lifecycle assertions in `dataset-suite-gtk2-*`. These
+precede the interface/realm work; its full Suite and other-application checks
+are pending. Namespace behavior, non-HTML accessor placement and further
+security/lifetime coverage remain open. The passing focused tests are not a
+claim of complete DOMStringMap or Web IDL compliance.
+
+Intermediate prototype diagnostics are retained in
+`dataset-prototype-first-build-failure`, `dataset-before-realm-fix` and
+`dataset-before-function-metadata-fix`. The interface test first exposed two
+wrong-realm TypeErrors and constructor resurrection, then metadata inherited
+from legacy function creation. The final run retains and passes those checks.

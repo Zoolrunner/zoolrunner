@@ -1,0 +1,66 @@
+<!doctype html><title>Dataset interface identity and realms</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label);}
+function test(label,fn){try{fn();}catch(e){check(String(e),'no exception',label+' exception: '+String(e));}}
+function caught(fn){try{fn();return null;}catch(e){return e;}}
+function finish(){document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;}
+var originalConstructor=DOMStringMap,prototype=DOMStringMap.prototype;
+var getter=Object.getOwnPropertyDescriptor(HTMLElement.prototype,'dataset').get;
+test('metadata',function(){
+ check(originalConstructor.name,'DOMStringMap','constructor name');check(originalConstructor.length,0,'constructor length');
+ var d=Object.getOwnPropertyDescriptor(originalConstructor,'prototype');
+ check(d.writable,false,'constructor prototype readonly');check(d.enumerable,false,'constructor prototype nonenumerable');check(d.configurable,false,'constructor prototype nonconfigurable');
+ check(Object.getPrototypeOf(prototype),Object.prototype,'interface prototype inherits Object');
+ d=Object.getOwnPropertyDescriptor(prototype,'constructor');
+ check(d.value,originalConstructor,'prototype constructor identity');check(d.writable,true,'prototype constructor writable');check(d.enumerable,false,'prototype constructor nonenumerable');check(d.configurable,true,'prototype constructor configurable');
+ d=Object.getOwnPropertyDescriptor(prototype,Symbol.toStringTag);
+ check(d.value,'DOMStringMap','interface toString tag');check(d.writable,false,'tag readonly');check(d.enumerable,false,'tag nonenumerable');check(d.configurable,true,'tag configurable');
+ check(getter.name,'get dataset','getter name');check(getter.length,0,'getter length');
+ d=Object.getOwnPropertyDescriptor(getter,'length');
+ check(d&&d.writable,false,'getter length readonly');check(d&&d.enumerable,false,'getter length nonenumerable');check(d&&d.configurable,true,'getter length configurable');
+ d=Object.getOwnPropertyDescriptor(getter,'name');
+ check(d&&d.writable,false,'getter name readonly');check(d&&d.enumerable,false,'getter name nonenumerable');check(d&&d.configurable,true,'getter name configurable');
+ check(caught(function(){new getter();}) instanceof TypeError,true,'getter is not a constructor');
+});
+test('SameObject cache',function(){
+ var element=document.createElement('div'),dataset=element.dataset;
+ check(Object.prototype.hasOwnProperty.call(element,'dataset'),false,'read does not create own property');
+ check(delete element.dataset,true,'deleting absent own property succeeds');
+ check(element.dataset,dataset,'deletion preserves cached object');
+ Object.defineProperty(element,'dataset',{value:17,configurable:true});check(element.dataset,17,'own shadow is respected');
+ delete element.dataset;check(element.dataset,dataset,'removing shadow restores cached object');
+ check(caught(function(){'use strict';element.dataset={};}) instanceof TypeError,true,'strict assignment to readonly getter rejected');
+ check(element.dataset,dataset,'rejected assignment preserves cache');
+ Object.setPrototypeOf(dataset,null);check(element.dataset,dataset,'custom dataset prototype preserves cache');
+ check(Object.getPrototypeOf(element.dataset),null,'getter does not reset custom prototype');
+ window.DOMStringMap=function Fake(){};
+ check(Object.getPrototypeOf(document.createElement('div').dataset),prototype,'global replacement does not change native prototype');
+ window.DOMStringMap=originalConstructor;
+});
+var frame=document.createElement('iframe');
+frame.onload=function(){
+ var foreign=frame.contentWindow;
+ test('foreign realm',function(){
+  var originalSymbol=foreign.Symbol,originalObject=foreign.Object;
+  foreign.Symbol={};Object.defineProperty(foreign.Symbol,'toStringTag',{get:function(){throw Error('public Symbol accessed');}});
+  foreign.Object={};
+  var element=foreign.document.createElement('div'),dataset=element.dataset;
+  foreign.Symbol=originalSymbol;foreign.Object=originalObject;
+  check(Object.getPrototypeOf(dataset),foreign.DOMStringMap.prototype,'dataset uses element realm prototype');
+  check(dataset instanceof foreign.DOMStringMap,true,'instanceof foreign interface');
+  check(dataset instanceof originalConstructor,false,'foreign dataset does not acquire caller prototype');
+  check(getter.call(element),dataset,'borrowed parent getter preserves foreign identity');
+  var foreignGetter=Object.getOwnPropertyDescriptor(foreign.HTMLElement.prototype,'dataset').get;
+  var parentElement=document.createElement('div');
+  check(foreignGetter.call(parentElement),parentElement.dataset,'borrowed foreign getter preserves parent identity');
+  check(caught(function(){foreignGetter.call({});}) instanceof foreign.TypeError,true,'getter TypeError uses function realm');
+  check(caught(function(){new foreign.DOMStringMap();}) instanceof foreign.TypeError,true,'constructor TypeError uses function realm');
+  var proto=foreign.DOMStringMap.prototype;
+  delete foreign.DOMStringMap;
+  check(typeof foreign.DOMStringMap,'undefined','deleted global constructor stays deleted');
+  check(Object.getPrototypeOf(foreign.document.createElement('div').dataset),proto,'deleting global preserves native prototype');
+ });
+ finish();
+};
+frame.src='about:blank';document.body.appendChild(frame);
+</script>

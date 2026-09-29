@@ -183,6 +183,11 @@ public:
   virtual void OnFinalize(JSObject *aJSObject);
   JSBool ReadHistoryState(JSContext* cx, nsISupports* aData, jsval* aResult);
   void MarkHistoryState(JSContext* cx, void* aArg);
+  void MarkDOMStringMap(JSContext* cx, void* aArg);
+  JSObject* GetDOMStringMapPrototype() const { return mDOMStringMapPrototype; }
+  void SetDOMStringMapPrototype(JSObject* aPrototype) { mDOMStringMapPrototype = aPrototype; }
+  PRBool IsDOMStringMapDeleted() const { return mDOMStringMapDeleted; }
+  void SetDOMStringMapDeleted() { mDOMStringMapDeleted = PR_TRUE; }
   void ClearHistoryState();
   nsresult QueueHistoryTraversal(PRInt32 aDelta);
   JSBool GetEventState(JSContext* cx, JSObject* aEvent, jsval* aResult);
@@ -573,6 +578,8 @@ protected:
   nsCOMPtr<nsISupports> mHistoryStateData;
   jsval mHistoryStateValue;
   JSObject* mEventStateMap;
+  JSObject* mDOMStringMapPrototype;
+  PRPackedBool mDOMStringMapDeleted;
 
   nsDataHashtable<nsStringHashKey, PRBool> *mPendingStorageEvents;
 

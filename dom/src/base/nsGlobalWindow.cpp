@@ -346,6 +346,8 @@ nsGlobalWindow::nsGlobalWindow(nsGlobalWindow *aOuterWindow)
     mJSObject(nsnull),
     mHistoryStateValue(JSVAL_NULL),
     mEventStateMap(nsnull),
+    mDOMStringMapPrototype(nsnull),
+    mDOMStringMapDeleted(PR_FALSE),
     mPendingStorageEvents(nsnull)
 #ifdef DEBUG
     , mSetOpenerWindowCalled(PR_FALSE)
@@ -1853,11 +1855,19 @@ nsGlobalWindow::GetGlobalJSObject()
 }
 
 void
+nsGlobalWindow::MarkDOMStringMap(JSContext* cx, void* aArg)
+{
+  if (mDOMStringMapPrototype)
+    JS_MarkGCThing(cx, mDOMStringMapPrototype, "DOMStringMap prototype", aArg);
+}
+
+void
 nsGlobalWindow::OnFinalize(JSObject *aJSObject)
 {
   if (aJSObject == mJSObject) {
     ClearHistoryState();
     mEventStateMap = nsnull;
+    mDOMStringMapPrototype = nsnull;
     mJSObject = nsnull;
   } else if (mJSObject) {
     NS_ERROR("Huh? XPConnect created more than one wrapper for this global!");
