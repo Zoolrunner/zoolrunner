@@ -375,6 +375,9 @@ public:
   static void SplitExpatName(const PRUnichar *aExpatName, nsIAtom **aPrefix,
                              nsIAtom **aTagName, PRInt32 *aNameSpaceID);
 
+  // Opt-in modern HTML content; privileged and XUL globals stay historical.
+  static PRBool UseES2015ForDocument(nsIDocument* aDocument);
+
   static nsAdoptingCString GetCharPref(const char *aPref);
   static PRPackedBool GetBoolPref(const char *aPref,
                                   PRBool aDefault = PR_FALSE);

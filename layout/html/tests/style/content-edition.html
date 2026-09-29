@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><title>Opt-in content edition</title>
+<script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name);
+}
+window.onerror = function(message) {
+  check(message, 'no exception', 'script error: ' + message);
+};
+window.onload = function() {
+  check(typeof modernResult, 'number', 'unversioned modern script executed');
+  check(modernResult, 42, 'arrow and default parameter');
+  check(typeof typedResult, 'number', 'unversioned MIME script executed');
+  check(typedResult, 9, 'class and method');
+  check(legacyResult, true, 'explicit legacy script retains callable RegExp');
+  check(Object.getOwnPropertyDescriptor(Function.prototype, 'length').configurable,
+        true, 'ES2015 realm built-in descriptors');
+  check(Function('return (x = 7) => x')()(), 7, 'dynamic function edition');
+  testDone = true;
+};
+</script>
+<script>var modernResult = ((x = 42) => x)();</script>
+<script type="application/javascript">
+class ModernEditionValue { value() { return 9; } }
+var typedResult = new ModernEditionValue().value();
+</script>
+<script type="application/javascript;version=1.7">
+var legacyResult = /a/('a')[0] === 'a';
+</script>
+</head><body>Requires javascript.options.content.es2015=true.</body></html>

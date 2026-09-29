@@ -6,14 +6,17 @@
 #include "nsString.h"
 
 class nsIContent;
+class nsIDocument;
 class nsIDOMElement;
 class nsIDOMNodeList;
 
 nsresult NS_QuerySelector(nsIContent* aScope, PRBool aIncludeScope,
                           const nsAString& aSelectors,
-                          nsIDOMElement** aResult);
+                          nsIDOMElement** aResult,
+                          nsIDocument* aDocument = nsnull);
 nsresult NS_QuerySelectorAll(nsIContent* aScope, PRBool aIncludeScope,
                              const nsAString& aSelectors,
-                             nsIDOMNodeList** aResult);
+                             nsIDOMNodeList** aResult,
+                             nsIDocument* aDocument = nsnull);
 
 #endif

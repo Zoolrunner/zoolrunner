@@ -2219,6 +2219,17 @@ nsContentUtils::GetCharPref(const char *aPref)
 }
 
 // static
+PRBool
+nsContentUtils::UseES2015ForDocument(nsIDocument* aDocument)
+{
+  if (!aDocument || !aDocument->GetPrincipal() || IsChromeDoc(aDocument) ||
+      !GetBoolPref("javascript.options.content.es2015", PR_FALSE))
+    return PR_FALSE;
+  nsCOMPtr<nsIHTMLDocument> htmlDocument = do_QueryInterface(aDocument);
+  return htmlDocument != nsnull;
+}
+
+// static
 PRPackedBool
 nsContentUtils::GetBoolPref(const char *aPref, PRBool aDefault)
 {

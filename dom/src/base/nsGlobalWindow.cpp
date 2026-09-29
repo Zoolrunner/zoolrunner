@@ -1193,10 +1193,16 @@ nsGlobalWindow::SetNewDocument(nsIDOMDocument* aDocument,
 
         Freeze();
         mCreatingInnerWindow = PR_TRUE;
+        // Choose the realm's built-in edition before XPConnect initializes it.
+        // Restore the caller's edition even when global initialization fails.
+        JSVersion oldVersion = ::JS_SetVersion(cx,
+          nsContentUtils::UseES2015ForDocument(newDoc)
+            ? JSVERSION_ECMA_2015 : JSVERSION_DEFAULT);
         rv = xpc->
           InitClassesWithNewWrappedGlobal(cx, sgo, NS_GET_IID(nsISupports),
                                           flags,
                                           getter_AddRefs(mInnerWindowHolder));
+        ::JS_SetVersion(cx, oldVersion);
         mCreatingInnerWindow = PR_FALSE;
         Thaw();
 

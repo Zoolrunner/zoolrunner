@@ -468,6 +468,9 @@ pref("dom.event.contextmenu.enabled",       true);
 pref("javascript.enabled",                  true);
 pref("javascript.allow.mailnews",           false);
 pref("javascript.options.strict",           false);
+// Select ES2015 for unversioned, non-privileged HTML content in new documents.
+// Historical application profiles retain the default ES5 edition.
+pref("javascript.options.content.es2015", false);
 
 // advanced prefs
 pref("security.enable_java",                true);

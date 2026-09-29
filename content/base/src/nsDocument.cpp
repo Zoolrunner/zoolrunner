@@ -2663,7 +2663,7 @@ nsDocument::GetDocumentElement(nsIDOMElement** aDocumentElement)
 }
 
 static nsresult
-ParseDOMSelectorList(const nsAString& aSelectors,
+ParseDOMSelectorList(nsIDocument* aDocument, const nsAString& aSelectors,
                      nsAutoPtr<nsCSSSelectorList>& aSelectorList)
 {
   nsCOMPtr<nsICSSParser> parser;
@@ -2671,7 +2671,12 @@ ParseDOMSelectorList(const nsAString& aSelectors,
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsCSSSelectorList* selectors = nsnull;
-  rv = parser->ParseSelectorString(aSelectors, &selectors);
+  if (aDocument)
+    parser->SetCaseSensitive(aDocument->IsCaseSensitive());
+  // XPConnect represents a null DOMString as void; selectors use ToString.
+  rv = parser->ParseSelectorString(aSelectors.IsVoid()
+                                   ? NS_LITERAL_STRING("null") : aSelectors,
+                                   &selectors);
   if (rv == NS_ERROR_OUT_OF_MEMORY)
     return rv;
   if (NS_FAILED(rv))
@@ -2744,18 +2749,20 @@ CollectDOMSelectorMatches(nsIDocument* aDocument, nsIContent* aScope,
 
 nsresult
 NS_QuerySelector(nsIContent* aScope, PRBool aIncludeScope,
-                 const nsAString& aSelectors, nsIDOMElement** aResult)
+                 const nsAString& aSelectors, nsIDOMElement** aResult,
+                 nsIDocument* aDocument)
 {
   NS_ENSURE_ARG_POINTER(aResult);
   *aResult = nsnull;
-  if (!aScope) return NS_OK;
+  if (aScope)
+    aDocument = aScope->GetOwnerDoc();
 
   nsAutoPtr<nsCSSSelectorList> selectors;
-  nsresult rv = ParseDOMSelectorList(aSelectors, selectors);
+  nsresult rv = ParseDOMSelectorList(aDocument, aSelectors, selectors);
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsIContent* match = nsnull;
-  rv = CollectDOMSelectorMatches(aScope->GetOwnerDoc(), aScope, aIncludeScope,
+  rv = CollectDOMSelectorMatches(aDocument, aScope, aIncludeScope,
                                  selectors, nsnull, &match);
   NS_ENSURE_SUCCESS(rv, rv);
   return match ? CallQueryInterface(match, aResult) : NS_OK;
@@ -2763,19 +2770,21 @@ NS_QuerySelector(nsIContent* aScope, PRBool aIncludeScope,
 
 nsresult
 NS_QuerySelectorAll(nsIContent* aScope, PRBool aIncludeScope,
-                    const nsAString& aSelectors, nsIDOMNodeList** aResult)
+                    const nsAString& aSelectors, nsIDOMNodeList** aResult,
+                    nsIDocument* aDocument)
 {
   NS_ENSURE_ARG_POINTER(aResult);
   *aResult = nsnull;
-  if (!aScope) return NS_OK;
+  if (aScope)
+    aDocument = aScope->GetOwnerDoc();
 
   nsAutoPtr<nsCSSSelectorList> selectors;
-  nsresult rv = ParseDOMSelectorList(aSelectors, selectors);
+  nsresult rv = ParseDOMSelectorList(aDocument, aSelectors, selectors);
   NS_ENSURE_SUCCESS(rv, rv);
 
   nsRefPtr<nsDOMSelectorContentList> matches = new nsDOMSelectorContentList();
   NS_ENSURE_TRUE(matches, NS_ERROR_OUT_OF_MEMORY);
-  rv = CollectDOMSelectorMatches(aScope->GetOwnerDoc(), aScope, aIncludeScope,
+  rv = CollectDOMSelectorMatches(aDocument, aScope, aIncludeScope,
                                  selectors, matches, nsnull);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -2791,7 +2800,7 @@ nsDocument::QuerySelector(const nsAString& aSelectors,
   NS_ENSURE_ARG_POINTER(aResult);
   *aResult = nsnull;
 
-  return NS_QuerySelector(GetRootContent(), PR_TRUE, aSelectors, aResult);
+  return NS_QuerySelector(GetRootContent(), PR_TRUE, aSelectors, aResult, this);
 }
 
 NS_IMETHODIMP
@@ -2801,7 +2810,7 @@ nsDocument::QuerySelectorAll(const nsAString& aSelectors,
   NS_ENSURE_ARG_POINTER(aResult);
   *aResult = nsnull;
 
-  return NS_QuerySelectorAll(GetRootContent(), PR_TRUE, aSelectors, aResult);
+  return NS_QuerySelectorAll(GetRootContent(), PR_TRUE, aSelectors, aResult, this);
 }
 
 NS_IMETHODIMP

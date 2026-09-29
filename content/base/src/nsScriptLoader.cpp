@@ -410,7 +410,9 @@ nsScriptLoader::DoProcessScriptElement(nsIScriptElement *aElement,
 
   PRBool isJavaScript = PR_TRUE;
   PRBool hasE4XOption = PR_FALSE;
-  const char* jsVersionString = nsnull;
+  JSVersion defaultVersion = nsContentUtils::UseES2015ForDocument(mDocument)
+    ? JSVERSION_ECMA_2015 : JSVERSION_DEFAULT;
+  const char* jsVersionString = ::JS_VersionToString(defaultVersion);
   nsAutoString language, type, src;
 
   // "language" is a deprecated attribute of HTML, so we check it only for
@@ -430,7 +432,7 @@ nsScriptLoader::DoProcessScriptElement(nsIScriptElement *aElement,
       // code to check nsParserUtils::IsJavaScriptLanguage -- that's probably
       // a separate bug, one we may not be able to fix short of XUL2).  See
       // bug 255895 (https://bugzilla.mozilla.org/show_bug.cgi?id=255895).
-      jsVersionString = ::JS_VersionToString(JSVERSION_DEFAULT);
+      jsVersionString = ::JS_VersionToString(defaultVersion);
     }
   }
 
@@ -472,7 +474,7 @@ nsScriptLoader::DoProcessScriptElement(nsIScriptElement *aElement,
     }
 
     if (isJavaScript) {
-      JSVersion jsVersion = JSVERSION_DEFAULT;
+      JSVersion jsVersion = defaultVersion;
       nsAutoString value;
       rv = mimeHdrParser->GetParameter(typeAndParams, "version",
                                        EmptyCString(), PR_FALSE, nsnull,

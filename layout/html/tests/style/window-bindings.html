@@ -48,6 +48,13 @@ window.onload = function() {
     try { target.addEventListener({toString:function() { throw sentinel; }}, null); }
     catch (e) { caught = e; }
     check(caught, sentinel, 'event type conversion exception preserved');
+    var extraCalls = 0;
+    function extraListener() { ++extraCalls; }
+    target.addEventListener('extra', extraListener, false, true, 'ignored');
+    event.initEvent('extra', false, false);
+    target.dispatchEvent(event);
+    target.removeEventListener('extra', extraListener, false);
+    check(extraCalls, 1, 'extra arguments ignored with legacy fourth argument');
   } catch (e) { check(String(e), 'no exception', 'unexpected exception'); }
   document.getElementById('results').appendChild(document.createTextNode(testResults.join('\n')));
   testDone = true;

@@ -616,7 +616,8 @@ PRBool nsCSSScanner::Next(nsresult& aErrorCode, nsCSSToken& aToken)
   if (ch == '@') {
     PRInt32 nextChar = Read(aErrorCode);
     PRInt32 followingChar = Peek(aErrorCode);
-    Pushback(nextChar);
+    if (nextChar >= 0)
+      Pushback(nextChar);
     if (StartsIdent(nextChar, followingChar, lexTable))
       return ParseAtKeyword(aErrorCode, ch, aToken);
   }
@@ -718,7 +719,9 @@ PRBool nsCSSScanner::Next(nsresult& aErrorCode, nsCSSToken& aToken)
         aToken.mType = eCSSToken_Containsmatch;
       }
       return PR_TRUE;
-    } else {
+    } else if (nextChar >= 0) {
+      // EOF is not a character: pushing -1 would inject U+FFFF after a
+      // universal selector at the end of a querySelector argument.
       Pushback(nextChar);
     }
   }

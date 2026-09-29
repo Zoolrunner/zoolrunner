@@ -1,0 +1,11 @@
+/* Additive selector interface; the historical fragment interface is unchanged. */
+#include "nsIDOMDocumentFragment.idl"
+interface nsIDOMElement;
+interface nsIDOMNodeList;
+
+[scriptable, uuid(42dd8c7d-47b6-428d-987a-6607e3ca36d1)]
+interface nsIDOMDocumentFragment2 : nsIDOMDocumentFragment
+{
+  nsIDOMElement querySelector(in DOMString selectors) raises(DOMException);
+  nsIDOMNodeList querySelectorAll(in DOMString selectors) raises(DOMException);
+};

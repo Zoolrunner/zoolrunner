@@ -14,6 +14,7 @@ def main():
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--url', required=True)
     parser.add_argument('--mode', choices=['probe', 'benchmark'], default='benchmark')
+    parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
     parser.add_argument('--timeout', type=int, default=1800)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
@@ -43,6 +44,7 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
             profile = Path(info['path'])
             preferences = {
                 'browser.dom.window.dump.enabled': True,
+                'javascript.options.content.es2015': args.content_edition == 'es2015',
                 'browser.shell.checkDefaultBrowser': False,
                 'browser.startup.homepage_override.mstone': 'ignore',
                 'nglayout.debug.disable_xul_cache': True,
@@ -76,7 +78,8 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
             markers = [line[len('SPEEDOMETER-RESULT '):] for line in output.splitlines()
                        if line.startswith('SPEEDOMETER-RESULT ')]
             report = {'pass': False, 'exit': exit_code, 'runtime': str(runtime),
-                      'url': args.url, 'mode': args.mode}
+                      'url': args.url, 'mode': args.mode,
+                      'contentEdition': args.content_edition}
             if len(markers) == 1:
                 report['result'] = json.loads(markers[0])
                 report['pass'] = exit_code == 0 and report['result']['pass'] is True

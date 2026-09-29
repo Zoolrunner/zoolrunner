@@ -1101,3 +1101,10 @@ pinned ES5.1 cases. Calendar on both architectures passes its compatibility
 tests and fresh-profile startup with all four views. These local results are
 recorded under `artifacts/macos-modern-validation/`; the remaining operating-
 system and architecture matrix is still underway.
+
+For the in-progress native Speedometer 2.1 work, the disposable Suite runner
+selects ES2015 HTML content with `javascript.options.content.es2015`. This
+preference defaults to false for existing application profiles and leaves
+privileged/XUL edition selection intact. See the [Speedometer test guide](layout/html/tests/speedometer21/README.md)
+for the unmodified benchmark runner, limitations and recorded results; a
+complete benchmark pass has not yet been established.

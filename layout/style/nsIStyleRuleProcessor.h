@@ -61,7 +61,8 @@ struct RuleProcessorData {
   RuleProcessorData(nsPresContext* aPresContext,
                     nsIContent* aContent, 
                     nsRuleWalker* aRuleWalker,
-                    nsCompatibility* aCompat = nsnull);
+                    nsCompatibility* aCompat = nsnull,
+                    PRBool aForDOMQuery = PR_FALSE);
   
   // NOTE: not |virtual|
   ~RuleProcessorData();

@@ -16,6 +16,8 @@ function runTests() {
     var first = document.getElementById('first');
     var second = document.getElementById('second');
     check(document.querySelector('#first'), first, 'document query');
+    check(document.querySelector('*'), document.documentElement, 'bare universal at EOF');
+    check(document.querySelector('*|*'), document.documentElement, 'namespace universal at EOF');
     check(scope.querySelector('.item'), first, 'first in tree order');
     check(scope.querySelector('#scope'), null, 'root excluded');
     check(scope.querySelector('#outside .item'), first, 'ancestors outside scope');
@@ -63,6 +65,12 @@ function runTests() {
     check(fragment.querySelector(':link'), anchor, 'links exposed as unvisited');
     check(fragment.querySelector('a:not(:visited)'), anchor, 'negated visited state hidden');
     var xml = document.implementation.createDocument('', 'Root', null);
+    var empty = document.implementation.createDocument('', '', null);
+    check(empty.querySelector('*'), null, 'empty document first match');
+    check(empty.querySelectorAll('*').length, 0, 'empty document static list');
+    var emptyCode = 0;
+    try { empty.querySelector('['); } catch (e) { emptyCode = e.code; }
+    check(emptyCode, 12, 'empty document still parses selector');
     var upper = xml.createElement('Item');
     xml.documentElement.appendChild(upper);
     check(xml.querySelector('Item'), upper, 'XML case preserved');

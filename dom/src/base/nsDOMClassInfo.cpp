@@ -203,7 +203,8 @@
 #include "nsIDOMScreen.h"
 #include "nsIDOMDocumentType.h"
 #include "nsIDOMDOMImplementation.h"
-#include "nsIDOMDocumentFragment.h"
+#include "nsIDOMDocumentFragment2.h"
+#include "nsIPrivateDOMEvent.h"
 #include "nsIDOMDocumentEvent.h"
 #include "nsIDOMAttr.h"
 #include "nsIDOMText.h"
@@ -1829,6 +1830,7 @@ nsDOMClassInfo::Init()
   DOM_CLASSINFO_MAP_END
 
   DOM_CLASSINFO_MAP_BEGIN(DocumentFragment, nsIDOMDocumentFragment)
+    DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentFragment2)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOMDocumentFragment)
     DOM_CLASSINFO_MAP_ENTRY(nsIDOM3Node)
   DOM_CLASSINFO_MAP_END
@@ -4469,6 +4471,70 @@ FindConstructorContractID(PRInt32 aDOMClassInfoID)
   return nsnull;
 }
 
+// Web IDL constructor failures must be JavaScript TypeErrors, rather than
+// XPConnect conversion exceptions. Preserve exceptions raised by user getters.
+static void
+DOMConstructorTypeError(JSContext* cx, const char* aMessage)
+{
+  if (!JS_EnterLocalRootScope(cx))
+    return;
+  JSObject* constructor = nsnull;
+  JSString* message = JS_NewStringCopyZ(cx, aMessage);
+  if (message && JS_GetClassObject(cx, JS_GetGlobalObject(cx),
+                                  JSProto_TypeError, &constructor) && constructor) {
+    jsval argument = STRING_TO_JSVAL(message), exception;
+    if (JS_CallFunctionValue(cx, JS_GetGlobalObject(cx),
+                             OBJECT_TO_JSVAL(constructor), 1, &argument,
+                             &exception))
+      JS_SetPendingException(cx, exception);
+  }
+  JS_LeaveLocalRootScope(cx);
+}
+
+static nsresult
+ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
+                  uintN argc, jsval* argv, jsval* rval, PRBool* aOK)
+{
+  *aOK = PR_FALSE;
+  if (!argc) {
+    DOMConstructorTypeError(cx, "Event requires a type argument");
+    return NS_OK;
+  }
+  JSString* type = JS_ValueToString(cx, argv[0]);
+  if (!type)
+    return NS_OK;
+  argv[0] = STRING_TO_JSVAL(type);
+
+  JSBool bubbles = JS_FALSE, cancelable = JS_FALSE;
+  if (argc > 1 && !JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
+    if (JSVAL_IS_PRIMITIVE(argv[1])) {
+      DOMConstructorTypeError(cx, "Event options must be a dictionary");
+      return NS_OK;
+    }
+    JSObject* options = JSVAL_TO_OBJECT(argv[1]);
+    jsval value;
+    if (!JS_GetProperty(cx, options, "bubbles", &value) ||
+        !JS_ValueToBoolean(cx, value, &bubbles) ||
+        !JS_GetProperty(cx, options, "cancelable", &value) ||
+        !JS_ValueToBoolean(cx, value, &cancelable))
+      return NS_OK;
+  }
+
+  nsCOMPtr<nsIScriptGlobalObject> owner = do_QueryReferent(aWeakOwner);
+  NS_ENSURE_STATE(owner && owner->GetGlobalJSObject());
+  nsCOMPtr<nsIDOMEvent> event;
+  nsresult rv = NS_NewDOMEvent(getter_AddRefs(event), nsnull, nsnull);
+  NS_ENSURE_SUCCESS(rv, rv);
+  rv = event->InitEvent(nsDependentJSString(type), bubbles, cancelable);
+  NS_ENSURE_SUCCESS(rv, rv);
+  nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
+  rv = nsDOMGenericSH::WrapNative(cx, owner->GetGlobalJSObject(), event,
+                                  NS_GET_IID(nsIDOMEvent), rval,
+                                  getter_AddRefs(holder));
+  *aOK = NS_SUCCEEDED(rv);
+  return rv;
+}
+
 static nsresult
 BaseStubConstructor(nsIWeakReference* aWeakOwner,
                     const nsGlobalNameStruct *name_struct, JSContext *cx,
@@ -4717,6 +4783,9 @@ nsDOMConstructor::Construct(nsIXPConnectWrappedNative *wrapper, JSContext * cx,
     NS_ERROR("Name isn't in hash.");
     return NS_ERROR_UNEXPECTED;
   }
+
+  if (nsDependentString(mClassName).EqualsLiteral("Event"))
+    return ConstructDOMEvent(mWeakOwner, cx, argc, argv, vp, _retval);
 
   if ((name_struct->mType != nsGlobalNameStruct::eTypeClassConstructor ||
        !FindConstructorContractID(name_struct->mDOMClassInfoID)) &&
@@ -6927,7 +6996,7 @@ JSBool JS_DLL_CALLBACK
 nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
                                           uintN argc, jsval *argv, jsval *rval)
 {
-  if (argc < 2 || argc > 4) {
+  if (argc < 2) {
     ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
 
     return JS_FALSE;
@@ -6982,17 +7051,22 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     return JS_FALSE;
   }
 
+  JSString* jsstr = JS_ValueToString(cx, argv[0]);
+  if (!jsstr)
+    return JS_FALSE;
+
+  // Keep the converted type rooted across listener wrapping and preserve any
+  // exception from its conversion. Even a null listener converts the type.
+  argv[0] = STRING_TO_JSVAL(jsstr);
+  if (JSVAL_IS_NULL(argv[1]) || JSVAL_IS_VOID(argv[1])) {
+    *rval = JSVAL_VOID;
+    return JS_TRUE;
+  }
+
   if (JSVAL_IS_PRIMITIVE(argv[1])) {
     // The second argument must be a function, or a
     // nsIDOMEventListener. Throw an error.
     ThrowJSException(cx, NS_ERROR_XPC_BAD_CONVERT_JS);
-
-    return JS_FALSE;
-  }
-
-  JSString* jsstr = JS_ValueToString(cx, argv[0]);
-  if (!jsstr) {
-    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_OUT_OF_MEMORY);
 
     return JS_FALSE;
   }
@@ -7019,7 +7093,7 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     return JS_FALSE;
   }
 
-  if (argc == 4) {
+  if (argc >= 4) {
     JSBool wantsUntrusted;
     if (!JS_ValueToBoolean(cx, argv[3], &wantsUntrusted)) {
       return JS_FALSE;

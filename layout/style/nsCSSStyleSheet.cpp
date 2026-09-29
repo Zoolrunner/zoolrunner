@@ -2660,7 +2660,8 @@ MOZ_DECL_CTOR_COUNTER(RuleProcessorData)
 RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
                                      nsIContent* aContent, 
                                      nsRuleWalker* aRuleWalker,
-                                     nsCompatibility* aCompat /*= nsnull*/)
+                                     nsCompatibility* aCompat /*= nsnull*/,
+                                     PRBool aForDOMQuery /*= PR_FALSE*/)
 {
   MOZ_COUNT_CTOR(RuleProcessorData);
 
@@ -2741,8 +2742,8 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
     // if HTML content and it has some attributes, check for an HTML link
     // NOTE: optimization: cannot be a link if no attributes (since it needs an href)
     if (mIsHTMLContent && mHasAttributes) {
-      // check if it is an HTML Link
-      if (mPresContext) {
+      // DOM queries must never consult or expose browsing history.
+      if (mPresContext && !aForDOMQuery) {
         if (nsStyleUtil::IsHTMLLink(aContent, mContentTag, mPresContext,
                                     &mLinkState)) {
           mIsHTMLLink = PR_TRUE;
@@ -2762,17 +2763,17 @@ RuleProcessorData::RuleProcessorData(nsPresContext* aPresContext,
     // if not an HTML link, check for a simple xlink (cannot be both HTML link and xlink)
     // NOTE: optimization: cannot be an XLink if no attributes (since it needs an 
     nsCOMPtr<nsIURI> xlinkURI;
-    if (!mPresContext && mHasAttributes &&
+    if ((!mPresContext || aForDOMQuery) && mHasAttributes &&
         !(mIsHTMLContent || aContent->IsContentOfType(nsIContent::eXUL)))
       xlinkURI = nsContentUtils::GetXLinkURI(aContent);
     if(!mIsHTMLLink &&
        mHasAttributes && 
        !(mIsHTMLContent || aContent->IsContentOfType(nsIContent::eXUL)) && 
-       ((mPresContext &&
+       ((mPresContext && !aForDOMQuery &&
          nsStyleUtil::IsSimpleXlink(aContent, mPresContext, &mLinkState)) ||
-        (!mPresContext && xlinkURI))) {
+        ((!mPresContext || aForDOMQuery) && xlinkURI))) {
       mIsSimpleXLink = PR_TRUE;
-      if (!mPresContext)
+      if (!mPresContext || aForDOMQuery)
         mLinkState = eLinkState_Unvisited;
     } 
   }
@@ -2951,11 +2952,14 @@ static PRBool AttrMatchesValue(const nsAttrSelector* aAttrSelector,
     case NS_ATTR_FUNC_DASHMATCH: 
       return nsStyleUtil::DashMatchCompare(aValue, aAttrSelector->mValue, comparator);
     case NS_ATTR_FUNC_ENDSMATCH:
-      return StringEndsWith(aValue, aAttrSelector->mValue, comparator);
+      return !aAttrSelector->mValue.IsEmpty() &&
+             StringEndsWith(aValue, aAttrSelector->mValue, comparator);
     case NS_ATTR_FUNC_BEGINSMATCH:
-      return StringBeginsWith(aValue, aAttrSelector->mValue, comparator);
+      return !aAttrSelector->mValue.IsEmpty() &&
+             StringBeginsWith(aValue, aAttrSelector->mValue, comparator);
     case NS_ATTR_FUNC_CONTAINSMATCH:
-      return FindInReadable(aAttrSelector->mValue, aValue, comparator);
+      return !aAttrSelector->mValue.IsEmpty() &&
+             FindInReadable(aAttrSelector->mValue, aValue, comparator);
     default:
       NS_NOTREACHED("Shouldn't be ending up here");
       return PR_FALSE;
@@ -3083,12 +3087,9 @@ static PRBool SelectorMatches(RuleProcessorData &data,
       result = localTrue == (child == nsnull);
     }
     else if (nsCSSPseudoClasses::root == pseudoClass->mAtom) {
-      if (data.mParentContent) {
-        result = localFalse;
-      }
-      else {
-        result = localTrue;
-      }
+      nsIDocument* document = data.mContent->GetDocument();
+      result = localTrue == (document &&
+                             document->GetRootContent() == data.mContent);
     }
     else if (nsCSSPseudoClasses::scope == pseudoClass->mAtom) {
       result = localTrue == (data.mContent == data.mScopedRoot);
@@ -3434,7 +3435,8 @@ NewRuleProcessorData(nsPresContext* aPresContext,
   RuleProcessorData* data = (aPresContext && aUseShellArena)
     ? new (aPresContext) RuleProcessorData(aPresContext, aContent,
                                            aRuleWalker, aCompat)
-    : new RuleProcessorData(aPresContext, aContent, aRuleWalker, aCompat);
+    : new RuleProcessorData(aPresContext, aContent, aRuleWalker, aCompat,
+                            PR_TRUE);
   if (data)
     data->mScopedRoot = aScopeRoot;
   if (data)
@@ -3484,7 +3486,7 @@ static PRBool SelectorMatchesTree(RuleProcessorData& aPrevData,
       data = prevdata->mParentData;
       if (!data) {
         nsIContent *content = prevdata->mContent->GetParent();
-        if (content) {
+        if (content && content->IsContentOfType(nsIContent::eELEMENT)) {
           data = NewRuleProcessorData(prevdata->mPresContext, content,
                                       prevdata->mRuleWalker,
                                       &prevdata->mCompatMode,

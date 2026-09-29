@@ -1,0 +1,59 @@
+<!doctype html>
+<html><head><title>Event constructor regression</title></head><body><div id="target"></div>
+<script>
+var testDone = false, testFailures = 0, testResults = [];
+function check(actual, expected, name) {
+  var ok = actual === expected;
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name);
+}
+window.onload = function() {
+  try {
+    var event = new Event('sample');
+    check(event instanceof Event, true, 'Event prototype');
+    check(event.type, 'sample', 'type');
+    check(event.bubbles, false, 'default bubbles');
+    check(event.cancelable, false, 'default cancelable');
+    check(event.target, null, 'initial target');
+    check(event.currentTarget, null, 'initial currentTarget');
+    check(event.eventPhase, 0, 'initial phase');
+    check(event.isTrusted, false, 'constructed event is untrusted');
+    check(new Event(null).type, 'null', 'null type conversion');
+    check(new Event(undefined).type, 'undefined', 'undefined type conversion');
+    check(new Event('x', null).bubbles, false, 'null dictionary');
+    check(new Event('x', undefined).cancelable, false, 'undefined dictionary');
+    var order = [];
+    var options = Object.create({bubbles: true});
+    Object.defineProperty(options, 'cancelable', {get:function() {
+      order.push('cancelable'); return true;
+    }});
+    var type = {toString:function() {order.push('type'); return 'sample';}};
+    event = new Event(type, options);
+    check(order.join(','), 'type,cancelable', 'conversion order and inherited members');
+    check(event.bubbles, true, 'inherited bubbles');
+    check(event.cancelable, true, 'cancelable getter');
+    var target = document.getElementById('target'), calls = 0;
+    target.addEventListener('sample', function(e) { ++calls; e.preventDefault(); });
+    check(target.dispatchEvent(event), false, 'canceled dispatch result');
+    check(calls, 1, 'constructed event dispatch');
+    check(event.target, target, 'dispatch target');
+    var caught, sentinel = {};
+    try { new Event({toString:function() {throw sentinel;}}); } catch (e) {caught=e;}
+    check(caught, sentinel, 'type conversion exception preserved');
+    caught = null;
+    Object.defineProperty(options, 'bubbles', {get:function() {throw sentinel;}});
+    try { new Event('x', options); } catch (e) {caught=e;}
+    check(caught, sentinel, 'dictionary getter exception preserved');
+    caught = null;
+    try { new Event(); } catch (e) {caught=e;}
+    check(caught instanceof TypeError, true, 'missing required type');
+    caught = null;
+    try { new Event('x', 1); } catch (e) {caught=e;}
+    check(caught instanceof TypeError, true, 'primitive dictionary rejected');
+    caught = null;
+    try { Event('x'); } catch (e) {caught=e;}
+    check(caught instanceof TypeError, true, 'constructor requires new');
+  } catch (e) { check(String(e), 'no exception', 'unexpected exception: ' + e); }
+  testDone = true;
+};
+</script></body></html>

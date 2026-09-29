@@ -37,7 +37,8 @@
 
 #include "nsISupports.h"
 #include "nsIContent.h"
-#include "nsIDOMDocumentFragment.h"
+#include "nsIDOMDocumentFragment2.h"
+#include "nsDOMSelector.h"
 #include "nsGenericElement.h"
 #include "nsINameSpaceManager.h"
 #include "nsINodeInfo.h"
@@ -51,7 +52,7 @@
 #include "nsDOMString.h"
 
 class nsDocumentFragment : public nsGenericElement,
-                           public nsIDOMDocumentFragment,
+                           public nsIDOMDocumentFragment2,
                            public nsIDOM3Node
 {
 public:
@@ -60,6 +61,8 @@ public:
 
   // nsISupports
   NS_DECL_ISUPPORTS_INHERITED
+
+  NS_DECL_NSIDOMDOCUMENTFRAGMENT2
 
   // interface nsIDOMDocumentFragment
   NS_IMETHOD    GetNodeName(nsAString& aNodeName)
@@ -198,6 +201,7 @@ nsDocumentFragment::~nsDocumentFragment()
 
 // QueryInterface implementation for nsDocumentFragment
 NS_INTERFACE_MAP_BEGIN(nsDocumentFragment)
+  NS_INTERFACE_MAP_ENTRY(nsIDOMDocumentFragment2)
   NS_INTERFACE_MAP_ENTRY(nsIDOMDocumentFragment)
   NS_INTERFACE_MAP_ENTRY(nsIDOMNode)
   NS_INTERFACE_MAP_ENTRY(nsIDOM3Node)
@@ -418,3 +422,17 @@ nsDocumentFragment::SetTextContent(const nsAString& aTextContent)
   return nsNode3Tearoff::SetTextContent(this, aTextContent);
 }
 
+
+NS_IMETHODIMP
+nsDocumentFragment::QuerySelector(const nsAString& aSelectors,
+                                  nsIDOMElement** aResult)
+{
+  return NS_QuerySelector(this, PR_FALSE, aSelectors, aResult);
+}
+
+NS_IMETHODIMP
+nsDocumentFragment::QuerySelectorAll(const nsAString& aSelectors,
+                                     nsIDOMNodeList** aResult)
+{
+  return NS_QuerySelectorAll(this, PR_FALSE, aSelectors, aResult);
+}

@@ -50,8 +50,8 @@ Relevant specifications are [Selectors API](https://www.w3.org/TR/selectors-api/
 [Selectors Level 3](https://www.w3.org/TR/selectors-3/), and
 [ECMAScript 2015](https://262.ecma-international.org/6.0/).
 
-Remaining work includes the native ES2015 workload, animation frame callbacks,
-DOM token lists and event constructors, further framework dependencies, and
+Remaining work includes validating the native ES2015 workload, animation frame
+callbacks and event constructors, further framework dependencies, and
 CSS layout/painting features. Re-evaluate this list against actual benchmark
 failures as support progresses. Preserve the full pinned ES5.1 run and the
 existing embedding, chrome/content, application lifecycle and layout probes.
@@ -78,3 +78,23 @@ replace the overlapping initial local implementations. The local content
 regressions and Suite benchmark harness remain in place; all merged behavior
 requires fresh native LoongArch validation. The pre-merge results above do not
 establish the status of the merged tree.
+
+The disposable runner profile enables `javascript.options.content.es2015` by
+default (use `--content-edition es5` for the historical default). This native
+preference selects ES2015 before initializing non-privileged HTML window
+built-ins and for unversioned HTML scripts. Explicit script editions still
+win; privileged HTML and XUL keep their existing edition selection. The
+preference defaults to false in ordinary application profiles. Set it before
+navigation, rather than changing it during a document's lifetime. The benchmark
+files are unchanged. `style/content-edition.html` exercises this opt-in boundary;
+it is separate from the default-edition layout probes.
+
+Merged native LoongArch GTK2 Suite validation (2026-09-28, GCC 15.3.0):
+48 selector assertions, 12 window-binding assertions, 23 Event-constructor
+assertions and seven opt-in edition assertions pass. The full pinned ES5.1
+run passes all 11,540 cases with zero failures/timeouts/crashes/harness errors.
+The unchanged Suite lifecycle runner passes all 24 checks, including Venkman
+startup and close, with the corrected compiler flags. The unchanged benchmark
+now reaches its first workload and stops at the missing `requestAnimationFrame`.
+The complete pinned ES2015 run is still in progress. These results cover Suite
+only and do not establish complete CSS, DOM or language conformance.
