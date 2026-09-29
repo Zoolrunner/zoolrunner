@@ -392,3 +392,12 @@ That package includes the ABI and initial event-state fixes, preceding the later
 mouse relatedTarget, propagation and event-name corrections. Its engine hash is
 unchanged; later DOM/XPCOM checks are recorded separately above. Xlib package
 validation and the full themed benchmark are still running.
+
+The Xlib Suite package gate also passes all 11,540 ES5.1 cases and 28,582 ES2015
+modes, 139 focused fixtures, 83 native ES2015 probes, both ABI probes, embedding
+and application checks (`package-suite-xlib-propagation`). This package includes
+propagation fixes and predates the subsequent string-key correction. The latest
+Xlib development runtime passes the same 927 assertions across 31 content
+fixtures as GTK2. Its 400-by-300 box-sizing painting region matches the same
+Chromium reference with zero differing pixels. Other applications remain untested
+in this Speedometer effort, pending the full themed Suite benchmark.

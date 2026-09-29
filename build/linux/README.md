@@ -289,3 +289,12 @@ The package predates subsequent DOM propagation and string-key corrections;
 see the Speedometer notes for those focused results. Xlib's full gate is pending.
 The driver now also runs `TestStringKeyLength.cpp` (19 checks), and resolves
 native checkout symlinks when rejecting build-tree library dependencies.
+
+Native LoongArch Xlib Suite also passes the complete relocated-package gate:
+11,540 ES5.1 cases, 28,582 ES2015 modes, 139 focused fixtures, 83 native ES2015
+probes, both ABI probes, native embedding and Suite windows/lifecycle/ChatZilla.
+Reports are in `artifacts/speedometer21/package-suite-xlib-propagation`. This
+package includes event propagation fixes but predates the string-key correction.
+The later Xlib build passes all 927 content assertions and its 400-by-300
+box-sizing painting region matches the Chromium reference pixel-for-pixel.
+These are Suite results, not a completed four-application/backend matrix.

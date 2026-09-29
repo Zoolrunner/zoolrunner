@@ -203,3 +203,8 @@ distinct listener lookup, including embedded NULs. Native LoongArch GTK2 Suite
 passes 927 assertions across 31 content fixtures after the string-key correction.
 The native `xpcom/tests/TestStringKeyLength.cpp` additionally checks hashing,
 cloning, lookup and removal (19 checks).
+
+The latest native LoongArch Xlib Suite also passes the 927 content assertions.
+The 400-by-300 box-sizing painting region matches the Chromium reference with
+zero differing pixels on both GTK2 and Xlib. This remains bounded painting
+coverage; shadows, transforms and other required workload styles are incomplete.
