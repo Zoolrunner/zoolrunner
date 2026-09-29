@@ -43,7 +43,8 @@ def main():
         worker.start()
         try:
             for name in ('local-storage', 'legacy-storage-event',
-                         'xhr-event-lifetime', 'xhr-event-dispatch', 'xhr-event-error'):
+                         'xhr-event-lifetime', 'xhr-event-dispatch', 'xhr-event-error',
+                         'xhr-listener-registration'):
                 report = args.reports / (name + '.json')
                 report.unlink(missing_ok=True)
                 url = 'http://127.0.0.1:%d/%s.html' % (server.server_port, name)

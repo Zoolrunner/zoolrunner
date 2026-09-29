@@ -459,3 +459,15 @@ EventTarget registration/dispatch, callback ordering, and modern ProgressEvent
 construction/data fields remain separate gaps; these results are bounded event
 notification coverage, not complete XHR conformance.
 The 24 Suite lifecycle checks also pass after these dispatch changes.
+Xlib passes the same 155 HTTP assertions. Chromium 148 passes 37 of the 39
+dispatch checks; it retains the stop-propagation flag after the two XHR
+notifications, whereas the DOM dispatch algorithm explicitly clears that flag.
+The expectations remain unchanged. The lifetime fixture also deliberately checks
+the historical `position` property, which Chromium does not expose.
+
+The sixth HTTP fixture, `xhr-listener-registration.html`, adds four assertions
+for handlers registered after open and removing error listeners independently
+of load listeners. It reproduced three failures before the correction. Native
+LoongArch GTK2 passes all 159 HTTP assertions after correcting the error-listener
+array and enabling channel progress notifications when a handler is added after
+open, while preserving unrelated channel flags.

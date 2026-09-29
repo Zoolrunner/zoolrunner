@@ -1,0 +1,29 @@
+<!doctype html><title>XHR listener registration</title><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+var request=new XMLHttpRequest(),progress=0,loads=0,errors=0;
+function shared(){++loads;}
+request.open('GET','xhr-listener-registration.html?payload='+new Date().getTime(),true);
+request.onprogress=function(){++progress;};
+request.addEventListener('load',shared,false);
+request.addEventListener('error',shared,false);
+request.removeEventListener('error',shared,false);
+request.onload=function(){setTimeout(function(){
+ check(progress>0,true,'progress handler registered after open receives notifications');
+ check(loads,1,'removing error listener preserves same load listener');
+ var failed=new XMLHttpRequest();
+ function removed(){++errors;}
+ failed.addEventListener('error',removed,false);
+ failed.removeEventListener('error',removed,false);
+ failed.onerror=function(){setTimeout(function(){
+  check(errors,0,'removed error listener is not called');
+  check(testResults.length,3,'all registration assertions executed');
+  testDone=true;
+ },50);};
+ failed.onload=function(){check('load','error','network error delivered');testDone=true;};
+ failed.open('GET','/connection-error',true);
+ failed.send(null);
+},50);};
+request.onerror=function(){check('error','load','request completed');testDone=true;};
+request.send(null);
+</script>

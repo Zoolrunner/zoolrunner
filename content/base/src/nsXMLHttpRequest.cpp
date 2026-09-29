@@ -406,7 +406,7 @@ nsXMLHttpRequest::RemoveEventListener(const nsAString & type,
     array = &mLoadEventListeners;
   }
   else if (type.Equals(ERRORSTR)) {
-    array = &mLoadEventListeners;
+    array = &mErrorEventListeners;
   }
   else {
     return NS_ERROR_INVALID_ARG;
@@ -508,6 +508,15 @@ nsXMLHttpRequest::SetOnprogress(nsIDOMEventListener * aOnprogress)
 {
   mOnProgressListener.Set(aOnprogress, this);
 
+  // open() may have created a background channel before the handler was set.
+  // Necko suppresses progress callbacks for those channels. Keep all unrelated
+  // load flags, including cache and security policy, intact.
+  if (aOnprogress && mChannel) {
+    nsLoadFlags flags;
+    nsresult rv = mChannel->GetLoadFlags(&flags);
+    NS_ENSURE_SUCCESS(rv, rv);
+    return mChannel->SetLoadFlags(flags & ~nsIRequest::LOAD_BACKGROUND);
+  }
   return NS_OK;
 }
 
