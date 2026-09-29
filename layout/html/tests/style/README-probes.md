@@ -145,3 +145,17 @@ quota conformance.
 not change event phase, cancellation, bubbling, or the active-dispatch guard.
 The native LoongArch GTK2 Suite passes all 12 checks (nine failed before the
 fix), alongside 24 Suite lifecycle and 19 window bootstrap checks.
+
+`class-list-methods.html` covers 73 DOMTokenList method, conversion, receiver,
+attribute-spelling, selector, cloning and forced-GC assertions. Run it through
+the Speedometer probe runner, which services its collection request. Native
+LoongArch GTK2 Suite passes all 73, plus 690 checks across 26 existing content
+fixtures, 24 Suite lifecycle checks, ChatZilla startup/shutdown and 58 legacy
+JavaScript checks. HTML class attributes retain their original UTF-16 spelling
+separately from selector atoms; the historical XUL atom-array path remains intact.
+The method corrections follow the [DOMTokenList algorithms](https://dom.spec.whatwg.org/#interface-domtokenlist).
+In particular, no-token updates preserve an absent attribute as required by
+the specification; Chromium 148 creates an empty attribute in this case and
+therefore fails the two related assertions in the reference run.
+Shared DOMTokenList prototype bindings, indexed properties and iteration remain
+unverified/incomplete; these results do not claim full interface conformance.

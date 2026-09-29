@@ -1151,3 +1151,10 @@ behavior. Native LoongArch GTK2 Suite lifecycle remains passing (24 checks).
 
 Reading UI-event `cancelBubble` now preserves internal event state, including
 the recursive-dispatch guard; its 12-check regression and Suite lifecycle pass.
+
+Class-list methods now validate receivers and arguments, preserve conversion
+exceptions, and implement ordered token updates. HTML class attributes preserve
+raw UTF-16 text alongside selector atoms. The native LoongArch GTK2 Suite passes
+73 focused checks and 690 existing content checks, with Suite/ChatZilla lifecycle
+and legacy JavaScript checks passing. Complete DOMTokenList bindings remain
+unfinished; see the layout probe documentation.

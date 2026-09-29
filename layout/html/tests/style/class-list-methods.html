@@ -1,0 +1,81 @@
+<!doctype html><html><head><title>DOMTokenList method regressions</title><style>.probe-a { width:23px; } .probe-b { height:29px; }</style></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+function attempt(fn){try{return {value:fn()};}catch(e){return {error:e};}}
+window.onload=function(){try{
+ var element=document.createElement('div'),list=element.classList;
+ check(list,element.classList,'stable identity');
+ element.className=' a  b a\t';check(list.length,2,'ordered unique tokens');check(list.item(0),'a','first token');check(list.item(1),'b','second token');
+ check(list.item(2),null,'missing index');check(list.item(-1),null,'unsigned index');check(list.item(4294967296),'a','index modulo 2^32');
+ check(attempt(function(){return list.item();}).error instanceof TypeError,true,'item required argument');
+ check(attempt(function(){return list.contains();}).error instanceof TypeError,true,'contains required argument');
+ check(attempt(function(){return list.toggle();}).error instanceof TypeError,true,'toggle required argument');
+ check(attempt(function(){return list.replace('a');}).error instanceof TypeError,true,'replace required arguments');
+ check(attempt(function(){return list.contains('');}).value,false,'contains empty is false');
+ check(attempt(function(){return list.contains('a b');}).value,false,'contains whitespace is false');
+ check(list.contains('a'),true,'contains token');
+ check(String(list),' a  b a\t','stringifier preserves raw attribute');
+ list.add('a');check(element.className,'a b','add existing token normalizes attribute');
+ element.className=' a  b a\t';list.remove('missing');check(element.className,'a b','remove missing token normalizes attribute');
+ element.className=' a  b a\t';list.add();check(element.className,'a b','zero argument add updates');
+ element.className=' a  b a\t';list.remove();check(element.className,'a b','zero argument remove updates');
+ element.removeAttribute('class');list.add();check(element.hasAttribute('class'),false,'empty add preserves absent attribute');
+ list.remove('missing');check(element.hasAttribute('class'),false,'empty remove preserves absent attribute');
+ element.className=' a  b a\t';check(list.toggle('a',true),true,'forced present result');check(element.className,' a  b a\t','forced present skips update');
+ check(list.toggle('c',false),false,'forced absent result');check(element.className,' a  b a\t','forced absent skips update');
+ check(list.toggle('c'),true,'toggle appends');check(element.className,'a b c','toggle change serializes');
+ check(list.toggle('c'),false,'toggle removes');check(element.className,'a b','toggle removal serializes');
+ element.className='a b c';check(list.replace('c','a'),true,'replace with preceding token');check(element.className,'a b','preceding replacement keeps original order');
+ element.className='a b c';check(list.replace('a','c'),true,'replace with following token');check(element.className,'c b','following replacement keeps earliest position');
+ element.className=' a  b ';check(list.replace('absent','c'),false,'missing replace result');check(element.className,' a  b ','missing replace skips update');
+ var sentinel={},order=[];
+ var result=attempt(function(){list.add('',{toString:function(){order.push('convert');throw sentinel;}});});
+ check(result.error,sentinel,'all add conversions precede token validation');check(order.join(','),'convert','later conversion performed');
+ check(element.className,' a  b ','failed conversion leaves attribute');
+ result=attempt(function(){list.replace({toString:function(){throw sentinel;}},{toString:function(){order.push('unexpected');return 'b';}});});
+ check(result.error,sentinel,'first replace conversion exception retained');check(order.join(','),'convert','replace stops conversion after exception');
+ result=attempt(function(){list.add('valid','');});check(result.error && result.error.name,'SyntaxError','empty token named exception');check(element.className,' a  b ','invalid add is atomic');
+ result=attempt(function(){list.remove('a','x y');});check(result.error && result.error.name,'InvalidCharacterError','whitespace named exception');check(element.className,' a  b ','invalid remove is atomic');
+ result=attempt(function(){list.replace('x y','');});check(result.error && result.error.name,'SyntaxError','replace empty token takes priority');
+ result=attempt(function(){list.supports('a');});check(result.error instanceof TypeError,true,'classList has no supported token vocabulary');
+ result=attempt(function(){list.supports({toString:function(){throw sentinel;}});});check(result.error,sentinel,'supports converts before vocabulary check');
+ list.value='\u00a0 \ud800';check(list.length,2,'non ASCII whitespace and surrogate tokens');check(list.contains('\u00a0'),true,'non ASCII space retained');
+ check(list.add(null,undefined),undefined,'add return value');check(list.contains('null'),true,'null token conversion');check(list.contains('undefined'),true,'undefined token conversion');
+ result=attempt(function(){list.contains.call({},'a');});check(result.error instanceof TypeError,true,'invalid receiver TypeError');
+ result=attempt(function(){list.contains.call(new Date(),'a');});check(result.error instanceof TypeError,true,'foreign native receiver TypeError');
+ var converted=false;
+ result=attempt(function(){list.add.call({}, {toString:function(){converted=true;return 'a';}});});
+ check(result.error instanceof TypeError,true,'invalid receiver rejected before arguments');check(converted,false,'invalid receiver skips conversion');
+ element.className='before';
+ list.add({toString:function(){element.className='during';return 'after';}});
+ check(element.className,'during after','conversion mutation observed before updating tokens');
+ element.className='before';
+ list.replace({toString:function(){return 'before';}},{toString:function(){element.className='before middle';return 'after';}});
+ check(element.className,'after middle','replace observes conversion mutations');
+ list.value='  raw  value ';check(element.className,'  raw  value ','value setter preserves spelling');
+ check(list.add.length,0,'variadic add arity');check(list.remove.length,0,'variadic remove arity');
+ element.className='  probe-a\fprobe-b  ';document.body.appendChild(element);
+ check(getComputedStyle(element,null).width,'23px','class atoms still drive width selector');
+ check(getComputedStyle(element,null).height,'29px','form feed separates class selector tokens');
+ check(element.getAttribute('class'),'  probe-a\fprobe-b  ','raw class attribute retains form feed');
+ var clone=element.cloneNode(false);
+ check(clone.className,element.className,'clone preserves original class spelling');
+ check(clone.classList.item(1),'probe-b','clone preserves parsed class tokens');
+ element.className='other';check(clone.className,'  probe-a\fprobe-b  ','clone attribute storage independent');
+ element.removeAttribute('class');check(list.length,0,'removeAttribute empties token set');
+ list.value=' \t\n\r\f';check(list.length,0,'all ASCII whitespace gives zero tokens');
+ check(list.value,' \t\n\r\f','whitespace-only attribute preserved');
+ list.add();check(list.value,'','empty token update serializes existing attribute');
+ check(element.hasAttribute('class'),true,'empty update retains existing attribute');
+ document.body.removeChild(element);
+ window.retainedClassList=list;
+ window.testRequestGC=true;
+ setTimeout(function afterGC(){
+   if(!window.testGCDone){setTimeout(afterGC,20);return;}
+   try{retainedClassList.add('retained');check(retainedClassList.value,'retained','detached classList survives collection');}
+   catch(e){check(String(e),'no exception','post GC access');}
+   delete window.retainedClassList;testDone=true;
+ },20);
+ return;
+}catch(e){check(String(e),'no exception','unexpected exception');}testDone=true;};
+</script></body></html>

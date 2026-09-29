@@ -2316,7 +2316,7 @@ nsGenericHTMLElement::ParseAttribute(nsIAtom* aAttribute,
     return PR_TRUE;
   }
   if (aAttribute == nsHTMLAtoms::kClass) {
-    aResult.ParseAtomArray(aValue);
+    aResult.ParseClassAttribute(aValue);
 
     return PR_TRUE;
   }

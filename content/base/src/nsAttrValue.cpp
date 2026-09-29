@@ -216,6 +216,10 @@ nsAttrValue::SetTo(const nsAttrValue& aOther)
       if (!EnsureEmptyAtomArray() ||
           !GetAtomArrayValue()->AppendObjects(*otherCont->mAtomArray)) {
         Reset();
+      } else {
+        AtomArray* array = GetMiscContainer()->mAtomArray;
+        array->mOriginalValue = otherCont->mAtomArray->mOriginalValue;
+        array->mHasOriginalValue = otherCont->mAtomArray->mHasOriginalValue;
       }
       break;
     }
@@ -381,6 +385,10 @@ nsAttrValue::ToString(nsAString& aResult) const
     case eAtomArray:
     {
       MiscContainer* cont = GetMiscContainer();
+      if (cont->mAtomArray->mHasOriginalValue) {
+        aResult = cont->mAtomArray->mOriginalValue;
+        break;
+      }
       PRInt32 count = cont->mAtomArray->Count();
       if (count) {
         cont->mAtomArray->ObjectAt(0)->ToString(aResult);
@@ -580,6 +588,14 @@ nsAttrValue::Equals(const nsAttrValue& aOther) const
       // For classlists we could be insensitive to order, however
       // classlists are never mapped attributes so they are never compared.
 
+      if (thisCont->mAtomArray->mHasOriginalValue !=
+          otherCont->mAtomArray->mHasOriginalValue ||
+          (thisCont->mAtomArray->mHasOriginalValue &&
+           !thisCont->mAtomArray->mOriginalValue.Equals(
+              otherCont->mAtomArray->mOriginalValue))) {
+        return PR_FALSE;
+      }
+
       PRInt32 count = thisCont->mAtomArray->Count();
       if (count != otherCont->mAtomArray->Count()) {
         return PR_FALSE;
@@ -616,6 +632,27 @@ nsAttrValue::ParseAtom(const nsAString& aValue)
   nsIAtom* atom = NS_NewAtom(aValue);
   if (atom) {
     SetPtrValueAndType(atom, eAtomBase);
+  }
+}
+
+void
+nsAttrValue::ParseClassAttribute(const nsAString& aValue)
+{
+  if (!EnsureEmptyAtomArray()) return;
+  AtomArray* array = GetMiscContainer()->mAtomArray;
+  // Keep the DOM spelling independently of the atomized selector tokens.
+  // In particular, atom serialization cannot preserve lone UTF-16 surrogates.
+  array->mOriginalValue = aValue;
+  array->mHasOriginalValue = PR_TRUE;
+  PRUint32 i = 0, length = aValue.Length();
+  while (i < length) {
+    while (i < length && (nsCRT::IsAsciiSpace(array->mOriginalValue[i]) || array->mOriginalValue[i] == '\f')) ++i;
+    PRUint32 start = i;
+    while (i < length && !nsCRT::IsAsciiSpace(array->mOriginalValue[i]) && array->mOriginalValue[i] != '\f') ++i;
+    if (i > start) {
+      nsCOMPtr<nsIAtom> atom = do_GetAtom(Substring(aValue, start, i - start));
+      if (!atom || !array->AppendObject(atom)) { Reset(); return; }
+    }
   }
 }
 
@@ -928,6 +965,8 @@ nsAttrValue::EnsureEmptyAtomArray()
 {
   if (Type() == eAtomArray) {
     GetAtomArrayValue()->Clear();
+    GetMiscContainer()->mAtomArray->mOriginalValue.Truncate();
+    GetMiscContainer()->mAtomArray->mHasOriginalValue = PR_FALSE;
     return PR_TRUE;
   }
 
@@ -936,7 +975,7 @@ nsAttrValue::EnsureEmptyAtomArray()
     return PR_FALSE;
   }
 
-  nsCOMArray<nsIAtom>* array = new nsCOMArray<nsIAtom>;
+  AtomArray* array = new AtomArray;
   if (!array) {
     Reset();
     return PR_FALSE;

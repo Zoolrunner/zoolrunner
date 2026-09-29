@@ -158,6 +158,7 @@ public:
 
   void ParseAtom(const nsAString& aValue);
   void ParseAtomArray(const nsAString& aValue);
+  void ParseClassAttribute(const nsAString& aValue);
   void ParseStringOrAtom(const nsAString& aValue);
 
   /**
@@ -244,13 +245,20 @@ private:
     eIntegerBase =   0x03        // 11
   };
 
+  struct AtomArray : public nsCOMArray<nsIAtom>
+  {
+    AtomArray() : mHasOriginalValue(PR_FALSE) {}
+    nsString mOriginalValue;
+    PRBool mHasOriginalValue;
+  };
+
   struct MiscContainer
   {
     ValueType mType;
     union {
       nscolor mColor;
       nsICSSStyleRule* mCSSStyleRule;
-      nsCOMArray<nsIAtom>* mAtomArray;
+      AtomArray* mAtomArray;
 #ifdef MOZ_SVG
       nsISVGValue* mSVGValue;
 #endif

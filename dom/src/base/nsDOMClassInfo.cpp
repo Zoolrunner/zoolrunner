@@ -7769,12 +7769,40 @@ struct DOMTokenListData {
   nsCOMPtr<nsIContent> mElement;
 };
 
+static void JS_DLL_CALLBACK DOMTokenListFinalize(JSContext*, JSObject*);
+static void ThrowNamedDOMException(JSContext*, nsresult, const char*);
+static JSClass sDOMTokenListClass = {
+  "DOMTokenList", JSCLASS_HAS_PRIVATE,
+  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, DOMTokenListFinalize
+};
+
+static DOMTokenListData*
+DOMTokenListReceiver(JSContext* cx, JSObject* obj)
+{
+  if (JS_GET_CLASS(cx, obj) != &sDOMTokenListClass) {
+    DOMConstructorTypeError(cx, "DOMTokenList method requires a DOMTokenList");
+    return nsnull;
+  }
+  DOMTokenListData* data =
+    NS_STATIC_CAST(DOMTokenListData*, JS_GetPrivate(cx, obj));
+  if (!data || !data->mElement) {
+    DOMConstructorTypeError(cx, "DOMTokenList has no associated element");
+    return nsnull;
+  }
+  nsCOMPtr<nsIDOMNode> node = do_QueryInterface(data->mElement);
+  if (!nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return nsnull;
+  }
+  return data;
+}
+
 static JSBool DOMTokenListGetTokens(JSContext *cx, JSObject *obj,
                                     nsTArray<nsString>& tokens)
 {
-  DOMTokenListData *data =
-    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
-  if (!data || !data->mElement) return JS_FALSE;
+  DOMTokenListData* data = DOMTokenListReceiver(cx, obj);
+  if (!data) return JS_FALSE;
 
   nsAutoString value;
   data->mElement->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value);
@@ -7787,8 +7815,11 @@ static JSBool DOMTokenListGetTokens(JSContext *cx, JSObject *obj,
            value[i] != '\n' && value[i] != '\r' && value[i] != '\f') ++i;
     if (i > start) {
       nsAutoString token(Substring(value, start, i - start));
-      if (tokens.IndexOf(token) == nsTArray<nsString>::NoIndex)
-        tokens.AppendElement(token);
+      if (tokens.IndexOf(token) == nsTArray<nsString>::NoIndex &&
+          !tokens.AppendElement(token)) {
+        JS_ReportOutOfMemory(cx);
+        return JS_FALSE;
+      }
     }
   }
   return JS_TRUE;
@@ -7800,30 +7831,29 @@ static nsresult DOMTokenListSetTokens(JSContext *cx, JSObject *obj,
   DOMTokenListData *data =
     NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
   NS_ENSURE_TRUE(data && data->mElement, NS_ERROR_UNEXPECTED);
+  if (tokens.IsEmpty() &&
+      !data->mElement->HasAttr(kNameSpaceID_None, nsHTMLAtoms::kClass))
+    return NS_OK;
   nsAutoString value;
   for (PRUint32 i = 0; i < tokens.Length(); ++i) {
     if (i) value.Append(PRUnichar(' '));
     value.Append(tokens[i]);
   }
-  data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value, PR_TRUE);
-  return NS_OK;
+  return data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass,
+                                 value, PR_TRUE);
 }
 
-static JSBool DOMTokenListValidate(JSContext *cx, JSString *str,
-                                   nsString& token)
+static JSBool DOMTokenListValidate(JSContext *cx, const nsString& token)
 {
-  if (!str) return JS_FALSE;
-  token.Assign(nsDependentString(JS_GetStringChars(str),
-                                 JS_GetStringLength(str)));
   if (token.IsEmpty()) {
-    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SYNTAX_ERR);
+    ThrowNamedDOMException(cx, NS_ERROR_DOM_SYNTAX_ERR, "SyntaxError");
     return JS_FALSE;
   }
   for (PRUint32 i = 0; i < token.Length(); ++i) {
     if (token[i] == ' ' || token[i] == '\t' || token[i] == '\n' ||
         token[i] == '\r' || token[i] == '\f') {
-      nsDOMClassInfo::ThrowJSException(cx,
-                                      NS_ERROR_DOM_INVALID_CHARACTER_ERR);
+      ThrowNamedDOMException(cx, NS_ERROR_DOM_INVALID_CHARACTER_ERR,
+                              "InvalidCharacterError");
       return JS_FALSE;
     }
   }
@@ -7841,9 +7871,8 @@ DOMTokenListFinalize(JSContext *cx, JSObject *obj)
 static JSBool DOMTokenListValueGetter(JSContext *cx, JSObject *obj,
                                       jsval id, jsval *vp)
 {
-  DOMTokenListData *data =
-    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
-  if (!data || !data->mElement) return JS_FALSE;
+  DOMTokenListData* data = DOMTokenListReceiver(cx, obj);
+  if (!data) return JS_FALSE;
   nsAutoString value;
   data->mElement->GetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value);
   JSString *str = JS_NewUCStringCopyN(cx,
@@ -7862,14 +7891,15 @@ static JSBool DOMTokenListToString(JSContext *cx, JSObject *obj, uintN argc,
 static JSBool DOMTokenListValueSetter(JSContext *cx, JSObject *obj,
                                       jsval id, jsval *vp)
 {
+  DOMTokenListData* data = DOMTokenListReceiver(cx, obj);
+  if (!data) return JS_FALSE;
   JSString *str = JS_ValueToString(cx, *vp);
   if (!str) return JS_FALSE;
-  DOMTokenListData *data =
-    NS_STATIC_CAST(DOMTokenListData *, JS_GetPrivate(cx, obj));
-  if (!data || !data->mElement) return JS_FALSE;
-  nsDependentString value(JS_GetStringChars(str), JS_GetStringLength(str));
-  data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass, value, PR_TRUE);
   *vp = STRING_TO_JSVAL(str);
+  nsAutoString value((nsDependentJSString(str)));
+  nsresult rv = data->mElement->SetAttr(kNameSpaceID_None, nsHTMLAtoms::kClass,
+                                       value, PR_TRUE);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
   return JS_TRUE;
 }
 
@@ -7885,8 +7915,10 @@ static JSBool DOMTokenListLengthGetter(JSContext *cx, JSObject *obj,
 static JSBool DOMTokenListItem(JSContext *cx, JSObject *obj, uintN argc,
                                jsval *argv, jsval *rval)
 {
+  if (!DOMTokenListReceiver(cx, obj)) return JS_FALSE;
+  if (!argc) { DOMConstructorTypeError(cx, "item requires an index"); return JS_FALSE; }
   uint32 index = 0;
-  if (argc && !JS_ValueToECMAUint32(cx, argv[0], &index)) return JS_FALSE;
+  if (!JS_ValueToECMAUint32(cx, argv[0], &index)) return JS_FALSE;
   nsTArray<nsString> tokens;
   if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
   if (index >= tokens.Length()) { *rval = JSVAL_NULL; return JS_TRUE; }
@@ -7901,10 +7933,11 @@ static JSBool DOMTokenListItem(JSContext *cx, JSObject *obj, uintN argc,
 static JSBool DOMTokenListContains(JSContext *cx, JSObject *obj, uintN argc,
                                    jsval *argv, jsval *rval)
 {
-  if (!argc) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  if (!DOMTokenListReceiver(cx, obj)) return JS_FALSE;
+  if (!argc) { DOMConstructorTypeError(cx, "DOMTokenList method requires a token"); return JS_FALSE; }
   JSString *str = JS_ValueToString(cx, argv[0]);
-  nsString token;
-  if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+  if (!str) return JS_FALSE;
+  nsString token((nsDependentJSString(str)));
   nsTArray<nsString> tokens;
   if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
   *rval = BOOLEAN_TO_JSVAL(tokens.IndexOf(token) !=
@@ -7915,26 +7948,29 @@ static JSBool DOMTokenListContains(JSContext *cx, JSObject *obj, uintN argc,
 static JSBool DOMTokenListMutate(JSContext *cx, JSObject *obj, uintN argc,
                                  jsval *argv, jsval *rval, PRBool add)
 {
+  if (!DOMTokenListReceiver(cx, obj)) return JS_FALSE;
   nsTArray<nsString> requested;
+  // WebIDL converts the complete variadic argument list before the DOM
+  // algorithm validates any token. Copy strings across reentrant conversions.
   for (uintN i = 0; i < argc; ++i) {
     JSString *str = JS_ValueToString(cx, argv[i]);
-    nsString token;
-    if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
-    if (requested.IndexOf(token) == nsTArray<nsString>::NoIndex)
-      requested.AppendElement(token);
+    if (!str) return JS_FALSE;
+    nsString token((nsDependentJSString(str)));
+    if (!requested.AppendElement(token)) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
   }
+  for (PRUint32 i = 0; i < requested.Length(); ++i)
+    if (!DOMTokenListValidate(cx, requested[i])) return JS_FALSE;
   nsTArray<nsString> tokens;
   if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
-  PRBool changed = PR_FALSE;
   for (PRUint32 i = 0; i < requested.Length(); ++i) {
     PRInt32 at = tokens.IndexOf(requested[i]);
-    if (add && at < 0) { tokens.AppendElement(requested[i]); changed = PR_TRUE; }
-    if (!add && at >= 0) { tokens.RemoveElementAt(at); changed = PR_TRUE; }
+    if (add && at < 0 && !tokens.AppendElement(requested[i])) {
+      JS_ReportOutOfMemory(cx); return JS_FALSE;
+    }
+    if (!add && at >= 0) tokens.RemoveElementAt(at);
   }
-  if (changed) {
-    nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
-    if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
-  }
+  nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
   *rval = JSVAL_VOID;
   return JS_TRUE;
 }
@@ -7950,24 +7986,23 @@ static JSBool DOMTokenListRemove(JSContext *cx, JSObject *obj, uintN argc,
 static JSBool DOMTokenListToggle(JSContext *cx, JSObject *obj, uintN argc,
                                  jsval *argv, jsval *rval)
 {
-  if (!argc) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  if (!DOMTokenListReceiver(cx, obj)) return JS_FALSE;
+  if (!argc) { DOMConstructorTypeError(cx, "DOMTokenList method requires a token"); return JS_FALSE; }
   JSString *str = JS_ValueToString(cx, argv[0]);
-  nsString token;
-  if (!DOMTokenListValidate(cx, str, token)) return JS_FALSE;
+  if (!str) return JS_FALSE;
+  nsString token((nsDependentJSString(str)));
+  if (!DOMTokenListValidate(cx, token)) return JS_FALSE;
   nsTArray<nsString> tokens;
   if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
   PRInt32 at = tokens.IndexOf(token);
-  PRBool force = argc > 1, present = at >= 0;
-  if (!force || JSVAL_IS_VOID(argv[1])) {
-    if (present) tokens.RemoveElementAt(at);
-    else tokens.AppendElement(token);
-    present = !present;
-  } else {
-    JSBool wanted;
-    if (!JS_ValueToBoolean(cx, argv[1], &wanted)) return JS_FALSE;
-    if (wanted && !present) { tokens.AppendElement(token); present = PR_TRUE; }
-    if (!wanted && present) { tokens.RemoveElementAt(at); present = PR_FALSE; }
-  }
+  PRBool present = at >= 0;
+  JSBool wanted = !present;
+  if (argc > 1 && !JSVAL_IS_VOID(argv[1]) &&
+      !JS_ValueToBoolean(cx, argv[1], &wanted)) return JS_FALSE;
+  if (wanted == present) { *rval = BOOLEAN_TO_JSVAL(present); return JS_TRUE; }
+  if (present) tokens.RemoveElementAt(at);
+  else if (!tokens.AppendElement(token)) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
+  present = wanted;
   nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
   if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
   *rval = BOOLEAN_TO_JSVAL(present);
@@ -7977,20 +8012,31 @@ static JSBool DOMTokenListToggle(JSContext *cx, JSObject *obj, uintN argc,
 static JSBool DOMTokenListReplace(JSContext *cx, JSObject *obj, uintN argc,
                                   jsval *argv, jsval *rval)
 {
-  if (argc < 2) { nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS); return JS_FALSE; }
+  if (!DOMTokenListReceiver(cx, obj)) return JS_FALSE;
+  if (argc < 2) { DOMConstructorTypeError(cx, "replace requires two tokens"); return JS_FALSE; }
   JSString *oldStr = JS_ValueToString(cx, argv[0]);
+  if (!oldStr) return JS_FALSE;
+  nsString oldToken((nsDependentJSString(oldStr)));
   JSString *newStr = JS_ValueToString(cx, argv[1]);
-  nsString oldToken, newToken;
-  if (!DOMTokenListValidate(cx, oldStr, oldToken) ||
-      !DOMTokenListValidate(cx, newStr, newToken)) return JS_FALSE;
+  if (!newStr) return JS_FALSE;
+  nsString newToken((nsDependentJSString(newStr)));
+  if (oldToken.IsEmpty() || newToken.IsEmpty()) {
+    ThrowNamedDOMException(cx, NS_ERROR_DOM_SYNTAX_ERR, "SyntaxError");
+    return JS_FALSE;
+  }
+  if (!DOMTokenListValidate(cx, oldToken) ||
+      !DOMTokenListValidate(cx, newToken)) return JS_FALSE;
   nsTArray<nsString> tokens;
   if (!DOMTokenListGetTokens(cx, obj, tokens)) return JS_FALSE;
   PRInt32 at = tokens.IndexOf(oldToken);
   if (at < 0) { *rval = JSVAL_FALSE; return JS_TRUE; }
   PRInt32 duplicate = tokens.IndexOf(newToken);
-  if (duplicate >= 0 && duplicate != at) tokens.RemoveElementAt(duplicate);
-  at = tokens.IndexOf(oldToken);
-  tokens[at] = newToken;
+  if (duplicate >= 0 && duplicate < at) {
+    tokens.RemoveElementAt(at);
+  } else {
+    if (duplicate > at) tokens.RemoveElementAt(duplicate);
+    tokens[at] = newToken;
+  }
   nsresult rv = DOMTokenListSetTokens(cx, obj, tokens);
   if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
   *rval = JSVAL_TRUE;
@@ -8000,15 +8046,18 @@ static JSBool DOMTokenListReplace(JSContext *cx, JSObject *obj, uintN argc,
 static JSBool DOMTokenListSupports(JSContext *cx, JSObject *obj, uintN argc,
                                    jsval *argv, jsval *rval)
 {
-  JS_ReportError(cx, "classList does not define supported tokens");
+  if (!DOMTokenListReceiver(cx, obj)) return JS_FALSE;
+  if (!argc) { DOMConstructorTypeError(cx, "supports requires a token"); return JS_FALSE; }
+  if (!JS_ValueToString(cx, argv[0])) return JS_FALSE;
+  DOMConstructorTypeError(cx, "classList does not define supported tokens");
   return JS_FALSE;
 }
 
 static JSFunctionSpec sDOMTokenListFunctions[] = {
   { "item", DOMTokenListItem, 1, 0, 0 },
   { "contains", DOMTokenListContains, 1, 0, 0 },
-  { "add", DOMTokenListAdd, 1, 0, 0 },
-  { "remove", DOMTokenListRemove, 1, 0, 0 },
+  { "add", DOMTokenListAdd, 0, 0, 0 },
+  { "remove", DOMTokenListRemove, 0, 0, 0 },
   { "toggle", DOMTokenListToggle, 1, 0, 0 },
   { "replace", DOMTokenListReplace, 2, 0, 0 },
   { "supports", DOMTokenListSupports, 1, 0, 0 },
@@ -8016,11 +8065,6 @@ static JSFunctionSpec sDOMTokenListFunctions[] = {
   { 0, 0, 0, 0, 0 }
 };
 
-static JSClass sDOMTokenListClass = {
-  "DOMTokenList", JSCLASS_HAS_PRIVATE,
-  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
-  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, DOMTokenListFinalize
-};
 
 // Expose HTML data-* attributes through the string-valued dataset properties
 // used by classic applications such as TodoMVC. This is a snapshot object;
@@ -8476,6 +8520,8 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
       JSObject *list = JS_NewObject(cx, &sDOMTokenListClass, nsnull,
                                     JS_GetParent(cx, obj));
       if (!list) return NS_ERROR_OUT_OF_MEMORY;
+      nsAutoGCRoot listRoot(&list, &rv);
+      NS_ENSURE_SUCCESS(rv, rv);
       DOMTokenListData *data = new DOMTokenListData();
       if (!data) return NS_ERROR_OUT_OF_MEMORY;
       data->mElement = content;
