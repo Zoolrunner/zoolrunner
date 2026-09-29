@@ -1,0 +1,16 @@
+<!doctype html><html><head><title>DOM symbol-key regression</title></head><body><div class="sample"></div><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+window.onload=function(){
+ var key=Symbol('DOM key');
+ var objects=[document.querySelectorAll('div'),document.getElementsByClassName('sample'),document.forms,document.styleSheets,document.body.childNodes,document,window];
+ for(var i=0;i<objects.length;i++){
+  try{var o=objects[i];check(o[key],undefined,'missing symbol '+i);
+   check(typeof Object.prototype.toString.call(o),'string','object tag '+i);
+   o[key]=i+42;check(o[key],i+42,'symbol expando '+i);
+   delete o[key];check(o[key],undefined,'delete symbol '+i);
+  }catch(e){check(String(e),'no exception','symbol access '+i);}
+ }
+ testDone=true;
+};
+</script></body></html>

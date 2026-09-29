@@ -148,3 +148,12 @@ remain available; no benchmark or application source changes are required.
 This fixture requires a host without a usable Java VM and is not in the generic
 layout probe list. Timeout reports now include frame DOM and Ember boot/queue
 state, and the runner captures plain console messages as well as script errors.
+
+After the LiveConnect correction both Ember workloads complete their steps.
+The debug workload exposed Symbol-key handling in DOM helpers: Symbol keys
+must not be converted to numeric indices or document/storage names, and Window
+must forward them to its inner global. The opt-in `dom-symbol-keys.html` probe
+passes 28 assertions across collections, Document and Window after reproducing
+Document/Window failures before the correction. It is separate from the
+ES5-default layout list. The benchmark next fails in Backbone's hidden iframe
+fallback because the newly inserted iframe has no `contentWindow`.

@@ -3060,6 +3060,11 @@ nsDOMClassInfo::GetArrayIndexFromId(JSContext *cx, jsval id, PRBool *aIsNumber)
     *aIsNumber = PR_FALSE;
   }
 
+  // Symbol keys are ordinary property keys, never numeric indices. In
+  // particular Object.prototype.toString probes Symbol.toStringTag here.
+  if (JSVAL_IS_SYMBOL(id))
+    return -1;
+
   if (!::JS_ValueToNumber(cx, id, &array_index)) {
     return -1;
   }
@@ -4164,6 +4169,9 @@ nsWindowSH::GetProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                                       ::JS_GetStringLength(str), vp);
       } else if (JSVAL_IS_INT(id)) {
         *_retval = ::JS_GetElement(cx, innerObj, JSVAL_TO_INT(id), vp);
+      } else if (JSVAL_IS_SYMBOL(id)) {
+        jsid key;
+        *_retval = JS_ValueToId(cx, id, &key) && OBJ_GET_PROPERTY(cx, innerObj, key, vp);
       } else {
         NS_ERROR("Write me!");
 
@@ -4291,6 +4299,9 @@ nsWindowSH::SetProperty(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                                       ::JS_GetStringLength(str), vp);
       } else if (JSVAL_IS_INT(id)) {
         *_retval = ::JS_SetElement(cx, innerObj, JSVAL_TO_INT(id), vp);
+      } else if (JSVAL_IS_SYMBOL(id)) {
+        jsid key;
+        *_retval = JS_ValueToId(cx, id, &key) && OBJ_SET_PROPERTY(cx, innerObj, key, vp);
       } else {
         NS_ERROR("Write me!");
 
@@ -9063,6 +9074,10 @@ nsHTMLDocumentSH::ResolveImpl(JSContext *cx,
 {
   nsCOMPtr<nsIHTMLDocument> doc(do_QueryWrappedNative(wrapper));
   NS_ENSURE_TRUE(doc, NS_ERROR_UNEXPECTED);
+  if (JSVAL_IS_SYMBOL(id)) {
+    *result = nsnull;
+    return NS_OK;
+  }
 
   // 'id' is not always a string, it can be a number since document.1
   // should map to <input name="1">. Thus we can't use
@@ -11265,6 +11280,9 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
                         JSObject *obj, jsval id, PRUint32 flags,
                         JSObject **objp, PRBool *_retval)
 {
+  if (JSVAL_IS_SYMBOL(id))
+    return NS_OK;
+
   JSObject *realObj;
   wrapper->GetJSObject(&realObj);
 
@@ -11335,6 +11353,9 @@ nsStorageSH::SetProperty(nsIXPConnectWrappedNative *wrapper,
                          JSContext *cx, JSObject *obj, jsval id,
                          jsval *vp, PRBool *_retval)
 {
+  if (JSVAL_IS_SYMBOL(id))
+    return NS_OK;
+
   nsCOMPtr<nsIDOMStorage> storage(do_QueryWrappedNative(wrapper));
   NS_ENSURE_TRUE(storage, NS_ERROR_UNEXPECTED);
 
@@ -11358,6 +11379,9 @@ nsStorageSH::DelProperty(nsIXPConnectWrappedNative *wrapper,
                          JSContext *cx, JSObject *obj, jsval id,
                          jsval *vp, PRBool *_retval)
 {
+  if (JSVAL_IS_SYMBOL(id))
+    return NS_OK;
+
   nsCOMPtr<nsIDOMStorage> storage(do_QueryWrappedNative(wrapper));
   NS_ENSURE_TRUE(storage, NS_ERROR_UNEXPECTED);
 
