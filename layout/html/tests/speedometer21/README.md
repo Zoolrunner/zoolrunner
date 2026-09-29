@@ -411,3 +411,14 @@ is retained as required by the
 coordinates, all-empty lists and degenerate lines. The existing 33 content
 geometry checks and 24 Suite lifecycle checks also pass on native LoongArch
 GTK2. SVG/transformed geometry and other layout gaps remain outside this result.
+
+The historical storage event now exposes the shared event state and propagation
+interfaces without changing its original domain-based initializer. Both legacy
+initializers leave the domain unchanged during dispatch. Serve
+`style/legacy-storage-event.html` over HTTP and run it in probe mode: its 36
+assertions capture a real session-storage notification, exercise both historical
+initializers, cancellation, immediate stopping and redispatch. Native LoongArch
+GTK2 passes all 36; the prior binding threw on the inherited state getter.
+This fixture requires an HTTP origin (file content has no sessionStorage in this
+platform). It does not establish modern StorageEvent constructor or cross-window
+local-storage notification support.

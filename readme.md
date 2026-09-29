@@ -1181,5 +1181,7 @@ The native event surface now exposes `defaultPrevented`,
 `stopImmediatePropagation` and generic `cancelBubble` through additive interfaces.
 Reinitialization and completed-dispatch state are corrected, and event names
 retain complete UTF-16 strings. The shared string-key regression covers embedded
-NULs without changing ordinary-key hashes. Current Suite validation and remaining
+NULs without changing ordinary-key hashes. Legacy domain-based storage events
+retain their initializer signatures and expose the shared event state methods.
+Current Suite validation and remaining
 DOM/CSS gaps are recorded in the [Speedometer notes](layout/html/tests/speedometer21/README.md).

@@ -2985,6 +2985,7 @@ nsDOMClassInfo::Init()
  
    DOM_CLASSINFO_MAP_BEGIN(StorageEvent, nsIDOMStorageEvent)
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageEvent)
+     DOM_CLASSINFO_EVENT_MAP_ENTRIES
    DOM_CLASSINFO_MAP_END
  
    DOM_CLASSINFO_MAP_BEGIN(CustomEvent, nsIDOMCustomEvent2)

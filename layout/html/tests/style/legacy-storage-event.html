@@ -1,0 +1,50 @@
+<!doctype html><title>Legacy storage event compatibility</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+try {
+ var target=document.createElement('div'),captured=null;
+ function capture(e){captured=e;}
+ window.addEventListener('storage',capture,false);
+ sessionStorage.setItem('legacy-event-probe',String(new Date().getTime()));
+ window.removeEventListener('storage',capture,false);
+ check(captured!==null,true,'legacy session storage notification delivered');
+ function exercise(namespaced) {
+  var e=captured,calls=0,later=0;
+  function init(type,bubbles,cancelable,domain) {
+   if(namespaced)e.initStorageEventNS('urn:legacy',type,bubbles,cancelable,domain);
+   else e.initStorageEvent(type,bubbles,cancelable,domain);
+  }
+  var type=namespaced?'legacy-storage-ns':'legacy-storage';
+  init(type,true,true,'original.example');
+  check(e.domain,'original.example',type+' domain');
+  check(e.defaultPrevented,false,type+' initial cancellation');
+  check(e.cancelBubble,false,type+' initial propagation');
+  target.addEventListener(type,function(ev){
+   ++calls;
+   init('ignored',false,false,'changed.example');
+   check(ev.type,type,type+' dispatch preserves type');
+   check(ev.domain,'original.example',type+' dispatch preserves domain');
+   check(ev.bubbles,true,type+' dispatch preserves bubbling');
+   check(ev.cancelable,true,type+' dispatch preserves cancelability');
+   ev.preventDefault();
+   check(ev.defaultPrevented,true,type+' cancellation visible');
+   ev.stopImmediatePropagation();
+   check(ev.cancelBubble,true,type+' propagation stopped');
+  },false);
+  target.addEventListener(type,function(){++later;},false);
+  check(target.dispatchEvent(e),false,type+' canceled dispatch result');
+  check(calls,1,type+' first listener called');
+  check(later,0,type+' later listener skipped');
+  check(e.cancelBubble,false,type+' propagation reset after dispatch');
+  check(e.currentTarget,null,type+' current target cleared');
+  init(type+'-again',false,false,'next.example');
+  check(e.domain,'next.example',type+' domain reinitialized');
+  check(e.defaultPrevented,false,type+' cancellation reset');
+  check(e.target,null,type+' target reset');
+ }
+ exercise(false);
+ exercise(true);
+ check(testResults.length,35,'all legacy storage assertions executed');
+}catch(error){check(String(error),'no exception','unexpected exception');}
+testDone=true;
+</script>

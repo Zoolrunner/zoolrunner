@@ -1293,6 +1293,8 @@ nsDOMStorageEvent::InitStorageEvent(const nsAString& aTypeArg,
                                     PRBool aCancelableArg,
                                     const nsAString& aDomainArg)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   nsresult rv = InitEvent(aTypeArg, aCanBubbleArg, aCancelableArg);
   NS_ENSURE_SUCCESS(rv, rv);
 
@@ -1308,6 +1310,8 @@ nsDOMStorageEvent::InitStorageEventNS(const nsAString& aNamespaceURIArg,
                                       PRBool aCancelableArg,
                                       const nsAString& aDomainArg)
 {
+  if (NS_IS_EVENT_IN_DISPATCH(mEvent))
+    return NS_OK;
   // XXXjst: Figure out what to do with aNamespaceURIArg here!
   nsresult rv = InitEvent(aTypeArg, aCanBubbleArg, aCancelableArg);
   NS_ENSURE_SUCCESS(rv, rv);
