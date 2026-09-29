@@ -305,3 +305,10 @@ of 1,170 content checks. The same build passes 300 History, 274 HTTP, fifteen
 dataset GC and 24 Suite lifecycle checks. Reports are
 `artifacts/speedometer21/css-attribute-suite-gtk2-*`; Xlib and other-application
 validation is still running. Namespace-prefix parsing is unchanged.
+
+Both Suite backends now pass the corrected nineteen-case selector fixture and
+the full 1,170-case content sequence, with their History, HTTP, GC and lifecycle
+checks also green. `html-attribute-case.html` and
+`html-attribute-selectors.html` are now included in the default
+`layout-probes.xul` sequence, so the DOM and CSS attribute-name distinction
+remains part of routine layout regression coverage.
