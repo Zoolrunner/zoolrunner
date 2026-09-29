@@ -986,3 +986,22 @@ The preceding 79c97eb5 XHR GTK2 snapshot has also completed its full unmodified
 benchmark: sixteen suites, ten iterations, 480 successful workload checks and
 exit zero in `benchmark-xhr-modern-gtk2.json`. This snapshot predates both the
 synchronous ready-state correction and the dataset work.
+
+### HTML attribute names in CSS
+
+The dataset DOM fix exposed inconsistent Unicode case folding in the CSS
+parser. Attribute selectors and generated `attr()` content now use ASCII-only
+folding for HTML. `html-attribute-selectors.html` improves from nine failures
+to nineteen passes on native GTK2 Suite. The larger sequence passes 1,170
+content assertions, plus 300 History, 274 HTTP, fifteen dataset GC and 24 Suite
+lifecycle assertions (`css-attribute-suite-gtk2-*`). Xlib and the other
+application builds for this parser correction remain in progress.
+
+The preceding dataset build passes all 156 focused content assertions, ten
+frame-teardown/GC assertions, fifteen native dataset GC assertions and the HTTP
+probes in Browser, Calendar and XULRunner on both GTK2 and Xlib. HTTP totals
+are 274 per Browser backend and 193 per Calendar/XULRunner backend, preserving
+the latter applications' explicit storage-denial policy. Unchanged standalone
+ChatZilla passes twelve checks in both XULRunner backends. Reports are
+`dataset-content-*`, `dataset-frame-gc-*`, `dataset-matrix-*` and
+`dataset-chatzilla-*`. Full package gates remain tracked separately.

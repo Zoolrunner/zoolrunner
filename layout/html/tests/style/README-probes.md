@@ -296,3 +296,12 @@ yet included in the default passing probe sequence. The expected distinction
 follows [Selectors case sensitivity](https://www.w3.org/TR/selectors-3/#casesens)
 and HTML's ASCII case rules; generated-content assertions measure layout,
 not only parser acceptance.
+
+The native parser now folds only ASCII characters for HTML attribute selectors
+and `attr()` references, preserving distinct non-ASCII names. XML remains
+case-sensitive. GTK2 Suite passes all nineteen checks after this correction,
+including generated-content widths and mutation-driven layout updates, as part
+of 1,170 content checks. The same build passes 300 History, 274 HTTP, fifteen
+dataset GC and 24 Suite lifecycle checks. Reports are
+`artifacts/speedometer21/css-attribute-suite-gtk2-*`; Xlib and other-application
+validation is still running. Namespace-prefix parsing is unchanged.

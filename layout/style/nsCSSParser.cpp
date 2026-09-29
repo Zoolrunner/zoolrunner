@@ -82,6 +82,20 @@
 
 //----------------------------------------------------------------------
 
+// HTML attribute names fold ASCII letters only. Unicode folding would merge
+// distinct attributes such as data-\u00c9 and data-\u00e9.
+static void
+LowerCaseHTMLAttributeName(nsAString& aName)
+{
+  nsAString::iterator iter, end;
+  aName.BeginWriting(iter);
+  aName.EndWriting(end);
+  for (; iter != end; ++iter) {
+    if (*iter >= 'A' && *iter <= 'Z')
+      *iter += 'a' - 'A';
+  }
+}
+
 // Your basic top-down recursive descent style parser
 class CSSParserImpl : public nsICSSParser,
                       public nsICSSParserCSSOM,
@@ -2366,7 +2380,7 @@ CSSParserImpl::ParseAttributeSelector(PRInt32&       aDataMask,
   }
 
   if (! mCaseSensitive) {
-    ToLowerCase(attr);
+    LowerCaseHTMLAttributeName(attr);
   }
   if (! GetToken(aErrorCode, PR_TRUE)) { // premature EOF
     REPORT_UNEXPECTED_EOF(PEAttSelInnerEOF);
@@ -4047,7 +4061,8 @@ PRBool CSSParserImpl::ParseAttr(nsresult& aErrorCode, nsCSSValue& aValue)
               attr.Append(mToken.mIdent);
             } else {
               nsAutoString buffer;
-              ToLowerCase(mToken.mIdent, buffer);
+              buffer = mToken.mIdent;
+              LowerCaseHTMLAttributeName(buffer);
               attr.Append(buffer);
             }
           }
@@ -4062,7 +4077,8 @@ PRBool CSSParserImpl::ParseAttr(nsresult& aErrorCode, nsCSSValue& aValue)
             attr = holdIdent;
           }
           else {
-            ToLowerCase(holdIdent, attr);
+            attr = holdIdent;
+            LowerCaseHTMLAttributeName(attr);
           }
         }
       }
@@ -4082,7 +4098,8 @@ PRBool CSSParserImpl::ParseAttr(nsresult& aErrorCode, nsCSSValue& aValue)
             attr.Append(mToken.mIdent);
           } else {
             nsAutoString buffer;
-            ToLowerCase(mToken.mIdent, buffer);
+            buffer = mToken.mIdent;
+            LowerCaseHTMLAttributeName(buffer);
             attr.Append(buffer);
           }
         }
