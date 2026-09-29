@@ -247,3 +247,16 @@ This exposed and corrected its image scaler's alpha-plane argument mismatch,
 cropped buffer dimensions and source/destination offset confusion. The earlier
 Xlib capture crashed in `Stretch8`; the corrected scaled image path passes the
 strict pixel comparison. Fully transparent rounded backgrounds are also skipped.
+
+`css-set-property.html` exercises the optional CSSOM priority argument through
+shared native prototype methods, including computed declarations and style rules.
+Its 43 checks cover WebIDL conversion order/null handling, invalid receivers and
+Symbols, priority replacement, shorthand priorities, atomic rejection of extra
+declarations, and read-only computed styles. The frozen three-string XPCOM
+interface remains unchanged; CSSOM parsing uses the existing additive parser
+interface instead of concatenating a declaration string.
+
+The separate `css-constructor-shadowing.html` diagnostic currently fails: replacing
+the global CSSStyleDeclaration constructor prevents the legacy computed-style
+wrapper from initializing. This also reproduces in the pre-setter snapshot and
+remains an open prototype-bootstrap gap, outside the passing setter total.

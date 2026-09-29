@@ -209,20 +209,10 @@ nsDOMCSSDeclaration::SetProperty(const nsAString& aPropertyName,
     return RemoveProperty(propID);
   }
 
-  if (aPropertyName.LowerCaseEqualsLiteral("box-sizing"))
-    return ParsePropertyValue(propID, aValue, &aPriority);
+  if (!aPriority.IsEmpty() && !aPriority.LowerCaseEqualsLiteral("important"))
+    return NS_OK;
 
-  if (aPriority.IsEmpty()) {
-    return ParsePropertyValue(propID, aValue);
-  }
-
-  // ParsePropertyValue does not handle priorities correctly -- it's
-  // optimized for speed.  And the priority is not part of the
-  // property value anyway.... So we have to use the full-blown
-  // ParseDeclaration()
-  return ParseDeclaration(aPropertyName + NS_LITERAL_STRING(":") +
-                          aValue + NS_LITERAL_STRING("!") + aPriority,
-                          PR_TRUE, PR_FALSE);
+  return ParsePropertyValue(propID, aValue, &aPriority, &aPropertyName);
 }
 
 NS_IMETHODIMP
@@ -245,7 +235,8 @@ nsDOMCSSDeclaration::RemoveProperty(const nsAString& aPropertyName,
 nsresult
 nsDOMCSSDeclaration::ParsePropertyValue(const nsCSSProperty aPropID,
                                         const nsAString& aPropValue,
-                                        const nsAString* aStandardPriority)
+                                        const nsAString* aStandardPriority,
+                                        const nsAString* aPropertyName)
 {
   nsCSSDeclaration* decl;
   nsresult result = GetCSSDeclaration(&decl, PR_TRUE);
@@ -268,7 +259,7 @@ nsDOMCSSDeclaration::ParsePropertyValue(const nsCSSProperty aPropID,
   PRBool changed;
   if (aStandardPriority) {
     nsCOMPtr<nsICSSParserCSSOM> cssom = do_QueryInterface(cssParser);
-    result = cssom ? cssom->ParsePropertyByName(NS_LITERAL_STRING("box-sizing"),
+    result = cssom ? cssom->ParsePropertyByName(*aPropertyName,
                       aPropValue, *aStandardPriority, sheetURI, baseURI,
                       decl, &changed) : NS_ERROR_NOT_IMPLEMENTED;
   } else {

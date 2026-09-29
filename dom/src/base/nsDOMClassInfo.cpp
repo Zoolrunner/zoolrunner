@@ -1526,6 +1526,7 @@ JSClass nsDOMClassInfo::sDOMConstructorProtoClass = {
 
 
 static JSBool DefineStorageMethods(JSContext* cx, JSObject* proto);
+static JSBool DefineCSSStyleMethods(JSContext* cx, JSObject* proto);
 
 static const char *
 CutPrefix(const char *aName) {
@@ -6074,6 +6075,30 @@ nsWindowSH::GlobalResolve(nsGlobalWindow *aWin, JSContext *cx,
     if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_Storage_id] &&
         !DefineStorageMethods(cx, dot_prototype))
       return NS_ERROR_OUT_OF_MEMORY;
+
+    if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_CSSStyleDeclaration_id] &&
+        !DefineCSSStyleMethods(cx, dot_prototype))
+      return NS_ERROR_OUT_OF_MEMORY;
+
+    if (ci_data && ci_data == &sClassInfoData[eDOMClassInfo_ComputedCSSStyleDeclaration_id]) {
+      // Computed declarations have their own native XPConnect prototype. Share
+      // the CSSStyleDeclaration binding instead of exposing the old required
+      // third argument through that prototype's interface resolver.
+      nsCOMPtr<nsIClassInfo> styleInfo =
+        GetClassInfoInstance(eDOMClassInfo_CSSStyleDeclaration_id);
+      nsCOMPtr<nsIXPConnectJSObjectHolder> styleHolder;
+      rv = sXPConnect->GetWrappedNativePrototype(cx, obj, styleInfo,
+                                                 getter_AddRefs(styleHolder));
+      NS_ENSURE_SUCCESS(rv, rv);
+      JSObject* stylePrototype;
+      rv = styleHolder->GetJSObject(&stylePrototype);
+      NS_ENSURE_SUCCESS(rv, rv);
+      jsval method;
+      if (!JS_GetProperty(cx, stylePrototype, "setProperty", &method) ||
+          !JS_DefineProperty(cx, dot_prototype, "setProperty", method,
+                             nsnull, nsnull, JSPROP_ENUMERATE))
+        return NS_ERROR_UNEXPECTED;
+    }
 
     v = OBJECT_TO_JSVAL(dot_prototype);
 
@@ -11458,6 +11483,53 @@ nsCSSValueListSH::GetItemAt(nsISupports *aNative, PRUint32 aIndex,
 
 
 // CSSStyleDeclaration helper
+
+static JSBool JS_DLL_CALLBACK
+CSSStyleSetProperty(JSContext* cx, JSObject* obj, uintN argc,
+                    jsval* argv, jsval* rval)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj,
+                                                        getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMCSSStyleDeclaration> style = do_QueryWrappedNative(wrapper);
+  if (!style || argc < 2) {
+    DOMConstructorTypeError(cx, "setProperty requires a CSS declaration, property and value");
+    return JS_FALSE;
+  }
+  JSString* method = JS_InternString(cx, "setProperty");
+  if (!method) return JS_FALSE;
+  if (NS_FAILED(nsContentUtils::GetSecurityManager()->CheckPropertyAccess(
+                  cx, obj, "CSSStyleDeclaration", STRING_TO_JSVAL(method),
+                  nsIXPCSecurityManager::ACCESS_CALL_METHOD)))
+    return JS_FALSE;
+
+  // Preserve the frozen three-string XPCOM interface. Only the JS binding
+  // supplies the optional priority and WebIDL null-to-empty conversions.
+  nsAutoString converted[3];
+  for (uintN i = 0; i < 3; ++i) {
+    if ((i == 2 && (argc < 3 || JSVAL_IS_VOID(argv[2]))) ||
+        (i != 0 && JSVAL_IS_NULL(argv[i])))
+      continue;
+    JSString* string = JS_ValueToString(cx, argv[i]);
+    if (!string) return JS_FALSE;
+    argv[i] = STRING_TO_JSVAL(string);
+    converted[i].Assign(nsDependentJSString(string));
+  }
+  nsresult rv = style->SetProperty(converted[0], converted[1], converted[2]);
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *rval = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+static JSBool
+DefineCSSStyleMethods(JSContext* cx, JSObject* proto)
+{
+  return JS_DefineFunction(cx, proto, "setProperty", CSSStyleSetProperty, 2,
+                           JSPROP_ENUMERATE) != nsnull;
+}
 
 nsresult
 nsCSSStyleDeclSH::GetStringAt(nsISupports *aNative, PRInt32 aIndex,

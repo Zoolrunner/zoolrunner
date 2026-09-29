@@ -488,3 +488,11 @@ Xlib initially crashed in its alpha scaler; correcting dimensions, source offset
 and clipped buffer strides resolves that crash. Both backends pass all 24 Suite
 lifecycle checks afterward. Rounded translucent fills, borders, text and canvas
 propagation remain unverified/incomplete; see the layout probe guide.
+
+The CSS setter correction passes 43 focused assertions; both native LoongArch
+Suite backends pass 970 content assertions and 24 lifecycle checks. A diagnostic invoking the original
+results callback with explicitly synthetic input then reaches another blocker:
+`history.pushState` is absent. That diagnostic is only UI coverage, never a
+benchmark result. Session-history implementation and a fresh complete run remain
+required. A separate constructor-shadowing probe reproduces an older computed-
+style bootstrap failure; it remains recorded in the layout guide.

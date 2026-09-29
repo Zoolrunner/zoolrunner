@@ -1,0 +1,68 @@
+<!doctype html><title>CSS setProperty bindings</title><style>div{height:1px}</style><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(actual,expected,label){var ok=actual===expected;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+actual+' expected='+expected);}
+function typeError(fn,label){var name='none';try{fn();}catch(e){name=e.name;}check(name,'TypeError',label);}
+try {
+ var element=document.createElement('div');document.body.appendChild(element);
+ var s=element.style,other=document.createElement('div').style;
+ check(s.setProperty.length,2,'two required arguments');
+ check(s.hasOwnProperty('setProperty'),false,'method lives on prototype');
+ check(s.setProperty,other.setProperty,'method shared between declarations');
+ check(s.setProperty,CSSStyleDeclaration.prototype.setProperty,'interface prototype method');
+ check(s.setProperty('width','12px'),undefined,'omitted priority returns undefined');
+ check(s.width,'12px','omitted priority sets value');
+ s.setProperty('width','13px',undefined);check(s.width,'13px','undefined priority defaults to empty');
+ s.setProperty('width','14px',null);check(s.width,'14px','null priority converts to empty');
+ s.setProperty('width',null);check(s.width,'','null value removes declaration');
+ s.setProperty('WIDTH','15px');check(s.width,'15px','property name is case insensitive');
+ s.setProperty('width','16px','IMPORTANT');check(s.width,'16px','important priority is case insensitive');
+ check(s.getPropertyPriority('width'),'important','important priority stored');
+ s.setProperty('width','17px');check(s.getPropertyPriority('width'),'','omitted priority clears important');
+ s.setProperty('width','18px',' important');check(s.width,'17px','whitespace priority is invalid');
+ s.setProperty('width','19px','!important');check(s.width,'17px','priority excludes exclamation mark');
+ s.setProperty('width','','invalid');check(s.width,'','empty value removes despite invalid priority');
+ var sentinel={},order=[];
+ function converted(label,value){return {toString:function(){order.push(label);return value;}};}
+ s.setProperty(converted('name','height'),converted('value','21px'),converted('priority','important'));
+ check(order.join(','),'name,value,priority','conversion order');
+ check(s.height,'21px','converted value applied');
+ var caught=null;
+ try{s.setProperty('height',{toString:function(){throw sentinel;}});}catch(e){caught=e;}
+ check(caught,sentinel,'conversion exception preserved');
+ check(s.height,'21px','throwing conversion does not mutate');
+ var extra={toString:function(){throw sentinel;}};
+ s.setProperty('height','22px','',extra);check(s.height,'22px','extra arguments ignored');
+ typeError(function(){s.setProperty();},'missing both required arguments');
+ typeError(function(){s.setProperty('width');},'missing required value');
+ typeError(function(){s.setProperty.call({},'width','1px');},'invalid receiver rejected');
+ typeError(function(){s.setProperty(Symbol('name'),'1px');},'symbol property rejected');
+ typeError(function(){s.setProperty('height',Symbol('value'));},'symbol value rejected');
+ typeError(function(){s.setProperty('height','1px',Symbol('priority'));},'symbol priority rejected');
+ check(s.height,'22px','failed symbol conversions preserve declaration');
+ s.setProperty('width','25px','important');
+ s.setProperty('width','26px!important');check(s.width,'25px','priority forbidden inside value');
+ s.setProperty('width','26px; height:30px','important');check(s.width,'25px','extra declarations rejected atomically');
+ check(s.height,'22px','extra declaration cannot mutate another property');
+ s.setProperty('width','26px;');check(s.width,'25px','trailing semicolon rejected');
+ s.setProperty('width','bad','');check(s.getPropertyPriority('width'),'important','invalid value preserves old priority');
+ s.setProperty('margin','1px','important');s.setProperty('margin','2px');
+ check(s.marginTop,'2px','shorthand replaces important values');
+ check(s.getPropertyPriority('margin-top'),'','shorthand clears longhand priority');
+ s.setProperty('margin-left','9px','important');s.setProperty('margin','3px');
+ check(s.marginLeft,'3px','shorthand replaces mixed priorities');
+ check(s.getPropertyPriority('margin-left'),'','mixed priority removed');
+ s.setProperty('width','27px/**/');check(s.width,'27px','trailing CSS comment accepted');
+ check(getComputedStyle(element).setProperty,s.setProperty,'computed and mutable declarations share method');
+ var rule=document.styleSheets[0].cssRules[0].style;
+ rule.setProperty('height','31px');check(rule.height,'31px','style rule accepts omitted priority');
+ var code=0;try{getComputedStyle(element).setProperty('width','1px');}catch(e){code=e.code;}
+ check(code,7,'computed declaration remains read only');
+ s.setProperty('-webkit-transform','rotate(1deg)');
+ s.setProperty('-moz-transform','rotate(1deg)');
+ s.setProperty('-ms-transform','rotate(1deg)');
+ s.setProperty('transform','rotate(1deg)');
+ check(true,true,'benchmark result setters complete without missing-priority exceptions');
+ check(testResults.length,42,'all setter assertions executed');
+}catch(error){check(String(error),'no exception','unexpected exception');}
+testDone=true;
+</script></body>

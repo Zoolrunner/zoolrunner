@@ -1,0 +1,11 @@
+<!doctype html><title>CSS constructor shadowing</title><body><div></div><script>
+var testDone=false,testFailures=0,testResults=[];
+var original=window.CSSStyleDeclaration,sentinel={};
+try {
+ var s=document.body.style;
+ window.CSSStyleDeclaration={get prototype(){throw sentinel;}};
+ var computed=getComputedStyle(document.body,null);
+ testResults.push('PASS computed declaration created with shadowed global constructor');
+} catch(e) {++testFailures;testResults.push('FAIL computed declaration with shadowed constructor: '+e);}
+finally {window.CSSStyleDeclaration=original;testDone=true;}
+</script></body>

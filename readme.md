@@ -1191,3 +1191,9 @@ historical graphics backends, and their views retain the content behind them.
 The focused GTK2 and Xlib painting fixture matches all 132,000 reference pixels. Rounded
 fills, borders, text and canvas transparency remain separate rendering gaps;
 see the [layout probes](layout/html/tests/style/README-probes.md).
+
+CSSStyleDeclaration.setProperty now supplies the optional priority in JavaScript
+while preserving its historical native interface. Its CSSOM parser replaces
+priorities correctly and rejects embedded declaration delimiters atomically.
+The final Speedometer UI also requires History.pushState, which is still being
+implemented; 480 successful workload checks alone are not a complete run.
