@@ -157,3 +157,11 @@ passes 28 assertions across collections, Document and Window after reproducing
 Document/Window failures before the correction. It is separate from the
 ES5-default layout list. The benchmark next fails in Backbone's hidden iframe
 fallback because the newly inserted iframe has no `contentWindow`.
+
+The optional capture flag is now handled consistently by native
+`removeEventListener` and `addEventListener`, preserving the historical fourth
+add-listener argument. Twelve removal/identity/conversion assertions pass in
+Suite. A small hidden-iframe fixture passes eight assertions both from file
+and HTTP, including synchronous insertion during parsing; Backbone's nested
+case still needs diagnosis. `--debug-errors FILE_SUBSTRING` enables debugger
+throw-stack diagnostics; do not use its timings as benchmark measurements.

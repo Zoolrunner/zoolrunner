@@ -1,0 +1,19 @@
+<!doctype html><html><head><title>Optional event-listener capture</title></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+window.onload=function(){try{
+ var count=0, target=document.createElement('div');document.body.appendChild(target);
+ function fn(){++count;}function fire(){target.dispatchEvent(new Event('example',{bubbles:true}));}
+ check(target.removeEventListener.length,2,'remove arity');
+ target.addEventListener('example',fn);fire();check(count,1,'optional add capture');
+ check(target.removeEventListener('example',fn),undefined,'optional remove capture');fire();check(count,1,'listener removed');
+ target.addEventListener('example',fn,true);target.removeEventListener('example',fn);fire();check(count,2,'capture identity preserved');
+ target.removeEventListener('example',fn,true);fire();check(count,2,'capture listener removed');
+ var converted=0;target.removeEventListener({toString:function(){++converted;return 'example';}},null);check(converted,1,'null listener still converts type');
+ check(target.removeEventListener('example',undefined),undefined,'undefined listener');
+ var sentinel={},caught;try{target.removeEventListener({toString:function(){throw sentinel;}},fn);}catch(e){caught=e;}check(caught,sentinel,'type conversion exception');
+ document.addEventListener('example',fn);document.removeEventListener('example',fn);fire();check(count,2,'document removal');
+ window.addEventListener('example',fn);window.removeEventListener('example',fn);fire();check(count,2,'window removal');
+ var listener={handleEvent:fn};target.addEventListener('example',listener);target.removeEventListener('example',listener);fire();check(count,2,'object listener identity');
+ }catch(e){check(String(e),'no exception','unexpected exception');}testDone=true;};
+</script></body></html>

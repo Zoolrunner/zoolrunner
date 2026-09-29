@@ -1,0 +1,15 @@
+<!doctype html><html><head><title>Hidden iframe context regression</title></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+(function(){try{
+ var iframe=document.createElement('iframe');iframe.src='javascript:0';iframe.style.display='none';iframe.tabIndex=-1;
+ check(iframe.contentWindow,null,'detached iframe has no window');
+ var inserted=document.body.insertBefore(iframe,document.body.firstChild);
+ check(inserted,iframe,'inserted node identity');check(!!iframe.contentWindow,true,'hidden iframe immediate window');
+ var w=iframe.contentWindow;w.document.open();w.document.write('<p>child</p>');w.document.close();
+ check(w.document.body.textContent,'child','hidden document write');
+ check(w.parent,window,'child parent');check(w.frameElement,iframe,'frame element');
+ iframe.style.display='block';check(iframe.contentWindow,w,'window identity after showing');
+ document.body.removeChild(iframe);check(iframe.contentWindow,null,'removed iframe has no window');
+ }catch(e){check(String(e),'no exception','unexpected exception');}testDone=true;})();
+</script></body></html>

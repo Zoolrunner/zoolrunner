@@ -24,6 +24,23 @@ function finish(ok, detail) {
   C['@mozilla.org/toolkit/app-startup;1'].getService(I.nsIAppStartup).quit(I.nsIAppStartup.eForceQuit);
 }
 function run() {
+  var debugFilter = prefs.getCharPref('zoolrunner.speedometer.debugErrors');
+  if (debugFilter) {
+    var service = C['@mozilla.org/js/jsd/debugger-service;1'].getService(I.jsdIDebuggerService);
+    service.on();
+    service.throwHook = {onExecute:function(frame,type,value){
+      if (frame.script && frame.script.fileName.indexOf(debugFilter)>=0) {
+        dump('SPEEDOMETER-THROW '+value.value.stringValue+'\n');
+        for(var f=frame,count=0;f&&count<12;f=f.callingFrame,++count){
+          dump('SPEEDOMETER-STACK '+f.script.fileName+':'+f.line+' '+f.script.functionName+'\n');
+        }
+        var result={};
+        frame.eval('[typeof n,String(n),typeof e,String(e),this.iframe && this.iframe.tagName,this.iframe && String(this.iframe.contentWindow),this.iframe && (this.iframe.ownerDocument===document),this.iframe && (this.iframe.parentNode===document.body),document.URL,window.frames.length].join(" | ")', 'speedometer-diagnostic',1,result);
+        if(result.value)dump('SPEEDOMETER-LOCALS '+result.value.stringValue+'\n');
+      }
+      return I.jsdIExecutionHook.RETURN_CONTINUE_THROW;
+    }};
+  }
   consoleService.registerListener(listener);
   mode = prefs.getCharPref('zoolrunner.speedometer.mode');
   deadline = Date.now() + prefs.getIntPref('zoolrunner.speedometer.timeout') * 1000;

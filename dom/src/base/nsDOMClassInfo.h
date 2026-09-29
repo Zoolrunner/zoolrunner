@@ -394,6 +394,7 @@ protected:
   static jsval sAll_id;
   static jsval sTags_id;
   static jsval sAddEventListener_id;
+  static jsval sRemoveEventListener_id;
 
   static const JSClass *sObjectClass;
   static const JSClass *sXPCNativeWrapperClass;
@@ -502,6 +503,11 @@ protected:
                                                        JSObject *obj,
                                                        uintN argc, jsval *argv,
                                                        jsval *rval);
+
+  static JSBool JS_DLL_CALLBACK RemoveEventListenerHelper(JSContext* cx,
+    JSObject* obj, uintN argc, jsval* argv, jsval* rval);
+  static JSBool EventListenerHelper(JSContext* cx, JSObject* obj,
+    uintN argc, jsval* argv, jsval* rval, PRBool aRemove);
 
   nsresult RegisterCompileHandler(nsIXPConnectWrappedNative *wrapper,
                                   JSContext *cx, JSObject *obj, jsval id,

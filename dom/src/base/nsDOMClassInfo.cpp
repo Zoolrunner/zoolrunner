@@ -1212,6 +1212,7 @@ jsval nsDOMClassInfo::sAdd_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sAll_id             = JSVAL_VOID;
 jsval nsDOMClassInfo::sTags_id            = JSVAL_VOID;
 jsval nsDOMClassInfo::sAddEventListener_id= JSVAL_VOID;
+jsval nsDOMClassInfo::sRemoveEventListener_id= JSVAL_VOID;
 static jsval sXMLHttpRequestSend_id        = JSVAL_VOID;
 static jsval sElementQuerySelector_id      = JSVAL_VOID;
 static jsval sElementQuerySelectorAll_id   = JSVAL_VOID;
@@ -1402,6 +1403,7 @@ nsDOMClassInfo::DefineStaticJSVals(JSContext *cx)
   SET_JSVAL_TO_STRING(sAll_id,             cx, "all");
   SET_JSVAL_TO_STRING(sTags_id,            cx, "tags");
   SET_JSVAL_TO_STRING(sAddEventListener_id,cx, "addEventListener");
+  SET_JSVAL_TO_STRING(sRemoveEventListener_id,cx, "removeEventListener");
   SET_JSVAL_TO_STRING(sXMLHttpRequestSend_id, cx, "send");
   SET_JSVAL_TO_STRING(sElementQuerySelector_id, cx, "querySelector");
   SET_JSVAL_TO_STRING(sElementQuerySelectorAll_id, cx, "querySelectorAll");
@@ -7212,6 +7214,21 @@ JSBool JS_DLL_CALLBACK
 nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
                                           uintN argc, jsval *argv, jsval *rval)
 {
+  return EventListenerHelper(cx, obj, argc, argv, rval, PR_FALSE);
+}
+
+JSBool JS_DLL_CALLBACK
+nsEventReceiverSH::RemoveEventListenerHelper(JSContext* cx, JSObject* obj,
+                                             uintN argc, jsval* argv, jsval* rval)
+{
+  return EventListenerHelper(cx, obj, argc, argv, rval, PR_TRUE);
+}
+
+JSBool
+nsEventReceiverSH::EventListenerHelper(JSContext* cx, JSObject* obj,
+                                       uintN argc, jsval* argv, jsval* rval,
+                                       PRBool aRemove)
+{
   if (argc < 2) {
     ThrowJSException(cx, NS_ERROR_XPC_NOT_ENOUGH_ARGS);
 
@@ -7254,11 +7271,11 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
   // Check that the caller has permission to call obj's addEventListener.
   if (NS_FAILED(sSecMan->CheckPropertyAccess(cx, obj,
                                              JS_GET_CLASS(cx, obj)->name,
-                                             sAddEventListener_id,
+                                             aRemove ? sRemoveEventListener_id : sAddEventListener_id,
                                              nsIXPCSecurityManager::ACCESS_GET_PROPERTY)) ||
       NS_FAILED(sSecMan->CheckPropertyAccess(cx, obj,
                                              JS_GET_CLASS(cx, obj)->name,
-                                             sAddEventListener_id,
+                                             aRemove ? sRemoveEventListener_id : sAddEventListener_id,
                                              nsIXPCSecurityManager::ACCESS_CALL_METHOD))) {
     // The caller doesn't have access to get or call the callee
     // object's addEventListener method. The security manager already
@@ -7309,7 +7326,7 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     return JS_FALSE;
   }
 
-  if (argc >= 4) {
+  if (!aRemove && argc >= 4) {
     JSBool wantsUntrusted;
     if (!JS_ValueToBoolean(cx, argv[3], &wantsUntrusted)) {
       return JS_FALSE;
@@ -7339,7 +7356,8 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
       return JS_FALSE;
     }
 
-    rv = eventTarget->AddEventListener(type, listener, useCapture);
+    rv = aRemove ? eventTarget->RemoveEventListener(type, listener, useCapture) :
+                   eventTarget->AddEventListener(type, listener, useCapture);
     if (NS_FAILED(rv)) {
       ThrowJSException(cx, rv);
 
@@ -7347,6 +7365,7 @@ nsEventReceiverSH::AddEventListenerHelper(JSContext *cx, JSObject *obj,
     }
   }
   
+  *rval = JSVAL_VOID;
   return JS_TRUE;
 }
 
@@ -7418,12 +7437,14 @@ nsEventReceiverSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
     return NS_OK;
   }
 
-  if (id == sAddEventListener_id && !(flags & JSRESOLVE_ASSIGNING)) {
+  if ((id == sAddEventListener_id || id == sRemoveEventListener_id) &&
+      !(flags & JSRESOLVE_ASSIGNING)) {
     JSString *str = JSVAL_TO_STRING(id);
     // The capture flag is optional, as in the DOM event-target API.
     JSFunction *fnc =
       ::JS_DefineFunction(cx, obj, ::JS_GetStringBytes(str),
-                          AddEventListenerHelper, 2, JSPROP_ENUMERATE);
+                          id == sAddEventListener_id ? AddEventListenerHelper :
+                          RemoveEventListenerHelper, 2, JSPROP_ENUMERATE);
 
     *objp = obj;
 
@@ -7449,7 +7470,8 @@ nsEventReceiverSH::SetProperty(nsIXPConnectWrappedNative *wrapper,
                                jsval *vp, PRBool *_retval)
 {
   if ((::JS_TypeOfValue(cx, *vp) != JSTYPE_FUNCTION && !JSVAL_IS_NULL(*vp)) ||
-      !JSVAL_IS_STRING(id) || id == sAddEventListener_id) {
+      !JSVAL_IS_STRING(id) || id == sAddEventListener_id ||
+      id == sRemoveEventListener_id) {
     return NS_OK;
   }
 

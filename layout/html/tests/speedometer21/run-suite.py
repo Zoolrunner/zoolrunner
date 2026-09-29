@@ -15,6 +15,7 @@ def main():
     parser.add_argument('--url', required=True)
     parser.add_argument('--mode', choices=['probe', 'benchmark'], default='benchmark')
     parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
+    parser.add_argument('--debug-errors', default='', help='Diagnostic throw-stack filename filter')
     parser.add_argument('--timeout', type=int, default=1800)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
@@ -51,6 +52,7 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 'nglayout.debug.disable_xul_fastload': True,
                 'zoolrunner.speedometer.url': args.url,
                 'zoolrunner.speedometer.mode': args.mode,
+                'zoolrunner.speedometer.debugErrors': args.debug_errors,
                 'zoolrunner.speedometer.timeout': args.timeout,
             }
             (profile / 'user.js').write_text(''.join(
