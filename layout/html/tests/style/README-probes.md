@@ -117,3 +117,11 @@ and frame realm separation. It also preserves the historical standards/quirks
 boundary for unqualified named window properties, without exposing those names
 through the prototype shared by ordinary nodes. All 53 checks pass in native
 LoongArch GTK2 Suite. This is focused coverage, not complete DOM conformance.
+
+`inert-document-title.html` checks DOM-backed title reads/writes on created HTML
+documents, including SVG document elements, text replacement, whitespace,
+conversion, element identity and absent/foreign roots. Its 31 assertions pass.
+Historical parsed documents keep their existing title path. The additional
+25-assertion `dom-conversion-exceptions.html` verifies that XPConnect preserves
+script-thrown argument-conversion exceptions, including reentrant conversions,
+without running the outer native mutation or suppressing ordinary type errors.

@@ -256,3 +256,12 @@ benchmark validation remains pending.
 After the prototype changes, Suite lifecycle passes all 24 checks, chrome/content
 window bootstrap passes all 19, and unchanged ChatZilla initializes and shuts
 down successfully. Other applications remain deferred until Suite completion.
+
+The created-document title setter now updates the DOM using the HTML/SVG title
+rules, and the getter handles an SVG document element. Historical parsed HTML
+uses its existing title path. The new title fixture passes 31 assertions, the
+original createHTMLDocument fixture still passes 31, and 25 argument-conversion
+checks pass after XPConnect stops replacing exceptions thrown by script with
+generic conversion errors. Suite lifecycle passes 24 checks and the unchanged
+legacy-application JavaScript fixture passes 58. The title algorithm is specified
+in [HTML document tree accessors](https://html.spec.whatwg.org/multipage/dom.html#document.title).

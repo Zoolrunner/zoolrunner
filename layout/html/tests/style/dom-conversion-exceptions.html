@@ -1,0 +1,31 @@
+<!doctype html><html><head><title>DOM conversion exceptions</title></head><body><div id="target"></div><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n);}
+try {
+ var target=document.getElementById('target'),sentinel={},calls=0;
+ var string={toString:function(){++calls;throw sentinel;}},number={valueOf:function(){++calls;throw sentinel;}};
+ var operations=[
+ ['createElement',function(){document.createElement(string);}],
+ ['createTextNode',function(){document.createTextNode(string);}],
+ ['attribute name',function(){target.setAttribute(string,'new');}],
+ ['attribute value',function(){target.setAttribute('kept',string);}],
+ ['attribute getter name',function(){target.getAttribute(string);}],
+ ['numeric node index',function(){target.childNodes.item(number);}],
+ ['text offset',function(){document.createTextNode('abc').splitText(number);}],
+ ['style property name',function(){target.style.setProperty(string,'red','');}],
+ ['style property value',function(){target.style.setProperty('color',string,'');}]
+ ];
+ target.setAttribute('kept','original');target.style.color='blue';
+ for(var i=0;i<operations.length;++i){var caught=null;calls=0;try{operations[i][1]();}catch(e){caught=e;}
+ check(caught,sentinel,operations[i][0]+' exception identity');check(calls,1,operations[i][0]+' converts once');}
+ check(target.getAttribute('kept'),'original','failed conversion leaves attribute unchanged');
+ check(target.style.color,'blue','failed conversion leaves style unchanged');
+ var reentrant={toString:function(){target.setAttribute('inner','side effect');throw sentinel;}};
+ var caught=null;try{target.setAttribute('kept',reentrant);}catch(e){caught=e;}
+ check(caught,sentinel,'reentrant conversion exception');check(target.getAttribute('inner'),'side effect','conversion side effect retained');check(target.getAttribute('kept'),'original','outer mutation did not run');
+ target.setAttribute('kept','success');check(target.getAttribute('kept'),'success','successful native call after exception');
+ caught=null;try{target.appendChild({});}catch(e){caught=e;}
+ check(caught!==null,true,'invalid native interface still reports conversion error');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+testDone=true;
+</script></body></html>

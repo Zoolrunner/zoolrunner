@@ -150,6 +150,12 @@ XPCThrower::ThrowBadResult(nsresult rv, nsresult result, XPCCallContext& ccx)
 void
 XPCThrower::ThrowBadParam(nsresult rv, uintN paramNum, XPCCallContext& ccx)
 {
+    // Conversion may call script (toString/valueOf or an accessor). Preserve
+    // its exception, just as Throw(nsresult, JSContext*) does, rather than
+    // replacing it with a generic argument-conversion error.
+    if(JS_IsExceptionPending(ccx))
+        return;
+
     char* sz;
     const char* format;
 

@@ -1132,3 +1132,9 @@ through Node, Window and XMLHttpRequest. Its 53 focused Suite checks include
 frame realms, document fragments and legacy named window properties. Angular 2's
 isolated TodoMVC workload now passes all three item-count checks; the full
 benchmark and remaining standards/application validation are still pending.
+
+Created HTML documents now update their title elements through `document.title`,
+including SVG document elements; historical parsed-document title behavior is
+preserved. Focused title and native argument-conversion regressions pass 31 and
+25 assertions, alongside the existing 31 createHTMLDocument assertions and 24
+Suite lifecycle checks. Full benchmark and CSS validation remain in progress.

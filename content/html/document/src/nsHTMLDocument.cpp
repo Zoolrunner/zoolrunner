@@ -56,6 +56,7 @@
 #include "nsPresContext.h"
 #include "nsIDOMNode.h" // for Find
 #include "nsIDOMNodeList.h"
+#include "nsIDOM3Node.h"
 #include "nsIDOMElement.h"
 #include "nsIDOMText.h"
 #include "nsIDOMComment.h"
@@ -1090,10 +1091,88 @@ nsHTMLDocument::EndLoad()
   nsDocument::EndLoad();
 }
 
+static PRBool
+HasSVGDocumentElement(nsHTMLDocument* aDocument)
+{
+  nsIContent* root = aDocument->GetRootContent();
+  return root && root->GetNodeInfo()->Equals(NS_LITERAL_STRING("svg"),
+                                            kNameSpaceID_SVG);
+}
+
+static nsresult
+FindModernDocumentTitle(nsHTMLDocument* aDocument, nsIDOMNode** aResult)
+{
+  *aResult = nsnull;
+  if (HasSVGDocumentElement(aDocument)) {
+    nsIContent* root = aDocument->GetRootContent();
+    for (PRUint32 i = 0; i < root->GetChildCount(); ++i) {
+      nsIContent* child = root->GetChildAt(i);
+      if (child->GetNodeInfo()->Equals(nsHTMLAtoms::title, kNameSpaceID_SVG))
+        return CallQueryInterface(child, aResult);
+    }
+    return NS_OK;
+  }
+  nsCOMPtr<nsIDOMNodeList> titles;
+  nsresult rv = aDocument->GetElementsByTagNameNS(
+    NS_LITERAL_STRING("http://www.w3.org/1999/xhtml"),
+    NS_LITERAL_STRING("title"), getter_AddRefs(titles));
+  NS_ENSURE_SUCCESS(rv, rv);
+  return titles->Item(0, aResult);
+}
+
 NS_IMETHODIMP
 nsHTMLDocument::SetTitle(const nsAString& aTitle)
 {
-  return nsDocument::SetTitle(aTitle);
+  if (!mUseHTMLNamespace)
+    return nsDocument::SetTitle(aTitle);
+
+  nsCOMPtr<nsIContent> root = GetRootContent();
+  if (!root) return NS_OK;
+  PRBool svg = HasSVGDocumentElement(this);
+  if (!svg && !root->GetNodeInfo()->NamespaceEquals(kNameSpaceID_XHTML))
+    return NS_OK;
+
+  nsCOMPtr<nsIDOMNode> title;
+  nsresult rv = FindModernDocumentTitle(this, getter_AddRefs(title));
+  NS_ENSURE_SUCCESS(rv, rv);
+  if (!title) {
+    nsCOMPtr<nsIContent> parent;
+    if (svg) {
+      parent = root;
+    } else if (root->GetNodeInfo()->Equals(nsHTMLAtoms::html,
+                                          kNameSpaceID_XHTML)) {
+      for (PRUint32 i = 0; i < root->GetChildCount(); ++i) {
+        nsIContent* child = root->GetChildAt(i);
+        if (child->GetNodeInfo()->Equals(nsHTMLAtoms::head,
+                                         kNameSpaceID_XHTML)) {
+          parent = child;
+          break;
+        }
+      }
+    }
+    if (!parent) return NS_OK;
+    nsCOMPtr<nsIDOMElement> element;
+    rv = CreateElementNS(svg ? NS_LITERAL_STRING("http://www.w3.org/2000/svg") :
+                              NS_LITERAL_STRING("http://www.w3.org/1999/xhtml"),
+                         NS_LITERAL_STRING("title"), getter_AddRefs(element));
+    NS_ENSURE_SUCCESS(rv, rv);
+    title = element;
+    nsCOMPtr<nsIDOMNode> parentNode = do_QueryInterface(parent), inserted;
+    if (svg) {
+      nsCOMPtr<nsIDOMNode> first;
+      rv = parentNode->GetFirstChild(getter_AddRefs(first));
+      NS_ENSURE_SUCCESS(rv, rv);
+      rv = parentNode->InsertBefore(title, first, getter_AddRefs(inserted));
+    } else {
+      rv = parentNode->AppendChild(title, getter_AddRefs(inserted));
+    }
+    NS_ENSURE_SUCCESS(rv, rv);
+  }
+  nsCOMPtr<nsIDOM3Node> node = do_QueryInterface(title);
+  NS_ENSURE_TRUE(node, NS_ERROR_UNEXPECTED);
+  // The historical XPIDL DOMString transport represents JS null as void.
+  // Only modern created documents use the ordinary DOMString conversion.
+  return node->SetTextContent(aTitle.IsVoid() ? NS_LITERAL_STRING("null") : aTitle);
 }
 
 nsresult
@@ -1562,13 +1641,9 @@ nsHTMLDocument::GetTitle(nsAString& aTitle)
     return nsDocument::GetTitle(aTitle);
 
   aTitle.Truncate();
-  nsCOMPtr<nsIDOMNodeList> titles;
-  nsresult rv = GetElementsByTagNameNS(
-    NS_LITERAL_STRING("http://www.w3.org/1999/xhtml"),
-    NS_LITERAL_STRING("title"), getter_AddRefs(titles));
-  NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIDOMNode> title;
-  titles->Item(0, getter_AddRefs(title));
+  nsresult rv = FindModernDocumentTitle(this, getter_AddRefs(title));
+  NS_ENSURE_SUCCESS(rv, rv);
   if (!title)
     return NS_OK;
   nsCOMPtr<nsIContent> content = do_QueryInterface(title);

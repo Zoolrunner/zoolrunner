@@ -1,0 +1,33 @@
+<!doctype html><html><head><title>Created document title semantics</title></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+try {
+ var d=document.implementation.createHTMLDocument(),html='http://www.w3.org/1999/xhtml',svgNS='http://www.w3.org/2000/svg';
+ d.title='  First\t title\n';var title=d.querySelector('title');
+ check(title.parentNode,d.head,'setter creates title in head');
+ check(title.textContent,'  First\t title\n','setter preserves literal whitespace');
+ check(d.title,'First title','getter collapses ASCII whitespace');
+ d.title='<tag>&\u03a9';check(d.querySelector('title'),title,'setter preserves title element identity');
+ check(title.childNodes.length,1,'setter replaces children with text');check(title.textContent,'<tag>&\u03a9','setter does not parse markup');
+ d.title='';check(title.childNodes.length,0,'empty title removes all children');check(d.title,'','empty title getter');
+ d.title=null;check(d.title,'null','null DOMString conversion');
+ d.title=undefined;check(d.title,'undefined','undefined DOMString conversion');
+ var calls=0;d.title={toString:function(){++calls;return 'object';}};check(calls,1,'single title conversion');check(d.title,'object','converted title');
+ var sentinel={},caught;try{d.title={toString:function(){throw sentinel;}};}catch(e){caught=e;}
+ check(caught,sentinel,'conversion exception identity');check(d.title,'object','failed conversion preserves title');
+ title.textContent='A';var nested=d.createElement('span');nested.textContent='ignored';title.appendChild(nested);title.appendChild(d.createTextNode(' B\u00a0 C'));
+ check(d.title,'A B\u00a0 C','getter uses child text and preserves non-ASCII space');
+ var later=d.createElement('title');later.textContent='later';d.head.appendChild(later);d.title='first';check(later.textContent,'later','only first title changes');
+ d.body.appendChild(title);check(d.title,'later','title getter follows current tree order');
+ d.head.removeChild(later);d.documentElement.removeChild(d.head);d.title='outside head';check(title.textContent,'outside head','existing title outside head can be set');
+ d.body.removeChild(title);d.title='ignored';check(d.title,'','missing head and title is no-op');check(d.querySelector('title'),null,'missing head is not synthesized');
+ var root=d.documentElement;d.removeChild(root);d.title='ignored';check(d.title,'','missing document element is no-op');
+ var svg=d.createElementNS(svgNS,'svg');d.appendChild(svg);var group=d.createElementNS(svgNS,'g');svg.appendChild(group);
+ d.title='  SVG title ';var svgTitle=svg.firstChild;check(svgTitle.localName,'title','SVG setter inserts first child');check(svgTitle.namespaceURI,svgNS,'SVG title namespace');check(svg.lastChild,group,'existing SVG children retained');check(d.title,'SVG title','SVG title getter');
+ var nestedTitle=d.createElementNS(svgNS,'title');nestedTitle.textContent='nested';group.appendChild(nestedTitle);d.title='changed';check(svg.firstChild,svgTitle,'SVG title element identity');check(nestedTitle.textContent,'nested','nested SVG title not selected');
+ svg.removeChild(svgTitle);check(d.title,'','SVG getter ignores descendant title');
+ var foreign=d.createElementNS('urn:test','root');d.replaceChild(foreign,svg);d.title='ignored';check(foreign.childNodes.length,0,'foreign root setter is no-op');
+ var htmlTitle=d.createElementNS(html,'title');htmlTitle.textContent='foreign tree';foreign.appendChild(htmlTitle);check(d.title,'foreign tree','HTML title getter independent of root namespace');d.title='ignored';check(htmlTitle.textContent,'foreign tree','foreign root setter remains no-op with HTML title');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+testDone=true;
+</script></body></html>
