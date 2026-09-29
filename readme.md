@@ -117,7 +117,7 @@ The linked guides retain the detailed test scope and reproduction procedures.
 | Mac OS X PowerPC | All four applications pass the local `act` build/package/runtime/upload matrix, including GUI and platform probes on original Mac OS X 10.0 under emulation. | Physical PowerPC hardware and GitHub-hosted runs remain untested. See the [10.0 status](mozconfigs/macos/powerpc/10.0-status.md) and [interactive UTM guide](mozconfigs/macos/powerpc/utm.md). |
 | Mac OS X i386 | All four applications pass local `act` compilation and packaging checks with an explicit 10.4 deployment target. | Runtime compatibility is unverified; recorded artifact uploads encountered a local server limitation. |
 | Windows x86 | Suite and Browser pass complete local MSVC2005/Wine `act` workflows; Suite, Browser and XULRunner also pass the GitHub-hosted build, package, audit, runtime and upload jobs. A separate September 16 Suite package passes 17 regression groups in NT 4.0, Me, and 2000 guests. | The new Wine-tested package has not been revalidated on original Windows releases. Calendar passes hosted build/package/audit; its runtime rerun remains pending after fixing omitted JavaScript component files. Windows 95 blockers remain open; see the [Windows build guide](build/win32/msvc8-cross/README.md). |
-| Linux LoongArch64 | GTK2 and Xlib Suite packages pass native shell, embedding, window, lifecycle and pinned ES5.1/ES2015 checks. Earlier GTK2 Browser builds and Xlib Browser window painting are recorded. | The current Speedometer work has not yet validated Browser, Calendar or XULRunner; the full benchmark and DOM/CSS compatibility work remain incomplete. |
+| Linux LoongArch64 | Suite, Browser, Calendar and XULRunner pass all eight GTK2/Xlib native package gates at the recorded XHR dispatch baseline, including pinned ES5.1/ES2015 checks. Full Speedometer 2.1 runs pass on both Suite backends. | Benchmark runs use the frozen revisions recorded in the Speedometer notes. DOM/CSS conformance remains incomplete; subsequent changes require separate validation. |
 | Linux aarch64 | All eight Suite/Browser/Calendar/XULRunner × GTK2/Xlib jobs pass local `act` compilation, packaging, runtime tests and uploads. Each passes all 11,540 pinned ES5.1 cases. | Native Oracle Linux 8 / GCC Toolset 14 containers; GitHub-hosted runs and other distributions remain unverified. See the [Linux guide](build/linux/README.md#aarch64-bring-up). |
 | Linux i686 / x86_64 | Suite passes all four local `act` build, ABI, package, runtime and upload jobs across GTK2/Xlib and both architectures. x86_64 GTK2 Browser and Calendar also pass complete local workflows. | Other application combinations and GitHub-hosted runs remain unverified. See the [Linux status](build/linux/README.md). |
 
@@ -190,8 +190,11 @@ those earlier milestones.
 
 Unmodified Speedometer 2.1 is an additional compatibility target, including
 the ES2015 features required by its workloads, while preserving historical
-application behavior. This work is in progress; a complete benchmark pass
-has not been established. See the [Speedometer validation notes](layout/html/tests/speedometer21/README.md).
+application behavior. Complete ten-iteration runs pass all sixteen workloads
+and 480 checked steps on both native LoongArch Suite backends, using the frozen
+revisions recorded in the [Speedometer validation notes](layout/html/tests/speedometer21/README.md).
+This does not establish complete standards compliance: live dataset behavior,
+CSS painting and other DOM gaps remain under development.
 
 Application compatibility is tested separately from language conformance:
 
