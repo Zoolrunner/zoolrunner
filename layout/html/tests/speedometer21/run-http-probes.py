@@ -33,6 +33,8 @@ def main():
     parser.add_argument('--runtime', type=Path, required=True)
     parser.add_argument('--reports', type=Path, required=True)
     parser.add_argument('--application', choices=['suite', 'browser', 'calendar', 'xulrunner'], default='suite')
+    parser.add_argument('--storage-policy', choices=['allow', 'deny'], default='allow',
+                        help='Explicitly test legacy denial for builds without storage permissions')
     args = parser.parse_args()
     here = Path(__file__).resolve().parent
     root = here.parents[3]
@@ -43,9 +45,9 @@ def main():
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
         try:
-            for name in ('local-storage', 'legacy-storage-event',
-                         'xhr-event-lifetime', 'xhr-event-dispatch', 'xhr-event-error',
-                         'xhr-listener-registration'):
+            storage = ('local-storage', 'legacy-storage-event') if args.storage_policy == 'allow' else ('storage-policy-denied',)
+            for name in storage + ('xhr-event-lifetime', 'xhr-event-dispatch', 'xhr-event-error',
+                                   'xhr-listener-registration'):
                 report = args.reports / (name + '.json')
                 report.unlink(missing_ok=True)
                 url = 'http://127.0.0.1:%d/%s.html' % (server.server_port, name)

@@ -49,8 +49,8 @@ function runTests() {
   check(value(),'none','none clears gradient');
   s.cssText='background:linear-gradient(red,blue);background:green';
   check(value(),'none','shorthand clears gradient');
-  s.cssText='background-image:linear-gradient(red,blue);background-image:url(data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7)';
-  check(value().indexOf('data:image/gif')!=-1,true,'URL replaces gradient');
+  s.cssText='background-image:linear-gradient(red,blue);background-image:url(gradient-replacement.gif)';
+  check(value().indexOf('gradient-replacement.gif')!=-1,true,'URL replaces gradient');
   var frame=document.createElement('iframe');document.body.appendChild(frame);
   var d=frame.contentDocument;d.open();d.write('<html><body><div id="q"></div></body></html>');d.close();
   var q=d.getElementById('q');

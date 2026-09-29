@@ -653,3 +653,25 @@ regression check, not another benchmark run. The GTK2 summary screenshot
 Suite gauge needle stays upright because CSS rotation is missing. They also
 show a border around the linked logo image that the reference omits. Full
 painting equivalence is therefore not claimed.
+
+### Other application validation after the Suite gate
+
+Native Browser GTK2 compilation and the complete relocated-package gate now
+pass, including both pinned language suites, native/embedding checks and real
+Browser navigation/window checks (`browser-package-gtk2/`). Its separate
+preferences compatibility probe passes 28 assertions with the documented
+pre-existing default-localization limitation. Calendar GTK2 compilation passes;
+its unit/four-view and full package gate is running, and XULRunner GTK2 is
+compiling. The three other applications' Xlib builds remain untested.
+
+Calendar GTK2 passes 985 content and 300 History assertions. The shared CSS
+fixtures retain all assertions but now use ordinary linked stylesheet/image
+files, because Calendar intentionally excludes the `data:` protocol. Its
+unchanged cookie-disabled configuration also lacks the permission service, so
+the original allowed-storage/event tests correctly encounter security denial.
+Those failed reports remain in `calendar-gtk2-http/`; they are not counted as
+storage conformance passes. With explicit `--storage-policy deny`, all nine
+legacy denial checks and 69 unchanged XHR assertions pass in
+`calendar-gtk2-http-policy/`. The driver defaults to the full allowed-storage
+checks and never switches policy implicitly. Application code and build feature
+selections were not changed to obtain these results.

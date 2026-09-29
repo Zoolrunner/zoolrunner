@@ -268,3 +268,18 @@ runners pass all 24 checks. Artifacts are under
 `artifacts/speedometer21/css-shadowing-{gtk2,xlib}-content-probes.json` and
 `css-shadowing-{gtk2,xlib}-lifecycle.stdout`. This bounded fix does not
 establish that all DOM constructors are independent of public property changes.
+
+Shared media-query and gradient fixtures use ordinary stylesheet/image files
+instead of `data:` URLs so Calendar can exercise the same CSS assertions while
+retaining its intentionally restricted protocol build. The linked/imported
+stylesheet checks still total 69 assertions, and the gradient replacement and
+round-trip checks still total 39. Both Suite backends and Browser GTK2 pass
+these resource changes; Calendar GTK2 passes the complete 985-assertion content
+set with them.
+
+Calendar also intentionally omits cookies and their permission service. Storage
+continues to fail closed in that configuration. `storage-policy-denied.html`
+checks nine legacy denial/child-window behaviors; it is not a substitute for
+the 90 allowed-storage/event assertions in Browser and Suite. Run the HTTP
+driver with explicit `--storage-policy deny` for this configuration. Its four
+XHR groups still run unchanged and pass all 69 assertions in Calendar GTK2.

@@ -1,0 +1,21 @@
+<!doctype html><title>Legacy storage policy denial</title><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,s){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+s+' actual='+String(a)+' expected='+String(b));}
+function denied(fn,label){var error=null;try{fn();}catch(e){error=e;}
+ check(error!==null,true,label+' throws');
+ // Preserve the classic platform's security code. This is a policy regression,
+ // not a claim of modern DOMException or storage API conformance.
+ check(error&&error.code,1000,label+' legacy security code');
+}
+try{
+ denied(function(){return window.localStorage;},'local storage');
+ denied(function(){return window.globalStorage[location.hostname];},'global storage');
+ var frame=document.createElement('iframe');document.body.appendChild(frame);
+ var child=frame.contentWindow;
+ denied(function(){return child.localStorage;},'child local storage');
+ denied(function(){return child.globalStorage[location.hostname];},'child global storage');
+ check(child.document.documentElement!==null,true,'child DOM remains usable');
+ frame.parentNode.removeChild(frame);
+}catch(e){check(String(e),'no exception','unexpected exception');}
+testDone=true;
+</script></body>
