@@ -61,6 +61,7 @@
 
 // JavaScript includes
 #include "jsapi.h"
+#include "jsreflect.h"
 #include "jsfun.h"
 #include "jsnum.h"
 #include "jsdbgapi.h"
@@ -8275,64 +8276,308 @@ static JSFunctionSpec sDOMTokenListFunctions[] = {
 };
 
 
-// Expose HTML data-* attributes through the string-valued dataset properties
-// used by classic applications such as TodoMVC. This is a snapshot object;
-// reads of attributes present when dataset is first accessed are supported.
-static JSObject *
-DOMCreateDataset(JSContext *cx, JSObject *parent, nsIContent *content)
+// Native named properties reflect the attribute list on every operation. The
+// handler traces the element's wrapper, so retaining a dataset retains its
+// element without introducing an opaque native reference cycle.
+static JSClass sDOMDatasetClass = {
+  "DOMStringMap", JSCLASS_HAS_RESERVED_SLOTS(2),
+  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+  JS_GetHostObjectOps, nsnull, nsnull, nsnull, nsnull, nsnull, nsnull, nsnull
+};
+static JSClass sDOMDatasetHandlerClass = {
+  "DOMStringMap state", JSCLASS_HAS_RESERVED_SLOTS(2),
+  JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_PropertyStub,
+  JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub, JS_FinalizeStub,
+  JSCLASS_NO_OPTIONAL_MEMBERS
+};
+
+enum DOMDatasetOperation {
+  DATASET_GET, DATASET_SET, DATASET_HAS, DATASET_DELETE, DATASET_DEFINE,
+  DATASET_DESCRIPTOR, DATASET_KEYS, DATASET_GET_PROTO, DATASET_SET_PROTO,
+  DATASET_EXTENSIBLE, DATASET_PREVENT
+};
+
+static JSBool
+DOMDatasetContent(JSContext* cx, JSObject* handler, nsCOMPtr<nsIContent>& content)
 {
-  JSObject *dataset = JS_NewObject(cx, nsnull, nsnull, parent);
-  if (!dataset) return nsnull;
-
-  PRUint32 count = content->GetAttrCount();
-  for (PRUint32 i = 0; i < count; ++i) {
-    PRInt32 nameSpace;
-    nsCOMPtr<nsIAtom> nameAtom;
-    nsCOMPtr<nsIAtom> prefixAtom;
-    if (NS_FAILED(content->GetAttrNameAt(i, &nameSpace,
-                                          getter_AddRefs(nameAtom),
-                                          getter_AddRefs(prefixAtom))) ||
-        nameSpace != kNameSpaceID_None || !nameAtom) {
-      continue;
-    }
-
-    nsAutoString attrName;
-    nameAtom->ToString(attrName);
-    if (attrName.Length() <= 5 ||
-        !Substring(attrName, 0, 5).Equals(NS_LITERAL_STRING("data-"))) {
-      continue;
-    }
-
-    nsAutoString propertyName;
-    PRBool uppercaseNext = PR_FALSE;
-    for (PRUint32 j = 5; j < attrName.Length(); ++j) {
-      PRUnichar ch = attrName[j];
-      if (ch == '-' && j + 1 < attrName.Length() &&
-          attrName[j + 1] >= 'a' && attrName[j + 1] <= 'z') {
-        uppercaseNext = PR_TRUE;
-        continue;
-      }
-      if (uppercaseNext) {
-        ch = ch - ('a' - 'A');
-        uppercaseNext = PR_FALSE;
-      }
-      propertyName.Append(ch);
-    }
-    if (propertyName.IsEmpty()) continue;
-
-    nsAutoString value;
-    content->GetAttr(kNameSpaceID_None, nameAtom, value);
-    JSString *jsValue = JS_NewUCStringCopyN(
-      cx, NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
-    if (!jsValue ||
-        !JS_DefineUCProperty(cx, dataset,
-          NS_REINTERPRET_CAST(const jschar *, propertyName.get()),
-          propertyName.Length(), STRING_TO_JSVAL(jsValue), nsnull, nsnull,
-          JSPROP_ENUMERATE)) {
-      return nsnull;
-    }
+  jsval element;
+  if (JS_GET_CLASS(cx, handler) != &sDOMDatasetHandlerClass ||
+      !JS_GetReservedSlot(cx, handler, 0, &element) ||
+      JSVAL_IS_PRIMITIVE(element)) {
+    DOMConstructorTypeError(cx, "DOMStringMap has no associated element");
+    return JS_FALSE;
   }
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(
+    cx, JSVAL_TO_OBJECT(element), getter_AddRefs(wrapper));
+  content = do_QueryWrappedNative(wrapper);
+  nsCOMPtr<nsIDOMNode> node = do_QueryInterface(content);
+  if (!content || !nsContentUtils::CanCallerAccess(node)) {
+    nsDOMClassInfo::ThrowJSException(cx, NS_ERROR_DOM_SECURITY_ERR);
+    return JS_FALSE;
+  }
+  return JS_TRUE;
+}
 
+static PRBool
+DOMDatasetAttributeName(const nsAString& attribute, nsAString& property)
+{
+  if (attribute.Length() < 5 ||
+      !Substring(attribute, 0, 5).EqualsLiteral("data-")) return PR_FALSE;
+  property.Truncate();
+  const PRUnichar* chars = attribute.BeginReading();
+  for (PRUint32 i = 5; i < attribute.Length(); ++i) {
+    PRUnichar ch = chars[i];
+    if (ch >= 'A' && ch <= 'Z') return PR_FALSE;
+    if (ch == '-' && i + 1 < attribute.Length() &&
+        chars[i + 1] >= 'a' && chars[i + 1] <= 'z') {
+      ch = chars[++i] - ('a' - 'A');
+    }
+    property.Append(ch);
+  }
+  return PR_TRUE;
+}
+
+static PRBool
+DOMDatasetNameAt(nsIContent* content, PRUint32 index,
+                 nsCOMPtr<nsIAtom>& atom, nsAString& property)
+{
+  PRInt32 nameSpace;
+  nsCOMPtr<nsIAtom> prefix;
+  if (NS_FAILED(content->GetAttrNameAt(index, &nameSpace,
+      getter_AddRefs(atom), getter_AddRefs(prefix))) ||
+      nameSpace != kNameSpaceID_None || !atom) return PR_FALSE;
+  nsAutoString attribute;
+  atom->ToString(attribute);
+  return DOMDatasetAttributeName(attribute, property);
+}
+
+static PRBool
+DOMDatasetFind(nsIContent* content, JSString* key, nsCOMPtr<nsIAtom>& atom)
+{
+  nsDependentString wanted(JS_GetStringChars(key), JS_GetStringLength(key));
+  for (PRUint32 i = 0; i < content->GetAttrCount(); ++i) {
+    nsAutoString property;
+    if (DOMDatasetNameAt(content, i, atom, property) && property.Equals(wanted))
+      return PR_TRUE;
+  }
+  atom = nsnull;
+  return PR_FALSE;
+}
+
+static JSBool
+DOMDatasetWrite(JSContext* cx, JSObject* handler, JSString* key, jsval value)
+{
+  // Web IDL converts the value before the named-setter algorithm validates
+  // the name. User conversion can mutate/adopt the associated element.
+  JSString* string = JS_ValueToString(cx, value);
+  if (!string) return JS_FALSE;
+  nsAutoString converted(JS_GetStringChars(string), JS_GetStringLength(string));
+  nsAutoString attribute(NS_LITERAL_STRING("data-"));
+  const jschar* chars = JS_GetStringChars(key);
+  size_t length = JS_GetStringLength(key);
+  for (size_t i = 0; i < length; ++i) {
+    PRUnichar ch = chars[i];
+    if (ch == '-' && i + 1 < length && chars[i + 1] >= 'a' && chars[i + 1] <= 'z') {
+      ThrowNamedDOMException(cx, NS_ERROR_DOM_SYNTAX_ERR, "SyntaxError");
+      return JS_FALSE;
+    }
+    if (ch >= 'A' && ch <= 'Z') {
+      attribute.Append(PRUnichar('-'));
+      ch += 'a' - 'A';
+    }
+    attribute.Append(ch);
+  }
+  nsresult rv = nsContentUtils::CheckQName(attribute, PR_FALSE);
+  if (NS_FAILED(rv)) {
+    ThrowNamedDOMException(cx, NS_ERROR_DOM_INVALID_CHARACTER_ERR, "InvalidCharacterError");
+    return JS_FALSE;
+  }
+  nsCOMPtr<nsIContent> content;
+  if (!DOMDatasetContent(cx, handler, content)) return JS_FALSE;
+  nsCOMPtr<nsIAtom> atom = do_GetAtom(attribute);
+  if (!atom) { JS_ReportOutOfMemory(cx); return JS_FALSE; }
+  rv = content->SetAttr(kNameSpaceID_None, atom, converted, PR_TRUE);
+  if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+  return JS_TRUE;
+}
+
+// Inspect a FromPropertyDescriptor record through its own fields only; a
+// modified Object.prototype must not turn a generic descriptor into a data one.
+static JSBool
+DOMDatasetDescriptorField(JSContext* cx, jsval* argv, const char* field,
+                          JSBool* present, jsval* value)
+{
+  JSString* name = JS_NewStringCopyZ(cx, field);
+  if (!name) return JS_FALSE;
+  jsval args[4] = { argv[-2], argv[-1], argv[2], STRING_TO_JSVAL(name) };
+  jsval descriptor = JSVAL_VOID;
+  if (!js_ReflectGetOwnPropertyDescriptor(cx, nsnull, 2, args + 2, &descriptor))
+    return JS_FALSE;
+  *present = !JSVAL_IS_VOID(descriptor);
+  *value = JSVAL_VOID;
+  return !*present || JS_GetProperty(cx, JSVAL_TO_OBJECT(descriptor), "value", value);
+}
+
+static JSBool
+DOMDatasetOperationImpl(JSContext* cx, JSObject* handler, uintN argc,
+                        jsval* argv, jsval* rval, DOMDatasetOperation operation)
+{
+  nsCOMPtr<nsIContent> content;
+  if (!DOMDatasetContent(cx, handler, content)) return JS_FALSE;
+  jsval self;
+  if (!JS_GetReservedSlot(cx, handler, 1, &self)) return JS_FALSE;
+  if (operation == DATASET_EXTENSIBLE || operation == DATASET_PREVENT) {
+    *rval = BOOLEAN_TO_JSVAL(operation == DATASET_EXTENSIBLE);
+    return JS_TRUE;
+  }
+  if (operation == DATASET_GET_PROTO)
+    return js_ReflectGetPrototypeOf(cx, handler, argc, argv, rval);
+  if (operation == DATASET_SET_PROTO) {
+    JSObject* cursor = JSVAL_TO_OBJECT(argv[1]);
+    while (cursor) {
+      if (OBJECT_TO_JSVAL(cursor) == self) { *rval = JSVAL_FALSE; return JS_TRUE; }
+      if (JS_GET_CLASS(cx, cursor) == &sDOMDatasetClass) {
+        jsval backing;
+        if (!JS_GetReservedSlot(cx, cursor, 0, &backing)) return JS_FALSE;
+        cursor = JS_GetPrototype(cx, JSVAL_TO_OBJECT(backing));
+      } else {
+        if (!OBJ_IS_NATIVE(cursor)) break;
+        cursor = JS_GetPrototype(cx, cursor);
+      }
+    }
+    return js_ReflectSetPrototypeOf(cx, handler, argc, argv, rval);
+  }
+  if (operation == DATASET_KEYS) {
+    JSObject* keys = JS_NewArrayObject(cx, 0, nsnull);
+    if (!keys) return JS_FALSE;
+    jsuint index = 0;
+    for (PRUint32 i = 0; i < content->GetAttrCount(); ++i) {
+      nsCOMPtr<nsIAtom> atom;
+      nsAutoString property;
+      if (!DOMDatasetNameAt(content, i, atom, property)) continue;
+      JSString* key = JS_NewUCStringCopyN(cx, property.get(), property.Length());
+      if (!key) return JS_FALSE;
+      jsval value = STRING_TO_JSVAL(key);
+      if (!JS_DefineElement(cx, keys, index++, value, nsnull, nsnull, JSPROP_ENUMERATE))
+        return JS_FALSE;
+    }
+    jsval ordinary;
+    if (!js_ReflectOwnKeys(cx, handler, argc, argv, &ordinary)) return JS_FALSE;
+    jsuint length;
+    if (!JS_GetArrayLength(cx, JSVAL_TO_OBJECT(ordinary), &length)) return JS_FALSE;
+    for (jsuint i = 0; i < length; ++i) {
+      jsval value;
+      if (!JS_GetElement(cx, JSVAL_TO_OBJECT(ordinary), i, &value) ||
+          !JS_DefineElement(cx, keys, index++, value, nsnull, nsnull, JSPROP_ENUMERATE))
+        return JS_FALSE;
+    }
+    *rval = OBJECT_TO_JSVAL(keys);
+    return JS_TRUE;
+  }
+  JSBool named = JSVAL_IS_STRING(argv[1]);
+  if (operation == DATASET_SET) {
+    if (named && argv[3] == self) {
+      if (!DOMDatasetWrite(cx, handler, JSVAL_TO_STRING(argv[1]), argv[2])) return JS_FALSE;
+      *rval = JSVAL_TRUE; return JS_TRUE;
+    }
+    return js_ReflectSet(cx, handler, argc, argv, rval);
+  }
+  if (operation == DATASET_DEFINE) {
+    if (!named) return js_ReflectDefineProperty(cx, handler, argc, argv, rval);
+    JSBool hasValue, hasWritable;
+    jsval value, writable;
+    if (!DOMDatasetDescriptorField(cx, argv, "value", &hasValue, &value) ||
+        !DOMDatasetDescriptorField(cx, argv, "writable", &hasWritable, &writable))
+      return JS_FALSE;
+    if (!hasValue && !hasWritable) { *rval = JSVAL_FALSE; return JS_TRUE; }
+    if (!DOMDatasetWrite(cx, handler, JSVAL_TO_STRING(argv[1]), value)) return JS_FALSE;
+    *rval = JSVAL_TRUE; return JS_TRUE;
+  }
+  nsCOMPtr<nsIAtom> atom;
+  if (named && DOMDatasetFind(content, JSVAL_TO_STRING(argv[1]), atom)) {
+    if (operation == DATASET_HAS) { *rval = JSVAL_TRUE; return JS_TRUE; }
+    if (operation == DATASET_DELETE) {
+      nsresult rv = content->UnsetAttr(kNameSpaceID_None, atom, PR_TRUE);
+      if (NS_FAILED(rv)) { nsDOMClassInfo::ThrowJSException(cx, rv); return JS_FALSE; }
+      *rval = JSVAL_TRUE; return JS_TRUE;
+    }
+    nsAutoString value;
+    content->GetAttr(kNameSpaceID_None, atom, value);
+    JSString* string = JS_NewUCStringCopyN(cx, value.get(), value.Length());
+    if (!string) return JS_FALSE;
+    if (operation == DATASET_GET) { *rval = STRING_TO_JSVAL(string); return JS_TRUE; }
+    JSObject* descriptor = JS_NewObject(cx, nsnull, nsnull, JS_GetGlobalObject(cx));
+    if (!descriptor || !JS_SetPrototype(cx, descriptor, nsnull) ||
+        !JS_DefineProperty(cx, descriptor, "value", STRING_TO_JSVAL(string), nsnull, nsnull, JSPROP_ENUMERATE) ||
+        !JS_DefineProperty(cx, descriptor, "writable", JSVAL_TRUE, nsnull, nsnull, JSPROP_ENUMERATE) ||
+        !JS_DefineProperty(cx, descriptor, "enumerable", JSVAL_TRUE, nsnull, nsnull, JSPROP_ENUMERATE) ||
+        !JS_DefineProperty(cx, descriptor, "configurable", JSVAL_TRUE, nsnull, nsnull, JSPROP_ENUMERATE))
+      return JS_FALSE;
+    *rval = OBJECT_TO_JSVAL(descriptor); return JS_TRUE;
+  }
+  if (operation == DATASET_GET) return js_ReflectGet(cx, handler, argc, argv, rval);
+  if (operation == DATASET_DELETE) return js_ReflectDeleteProperty(cx, handler, argc, argv, rval);
+  if (operation == DATASET_DESCRIPTOR) return js_ReflectGetOwnPropertyDescriptor(cx, handler, argc, argv, rval);
+  jsid id;
+  JSObject* owner;
+  JSProperty* property;
+  if (!JS_ValueToId(cx, argv[1], &id) ||
+      !OBJ_LOOKUP_PROPERTY(cx, JSVAL_TO_OBJECT(argv[0]), id, &owner, &property)) return JS_FALSE;
+  *rval = BOOLEAN_TO_JSVAL(property != nsnull);
+  if (property) OBJ_DROP_PROPERTY(cx, owner, property);
+  return JS_TRUE;
+}
+
+#define DATASET_TRAP(name, operation) \
+static JSBool name(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* rval) { \
+  if (!JS_EnterLocalRootScope(cx)) return JS_FALSE; \
+  JSBool ok = DOMDatasetOperationImpl(cx, obj, argc, argv, rval, operation); \
+  JS_LeaveLocalRootScope(cx); return ok; \
+}
+DATASET_TRAP(DOMDatasetGet, DATASET_GET)
+DATASET_TRAP(DOMDatasetSet, DATASET_SET)
+DATASET_TRAP(DOMDatasetHas, DATASET_HAS)
+DATASET_TRAP(DOMDatasetDelete, DATASET_DELETE)
+DATASET_TRAP(DOMDatasetDefine, DATASET_DEFINE)
+DATASET_TRAP(DOMDatasetDescriptor, DATASET_DESCRIPTOR)
+DATASET_TRAP(DOMDatasetKeys, DATASET_KEYS)
+DATASET_TRAP(DOMDatasetGetProto, DATASET_GET_PROTO)
+DATASET_TRAP(DOMDatasetSetProto, DATASET_SET_PROTO)
+DATASET_TRAP(DOMDatasetExtensible, DATASET_EXTENSIBLE)
+DATASET_TRAP(DOMDatasetPrevent, DATASET_PREVENT)
+#undef DATASET_TRAP
+
+static JSFunctionSpec sDOMDatasetFunctions[] = {
+  { "get", DOMDatasetGet, 3, 0, 0 },
+  { "set", DOMDatasetSet, 4, 0, 0 },
+  { "has", DOMDatasetHas, 2, 0, 0 },
+  { "deleteProperty", DOMDatasetDelete, 2, 0, 0 },
+  { "defineProperty", DOMDatasetDefine, 3, 0, 0 },
+  { "getOwnPropertyDescriptor", DOMDatasetDescriptor, 2, 0, 0 },
+  { "ownKeys", DOMDatasetKeys, 1, 0, 0 },
+  { "getPrototypeOf", DOMDatasetGetProto, 1, 0, 0 },
+  { "setPrototypeOf", DOMDatasetSetProto, 2, 0, 0 },
+  { "isExtensible", DOMDatasetExtensible, 1, 0, 0 },
+  { "preventExtensions", DOMDatasetPrevent, 1, 0, 0 },
+  { 0, 0, 0, 0, 0 }
+};
+
+static JSObject*
+DOMCreateDataset(JSContext* cx, JSObject* parent, JSObject* element)
+{
+  if (!JS_EnterLocalRootScope(cx)) return nsnull;
+  JSObject* dataset = nsnull;
+  JSObject* backing = JS_NewObject(cx, nsnull, nsnull, parent);
+  JSObject* handler = JS_NewObject(cx, &sDOMDatasetHandlerClass, nsnull, parent);
+  if (backing && handler && JS_SetPrototype(cx, handler, nsnull) &&
+      JS_SetReservedSlot(cx, handler, 0, OBJECT_TO_JSVAL(element)) &&
+      JS_DefineFunctions(cx, handler, sDOMDatasetFunctions)) {
+    dataset = JS_NewHostObject(cx, &sDOMDatasetClass, backing, handler, parent);
+    if (dataset && !JS_SetReservedSlot(cx, handler, 1, OBJECT_TO_JSVAL(dataset))) dataset = nsnull;
+  }
+  JS_LeaveLocalRootScopeWithResult(cx, OBJECT_TO_JSVAL(dataset));
   return dataset;
 }
 
@@ -8707,7 +8952,7 @@ nsElementSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
 
       nsCOMPtr<nsIContent> content(do_QueryWrappedNative(wrapper));
       NS_ENSURE_TRUE(content, NS_ERROR_UNEXPECTED);
-      JSObject *dataset = DOMCreateDataset(cx, JS_GetParent(cx, obj), content);
+      JSObject *dataset = DOMCreateDataset(cx, JS_GetParent(cx, obj), obj);
       if (!dataset) return NS_ERROR_OUT_OF_MEMORY;
       if (!JS_DefineProperty(cx, obj, "dataset", OBJECT_TO_JSVAL(dataset),
                              nsnull, nsnull, JSPROP_ENUMERATE | JSPROP_READONLY))

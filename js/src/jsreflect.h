@@ -8,7 +8,7 @@ extern JSBool js_EnumerateHostObject(JSContext *cx, JSObject *target,
 extern JSClass js_ReflectClass;
 extern JSObject *js_InitReflectClass(JSContext *cx, JSObject *global);
 #define REFLECT_NATIVE(name) \
-extern JSBool name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
+extern JS_FRIEND_API(JSBool) name(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 REFLECT_NATIVE(js_ReflectDefineProperty);
 REFLECT_NATIVE(js_ReflectDeleteProperty);
 REFLECT_NATIVE(js_ReflectEnumerate);

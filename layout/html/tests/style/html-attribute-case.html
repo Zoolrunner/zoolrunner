@@ -1,0 +1,30 @@
+<!doctype html><title>HTML attribute ASCII case folding</title><pre id="results"></pre><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,label){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+label+' actual='+String(a)+' expected='+String(b));}
+try{
+ var e=document.createElement('div');
+ e.setAttribute('DATA-\u00c9','upper');
+ check(e.attributes[0].name,'data-\u00c9','only ASCII attribute characters lowercased');
+ check(e.getAttribute('data-\u00c9'),'upper','non ASCII uppercase retrieved');
+ check(e.getAttribute('DATA-\u00c9'),'upper','ASCII lookup insensitive');
+ check(e.hasAttribute('DATA-\u00c9'),true,'ASCII hasAttribute insensitive');
+ check(e.getAttribute('data-\u00e9'),null,'non ASCII lowercase remains distinct');
+ check(e.hasAttribute('data-\u00e9'),false,'non ASCII hasAttribute remains distinct');
+ e.setAttribute('data-\u00e9','lower');
+ check(e.attributes.length,2,'distinct non ASCII attributes coexist');
+ check(e.getAttribute('data-\u00c9'),'upper','lowercase insertion preserves uppercase value');
+ check(e.getAttribute('data-\u00e9'),'lower','lowercase value independently retrievable');
+ e.setAttribute('DATA-\u00c9','updated');
+ check(e.attributes.length,2,'ASCII alias replaces existing attribute');
+ check(e.getAttribute('data-\u00c9'),'updated','ASCII alias updates correct value');
+ e.removeAttribute('DATA-\u00e9');
+ check(e.hasAttribute('data-\u00e9'),false,'ASCII alias removes lowercase attribute');
+ check(e.getAttribute('data-\u00c9'),'updated','removal preserves distinct uppercase attribute');
+ var xml=document.implementation.createDocument('http://www.w3.org/1999/xhtml','div',null).documentElement;
+ xml.setAttribute('DATA-X','upper');xml.setAttribute('data-x','lower');
+ check(xml.attributes.length,2,'XML ASCII attribute case remains distinct');
+ check(xml.getAttribute('DATA-X'),'upper','XML uppercase lookup preserved');
+ check(xml.getAttribute('data-x'),'lower','XML lowercase lookup preserved');
+}catch(e){check(String(e),'no exception','unexpected exception');}
+document.getElementById('results').textContent=JSON.stringify({failures:testFailures,results:testResults});testDone=true;
+</script>

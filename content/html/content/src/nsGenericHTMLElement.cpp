@@ -362,6 +362,20 @@ nsGenericHTMLElement::GetTagName(nsAString& aTagName)
   return GetNodeName(aTagName);
 }
 
+// HTML attribute names are ASCII case-insensitive. Unicode case folding
+// would merge distinct custom attributes (for example data-É and data-é).
+static void
+LowerCaseHTMLAttributeName(nsAString& aName)
+{
+  nsAString::iterator current, end;
+  aName.BeginWriting(current);
+  aName.EndWriting(end);
+  for (; current != end; ++current) {
+    if (*current >= 'A' && *current <= 'Z')
+      *current += 'a' - 'A';
+  }
+}
+
 NS_IMETHODIMP
 nsGenericHTMLElement::SetAttribute(const nsAString& aName,
                                    const nsAString& aValue)
@@ -374,8 +388,8 @@ nsGenericHTMLElement::SetAttribute(const nsAString& aName,
 
     nsCOMPtr<nsIAtom> nameAtom;
     if (mNodeInfo->NamespaceEquals(kNameSpaceID_None)) {
-      nsAutoString lower;
-      ToLowerCase(aName, lower);
+      nsAutoString lower(aName);
+      LowerCaseHTMLAttributeName(lower);
       nameAtom = do_GetAtom(lower);
     }
     else {
@@ -4227,8 +4241,8 @@ const nsAttrName*
 nsGenericHTMLElement::InternalGetExistingAttrNameFromQName(const nsAString& aStr) const
 {
   if (mNodeInfo->NamespaceEquals(kNameSpaceID_None)) {
-    nsAutoString lower;
-    ToLowerCase(aStr, lower);
+    nsAutoString lower(aStr);
+    LowerCaseHTMLAttributeName(lower);
     return mAttrsAndChildren.GetExistingAttrNameFromQName(
       NS_ConvertUTF16toUTF8(lower));
   }

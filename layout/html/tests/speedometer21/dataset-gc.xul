@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        onload="run()" width="300" height="100">
+<script type="application/javascript;version=2015"><![CDATA[
+var checks=[],failures=0;
+function check(a,b,label){if(a!==b)++failures;checks.push((a===b?'PASS ':'FAIL ')+label);}
+function run(){
+ var C=Components.classes,I=Components.interfaces;
+ var debuggerService=C['@mozilla.org/js/jsd/debugger-service;1'].getService(I.jsdIDebuggerService);
+ debuggerService.on();
+ function fresh(){return document.createElementNS('http://www.w3.org/1999/xhtml','div');}
+ try{
+  var dataset=(function(){var element=fresh();element.setAttribute('data-item','initial');return element.dataset;})();
+  debuggerService.GC();check(dataset.item,'initial','retained dataset keeps detached element');
+  dataset.item={toString:function(){debuggerService.GC();return 'converted';}};
+  check(dataset.item,'converted','write survives collection during conversion');
+  check(Object.getOwnPropertyDescriptor(dataset,'item').value,'converted','live descriptor after collection');
+  var key=Symbol('retained'),marker={};dataset[key]=marker;debuggerService.GC();
+  check(dataset[key],marker,'symbol value retained without string conversion');
+  check(Object.getOwnPropertySymbols(dataset)[0],key,'symbol key retained');
+  var element=fresh(),other=element.dataset;
+  other.item={toString:function(){element.setAttribute('data-during','callback');debuggerService.GC();return 'after';}};
+  check(other.during,'callback','reentrant attribute survives collection');
+  check(element.getAttribute('data-item'),'after','conversion result reflected');
+  check(Object.keys(other).join(','),'during,item','reentrant insertion order');
+  element=null;debuggerService.GC();
+  check(other.item,'after','element wrapper survives dropping direct reference');
+  delete other.item;debuggerService.GC();check(other.item,undefined,'attribute deletion survives collection');
+  check(Object.keys(other).join(','),'during','deleted key stays absent after collection');
+  var ephemeral=fresh().dataset;
+  check(Reflect.defineProperty(ephemeral,'item',{value:{toString:function(){ephemeral=null;debuggerService.GC();return 'temporary';}}}),true,'definition retains receiver after last script reference is dropped');
+  var thrown=null;try{dataset.failed={toString:function(){debuggerService.GC();throw marker;}};}catch(e){thrown=e;}
+  check(thrown,marker,'conversion exception survives collection');
+  check('failed' in dataset,false,'throwing conversion leaves attribute absent');
+  var receiver={},prototype={};Object.defineProperty(prototype,'probe',{get:function(){debuggerService.GC();return this;}});
+  Object.setPrototypeOf(other,prototype);
+  check(Reflect.get(other,'probe',receiver),receiver,'prototype getter receiver survives collection');
+ }catch(e){check(String(e),'no exception','unexpected exception');}
+ finally{debuggerService.off();}
+ dump('DATASET-GC checks='+checks.length+' failures='+failures+'\n');
+ dump('SPEEDOMETER-RESULT '+JSON.stringify({pass:failures===0,detail:{failures:failures,results:checks}})+'\n');
+ C['@mozilla.org/toolkit/app-startup;1'].getService(I.nsIAppStartup).quit(3);
+}
+]]></script></window>

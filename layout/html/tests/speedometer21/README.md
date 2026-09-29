@@ -889,3 +889,35 @@ and Xlib package checks, including 11,540 ES5.1 and 28,582 selected ES2015 cases
 on each backend, 35 new native host-object assertions, and existing application
 checks. Reports are `host-package-suite-{gtk2,xlib}/logs`; these packages precede
 the live DOM dataset binding and do not resolve its conformance gaps.
+
+### Live dataset binding, first native pass
+
+The native binding now passes all 47 `dataset-live.html` assertions, all sixteen
+`html-attribute-case.html` assertions and fifteen GC/reentrancy checks in
+`dataset-gc.xul` on GTK2 Suite. The combined content regression sequence passes
+1,048 checks (the preceding 985 plus the 47 dataset and sixteen attribute-name
+checks). Reports are `dataset-native-gtk2-*` and `dataset-suite-gtk2-content.json`.
+HTML attribute creation and lookup now fold ASCII letters only, preserving
+distinct non-ASCII names. Chromium 148 also passes the sixteen attribute tests.
+
+The binding traces its element wrapper, reads names and values from the current
+attribute list, reflects writes/deletes, handles data descriptors through the
+named setter, preserves raw symbol values and alternate receivers, and refuses
+preventExtensions. Native forwarding uses engine Reflect entry points rather
+than replaceable JavaScript methods. Explicit GC during coercion, exceptions,
+prototype getters and loss of the last script reference preserves the receiver.
+
+This remains incomplete: `dataset-descriptors.html` reaches 33 assertions with
+two failures because DOMStringMap's interface constructor/prototype is not yet
+installed. The old own-property cache for `element.dataset` also remains; the
+prototype accessor and complete SameObject behavior need further work. The
+current binding handles null-namespace attributes. Namespace interpretation,
+cross-window behavior and broader application validation remain open. These
+results must not be represented as complete Web IDL conformance.
+
+The initial binding build failed on a historical string API mismatch. Its
+launcher ran the previous component; those snapshot failures and the build log
+are retained in `dataset-initial-build-failure`, not counted as validation of
+the new binding. After the compile correction, two remaining liveness failures
+exposed Unicode attribute-name folding; those reports are retained separately
+in `dataset-before-ascii-attribute-fix`. No assertions were removed.

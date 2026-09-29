@@ -162,6 +162,7 @@ EXPORTS		= \
 		jsproto.tbl \
 		jsprvtd.h \
 		jspubtd.h \
+		jsreflect.h \
 		jsregexp.h \
 		jsscan.h \
 		jsscope.h \
