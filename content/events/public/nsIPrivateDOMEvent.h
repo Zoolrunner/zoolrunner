@@ -69,6 +69,8 @@ public:
   NS_IMETHOD SetTrusted(PRBool aTrusted)=0;
 };
 
+nsresult NS_NewDOMCustomEvent(nsIDOMEvent** aResult);
+
 nsresult
 NS_NewDOMEvent(nsIDOMEvent** aInstancePtrResult, nsPresContext* aPresContext, nsEvent *aEvent);
 nsresult

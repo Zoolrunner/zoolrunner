@@ -33,6 +33,14 @@ function poll() {
   if (done) return;
   try {
     var w = browser.contentWindow.wrappedJSObject || browser.contentWindow;
+    if (mode == 'probe' && w.testRequestGC) {
+      w.testRequestGC = false;
+      var debuggerService = C['@mozilla.org/js/jsd/debugger-service;1']
+        .getService(I.jsdIDebuggerService);
+      debuggerService.on();
+      try { debuggerService.GC(); } finally { debuggerService.off(); }
+      w.testGCDone = true;
+    }
     if (mode == 'probe' && w.testDone) {
       for (var i = 0; i < w.testResults.length; ++i)
         dump('SPEEDOMETER-PROBE ' + w.testResults[i] + '\n');

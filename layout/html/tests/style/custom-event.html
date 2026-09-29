@@ -1,0 +1,37 @@
+<!doctype html><html><head><title>CustomEvent regression</title></head><body><script>
+var testDone=false,testFailures=0,testResults=[];
+function check(a,b,n){var ok=a===b;if(!ok)++testFailures;testResults.push((ok?'PASS ':'FAIL ')+n+(ok?'':': '+a+' expected '+b));}
+window.onload=function(){try{
+ var e=new CustomEvent('sample');
+ check(e.type,'sample','type');check(e.detail,null,'default detail');
+ check(e.bubbles,false,'default bubbles');check(e.cancelable,false,'default cancelable');
+ check(e instanceof CustomEvent,true,'CustomEvent prototype');check(e instanceof Event,true,'Event prototype');
+ var object={payload:42};e=new CustomEvent('sample',{detail:object,bubbles:true,cancelable:true});
+ check(e.detail,object,'object detail identity');check(e.bubbles,true,'bubbles');check(e.cancelable,true,'cancelable');
+ var received;function listener(event){received=event.detail;event.initCustomEvent('ignored',false,false,null);}
+ document.body.addEventListener('sample',listener,false);document.body.dispatchEvent(e);document.body.removeEventListener('sample',listener,false);
+ check(received,object,'dispatch detail');check(e.type,'sample','init ignored during dispatch');check(e.detail,object,'detail retained during dispatch');
+ e.initCustomEvent('again',false,false,9);check(e.detail,9,'legacy initializer detail');check(e.type,'again','legacy initializer type');
+ check(e.bubbles,false,'reinit bubbles false');check(e.cancelable,false,'reinit cancelable false');
+ e.initCustomEvent('again',true,true,null);check(e.bubbles,true,'reinit bubbles true');check(e.cancelable,true,'reinit cancelable true');
+ check(e.detail,null,'explicit null detail');
+ check(new CustomEvent('x',{detail:undefined}).detail,null,'undefined dictionary default');
+ check(new CustomEvent('x',{detail:'text'}).detail,'text','string detail');
+ check(new CustomEvent('x',{detail:false}).detail,false,'boolean detail');
+ var order=[];new CustomEvent({toString:function(){order.push('type');return 'x';}},{get bubbles(){order.push('bubbles');return false;},get cancelable(){order.push('cancelable');return false;},get detail(){order.push('detail');return object;}});
+ check(order.join(','),'type,bubbles,cancelable,detail','dictionary conversion order');
+ var sentinel={},caught;try{new CustomEvent('x',{get detail(){throw sentinel;}});}catch(ex){caught=ex;}
+ check(caught,sentinel,'getter exception');
+ caught=null;try{new CustomEvent();}catch(ex){caught=ex.name;}check(caught,'TypeError','required type');
+ caught=null;try{new CustomEvent('x',1);}catch(ex){caught=ex.name;}check(caught,'TypeError','dictionary validation');
+ var legacy=document.createEvent('CustomEvent');check(legacy.detail,null,'createEvent default detail');
+ legacy.initCustomEvent('old',true,false,object);check(legacy.detail,object,'createEvent initializer');
+ window.retainedCustomEvent = new CustomEvent('gc',{detail:{value:71}});
+ window.testRequestGC=true;
+ setTimeout(function afterGC(){
+   if(!window.testGCDone){setTimeout(afterGC,50);return;}
+   check(window.retainedCustomEvent.detail.value,71,'object detail survives forced GC');
+   window.retainedCustomEvent=null;testDone=true;
+ },50);
+ }catch(ex){check(String(ex),'no exception','unexpected exception');testDone=true;}};
+</script></body></html>

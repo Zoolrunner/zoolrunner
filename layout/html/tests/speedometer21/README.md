@@ -129,3 +129,11 @@ positions, conversion order, existing node identity, inert scripts, table and
 XML contexts, malformed XML and standard exceptions. Historical XPCOM exception
 names remain unchanged; the new API supplies its standard exception name.
 Full benchmark completion remains pending.
+
+Native CustomEvent construction and `document.createEvent("CustomEvent")` now
+use an additive interface, leaving the historical `nsIDOMCustomEvent` unchanged.
+The Suite fixture passes 29 assertions, including object detail identity,
+reinitialization during/after dispatch and survival through forced garbage
+collection. Its GC step uses the Suite debugger service through the probe
+runner. Native roots preserve event data, but collection of cycles involving
+`detail` has not been validated and remains a lifecycle limitation to resolve.

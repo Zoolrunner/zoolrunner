@@ -1838,6 +1838,8 @@ nsEventListenerManager::CreateEvent(nsPresContext* aPresContext,
   }
 
   // And if we didn't get an event, check the type argument.
+  if (aEventType.LowerCaseEqualsLiteral("customevent"))
+    return NS_NewDOMCustomEvent(aDOMEvent);
 
   if (aEventType.LowerCaseEqualsLiteral("mouseevent") ||
       aEventType.LowerCaseEqualsLiteral("mouseevents") ||

@@ -1,0 +1,13 @@
+/* Modern CustomEvent data, without changing the historical custom-event IID. */
+#include "nsIDOMEvent.idl"
+%{C++
+#include "jsapi.h"
+%}
+native CustomEventJSValue(jsval);
+[scriptable, uuid(18bef5fb-e782-437e-ae35-9db233efcfe1)]
+interface nsIDOMCustomEvent2 : nsIDOMEvent
+{
+  [noscript] readonly attribute CustomEventJSValue detailValue;
+  [noscript] void initCustomEventValue(in DOMString type, in boolean bubbles,
+                       in boolean cancelable, in CustomEventJSValue detail);
+};

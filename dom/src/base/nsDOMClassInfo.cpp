@@ -226,6 +226,7 @@
 #include "nsIDOMSmartCardEvent.h"
 #include "nsIDOMXULCommandEvent.h"
 #include "nsIDOMPageTransitionEvent.h"
+#include "nsIDOMCustomEvent2.h"
 #include "nsIDOMNSDocumentStyle.h"
 #include "nsIDOMDocumentRange.h"
 #include "nsIDOMDocumentTraversal.h"
@@ -1113,6 +1114,8 @@ static nsDOMClassInfoData sClassInfoData[] = {
                            DOM_DEFAULT_SCRIPTABLE_FLAGS)
   NS_DEFINE_CLASSINFO_DATA(DOMRectList, nsDOMRectListSH,
                            ARRAY_SCRIPTABLE_FLAGS)
+  NS_DEFINE_CLASSINFO_DATA(CustomEvent, nsCustomEventSH,
+                           DOM_DEFAULT_SCRIPTABLE_FLAGS | nsIXPCScriptable::WANT_NEWRESOLVE)
 };
 
 // Objects that shuld be constructable through |new Name();|
@@ -2969,6 +2972,10 @@ nsDOMClassInfo::Init()
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMStorageEvent)
    DOM_CLASSINFO_MAP_END
  
+   DOM_CLASSINFO_MAP_BEGIN(CustomEvent, nsIDOMCustomEvent2)
+     DOM_CLASSINFO_MAP_ENTRY(nsIDOMCustomEvent2)
+     DOM_CLASSINFO_MAP_ENTRY(nsIDOMEvent)
+   DOM_CLASSINFO_MAP_END
    DOM_CLASSINFO_MAP_BEGIN(DOMRect, nsIDOMDOMRect)
      DOM_CLASSINFO_MAP_ENTRY(nsIDOMDOMRect)
    DOM_CLASSINFO_MAP_END
@@ -4507,9 +4514,74 @@ DOMConstructorTypeError(JSContext* cx, const char* aMessage)
   JS_LeaveLocalRootScope(cx);
 }
 
+static JSBool
+CustomEventDetail(JSContext* cx, JSObject* obj, jsval id, jsval* value)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj, getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMCustomEvent2> event = do_QueryWrappedNative(wrapper);
+  if (!event) {
+    DOMConstructorTypeError(cx, "CustomEvent detail requires a CustomEvent");
+    return JS_FALSE;
+  }
+  return NS_SUCCEEDED(event->GetDetailValue(value));
+}
+
+static JSBool
+InitCustomEvent(JSContext* cx, JSObject* obj, uintN argc, jsval* argv, jsval* value)
+{
+  nsCOMPtr<nsIXPConnectWrappedNative> wrapper;
+  nsContentUtils::XPConnect()->GetWrappedNativeOfJSObject(cx, obj, getter_AddRefs(wrapper));
+  nsCOMPtr<nsIDOMCustomEvent2> event = do_QueryWrappedNative(wrapper);
+  if (!event || !argc) {
+    DOMConstructorTypeError(cx, "initCustomEvent requires a CustomEvent and type");
+    return JS_FALSE;
+  }
+  JSString* type = JS_ValueToString(cx, argv[0]);
+  if (!type) return JS_FALSE;
+  argv[0] = STRING_TO_JSVAL(type);
+  JSBool bubbles = JS_FALSE, cancelable = JS_FALSE;
+  if ((argc > 1 && !JS_ValueToBoolean(cx, argv[1], &bubbles)) ||
+      (argc > 2 && !JS_ValueToBoolean(cx, argv[2], &cancelable)))
+    return JS_FALSE;
+  jsval detail = argc > 3 && !JSVAL_IS_VOID(argv[3]) ? argv[3] : JSVAL_NULL;
+  nsresult rv = event->InitCustomEventValue(nsDependentJSString(type), bubbles, cancelable, detail);
+  if (NS_FAILED(rv)) {
+    nsDOMClassInfo::ThrowJSException(cx, rv);
+    return JS_FALSE;
+  }
+  *value = JSVAL_VOID;
+  return JS_TRUE;
+}
+
+NS_IMETHODIMP
+nsCustomEventSH::NewResolve(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
+                            JSObject* obj, jsval id, PRUint32 flags,
+                            JSObject** objp, PRBool* retval)
+{
+  if (JSVAL_IS_STRING(id)) {
+    nsDependentJSString name(JSVAL_TO_STRING(id));
+    if (name.EqualsLiteral("detail")) {
+      if (!JS_DefineProperty(cx, obj, "detail", JSVAL_VOID, CustomEventDetail, nsnull,
+                             JSPROP_SHARED | JSPROP_READONLY | JSPROP_ENUMERATE))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
+    if (name.EqualsLiteral("initCustomEvent")) {
+      if (!JS_DefineFunction(cx, obj, "initCustomEvent", InitCustomEvent, 1, JSPROP_ENUMERATE))
+        return NS_ERROR_FAILURE;
+      *objp = obj;
+      return NS_OK;
+    }
+  }
+  return nsDOMGenericSH::NewResolve(wrapper, cx, obj, id, flags, objp, retval);
+}
+
 static nsresult
 ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
-                  uintN argc, jsval* argv, jsval* rval, PRBool* aOK)
+                  uintN argc, jsval* argv, jsval* rval, PRBool* aOK,
+                  PRBool aCustom = PR_FALSE)
 {
   *aOK = PR_FALSE;
   if (!argc) {
@@ -4522,6 +4594,7 @@ ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
   argv[0] = STRING_TO_JSVAL(type);
 
   JSBool bubbles = JS_FALSE, cancelable = JS_FALSE;
+  jsval detail = JSVAL_NULL;
   if (argc > 1 && !JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
     if (JSVAL_IS_PRIMITIVE(argv[1])) {
       DOMConstructorTypeError(cx, "Event options must be a dictionary");
@@ -4534,14 +4607,28 @@ ConstructDOMEvent(nsIWeakReference* aWeakOwner, JSContext* cx,
         !JS_GetProperty(cx, options, "cancelable", &value) ||
         !JS_ValueToBoolean(cx, value, &cancelable))
       return NS_OK;
+    if (aCustom) {
+      if (!JS_GetProperty(cx, options, "detail", &value))
+        return NS_OK;
+      if (JSVAL_IS_VOID(value)) value = JSVAL_NULL;
+      detail = value;
+      // Root the last dictionary member across native allocation and wrapping.
+      argv[1] = detail;
+    }
   }
 
   nsCOMPtr<nsIScriptGlobalObject> owner = do_QueryReferent(aWeakOwner);
   NS_ENSURE_STATE(owner && owner->GetGlobalJSObject());
   nsCOMPtr<nsIDOMEvent> event;
-  nsresult rv = NS_NewDOMEvent(getter_AddRefs(event), nsnull, nsnull);
+  nsresult rv = aCustom ? NS_NewDOMCustomEvent(getter_AddRefs(event)) :
+                         NS_NewDOMEvent(getter_AddRefs(event), nsnull, nsnull);
   NS_ENSURE_SUCCESS(rv, rv);
-  rv = event->InitEvent(nsDependentJSString(type), bubbles, cancelable);
+  if (aCustom) {
+    nsCOMPtr<nsIDOMCustomEvent2> custom = do_QueryInterface(event);
+    rv = custom->InitCustomEventValue(nsDependentJSString(type), bubbles, cancelable, detail);
+  } else {
+    rv = event->InitEvent(nsDependentJSString(type), bubbles, cancelable);
+  }
   NS_ENSURE_SUCCESS(rv, rv);
   nsCOMPtr<nsIXPConnectJSObjectHolder> holder;
   rv = nsDOMGenericSH::WrapNative(cx, owner->GetGlobalJSObject(), event,
@@ -4799,6 +4886,9 @@ nsDOMConstructor::Construct(nsIXPConnectWrappedNative *wrapper, JSContext * cx,
     NS_ERROR("Name isn't in hash.");
     return NS_ERROR_UNEXPECTED;
   }
+
+  if (nsDependentString(mClassName).EqualsLiteral("CustomEvent"))
+    return ConstructDOMEvent(mWeakOwner, cx, argc, argv, vp, _retval, PR_TRUE);
 
   if (nsDependentString(mClassName).EqualsLiteral("Event"))
     return ConstructDOMEvent(mWeakOwner, cx, argc, argv, vp, _retval);

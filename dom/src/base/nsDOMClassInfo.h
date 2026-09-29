@@ -404,6 +404,19 @@ public:
 
 typedef nsDOMClassInfo nsDOMGenericSH;
 
+class nsCustomEventSH : public nsDOMGenericSH
+{
+protected:
+  nsCustomEventSH(nsDOMClassInfoData* aData) : nsDOMGenericSH(aData) {}
+public:
+  NS_IMETHOD NewResolve(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
+                        JSObject* obj, jsval id, PRUint32 flags,
+                        JSObject** objp, PRBool* retval);
+  static nsIClassInfo* doCreate(nsDOMClassInfoData* data)
+  { return new nsCustomEventSH(data); }
+};
+
+
 // Scriptable helper for implementations of nsIDOMGCParticipant that
 // need a mark callback.
 class nsDOMGCParticipantSH : public nsDOMGenericSH

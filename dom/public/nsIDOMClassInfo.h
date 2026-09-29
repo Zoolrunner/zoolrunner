@@ -370,6 +370,7 @@ enum nsDOMClassInfoID {
 
   eDOMClassInfo_DOMRect_id,
   eDOMClassInfo_DOMRectList_id,
+  eDOMClassInfo_CustomEvent_id,
 
   // This one better be the last one in this list
   eDOMClassInfoIDCount
