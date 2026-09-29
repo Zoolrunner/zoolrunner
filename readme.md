@@ -234,8 +234,9 @@ resize behavior. Passing parser or CSSOM assertions does not establish complete
 site rendering; layout and painting must also be inspected in Browser and Suite.
 
 Text-shadow grammar and computed inheritance now have focused coverage; native
-GTK2 Suite passes the thirty computed-value checks. Shadow painting remains
-unimplemented, and the follow-up application matrix is pending. See the
+GTK2 and Xlib Suite pass 32 computed-value checks and their broader integration
+sequences. Shadow painting remains unimplemented, and the follow-up application
+matrix is pending. See the
 [probe results](layout/html/tests/style/README-probes.md).
 
 Remaining gaps include flexbox sizing and alignment, multiple background layers,

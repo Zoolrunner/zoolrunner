@@ -402,3 +402,10 @@ Chromium, including fractional pixel values and negative-zero serialization.
 The original failure is `text-shadow-computed-xlib-fractional-failure.json`;
 the corrected result is `text-shadow-fractional-xlib.json`. Broader follow-up
 checks for this precision correction are still in progress.
+
+After 3c8c0eac, both Suite backends pass the expanded integration sequence:
+1,309 content assertions, 300 History, 274 HTTP, fifteen dataset GC and 24
+lifecycle assertions. See `text-shadow-fractional-suite-{gtk2,xlib}-*` and
+`text-shadow-fractional-package-suite-{gtk2,xlib}/integration-result.json`.
+The other applications are now rebuilding against this fixed revision; painting
+work is isolated in a separate worktree and is not included in these results.
