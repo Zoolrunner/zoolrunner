@@ -79,7 +79,7 @@ try {
     var chrome = file(profile.path + '\\chrome');
     if (!chrome.exists()) chrome.create(I.nsIFile.DIRECTORY_TYPE, 0700);
     write(chrome.path + '\\chrome.rdf', '<?xml version="1.0"?><RDF:RDF xmlns:RDF="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:c="http://www.mozilla.org/rdf/chrome#"><RDF:Seq RDF:about="urn:mozilla:package:root"><RDF:li RDF:resource="urn:mozilla:package:zooltest"/></RDF:Seq><RDF:Description RDF:about="urn:mozilla:package:zooltest" c:name="zooltest" c:locType="profile" c:baseURL="file:///C:/ZRREG916/tests/"/></RDF:RDF>', false);
-    var gui = [['application','APPLICATION PASS:'], ['window','WINDOW-BOOTSTRAP checks=17 failures=0'],
+    var gui = [['application','APPLICATION PASS:'], ['window','WINDOW-BOOTSTRAP checks=19 failures=0'],
                ['lifecycle','PLATFORM-LIFECYCLE checks=24 failures=0'], ['chatzilla','SUITE-CHATZILLA initialized=true']];
     for (i = 0; i < gui.length; ++i) {
         test = gui[i][0];

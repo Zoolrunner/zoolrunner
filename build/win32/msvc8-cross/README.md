@@ -250,8 +250,13 @@ MSVC 2005/CrossOver; the complete `nsDocument.cpp` also compiled on macOS arm64.
 The October 6 local Suite `act` run compiled `nsDocument.cpp` successfully,
 then exposed the same C2248 in `nsHTMLDocument.cpp`. The corrected title setter
 passed a full MSVC translation-unit compile in that workflow's object tree.
-These compile checks do not establish a complete Windows build or runtime pass;
-the remaining workflow stages still need validation.
+The hosted Suite run on `38dc635b` passed compilation, packaging and PE audit.
+Its window-bootstrap fixture passed all 19 assertions, including `console.assert`
+in chrome and content globals, but the Windows drivers still expected the older
+17-assertion summary. Both Suite and Toolkit drivers now require 19 assertions
+and zero failures; the separate Suite report still contains 17 test groups.
+The corrected runtime gate still needs a complete workflow rerun. Wine results
+do not establish runtime compatibility with original Windows installations.
 
 Calendar disables plugins and uses the plaintext-only editor. Libxul's library
 list and static module table must honor both settings: linking `gkplugin.lib`

@@ -353,7 +353,7 @@ MOZ_NO_REMOTE=1 obj-zoolrunner-macos-arm64-xulrunner/dist/bin/xulrunner-bin \
   "$PWD/js/tests/es5/window-app/application.ini" -profile "$profile"
 ```
 
-Require `WINDOW-BOOTSTRAP checks=17 failures=0`. The profile may contain runtime
+Require `WINDOW-BOOTSTRAP checks=19 failures=0`. The profile may contain runtime
 files; remove that temporary directory after inspecting results.
 
 Unmodified ChatZilla 0.9.86.1 initializes with its input widget in Suite and in a

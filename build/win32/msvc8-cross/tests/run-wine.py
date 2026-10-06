@@ -114,7 +114,7 @@ else:
                                            for k, v in prefs.items()))
     appname = re.search(r'^MOZ_APP_NAME\s*=\s*(\S+)', (obj / 'config/autoconf.mk').read_text(), re.M).group(1)
     for label, source, marker in [('application', code, 'APPLICATION PASS:'),
-                                   ('window', window, 'WINDOW-BOOTSTRAP checks=17 failures=0')]:
+                                   ('window', window, 'WINDOW-BOOTSTRAP checks=19 failures=0')]:
         result = logs / (label + '-result.log')
         logger = (scripts / 'tests/file-log.js').read_text().replace('LOGFILE', json.dumps(windows(result)))
         logger += '\nfunction dump(text) { zrWrite(text); }\n'
