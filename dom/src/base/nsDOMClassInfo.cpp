@@ -5717,8 +5717,9 @@ ConsoleLogArguments(JSContext *cx, uintN argc, jsval *argv, uintN firstArg,
     if (i != firstArg) {
       message.Append(PRUnichar(' '));
     }
-    message.Append(nsDependentString(::JS_GetStringChars(arg),
-                                     ::JS_GetStringLength(arg)));
+    message.Append(nsDependentString(
+      NS_REINTERPRET_CAST(const PRUnichar *, ::JS_GetStringChars(arg)),
+      ::JS_GetStringLength(arg)));
   }
 
   return consoleService->LogStringMessage(message.get());
@@ -6447,8 +6448,9 @@ nsWindowSH::GetComputedStyle(JSContext *cx, JSObject *obj, uintN argc,
   if (argc > 1 && !JSVAL_IS_NULL(argv[1]) && !JSVAL_IS_VOID(argv[1])) {
     JSString *str = JS_ValueToString(cx, argv[1]);
     if (!str) return JS_FALSE;
-    pseudo.Assign(nsDependentString(JS_GetStringChars(str),
-                                    JS_GetStringLength(str)));
+    pseudo.Assign(nsDependentString(
+      NS_REINTERPRET_CAST(const PRUnichar *, JS_GetStringChars(str)),
+      JS_GetStringLength(str)));
   }
 
   nsCOMPtr<nsIDOMCSSStyleDeclaration> style;
@@ -7962,7 +7964,9 @@ nsXMLHttpRequestSH::NewResolve(nsIXPConnectWrappedNative *wrapper,
     if (name.EqualsLiteral("onload") || name.EqualsLiteral("onerror") ||
         name.EqualsLiteral("onprogress") ||
         name.EqualsLiteral("onreadystatechange")) {
-      if (!JS_DefineUCProperty(cx, obj, name.get(), name.Length(), JSVAL_NULL,
+      if (!JS_DefineUCProperty(cx, obj,
+                              NS_REINTERPRET_CAST(const jschar *, name.get()),
+                              name.Length(), JSVAL_NULL,
                               GetHandler, SetHandler, JSPROP_ENUMERATE))
         return NS_ERROR_OUT_OF_MEMORY;
       *objp = obj;
@@ -8388,7 +8392,9 @@ DOMDatasetNameAt(nsIContent* content, PRUint32 index,
 static PRBool
 DOMDatasetFind(nsIContent* content, JSString* key, nsCOMPtr<nsIAtom>& atom)
 {
-  nsDependentString wanted(JS_GetStringChars(key), JS_GetStringLength(key));
+  nsDependentString wanted(
+    NS_REINTERPRET_CAST(const PRUnichar *, JS_GetStringChars(key)),
+    JS_GetStringLength(key));
   for (PRUint32 i = 0; i < content->GetAttrCount(); ++i) {
     nsAutoString property;
     if (DOMDatasetNameAt(content, i, atom, property) && property.Equals(wanted))
@@ -8405,7 +8411,9 @@ DOMDatasetWrite(JSContext* cx, JSObject* handler, JSString* key, jsval value)
   // the name. User conversion can mutate/adopt the associated element.
   JSString* string = JS_ValueToString(cx, value);
   if (!string) return JS_FALSE;
-  nsAutoString converted(JS_GetStringChars(string), JS_GetStringLength(string));
+  nsAutoString converted(
+    NS_REINTERPRET_CAST(const PRUnichar *, JS_GetStringChars(string)),
+    JS_GetStringLength(string));
   nsAutoString attribute(NS_LITERAL_STRING("data-"));
   const jschar* chars = JS_GetStringChars(key);
   size_t length = JS_GetStringLength(key);
@@ -8489,7 +8497,8 @@ DOMDatasetOperationImpl(JSContext* cx, JSObject* handler, uintN argc,
       nsCOMPtr<nsIAtom> atom;
       nsAutoString property;
       if (!DOMDatasetNameAt(content, i, atom, property)) continue;
-      JSString* key = JS_NewUCStringCopyN(cx, property.get(), property.Length());
+      JSString* key = JS_NewUCStringCopyN(cx,
+        NS_REINTERPRET_CAST(const jschar *, property.get()), property.Length());
       if (!key) return JS_FALSE;
       jsval value = STRING_TO_JSVAL(key);
       if (!JS_DefineElement(cx, keys, index++, value, nsnull, nsnull, JSPROP_ENUMERATE))
@@ -8537,7 +8546,8 @@ DOMDatasetOperationImpl(JSContext* cx, JSObject* handler, uintN argc,
     }
     nsAutoString value;
     content->GetAttr(kNameSpaceID_None, atom, value);
-    JSString* string = JS_NewUCStringCopyN(cx, value.get(), value.Length());
+    JSString* string = JS_NewUCStringCopyN(cx,
+      NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
     if (!string) return JS_FALSE;
     if (operation == DATASET_GET) { *rval = STRING_TO_JSVAL(string); return JS_TRUE; }
     JSObject* descriptor = JS_NewObject(cx, nsnull, nsnull, JS_GetGlobalObject(cx));
@@ -12248,7 +12258,8 @@ HistoryTraverse(JSContext* cx, JSObject* obj, uintN argc, jsval* argv,
     if (legacy) {
       if (!JSVAL_IS_INT(argv[0])) { *rval = JSVAL_VOID; return JS_TRUE; }
       delta = JSVAL_TO_INT(argv[0]);
-    } else if (!JS_ValueToECMAInt32(cx, argv[0], &delta)) {
+    } else if (!JS_ValueToECMAInt32(cx, argv[0],
+                                    NS_REINTERPRET_CAST(int32 *, &delta))) {
       return JS_FALSE;
     }
   }
@@ -12501,7 +12512,8 @@ LocalStorageMethod(JSContext* cx, JSObject* obj, uintN argc,
   if (operation == LocalGet || operation == LocalKey) {
     if (value.IsVoid()) *rval = JSVAL_NULL;
     else {
-      JSString* result = JS_NewUCStringCopyN(cx, value.get(), value.Length());
+      JSString* result = JS_NewUCStringCopyN(cx,
+        NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
       if (!result) return JS_FALSE;
       *rval = STRING_TO_JSVAL(result);
     }
@@ -12550,14 +12562,16 @@ nsStorageSH::GetProperty(nsIXPConnectWrappedNative* wrapper, JSContext* cx,
     return NS_OK;
   JSObject* proto = JS_GetPrototype(cx, obj);
   JSBool found;
-  if (proto && JS_HasUCProperty(cx, proto, key.get(), key.Length(), &found) && found)
+  if (proto && JS_HasUCProperty(cx, proto,
+      NS_REINTERPRET_CAST(const jschar *, key.get()), key.Length(), &found) && found)
     return NS_OK;
   nsAutoString value;
   nsresult rv = local->GetValue(key, value);
   NS_ENSURE_SUCCESS(rv, rv);
   *vp = JSVAL_VOID;
   if (!value.IsVoid()) {
-    JSString* result = JS_NewUCStringCopyN(cx, value.get(), value.Length());
+    JSString* result = JS_NewUCStringCopyN(cx,
+      NS_REINTERPRET_CAST(const jschar *, value.get()), value.Length());
     if (!result) return NS_ERROR_OUT_OF_MEMORY;
     *vp = STRING_TO_JSVAL(result);
   }
@@ -12597,7 +12611,8 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   JSBool hasProp;
 
   if (proto &&
-      (::JS_HasUCProperty(cx, proto, keyValue.get(),
+      (::JS_HasUCProperty(cx, proto,
+                          NS_REINTERPRET_CAST(const jschar *, keyValue.get()),
                           keyValue.Length(), &hasProp) &&
        hasProp)) {
     // We found the property we're resolving on the prototype,
@@ -12619,7 +12634,8 @@ nsStorageSH::NewResolve(nsIXPConnectWrappedNative *wrapper, JSContext *cx,
   NS_ENSURE_SUCCESS(rv, rv);
 
   if (item) {
-    if (!::JS_DefineUCProperty(cx, realObj, keyValue.get(),
+      if (!::JS_DefineUCProperty(cx, realObj,
+                               NS_REINTERPRET_CAST(const jschar *, keyValue.get()),
                                keyValue.Length(), JSVAL_VOID, nsnull,
                                nsnull, 0)) {
       return NS_ERROR_FAILURE;

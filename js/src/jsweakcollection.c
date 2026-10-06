@@ -10,6 +10,7 @@
 #include "jsobj.h"
 #include "jssymbol.h"
 #include "jsweakcollection.h"
+#include "jsiteres6.h"
 
 typedef struct JSWeakCollection {
     struct JSWeakCollection *next, *previous;
