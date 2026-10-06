@@ -1172,7 +1172,11 @@ nsHTMLDocument::SetTitle(const nsAString& aTitle)
   NS_ENSURE_TRUE(node, NS_ERROR_UNEXPECTED);
   // The historical XPIDL DOMString transport represents JS null as void.
   // Only modern created documents use the ordinary DOMString conversion.
-  return node->SetTextContent(aTitle.IsVoid() ? NS_LITERAL_STRING("null") : aTitle);
+  // Keep the string types out of a conditional expression: MSVC 2005
+  // otherwise attempts to copy the noncopyable nsAString base.
+  if (aTitle.IsVoid())
+    return node->SetTextContent(NS_LITERAL_STRING("null"));
+  return node->SetTextContent(aTitle);
 }
 
 nsresult
