@@ -1,7 +1,7 @@
 # ZoolRunner
 
 ZoolRunner is an updated and modernized platform for developing and running
-**XULRunner 1.8.1 / Mozilla 1.8.1 applications**. It continues RetroZilla,
+**XULRunner 1.8.1 / Mozilla 1.8.1 applications**. It is a fork of RetroZilla,
 which was derived from Mozilla 1.8.1.
 
 The goal is to keep applications and code from that era working while improving
