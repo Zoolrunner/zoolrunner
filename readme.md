@@ -6,7 +6,7 @@ which was derived from Mozilla 1.8.1.
 
 The goal is to keep applications and code from that era working while improving
 the implementation underneath: fixing bugs, updating dependencies and adding
-modern language, rendering and operating-system support. XUL, XBL, XPCOM,
+modern language, rendering and operating system support. XUL, XBL, XPCOM,
 XPConnect and the classic Mozilla application interfaces remain central to it.
 
 The primary goal is the **application platform**. The browser and full Mozilla
