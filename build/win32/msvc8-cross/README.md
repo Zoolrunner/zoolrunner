@@ -240,6 +240,15 @@ point. Building it as a separate `appcomps.dll` instead fails during compilation
 with a missing `dist/lib/xpcom.lib` prerequisite, before libxul is linked.
 All profiles use the static CRT and process-heap allocation support.
 
+The DOM selector parser uses explicit branches when converting a void DOMString
+to the literal `"null"`. MSVC 2005 rejects a conditional expression mixing
+`NS_LITERAL_STRING` and `const nsAString&` with C2248 because it attempts to
+copy the noncopyable string base. A focused compile using the production string
+headers reproduced the original error and passed with the branch form under
+MSVC 2005/CrossOver; the complete `nsDocument.cpp` also compiled on macOS arm64.
+These checks do not establish a complete Windows build or runtime pass for
+this correction; the Windows CI matrix still needs to be rerun.
+
 Calendar disables plugins and uses the plaintext-only editor. Libxul's library
 list and static module table must honor both settings: linking `gkplugin.lib`
 or `composer.lib` unconditionally requires archives that Calendar does not

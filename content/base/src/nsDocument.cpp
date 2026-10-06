@@ -2742,9 +2742,12 @@ ParseDOMSelectorList(nsIDocument* aDocument, const nsAString& aSelectors,
   if (aDocument)
     parser->SetCaseSensitive(aDocument->IsCaseSensitive());
   // XPConnect represents a null DOMString as void; selectors use ToString.
-  rv = parser->ParseSelectorString(aSelectors.IsVoid()
-                                   ? NS_LITERAL_STRING("null") : aSelectors,
-                                   &selectors);
+  // Avoid a conditional mixing nsAFlatString and nsAString: MSVC 2005
+  // attempts to invoke nsAString's private copy constructor.
+  if (aSelectors.IsVoid())
+    rv = parser->ParseSelectorString(NS_LITERAL_STRING("null"), &selectors);
+  else
+    rv = parser->ParseSelectorString(aSelectors, &selectors);
   if (rv == NS_ERROR_OUT_OF_MEMORY)
     return rv;
   if (NS_FAILED(rv))
