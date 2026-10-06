@@ -1,0 +1,363 @@
+# Platform reference and validation history
+
+[Build instructions](README.md)
+
+Preserved from the former build guide. Implementation details and results refer
+to their recorded revisions; later entries may supersede older status claims.
+Commands use the repository root unless stated otherwise.
+
+<details>
+<summary>Browse reference sections</summary>
+
+- [Toolchain layout](#toolchain-layout)
+- [Runtime selection](#runtime-selection)
+- [Building XULRunner or the Suite](#building-xulrunner-or-the-suite)
+- [PE audit](#pe-audit)
+- [Guest regression payload](#guest-regression-payload)
+- [Linux GitHub Actions builds](#linux-github-actions-builds)
+
+</details>
+
+# MSVC 2005 cross-build support
+
+Windows builds are made from a **Linux or macOS host**, using genuine
+**Microsoft Visual C++ 2005 (MSVC 8.0 / VC8)** tools through **Wine**. CrossOver
+is a supported Wine provider on macOS. This directory connects those tools to
+the existing Mozilla configure/make build; the wrappers are shared by both
+hosts, and only runtime discovery is host-sensitive.
+
+The minimum target operating systems are **Windows 95** and **Windows NT 4.0**.
+These are compatibility requirements; see [COMPATIBILITY.md](COMPATIBILITY.md)
+for actual validation results and unresolved runtime blockers.
+
+The target is Windows x86.  Programs needed while building remain native to
+the build host and use `HOST_CC`, `HOST_CXX`, `HOST_LD`, and `HOST_AR`.
+
+## Toolchain layout
+
+Set `MSVC8_ROOT` to the extracted toolchain root.  The installation used to
+develop this support contains:
+
+```text
+MSVC8_ROOT/
+  bin/                 cl.exe, link.exe, lib.exe, rc.exe, mt.exe, ml.exe
+  include/             Visual C++ and CRT headers
+  lib/                 Visual C++ and CRT libraries
+  atlmfc/include/
+  atlmfc/lib/
+  PlatformSDK/Bin/
+  PlatformSDK/Include/
+  PlatformSDK/Lib/
+  redist/x86/Microsoft.VC80.CRT/
+```
+
+The full Suite build requires the genuine Microsoft `midl.exe` and its
+`midlc.exe` companion.  They may be placed in either `bin` or
+`PlatformSDK/Bin`; the tested installation uses Microsoft MIDL 6.00.0366 from
+the Windows Server 2003 SP1 Platform SDK.  Configure detects this older target
+and supplies `-no_robust`, avoiding generated stubs which require Windows 2000.
+The XULRunner configuration does not currently build a MIDL-using component.
+
+The build does not use files from `redist`: target code uses the static
+multithreaded CRT (`/MT`, or `/MTd` for an actual debug build).
+
+The wrappers construct `INCLUDE`, `LIB`, and the Windows-side executable
+search path explicitly for every invocation.  No Visual Studio registration,
+`vcvars32.bat`, or persistent Wine-prefix modification is required.
+
+## Runtime selection
+
+The runtime launcher is selected in this order:
+
+1. `MSVC8_WINE`
+2. `WINE`
+3. `wine` on `PATH`
+4. the standard CrossOver application path on macOS
+
+For CrossOver, set `MSVC8_WINE_BOTTLE` when a particular bottle is required.
+`CX_BOTTLE` is also recognized.  Ordinary Wine ignores these CrossOver-only
+settings.
+
+Examples:
+
+```sh
+# macOS with CrossOver
+MSVC8_ROOT=/path/to/msvc8.0 \
+MSVC8_WINE=/Applications/CrossOver.app/Contents/SharedSupport/CrossOver/bin/wine \
+MSVC8_WINE_BOTTLE=MyBottle \
+build/win32/msvc8-cross/test-toolchain.sh
+
+# Linux with Wine from PATH
+MSVC8_ROOT=/path/to/msvc8.0 \
+WINE=wine \
+build/win32/msvc8-cross/test-toolchain.sh
+```
+
+The standalone test compiles and links a console program with genuine MSVC 8,
+checks that it is PE32 when host tools permit, rejects a VC80 DLL-runtime
+dependency, and runs it through the selected runtime.
+
+## Building XULRunner or the Suite
+
+Use the supplied mozconfig directly from the source root:
+
+```sh
+MSVC8_ROOT=/path/to/msvc8.0 \
+WINE=wine \
+MOZCONFIG=mozconfigs/cross/win32-msvc8-xulrunner.mozconfig \
+make -f client.mk build
+```
+
+For the complete Suite, select
+`mozconfigs/cross/win32-msvc8-suite.mozconfig` instead.  It uses eight make
+jobs.  For Windows 95/NT 4 testing, use the static-component aggregate config:
+
+```sh
+MSVC8_ROOT=/path/to/msvc8.0 \
+WINE=wine \
+MOZCONFIG=mozconfigs/cross/win32-msvc8-suite-legacy.mozconfig \
+make -f client.mk build
+
+package_dir=`mktemp -d /tmp/zoolrunner-package.XXXXXX` || exit 1
+make -C obj-zoolrunner-win32-msvc8-suite-legacy/xpinstall/packager dist \
+  MOZ_PKG_DEST="$package_dir" MOZ_PKG_APPNAME=zoolrunner
+```
+
+The legacy config builds normal XPCOM modules into `mozcomps.dll`.  It does
+not turn the Suite into one executable: NSPR, NSS, XPCOM, JavaScript, SQLite,
+LDAP, MAPI, plugins, and components that must remain separate still use their
+normal DLL boundaries.  Aggregation prevents a separate statically linked
+VC8 CRT in every small component DLL from exhausting the 64 process TLS slots
+available on Windows 95 and Windows NT 4.
+
+The bundled Expat entropy provider resolves `ADVAPI32!SystemFunction036`
+dynamically instead of calling the VC8 CRT `rand_s()` entry point.  VC8's
+`rand_s()` terminates the process through its invalid-parameter handler when
+that system entry point is absent, as it is on Windows 95 and Windows NT 4.
+Expat therefore keeps the same high-quality provider on newer Windows and
+uses its existing time/process fallback on the legacy systems.
+
+`mozcomps.dll` delegates component requests to the original generic modules
+inside the aggregate.  Their constructors remain lazy and independent, as in
+a normal component build; requesting one component does not eagerly initialize
+unrelated editor, parser, layout, networking, image, and application modules.
+
+On macOS, set `MSVC8_WINE` and optionally `MSVC8_WINE_BOTTLE` as shown above.
+The remaining command is identical.
+
+`--enable-static-rtl` selects `/MT` throughout the Mozilla target and the
+separately configured NSPR and NSS builds.  In addition, the compiler wrapper
+rejects `/MD` and `/MDd` whenever `MSVC8_REQUIRE_STATIC_RTL` is active.  This
+detects a third-party sub-build that attempts to reintroduce the DLL runtime
+instead of relying on option ordering.
+
+The legacy Suite config also enables `MSVC8_USE_PROCESS_HEAP`.  A small object
+linked into every target image implements the public CRT allocation entry
+points on top of the Win32 process heap.  This preserves `/MT` and avoids a
+VC80 runtime DLL while giving Mozilla's historically cross-DLL C and C++
+allocations one ownership domain.  Without it, each static LIBCMT copy owns a
+different private heap, so a buffer created in one Mozilla DLL can fail when
+another DLL releases it.
+
+The MSVC 8 manifest tool can parse and create manifests under current
+CrossOver but may fail while updating a PE resource.  When a linker-generated
+manifest exists, the shared linker wrapper embeds it with the genuine MSVC 8
+resource compiler and relinks with `/MANIFEST:NO`.  Set
+`MSVC8_EMBED_MANIFEST=0` only for diagnosis.  Static-CRT release binaries do
+not require the `Microsoft.VC80.CRT` private assembly.
+
+## PE audit
+
+After a build, audit all shipped executables and DLLs:
+
+```sh
+build/win32/msvc8-cross/audit-pe.sh \
+  obj-zoolrunner-win32-msvc8-xulrunner/dist/bin \
+  obj-zoolrunner-win32-msvc8-xulrunner/pe-imports.tsv
+```
+
+The audit follows the build's installation symlinks, fails on VC80 release or
+debug DLL-runtime imports and embedded VC80 CRT deployment references, checks
+that every image is x86 PE32, that PE OS/subsystem versions do not exceed 4.0,
+and rejects non-system DLL imports which are absent from the package.  It also
+lists every PE that imports `TlsAlloc` and rejects a payload with 64 or more
+such images.  It emits
+every imported API plus companion metadata and compatibility-review TSV files
+for independent Windows 95 and Windows NT 4 SP6a review.  Audit the staged
+package directory, not just `dist/bin`, so the report describes exactly what is
+shipped.  See
+COMPATIBILITY.md for the current status. Set `PE_OBJDUMP` if the host's
+`objdump` is not the desired PE-aware implementation.
+
+Path conversion is centralized in `msvc8-tool.pl`.  It converts native paths
+only in known path-bearing options and operands, including response files,
+instead of treating every slash as a path.  Wine's own `winepath` supplies the
+drive mapping, so the implementation does not assume that the host filesystem
+is mounted as `Z:`.
+
+## Guest regression payload
+
+The [Suite regression payload](tests/README.md) stages the existing JavaScript
+and GUI checks for legacy Windows VMs with a separate profile and saved logs.
+Run it against the audited aggregate package; host Wine execution alone does
+not establish NT4, Windows Me or Windows 2000 runtime compatibility.
+
+The aggregate build's `xpcshell` loads `mozcomps` at runtime and supplies its
+module table to XPCOM, matching Suite initialization without creating a clean
+build dependency cycle. In static MSVC CRT builds, the shell reads script files
+with its own CRT and passes source bytes to JSAPI; a `FILE*` cannot safely cross
+between the executable's and JavaScript DLL's independent CRTs. Both `-f` and
+`load()` follow this path. Inline `-e` scripts use the shell's script principal,
+as file scripts do, and evaluation failures return a failing exit status.
+
+Static packaging must retain the application-facing typelibs separately from
+`mozcomps.dll`. The Suite manifest includes startup, Composer, protocol and
+other enabled platform interfaces; their omission can leave a browser window
+working while breaking shutdown or other Suite applications. The payload
+checks required interfaces before running the GUI regressions.
+
+## Linux GitHub Actions builds
+
+`.github/workflows/windows.yml` builds **Suite, Browser, Calendar and
+XULRunner** as separate Windows x86 jobs on Ubuntu. The container uses genuine
+MSVC 2005 through Wine 11 WoW64; host tools use the native Linux compiler.
+The minimum target requirements remain **Windows 95 and Windows NT 4.0**.
+
+`fetch-toolchain.sh` downloads a pinned, SHA-256-checked snapshot of
+[widberg/msvc8.0](https://github.com/widberg/msvc8.0), plus the missing MIDL
+compiler from Microsoft's Windows Server 2003 SP1 Platform SDK. The image
+also pins WineHQ binary packages and verifies their hashes. No separately
+installed Visual Studio or GitHub toolchain action is required.
+
+To reproduce a job from the checkout root:
+
+```sh
+docker build --platform linux/amd64 \
+  -f build/win32/msvc8-cross/Dockerfile \
+  -t zoolrunner-msvc8-linux build/win32/msvc8-cross
+mkdir -p /tmp/zoolrunner-windows-suite
+docker run --rm --platform linux/amd64 \
+  --mount "type=bind,source=$PWD,target=/source,readonly" \
+  --mount "type=bind,source=/tmp/zoolrunner-windows-suite,target=/work" \
+  -e ZR_BUILD_JOBS=3 zoolrunner-msvc8-linux \
+  sh /source/build/win32/msvc8-cross/with-display.sh \
+  sh /source/build/win32/msvc8-cross/build-ci.sh suite /work/build
+```
+
+Use a new work directory for each build. Replace `suite` with `browser`,
+`calendar` or `xulrunner` as appropriate. Before starting Wine, the build script
+creates the configured `WINEPREFIX` (`/work/wine`) as the container user.
+GitHub's runner owns the bind-mounted `/work` directory; Wine refuses to create
+a missing prefix beneath that differently owned parent. Creating the prefix
+first leaves ownership of the host work directory unchanged.
+The build copies the source into the
+work directory, builds and packages the application, audits PE imports, and
+runs packaged native, JavaScript and application-window tests in Wine/Xvfb.
+Suite uses the aggregate component library; Toolkit applications use libxul.
+Calendar's `xpfe/components/build2` application component must declare
+`LIBXUL_LIBRARY` so it is archived into libxul with its translated module entry
+point. Building it as a separate `appcomps.dll` instead fails during compilation
+with a missing `dist/lib/xpcom.lib` prerequisite, before libxul is linked.
+All profiles use the static CRT and process-heap allocation support.
+
+The DOM selector parser and modern document-title setter use explicit branches
+when converting a void DOMString to the literal `"null"`. MSVC 2005 rejects a
+conditional expression mixing
+`NS_LITERAL_STRING` and `const nsAString&` with C2248 because it attempts to
+copy the noncopyable string base. A focused compile using the production string
+headers reproduced the original error and passed with the branch form under
+MSVC 2005/CrossOver; the complete `nsDocument.cpp` also compiled on macOS arm64.
+The October 6 local Suite `act` run compiled `nsDocument.cpp` successfully,
+then exposed the same C2248 in `nsHTMLDocument.cpp`. The corrected title setter
+passed a full MSVC translation-unit compile in that workflow's object tree.
+The hosted Suite run on `38dc635b` passed compilation, packaging and PE audit.
+Its window-bootstrap fixture passed all 19 assertions, including `console.assert`
+in chrome and content globals, but the Windows drivers still expected the older
+17-assertion summary. Both Suite and Toolkit drivers now require 19 assertions
+and zero failures; the separate Suite report still contains 17 test groups.
+The corrected runtime gate still needs a complete workflow rerun. Wine results
+do not establish runtime compatibility with original Windows installations.
+
+Calendar disables plugins and uses the plaintext-only editor. Libxul's library
+list and static module table must honor both settings: linking `gkplugin.lib`
+or `composer.lib` unconditionally requires archives that Calendar does not
+build. The matching module entries must also be omitted to avoid unresolved
+entry points. Windows plaintext builds name the editor archive `texteditor.lib`;
+libxul must select that name instead of `editor.lib`. The hosted Calendar job
+on `ad9b56f9` passed compilation, packaging and PE audit with this correction.
+
+Calendar also requires the top-level `js/` directory installed by its component
+and import/export makefiles. `calItemModule.js` loads scripts such as
+`js/calItemBase.js` from that directory; shipping only `components/` and chrome
+leaves the application incomplete. The Windows packager includes `js/` and
+resolves its build-tree symlinks. Run the host-only package regression with
+`python3 build/win32/msvc8-cross/tests/test-package.py`; it checks the component
+loader's script dependencies in both relocated staging and the ZIP. This
+package-content check does not establish Windows runtime success.
+
+Browser uses the bundled Platform SDK's `pstore.h` interface declarations and
+Mozilla smart pointers for the IE profile importer. It must not use MSVC's
+`#import` on a build-host `pstorec.dll`: Linux cross-build hosts have no Windows
+system directory or original Protected Storage type library. Runtime loading
+of the optional Windows DLL remains unchanged.
+
+If a build stops immediately after `Building deps for ...`, check the dependency
+scanner diagnostics before investigating the target compiler. Failed scans now
+print their diagnostics and retain an adjacent `.deps/*.pp.log`; they remove
+partial dependency files and stop the build. The host scanner's macro-expression
+diagnostics must track the expanded expression, not the original directive.
+The libpng chunk checks exposed this distinction during Linux XULRunner bring-up.
+Run `python3 config/mkdepend/test.py --sanitize` on a Linux or macOS host with
+ASan/UBSan support to check nested conditional-header selection and the bundled
+PNG dependency scan. `HOST_CC` selects the native compiler; omit `--sanitize`
+when those runtimes are unavailable. This tests dependency discovery, not PNG
+decoding or complete C-preprocessor conformance.
+
+Each job uploads its application ZIP and diagnostic logs. Wine regression
+results do not replace tests in Windows 95, NT 4.0 or other actual Windows
+installations. The Linux/Wine 11 toolchain has passed its compile/link/PE32/execution
+smoke test in an x86_64 Debian VM, including process-heap support. The GNU
+PE auditor also passes on the previously validated Suite package.
+
+The complete local Suite `act` workflow passed on 2026-09-17 using MSVC2005
+and Wine 11 inside the x86 Linux VM: compilation, package creation, PE audit,
+all 17 packaged regression groups and both artifact uploads passed. The GUI
+coverage includes application startup/navigation, 17 window-bootstrap checks,
+24 lifecycle checks and ChatZilla. The package, checksums and diagnostic logs
+are retained in `artifacts/windows-act-validation/suite-local-act`. The local
+artifact server uses the upload-v7 compatibility fixes; see the
+[act artifact-server note](../../../mozconfigs/macos/NOTES.md#act-artifact-server-limitation).
+These Wine results do not validate this new package on original Windows releases.
+
+[GitHub run 35222856488](https://github.com/Zoolrunner/zoolrunner/actions/runs/35222856488)
+on commit `0ff9397b` passed the complete Suite and XULRunner jobs. Browser
+failed importing the build-host Protected Storage type library, and Calendar
+failed linking the incorrectly named editor archive. Local validation now
+focuses on Browser and Calendar at the user's request; the full production
+matrix retains all four applications.
+
+Browser subsequently passed its complete local `act` workflow with the fixes
+from `cdd3f800`: compilation, package creation, PE audit, native and JavaScript
+regressions, browser chrome/navigation/error-page checks, all 17 window-bootstrap
+checks, and both artifact uploads. The fixes were applied to its running build
+before the affected directories compiled; a separate production-flags compile
+also checked the complete IE importer. Package SHA-256:
+`78a7c1b30aa3d459c2196eb0cd2e34790ba19a853c26bb31eda8f53a93c26a5f`.
+The package, logs and source-patch provenance are retained in
+`artifacts/windows-all-act-validation`. Calendar's local rerun was stopped at
+the user's request during compilation to use faster GitHub-hosted CI. Its
+Wine/toolchain checks passed, and the generated make configuration selected
+`texteditor` correctly. The complete corrected build, package and runtime
+results were subsequently checked in
+[GitHub run 35246186211](https://github.com/Zoolrunner/zoolrunner/actions/runs/35246186211):
+Suite, Browser and XULRunner passed; Calendar passed build/package/audit but
+failed runtime startup. Its application log reports missing
+`js/calItemBase.js`, followed by a Wine page fault/debugger wait. The corrected
+packager passes the local package-content regression; the complete Calendar
+runtime workflow still needs a hosted rerun.
+
+Windows builds select the host `mkdepend` tool's existing no-X11 mode.
+The successful hosted Suite/XULRunner jobs also verify the Wine-prefix ownership
+correction. On this Apple Silicon host, Wine failed under container CPU
+emulation, so local validation uses a full x86 Linux VM. This is a local testing
+requirement, not a requirement for native x86_64 Linux CI runners.

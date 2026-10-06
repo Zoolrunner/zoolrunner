@@ -3987,7 +3987,7 @@ matching the intentional header change. Fresh validation retains the complete
 fixture table. Linux now runs it and the full pinned ES2015 corpus inside the
 workflow, linking the five private-interface probes against production objects
 while public embedding probes continue to use the packaged shared library; see
-[Linux gate](../../../build/linux/README.md#es2015-regression-gate).
+[Linux gate](../../../build/linux/NOTES.md#es2015-regression-gate).
 
 The separate class-expression diagnostic retains 3,028 diagnostic passes and
 4,999 failures across 8,027 modes. Manual review of 25 original-tagged or

@@ -85,6 +85,10 @@ relevant reference (`DETAILS.md` for ES5, ES2015 and Speedometer); update status
 summaries instead of appending progress logs to entry pages. Preserve historical
 results with their revision and test scope. `docs/project-record.md` preserves
 the former root README; maintain dependency versions in `docs/dependencies.md`.
+Build guides cover prerequisites, configuration, compilation, packaging and
+build troubleshooting. Keep runtime-test procedures, validation matrices, bug
+investigations and progress logs in separate test guides or platform records
+(`NOTES.md` beside the build guides), linked from `docs/README.md`.
 
 ---
 

@@ -483,7 +483,7 @@ Linux 8's Python 3.6; this changes subprocess argument spelling, not test policy
 
 [Linux ARM conformance results](linux-aarch64-results.json) records validated
 commits, full-report hashes, package hashes and accompanying ABI/application
-checks. The [Linux guide](../../../build/linux/README.md#aarch64-bring-up)
+checks. The [Linux guide](../../../build/linux/NOTES.md#aarch64-bring-up)
 separates workflow checks from supplemental NSS/SQLite probes. These are local
 container results, not GitHub-hosted execution or exhaustive specification proof.
 

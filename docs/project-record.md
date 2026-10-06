@@ -86,7 +86,7 @@ up its compiler, SDK, and host dependencies:
 | Target | Build guide and requirements |
 | --- | --- |
 | Linux i686 / x86_64 | [Linux build guide](../build/linux/README.md): Oracle Linux 8 containers, GCC Toolset 14, GTK2 or Xlib |
-| Linux aarch64 | [Linux build guide](../build/linux/README.md#aarch64-bring-up): native Oracle Linux 8, GCC Toolset 14, GTK2 or Xlib |
+| Linux aarch64 | [Linux build guide](../build/linux/NOTES.md#aarch64-bring-up): native Oracle Linux 8, GCC Toolset 14, GTK2 or Xlib |
 | Linux LoongArch64 | [Checked-in profiles](../mozconfigs/linux/loongarch64): GCC, GTK2 or experimental Xlib |
 | macOS arm64 / x86_64 | [macOS build guide](../mozconfigs/macos/README.md): Clang, Cocoa, and **SDK 11.3** |
 | Mac OS X i386 | [i386 cross-build guide](../mozconfigs/macos/i386/README.md): SDK 10.4u for target code, SDK 11.3 for native host tools |
@@ -142,7 +142,7 @@ The linked guides retain the detailed test scope and reproduction procedures.
 | Mac OS X i386 | All four applications pass local `act` compilation and packaging checks with an explicit 10.4 deployment target. | Runtime compatibility is unverified; recorded artifact uploads encountered a local server limitation. |
 | Windows x86 | Suite and Browser pass complete local MSVC2005/Wine `act` workflows; Suite, Browser and XULRunner also pass the GitHub-hosted build, package, audit, runtime and upload jobs. A separate September 16 Suite package passes 17 regression groups in NT 4.0, Me, and 2000 guests. | The new Wine-tested package has not been revalidated on original Windows releases. Calendar passes hosted build/package/audit; its runtime rerun remains pending after fixing omitted JavaScript component files. Windows 95 blockers remain open; see the [Windows build guide](../build/win32/msvc8-cross/README.md). |
 | Linux LoongArch64 | Suite, Browser, Calendar and XULRunner pass all eight GTK2/Xlib native package gates at the recorded native dataset baseline, including pinned ES5.1/ES2015 checks. Full Speedometer 2.1 runs pass on both Suite backends. | Benchmark runs use the frozen revisions recorded in the Speedometer notes. DOM/CSS conformance remains incomplete; subsequent changes require separate validation. |
-| Linux aarch64 | All eight Suite/Browser/Calendar/XULRunner × GTK2/Xlib jobs pass local `act` compilation, packaging, runtime tests and uploads. Each passes all 11,540 pinned ES5.1 cases. | Native Oracle Linux 8 / GCC Toolset 14 containers; GitHub-hosted runs and other distributions remain unverified. See the [Linux guide](../build/linux/README.md#aarch64-bring-up). |
+| Linux aarch64 | All eight Suite/Browser/Calendar/XULRunner × GTK2/Xlib jobs pass local `act` compilation, packaging, runtime tests and uploads. Each passes all 11,540 pinned ES5.1 cases. | Native Oracle Linux 8 / GCC Toolset 14 containers; GitHub-hosted runs and other distributions remain unverified. See the [Linux guide](../build/linux/NOTES.md#aarch64-bring-up). |
 | Linux i686 / x86_64 | Suite passes all four local `act` build, ABI, package, runtime and upload jobs across GTK2/Xlib and both architectures. x86_64 GTK2 Browser and Calendar also pass complete local workflows. | Other application combinations and GitHub-hosted runs remain unverified. See the [Linux status](../build/linux/README.md). |
 
 Modern macOS profiles currently target 11.0 for arm64 and 10.6 for x86_64. The
@@ -237,7 +237,7 @@ Application compatibility is tested separately from language conformance:
 The [macOS packaged runtime tests](../build/macosx/tests/README.md) cover relocated
 applications, navigation, graphics, and these application regressions. Native
 input also needs its own checks: see the
-[startup keyboard regression](../mozconfigs/macos/arm64/README.md#startup-keyboard-regression)
+[startup keyboard regression](../mozconfigs/macos/arm64/NOTES.md#startup-keyboard-regression)
 for typing immediately after the first window opens, shortcuts, and reactivation.
 
 ## HTML and CSS compatibility
