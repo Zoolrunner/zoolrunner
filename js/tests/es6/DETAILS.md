@@ -1,0 +1,4608 @@
+# Detailed reference and validation history
+
+[Quick guide](README.md)
+
+This reference preserves the original instructions, implementation notes and
+validation reports. Read results in revision order: an older failure or pending
+check may have been resolved later, and a pass does not validate later changes.
+Commands run from the repository root.
+
+<details>
+<summary>Browse reference sections</summary>
+
+- [Later coverage diagnostics](#later-coverage-diagnostics)
+- [Reproducible initial baseline](#reproducible-initial-baseline)
+- [Implementation and compatibility gates](#implementation-and-compatibility-gates)
+- [Edition boundary validation (macOS arm64, 2026-09-17)](#edition-boundary-validation-macos-arm64-2026-09-17)
+- [Contextual keywords and declaration checks](#contextual-keywords-and-declaration-checks)
+- [Binary and octal numbers](#binary-and-octal-numbers)
+- [Modern function metadata and globals](#modern-function-metadata-and-globals)
+- [Immutable writes and extended operands](#immutable-writes-and-extended-operands)
+- [Inferred function names](#inferred-function-names)
+- [Integer Math operations and rounding](#integer-math-operations-and-rounding)
+- [Remaining ES2015 numeric Math methods](#remaining-es2015-numeric-math-methods)
+- [String code points, repetition, literal search and raw assembly](#string-code-points-repetition-literal-search-and-raw-assembly)
+- [Unicode normalization](#unicode-normalization)
+- [Array-like operations](#array-like-operations)
+- [Object additions and edition-specific reflection](#object-additions-and-edition-specific-reflection)
+- [Prototype mutation](#prototype-mutation)
+- [Realm intrinsics and literal construction](#realm-intrinsics-and-literal-construction)
+- [Array.of](#arrayof)
+- [Symbol primitives](#symbol-primitives)
+- [Symbol.match classification](#symbolmatch-classification)
+- [Fresh modern RegExp literals](#fresh-modern-regexp-literals)
+- [Symbol.hasInstance](#symbolhasinstance)
+- [Built-in Symbol.toStringTag properties](#built-in-symboltostringtag-properties)
+- [Array and String iterators](#array-and-string-iterators)
+- [Array.from](#arrayfrom)
+- [Symbol.unscopables](#symbolunscopables)
+- [Modern object-literal properties](#modern-object-literal-properties)
+- [Map and Set](#map-and-set)
+- [Weak collections](#weak-collections)
+- [Reflect](#reflect)
+- [Proxy](#proxy)
+- [Annex B built-ins](#annex-b-built-ins)
+- [RegExp prototype fields](#regexp-prototype-fields)
+- [RegExp match/search protocols](#regexp-matchsearch-protocols)
+- [RegExp constructors and sticky flags](#regexp-constructors-and-sticky-flags)
+- [RegExp and String split protocols](#regexp-and-string-split-protocols)
+- [RegExp and String replacement protocols](#regexp-and-string-replacement-protocols)
+- [Date conversion and prototype](#date-conversion-and-prototype)
+- [Array concat and species](#array-concat-and-species)
+- [Array callback methods](#array-callback-methods)
+- [Array indexed methods](#array-indexed-methods)
+- [Array string conversion and sorting](#array-string-conversion-and-sorting)
+- [Error construction and prototypes](#error-construction-and-prototypes)
+- [ArrayBuffer and DataView](#arraybuffer-and-dataview)
+- [Modern Unicode casing](#modern-unicode-casing)
+- [Modern Function invocation](#modern-function-invocation)
+- [Reflection key ordering and array realms](#reflection-key-ordering-and-array-realms)
+- [ECMAScript job queue foundation](#ecmascript-job-queue-foundation)
+- [Promise and application checkpoints](#promise-and-application-checkpoints)
+- [Function-environment new.target](#function-environment-newtarget)
+- [Property assignment references](#property-assignment-references)
+- [Identifier assignment references](#identifier-assignment-references)
+- [Template literals](#template-literals)
+- [Arrow functions](#arrow-functions)
+- [Rest parameters](#rest-parameters)
+- [Block lexical initialization](#block-lexical-initialization)
+- [Block const and per-iteration bindings](#block-const-and-per-iteration-bindings)
+- [Strict function declaration positions](#strict-function-declaration-positions)
+- [For-of iteration](#for-of-iteration)
+- [Unicode identifier code points](#unicode-identifier-code-points)
+- [Modern generators](#modern-generators)
+- [Typed arrays](#typed-arrays)
+- [Basic object patterns and update targets](#basic-object-patterns-and-update-targets)
+- [Computed object pattern keys](#computed-object-pattern-keys)
+- [Destructuring defaults](#destructuring-defaults)
+- [Iterator-based patterns and captured assignment targets](#iterator-based-patterns-and-captured-assignment-targets)
+- [Unicode regular expressions](#unicode-regular-expressions)
+- [Global declarations and statement completion values](#global-declarations-and-statement-completion-values)
+- [Array, call and constructor spread](#array-call-and-constructor-spread)
+- [Persistent global and eval lexical bindings](#persistent-global-and-eval-lexical-bindings)
+- [Method home objects and super properties](#method-home-objects-and-super-properties)
+- [Scripted setter assignment results](#scripted-setter-assignment-results)
+- [Classes and derived constructors](#classes-and-derived-constructors)
+- [Catch variables and block function declarations (integrated macOS arm64 validation)](#catch-variables-and-block-function-declarations-integrated-macos-arm64-validation)
+- [Parameter environments (integrated macOS arm64 validation)](#parameter-environments-integrated-macos-arm64-validation)
+- [Modules (integrated macOS arm64 validation)](#modules-integrated-macos-arm64-validation)
+- [Pattern, realm and strict block-function follow-up](#pattern-realm-and-strict-block-function-follow-up)
+- [Original RegExp ranges and buffer-detachment host follow-up](#original-regexp-ranges-and-buffer-detachment-host-follow-up)
+- [Conversion and built-in metadata follow-up](#conversion-and-built-in-metadata-follow-up)
+- [Tail-call execution and generator shorthand](#tail-call-execution-and-generator-shorthand)
+- [Property queries and reentrant array-length conversion](#property-queries-and-reentrant-array-length-conversion)
+- [Property replacement and function creation order](#property-replacement-and-function-creation-order)
+- [Catch environments, Unicode strings and signed-zero indices](#catch-environments-unicode-strings-and-signed-zero-indices)
+- [Generator method grammar and caller reflection](#generator-method-grammar-and-caller-reflection)
+- [Switch discriminant environments](#switch-discriminant-environments)
+- [With-binding reads after observable lookup](#with-binding-reads-after-observable-lookup)
+- [Untagged later-test diagnostics](#untagged-later-test-diagnostics)
+- [JSON reviver descriptor rejection](#json-reviver-descriptor-rejection)
+- [JSON method realms and array lengths](#json-method-realms-and-array-lengths)
+- [Canonical comparison and incomplete RegExp escapes](#canonical-comparison-and-incomplete-regexp-escapes)
+- [Date arithmetic and callback order](#date-arithmetic-and-callback-order)
+- [Contextual modifiers and class parameter lists](#contextual-modifiers-and-class-parameter-lists)
+- [Discarded derived-this reads](#discarded-derived-this-reads)
+- [Discarded conversions and arguments detachment](#discarded-conversions-and-arguments-detachment)
+- [Mapped arguments property creation order](#mapped-arguments-property-creation-order)
+- [Complete later-corpus diagnostic](#complete-later-corpus-diagnostic)
+- [URI decoding and eager Math initialization](#uri-decoding-and-eager-math-initialization)
+- [HTML comments, Number formatting and immutable native fields](#html-comments-number-formatting-and-immutable-native-fields)
+- [Non-strict block functions and prototype initializer syntax](#non-strict-block-functions-and-prototype-initializer-syntax)
+- [Large RegExp counts and assignment/method grammar edges](#large-regexp-counts-and-assignmentmethod-grammar-edges)
+- [Math extrema conversion order](#math-extrema-conversion-order)
+- [Current macOS arm64 Suite validation](#current-macos-arm64-suite-validation)
+- [Latest macOS arm64 Suite assignment-grammar validation](#latest-macos-arm64-suite-assignment-grammar-validation)
+- [Completed ES2015 gate on the macOS arm64 Suite](#completed-es2015-gate-on-the-macos-arm64-suite)
+- [Current cross-platform validation](#current-cross-platform-validation)
+- [Current macOS arm64 application matrix](#current-macos-arm64-application-matrix)
+- [Native structured-value snapshots for session history](#native-structured-value-snapshots-for-session-history)
+- [Native weak-key storage for DOM values](#native-weak-key-storage-for-dom-values)
+- [Native named-property object support (in progress)](#native-named-property-object-support-in-progress)
+
+</details>
+
+# ECMAScript 2015 conformance work
+
+Full [ECMAScript 2015 (ES6)](https://262.ecma-international.org/6.0/) compliance
+is required. Implementation is in progress; ZoolRunner is not ES6 compliant.
+Preserve the classic JSAPI, historical XUL applications and explicitly selected
+legacy JavaScript versions. Keep the [ES5.1 regression gate](../es5/README.md)
+and application checks alongside this work.
+
+
+## Later coverage diagnostics
+
+`diagnose-later-test262.py` runs explicitly selected candidates from the clean
+later checkout at `35d566604512cba908054eec49f85e64a59f3091`. The default
+`--selection es6id` includes every case retaining that metadata key.
+`--selection es2015-features` selects cases mentioning implemented/required ES6
+feature tags, including cases that also use newer features. `--selection all`
+permits inspecting untagged tests too; combine it with `--filter` for a bounded
+path review. None of these selections is an edition decision. Every selected
+failure remains in the report; no outcomes are converted into exclusions.
+As required by upstream `INTERPRETING.md`, files named with `_FIXTURE` are
+module dependencies rather than standalone tests. They remain available to
+the diagnostic module loader. The existing two metadata selections retain
+exactly the same source/mode sets.
+
+The shell's `createTest262Realm()` returns an isolated standard global with
+`$262.global`, `evalScript`, `createRealm`, `gc`, `detachArrayBuffer` and explicit module hooks. Its
+opaque `compileScript`/`executeScript` pair separates compilation from execution,
+retains scripts through GC, and rejects execution through another realm's host.
+Harness setup is a separate script in the tested realm; bookkeeping stays in
+the shell realm, so a test can make its global nonextensible. Negative tests
+must throw the expected realm's constructor in their specified parse, resolution
+or runtime phase. Harness failures cannot satisfy a negative expectation.
+The runner has 38 executable phase, isolation, Unicode, module-graph, async, metadata and host-fixture controls:
+
+```sh
+python3 js/tests/es6/test-later-runner.py --shell /path/to/frozen/xpcshell
+python3 js/tests/es6/diagnose-later-test262.py \
+  --suite /path/to/test262-later --shell /path/to/frozen/xpcshell \
+  --selection es6id --report /tmp/later-es6id-diagnostic.json
+```
+
+A nonzero diagnostic exit retains all results, including expected edition
+conflicts, for review. The module host resolves relative imports against the
+entry module and the pinned suite's unchanged `*_FIXTURE.js` files, reuses
+canonical module identities, and supports cycles. Missing dependencies remain
+explicit host errors. Entry parse failures, dependency resolution/parse failures
+and runtime failures remain distinct; an unavailable file cannot satisfy a
+negative expectation. Buffer detachment uses the
+additive native `JS_DetachArrayBuffer` API and reports errors in the host method's
+own realm. Agent and other modern host capabilities are not implied. The
+informational `generated` flag does not change execution; unknown flags remain
+explicit harness failures. Missing hosts and later syntax must
+be investigated, not counted as ES2015 passes. Later diagnostics exposed
+proper tail-call gaps that are now implemented and covered by the
+[tail-call regressions](#tail-call-execution-and-generator-shorthand). The
+broader edition review remains unfinished; the historical corpus alone does
+not establish complete coverage.
+
+## Reproducible initial baseline
+
+The initial corpus is official TC39 Test262 at
+[`5e653f2e6ca14ac1ad8e801955a709cae7ac8a11`](https://github.com/tc39/test262/tree/5e653f2e6ca14ac1ad8e801955a709cae7ac8a11),
+the final snapshot from 2015. It includes all 14,968 JavaScript files under
+`annexB`, `built-ins` and `language`: 28,582 test/mode cases. ECMA-402's separate
+`intl402` suite and the harness's own tests are not ECMA-262 conformance cases.
+No failing language features are excluded. A clean pinned checkout is required.
+
+This historical snapshot is a starting baseline, not the complete eventual
+coverage target. Later upstream tests also exercise ES2015 semantics, and the
+modern Test262 corpus includes later language editions. Even this snapshot
+contains 60 test/mode cases tagged `es7id` (including proposed corrections).
+The runner records edition references and excludes none of these from the
+baseline. A reviewed ES2015 inventory, covering both those edition boundaries
+and later ES2015 regressions, is still needed; passing this initial corpus
+alone must not be described as satisfying all ES6 tests or proving compliance.
+
+Python 3 and PyYAML are optional test-runner dependencies, not application build
+dependencies. Keep the upstream checkout outside the ZoolRunner source tree:
+
+```sh
+git init /tmp/test262-es2015
+git -C /tmp/test262-es2015 fetch --depth 1 https://github.com/tc39/test262.git \
+  5e653f2e6ca14ac1ad8e801955a709cae7ac8a11
+git -C /tmp/test262-es2015 checkout --detach FETCH_HEAD
+python3 js/tests/es6/test-runner.py
+python3 js/tests/es6/test-runner-integration.py \
+  --suite /tmp/test262-es2015 \
+  --shell obj-zoolrunner-macos-arm64-xulrunner/dist/bin/xpcshell
+python3 js/tests/es6/run-test262.py \
+  --suite /tmp/test262-es2015 \
+  --shell obj-zoolrunner-macos-arm64-xulrunner/dist/bin/xpcshell \
+  --report /tmp/zoolrunner-es2015.json
+```
+
+Do not replace the shell or its libraries during a run. Unmarked tests run in
+both strict and non-strict mode, following this snapshot's upstream runner.
+`noStrict`, `onlyStrict`, `raw` and `module` flags are retained. This differs
+intentionally from the older ES5 corpus's non-strict default. The test's own
+directive prologue remains effective. Unicode test source and the harness are
+compiled as separate global scripts, with a transport/strictness preflight.
+Expected exceptions use this snapshot's negative-test patterns. A harness
+exception, crash, timeout or missing completion marker cannot satisfy a test.
+The timezone defaults to `America/Los_Angeles` and is recorded in the report.
+The runner now selects the explicit ES2015 edition (`xpcshell -E -v 2015`) and
+checks that selection during preflight. `--edition legacy` reproduces the
+original default-language baseline. Reports identify the selected edition;
+do not compare a legacy run with an ES2015 run as if the semantics were equal.
+
+Module tests now use the native module compiler, the diagnostic host's explicit
+dependency linker, and the engine's module evaluator. The pinned module cases
+run as part of the full suite; no module modes are marked unsupported in the
+current complete macOS arm64 run. The runner drains pending jobs before checking
+`$DONE`, and a job exception cannot satisfy a synchronous negative test. An
+async test that does not complete remains unsupported and counts against the
+gate. Every result is recorded. `--filter` is only a diagnostic subset and
+cannot establish a full-suite pass.
+
+## Implementation and compatibility gates
+
+The first implementation group adds the four non-coercing Number predicates
+and `EPSILON`, `MAX_SAFE_INTEGER`, `MIN_SAFE_INTEGER`. Global `isNaN` and
+`isFinite` retain their coercing behavior. Run `number.js` through xpcshell
+with the matching runtime library path. Its focused checks cover hostile
+objects, wrappers, signed zero, fractional and safe-integer boundaries,
+constant descriptors and non-constructible native methods.
+
+`window-app/application.ini` is a standalone XULRunner fixture; use a disposable
+profile and require `ES6-WINDOW checks=15 failures=0`. It checks additions in
+chrome and content window globals as well as an unchanged legacy XUL setter.
+The desktop application runner also exercises `window-queryselector.xul` and
+requires `DOM-QUERY-SELECTOR checks=17 failures=0`. It checks tree order,
+combinators, basic functional selectors, `:scope`, static list behavior and
+syntax errors. This focused fixture does not establish complete Selectors
+Level 4 compliance. Forgiving invalid members in `:is()`/`:where()`, `:has()`,
+modern `:nth-*` grammar, and several state and attribute selector details
+remain unfinished.
+The focused shell test requires `ES6-NUMBER checks=156 failures=0`.
+
+The original Number subset has 338 passes and 26 failures in 364 test/mode
+cases on the macOS arm64 Suite. Missing predicates, binary/octal conversion
+and Symbol coercion account for those failures. This is not a full ES6 result.
+With the Number additions, the native arm64 XULRunner subset passes 358/364;
+the six remaining failures concern binary/octal conversion and Symbol coercion.
+
+The complete initial Suite baseline on 2026-09-17, before these additions
+(source `f9eccf03`), ran in 847 seconds on macOS arm64:
+
+| Result | Test/mode cases |
+| --- | ---: |
+| Pass | 22,467 |
+| Fail | 6,091 |
+| Unsupported | 14 |
+| Timeout | 2 |
+| Crash | 0 |
+| Harness/completion error | 8 |
+
+All 14 unsupported cases are modules. Two harness errors arise because the
+TypedArray harness requires the unimplemented `Float64Array`; six nested
+destructuring cases exit without a completion marker. The two timeout cases
+are strict/non-strict variants of a `const` loop syntax test. These remain
+unresolved, counted results; none were silently accepted or excluded.
+
+After the Number additions, the full pinned ES5 corpus passes **11,540/11,540**
+on macOS arm64 XULRunner, with zero failures, timeouts, crashes or harness errors.
+XULRunner also passes the 156 Number assertions, 15 Number window checks,
+18 native embedding checks, 17 existing window-bootstrap checks, the existing
+packaged shell/application regressions and all 169 layout assertions.
+The subsequent complete run with explicit ES2015 selection is recorded below.
+The rebuilt macOS arm64 Suite also passes 358/364 Number cases, all 156 focused
+Number assertions, packaging/embedding and the existing desktop regressions,
+including Composer lifecycle, window bootstrap and ChatZilla initialization.
+Unmodified ChatZilla also initializes with its input widget in a temporary
+standalone XULRunner wrapper using ChatZilla's historical application ID.
+Calendar passes the 156 Number assertions, eight unchanged compatibility test
+files, startup and all four views. These application checks do not establish
+compatibility with every historical application.
+
+At that initial baseline, remaining work included well-known Symbol protocols; lexical scopes
+and TDZ; ES2015 functions, destructuring, classes and `super`; iteration consumers, syntax and
+generators; collections and typed arrays; standard-library and regexp changes;
+Promise jobs; and module compilation, linking and evaluation. Later sections
+record subsequent implementations and remaining failures. Preserve XDR and
+decompilation when bytecode changes. Review compatibility at the script-loading
+boundary instead of changing old applications to accommodate engine regressions.
+
+ES2015 also changes some earlier semantics rather than only adding features.
+For example, built-in function `length` descriptors become configurable and
+strict object literals permit repeated data-property names. ES5 and ES2015
+tests for those behaviors cannot both pass under one identical set of semantics.
+Before implementing such changes, provide an explicit edition selection for
+conformance execution and preserve historical loader/version behavior. Keep
+the original ES5 assertions, running them in the ES5 compatibility environment;
+run the ES2015 assertions in the ES2015 environment. Record that selection in
+reports. The first edition boundary is now implemented through
+`JSVERSION_ECMA_2015` / `JS_SetVersion`, with `ECMAv6` as its JSAPI string name.
+Existing numeric version values and the historical default remain unchanged.
+ES2015 allows repeated ordinary object properties, including strict code;
+duplicate literal `__proto__` setters remain an early error. Accessors can
+shadow inherited properties while honoring embedding access checks. The new
+mode does not inherit legacy E4X operators, callable regexps, implicit regexp
+input or eval's second-argument scope extension. Legacy versions retain those
+behaviors. The bytecode cache version has been advanced.
+
+HTML and XUL scripts can opt in with `type="application/javascript;version=2015"`.
+Unversioned XUL scripts still use the historical JS 1.7 grammar; ordinary
+unversioned HTML scripts retain the existing default. This is an implementation
+boundary, not a claim of complete ES2015 support. Global built-in initialization
+still needs a compatibility policy: script edition selection alone cannot give
+one shared function object two incompatible property descriptors.
+
+`editions.js` tests the language boundary. `TestEditionEmbedding.c` tests JSAPI
+version round trips, saved editions in XDR, nested eval/Function compilation,
+decompilation, cross-edition callbacks, garbage collection, caller restoration
+and embedding access controls. Compile it using the same flags as
+`../es5/TestObjectEmbedding.c`. The `window-editions.xul` fixture tests explicit
+modern scripts alongside unchanged legacy XUL and default HTML scripts; launch
+the existing `window-app/application.ini` with
+`-chrome chrome://es6window/content/window-editions.xul` and a disposable profile.
+Do not approximate edition selection by changing behavior only while a test
+is running or by identifying Test262 sources.
+
+## Edition boundary validation (macOS arm64, 2026-09-17)
+
+The complete pinned corpus in explicit ES2015 mode ran all 28,582 cases in
+814 seconds, with the runtime binary hashes unchanged throughout:
+
+| Result | Test/mode cases |
+| --- | ---: |
+| Pass | 22,550 |
+| Fail | 6,008 |
+| Unsupported | 14 |
+| Timeout | 2 |
+| Crash | 0 |
+| Harness/completion error | 8 |
+
+Compared with the initial historical-default baseline, 123 cases gained a pass
+and 40 lost a pass. The latter involve incomplete `let`/`yield` handling in the
+new mode, which currently inherits parts of the older block-scope parser.
+The subsequent contextual-keyword changes resolve those 40 regressions;
+they were never excluded. The object-literal subset
+improved from 85/208 to 105/208, with no previous passes lost. This comparison
+also includes the earlier Number additions; it is not an isolated measurement
+of the edition patch alone. The ES5 default-mode regression gate passes all
+11,540 cases again, with no failures, crashes, timeouts or harness errors.
+
+All four native arm64 applications build and pass packaging, 156 Number
+checks, 36 edition checks, 18 existing embedding checks and 11 new edition
+embedding checks. Their relocated desktop runs pass the existing shell/window
+regressions and all five mixed-edition window checks. Browser navigation through
+the normal browser window passes all 169 layout assertions. Calendar passes
+eight compatibility test files and all four views. ChatZilla initializes in
+Suite and in its unchanged standalone XULRunner wrapper with the input widget.
+
+The first Suite lifecycle run exposed a fixture-state problem: some initial
+Composer documents were already modified, so insertion caused no new dirty-state
+notification. Package diagnostics reproduced that state. The fixture now resets
+and verifies its modification count before observing the clean-to-dirty
+transition, preserving all editing/undo/shutdown assertions. Three fresh-package
+runs pass all 24 checks after that correction. See the
+[lifecycle test documentation](../../../editor/composer/tests/README.md).
+
+Modern macOS packaging now includes the focused edition and native embedding
+gates, and the desktop runner includes the mixed-edition window fixture. These
+are local arm64 results, not new GitHub-hosted, x86_64, Windows or Linux results.
+
+For engine changes, rerun the complete pinned ES5 corpus, the affected ES2015
+tests and focused regressions. Native embedding, chrome/content globals,
+XULRunner, Suite, ChatZilla and Calendar application checks are separate gates.
+Record architectures and runtime results explicitly; macOS arm64 results do
+not establish MSVC2005, other architectures or legacy operating-system support.
+
+## Contextual keywords and declaration checks
+
+In the explicitly selected ES2015 edition, `let` is recognized as a lexical
+statement only in declaration positions. Ordinary non-strict uses of `let`
+and `yield` remain identifiers; explicitly selected JS 1.7 retains its let
+expressions and historical generators. Lexical declarations cannot be bare
+`if`, loop, `with`, or labelled statement bodies, and a `let` for-in declaration
+cannot have an initializer. Escaped identifier spellings do not become a
+contextual declaration keyword.
+
+The parser tracks lexical and var declarations by statement-list scope to
+reject conflicts without confusing valid shadowing or separate sibling blocks.
+`contextual-keywords.js` exercises these rules with 84 assertions, including
+strict and non-strict cases, destructuring identifiers, catch parameters and
+legacy syntax. The macOS package gate runs this test alongside the earlier
+edition and Number tests.
+
+These checks do not complete lexical declarations. Top-level `let` still uses
+the historical global storage path; persistent global lexical environments,
+temporal dead zones, per-iteration environments, complete parameter/catch
+conflict rules, and ES2015 `const` semantics remain unfinished. Modern generator
+syntax and iteration semantics also remain unfinished. Do not describe the
+contextual-keyword checks as complete `let` or generator support.
+
+A separate diagnostic fix restores TypeError propagation for nested
+array destructuring of `null`, `undefined`, or an array hole inside a function.
+The upstream assignment/destructuring subset passes 74/267 cases with zero
+harness errors or lost previous passes; the remaining 193 are still failures.
+All six previously missing completion markers in this subset now pass.
+`../es5/destructuring-errors.js` adds 54 cross-edition regression checks,
+including complete function decompilation round trips. No bytecode format
+changes are involved in this diagnostic fix.
+
+
+After contextual-keyword and declaration checks, a complete 28,582-case run
+on macOS arm64 XULRunner recorded **22,595 passes, 5,963 failures, 14 unsupported,
+2 timeouts, 0 crashes, and 8 harness/completion errors** in 735.85 seconds.
+Runtime hashes were unchanged. Relative to the earlier explicit-edition run,
+45 cases gained a pass and none lost a pass. The corresponding complete ES5
+run passed **11,540/11,540** again. These full-run totals precede the subsequent
+destructuring-diagnostic and radix-literal fixes.
+
+## Binary and octal numbers
+
+Explicit ES2015 mode accepts `0b`/`0B` and `0o`/`0O` literals and numeric
+strings. Conversion uses the existing integer converter, including its
+rounding logic for power-of-two radices. Signed radix strings remain invalid;
+unary signs on source literals still work. `parseInt` and `parseFloat` retain
+their own grammars. Historical modes keep their earlier source and conversion
+behavior. `radix-literals.js` supplies 130 checks for grammar, whitespace,
+rounding, overflow, property names, coercion callbacks, and decompilation.
+
+The pinned numeric-literal subset passes **170/170** and the Number subset
+passes **362/364** on macOS arm64 XULRunner. The two remaining Number failures
+require Symbol conversion. A later upstream numeric regression,
+`built-ins/Number/string-hex-literal-invalid.js`, also passes in strict and
+non-strict modes at current-upstream pin
+`35d566604512cba908054eec49f85e64a59f3091`. That is a separately reviewed test,
+not a full current-Test262 result. The current corpus inventory has 48,912
+JavaScript files under the three core roots and still needs edition review;
+its later-language tests must not be confused with ES2015 requirements.
+
+The subsequent complete run including radix support and diagnostic fallback
+records **22,609 passes, 5,955 failures, 14 unsupported, 2 timeouts, 0 crashes,
+and 2 harness errors** in 543.99 seconds, with unchanged runtime hashes.
+It gains 14 passes over the contextual-keyword run and loses none. The two
+remaining harness errors require `Float64Array`; the six destructuring
+completion failures are resolved. The corresponding full ES5 run passes
+**11,540/11,540**. These full totals precede the parameter-history correction.
+
+Function-body `let` declarations now reject conflicts with ordinary or
+destructured formal parameters, while nested blocks may shadow parameters.
+Catch-body conflicts also report SyntaxError. `lexical-parameters.js` covers
+36 cases, including Function construction and preserved JS 1.7 shadowing.
+The native embedding fixture now has 13 checks, including modern rejection and
+legacy acceptance through `JS_CompileFunction`. Its XDR/decompilation payload
+and the real window fixture also exercise lexical bindings, numeric prefixes,
+and nested destructuring exceptions. See `../es5/strict-parameter-history.js`
+for the separate shared-property duplicate-marker regression.
+
+After the parameter correction, the complete ES5 gate again passes
+**11,540/11,540** on macOS arm64 XULRunner. The complete ES2015 language subset
+records 6,670 passes, 1,508 failures, 14 unsupported modules, 2 timeouts and no
+crashes/harness errors across 8,194 cases. The Function subset records 657
+passes and 58 failures across 715 cases. Neither subset loses any previous
+passes. They are supplemental checks, not replacements for the full totals
+above or claims of complete ES2015 compliance.
+
+The final batch rebuilds the engine for all four macOS arm64 applications.
+Suite, Browser, Calendar and XULRunner each pass packaging, all new shell and
+13 native edition/embedding checks, and relocated desktop regressions with the
+expanded mixed-edition fixture. Calendar passes its eight compatibility files
+and four views; Suite passes Composer lifecycle and ChatZilla startup. Browser
+navigation passes all 169 existing layout assertions. Unchanged ChatZilla also
+initializes its input widget in a disposable standalone XULRunner application.
+Other operating systems and architectures have not been revalidated for this
+batch; these native macOS results do not establish their compatibility.
+
+## Modern function metadata and globals
+
+`xpcshell -E` selects ES2015 before global built-ins are initialized. The
+conformance runner uses this option and checks the native `Number.length`
+descriptor during preflight. `-v 2015` still switches subsequent scripts in
+an existing global; it does not replace that global's built-ins. Existing
+application globals and unversioned shell invocations retain their historical
+initialization. Native embeddings can select `JSVERSION_ECMA_2015` before
+`JS_InitStandardClasses` to create a modern global.
+
+Modern functions have own, non-enumerable, read-only, configurable `length`
+data properties; named functions also have matching `name` properties.
+Anonymous expressions without an inferred name have no own `name` property. Function clones preserve their creation edition;
+internal templates no longer expose deleted metadata through inheritance.
+Metadata is installed after code generation has reserved regexp cache slots.
+Direct eval continues resolving locals through the compiler template.
+Bound functions compute their metadata without coercing non-number lengths
+or non-string names. Modern globals install the shared restricted `caller`
+and `arguments` accessors on `Function.prototype`. Legacy globals retain
+their earlier descriptors. Anonymous inferred names and complete mixed-global
+interoperability still require work; this is not full function conformance.
+The XDR version is incremented because cached functions now retain their
+creation edition.
+
+`function-metadata.js` has 82 checks including reentrant getters, collection,
+closures, bound construction, and restricted accessors. Run it with `-E`.
+`TestFunctionMetadata.c` has 17 native checks for modern initialization,
+XDR decoding in both directions between modern and legacy modes, and JSAPI cloning of
+interpreted and bound functions. Legacy functions created inside a modern
+global retain their metadata getters and historical `arguments` behavior. Both
+pass on macOS arm64 XULRunner. A complete ES5 rerun passes all 11,540 cases.
+The final complete ES2015 run on Suite records **22,846 passes, 5,718 failures,
+14 unsupported modules, two timeouts, zero crashes, and two harness errors**
+in 462.87 seconds, with unchanged runtime hashes. It gains 237 passes and loses
+none relative to the previous full baseline. The final Function subset passes
+691/715, gaining 34 passes and losing none; remaining cases exercise Symbols
+or Proxies, and accessor-function prototype restrictions also remain incomplete.
+
+All four macOS arm64 applications rebuild and pass packaging with the 82 shell
+checks, 17 metadata embedding checks, and existing 13 edition embedding checks.
+Relocated desktop tests pass for Suite, Browser, Calendar and XULRunner, including
+the expanded mixed-edition window fixture. Suite passes Composer lifecycle and
+ChatZilla startup; Browser navigation passes 169 layout assertions. Calendar's
+eight compatibility files and four views pass. Unchanged standalone ChatZilla
+also initializes its input widget in XULRunner and exits successfully. The
+runner's five unit checks and 17 real-shell checks pass. Other operating systems
+and architectures have not been revalidated for this batch. Thousands of
+conformance failures remain; these results do not establish ES2015 completion.
+
+## Immutable writes and extended operands
+
+Explicit ES2015 mode now rejects missing `const` initializers and constant
+statements where a lexical declaration is not permitted. Assignment, compound
+assignment, increment/decrement and destructuring writes to initialized
+constant bindings throw `TypeError`, including captured bindings and direct
+eval. Operand evaluation and numeric coercion happen before the immutable-write
+exception; coercion exceptions retain precedence. Legacy script editions keep
+their historical ignored-write and optional-initializer behavior. Ordinary
+read-only object properties and named-function self-bindings remain separate.
+
+This does **not** complete lexical bindings: block/global lexical environments,
+temporal dead zones, per-iteration environments and const for-in/of declarations
+remain unfinished. Modern const still uses historical storage internally.
+
+`const-writes.js` has 104 checks covering both language editions, strict and
+non-strict writes, closures, eval, GC during coercion, finally blocks and
+function decompilation. `test-const-large-script.py --shell PATH` adds 14 checks
+across the 16-bit atom-index boundary, including compound/destructuring writes
+and legacy/modern object initializer value ordering. These checks execute both
+compiled and decompiled functions. The large-script test caught and corrected
+an extended-property initializer ordering bug as well as the new opcode's
+extended-operand emission. Both regressions run during macOS packaging.
+The bytecode cache version is now 34; the native edition/XDR and real-window
+fixtures also exercise modern const writes.
+
+The first full macOS arm64 XULRunner run with immutable-write support recorded
+**22,884 passes, 5,682 failures, 14 unsupported modules, zero timeouts, zero
+crashes and two harness errors** in 507 seconds. It gained 38 passes and lost
+none relative to the preceding metadata run. ES5 passed all 11,540 cases.
+After the extended-operand fixes, a second complete XULRunner run records the
+same counts in 745.97 seconds; its ES5 rerun passes 11,540/11,540 in 540.85
+seconds. The final Suite run, including the locked-property lookup adjustment,
+also records the same ES2015 counts in 677.97 seconds. Both ES2015 runs
+verify unchanged runtime hashes. No previous passing case is lost.
+
+All four macOS arm64 applications pass engine/loader builds, packaging and
+relocated desktop checks. XULRunner's aggregate XUL library is relinked after
+its XPConnect loader rebuild. Package checks include all 104 immutable-write
+checks, 14 extended-operand checks, 82 metadata checks, 17 metadata embedding
+checks and 13 edition embedding checks. Suite passes the 24 lifecycle checks
+and ChatZilla startup; Browser navigation passes 169 assertions; Calendar
+passes eight unit files and all four views. Standalone ChatZilla initializes
+its input widget and exits successfully in XULRunner. Runner unit and
+integration checks pass. Other operating systems and architectures have not
+been revalidated for this batch; full ES2015 conformance remains incomplete.
+
+
+## Inferred function names
+
+In explicit ES2015 mode, anonymous ordinary function expressions acquire names
+from `var`/`let`/`const` initializers, identifier assignments and static object
+property definitions. Parentheses around the function expression preserve
+eligibility; comma, conditional and logical expressions do not. Parenthesized
+assignment targets and property assignments do not infer names in ES2015.
+Annex B's `__proto__` prototype setters also do not infer names. Explicit
+function names retain precedence. This follows the edition's
+[SetFunctionName](https://262.ecma-international.org/6.0/#sec-setfunctionname)
+operation and its syntax-specific callers.
+
+Modern object accessors acquire `get ` / `set ` prefixes, have no automatic
+`prototype` property and reject construction. Legacy editions retain their
+historical anonymous accessor names and constructor behavior. Quoted, numeric
+and keyword accessor names decompile using modern accessor syntax in ES2015
+scripts. Inferred names are stored separately from the function's lexical name,
+traced by GC, retained through cloning and serialized through XDR version 35.
+They do not create a self-binding or rewrite anonymous function syntax during
+decompilation. The historical JSAPI diagnostic-name accessors remain based on
+the declared function name.
+
+`inferred-function-names.js` has 89 checks for inference and its exclusions,
+descriptors, Unicode names, closures, GC, regexp slots, cloning, decompilation
+and legacy behavior. Run it with `xpcshell -E`. `TestFunctionMetadata.c` now
+has 20 checks, retaining the prior named-function and bound-function cases and
+adding inferred names through XDR and JSAPI cloning. Both pass in the native
+macOS arm64 Browser shell; the existing 82 metadata checks also pass. The
+mixed-edition window payload includes inferred and accessor metadata.
+
+The diagnostic `fn-name` subset passes 22/104 test/mode cases. The remaining
+cases also require computed properties, concise methods, destructuring defaults,
+arrows, generators or classes. Those features remain unfinished.
+
+Parenthesized identifier assignment targets retain a bytecode source note, and
+conditional folding preserves anonymous-function branches whose decompilation
+would otherwise acquire a name. The earlier extended-operand fixture now has
+24 checks. It also covers legacy and modern global reads/writes, increments,
+compound assignment, deletion, for-in name/property targets and method calls.
+The new coverage corrected existing extended-operand stack/decompilation paths:
+`FINDNAME` decompiles as an identifier, compound assignment retains its object
+and id, for-in targets retain their literal operands, and source notes are read
+at the start of an extended instruction.
+
+The complete Suite ES2015 rerun records **22,900 passes, 5,666 failures,
+14 unsupported modules, zero timeouts, zero crashes and two harness errors**.
+Compared with the const batch, 16 additional cases pass and no passing case
+regresses. The runtime hash remained unchanged throughout the run. The full
+required-mode ES5 rerun passes all **11,540 cases**. Reports are
+`artifacts/es6/inferred-names-final-full.json` and
+`artifacts/es6/inferred-names-final-es5.json`.
+
+All four macOS arm64 applications rebuilt and passed packaging and relocated
+runtime checks. Suite passed Composer lifecycle and ChatZilla checks; Browser
+passed 169 navigation/layout assertions; Calendar passed eight unit suites and
+all four views; standalone ChatZilla initialized with working input in XULRunner.
+These results cover this revision on macOS arm64 only. Other operating systems
+and architectures have not been revalidated for this batch. Full ES2015
+conformance and universal historical-application compatibility are not established.
+
+
+## Integer Math operations and rounding
+
+`Math.sign`, `Math.trunc`, `Math.clz32` and `Math.imul` are implemented through
+portable C89 code and existing engine conversion helpers. They are also
+available to legacy scripts, like the earlier Number additions. Conversion
+order, exceptions, signed zero and modulo-32-bit multiplication are covered by
+`math-integer.js` (169 checks), including callback-triggered GC. The new methods
+are nonconstructible and preserve the ordinary Math property descriptors.
+`Math.round` now avoids prematurely rounding `x + 0.5`, correcting values just
+below one half and large odd integers without changing tie direction.
+
+The diagnostic Math subset passes 376/468 test/mode cases, with all cases for
+these four methods and `round` passing. The remaining Math cases require the
+other ES2015 numeric methods and Symbol support.
+
+The complete ES2015 run records **22,938 passes, 5,628 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. This adds 38 passes
+with no previously passing case lost; runtime hashes stayed unchanged. The
+complete required-mode ES5 run passes all **11,540 cases**. Reports are
+`artifacts/es6/math-integer-full.json` and `artifacts/es6/math-integer-es5.json`.
+
+All four macOS arm64 engines rebuilt and passed packaging and relocated runtime
+checks. This includes Suite Composer lifecycle and ChatZilla checks, Browser's
+169 navigation/layout assertions, Calendar's eight unit suites and four views,
+and standalone ChatZilla startup/input in XULRunner. Other operating systems
+and architectures have not been revalidated for this batch; the ES6 goal remains
+incomplete.
+
+
+## Remaining ES2015 numeric Math methods
+
+The standard Math method names are now implemented, including `expm1`, `log1p`,
+`cbrt`, the hyperbolic/inverse-hyperbolic functions, `log10`, `log2`, `fround` and
+`hypot`. Math's Symbol-based tag remains unavailable until Symbol support lands.
+These additions are available in legacy globals as well as modern globals;
+existing application-facing methods and embeddings remain in place.
+
+Ten numerical kernels use the already bundled Sun fdlibm sources, with their
+original licenses retained. The normal configure/make build and standalone
+reference makefile compile only these selected kernels through a private target
+endianness adapter. Existing ES3/ES5 transcendental methods retain their current
+host/fdlibm policy. No C99-only math imports are required in the application,
+including the MSVC 2005 build. The adaptation also corrects stale union state in
+subnormal cube roots, signed exponent shifts, an atanh low-word negation and
+aliasing-dependent low-word reads in sinh/cosh.
+
+`fround` explicitly rounds a binary32 significand to nearest/even, including
+subnormals and overflow, without depending on a host float cast. `log2` preserves
+exact powers of two. `hypot` uses scaled compensated summation and performs all
+argument conversions in order, including after Infinity or NaN.
+
+`math-transcendental.js` passes **4,206 checks**, covering descriptors,
+nonconstructibility, signed zero, special values, coercion/GC, subnormals,
+rounding ties, overflow boundaries and many-argument hypot. The upstream Math
+subset passes **466/468 test/mode cases**; its two failures require
+`Symbol.toStringTag`.
+
+The complete ES2015 run records **23,028 passes, 5,538 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. Compared with the
+integer Math batch, 90 additional cases pass and no passing case regresses.
+Runtime hashes remained unchanged. The complete required-mode ES5 run passes
+all **11,540 cases**. Reports are `artifacts/es6/math-numeric-full.json` and
+`artifacts/es6/math-numeric-es5.json`.
+
+All four macOS arm64 engines rebuilt and passed packaging and relocated runtime
+checks, including Suite Composer/ChatZilla, Browser's 169 navigation assertions,
+Calendar's eight unit suites/four views and standalone ChatZilla in XULRunner.
+Other operating systems and architectures have not been revalidated for this
+batch. The remaining ES2015 failures still prevent a conformance claim.
+
+The optional host diagnostic compares ten kernels with a modern C99 libm using
+special/boundary values and deterministic binary64 samples. It checks special
+values exactly and finite results within four times binary64 epsilon relative
+tolerance (with a minimum-subnormal absolute floor). This is a numerical
+cross-check, not proof of correct rounding or target-OS compatibility:
+
+```sh
+python3 js/tests/es6/test-math-kernels.py \
+  --objdir obj-zoolrunner-macos-arm64-suite --cc clang --sanitize
+```
+
+On macOS arm64 this passes **2,000,510 comparisons** with ASan and UBSan. The
+application JavaScript fixture remains the portable runtime regression; the
+host diagnostic requires a compiler and C99 libm supporting the reference
+functions, which MSVC 2005 itself does not provide.
+
+
+## String code points, repetition, literal search and raw assembly
+
+The engine now implements `String.fromCodePoint`, `String.raw`, and prototype
+`codePointAt`, `repeat`, `startsWith`, `endsWith` and `includes`. These additions
+are available in legacy globals too; existing `indexOf`, `substr`, `substring`
+and other historical methods retain their behavior. Template-literal parsing,
+Unicode normalization, Symbol conversion and `Symbol.match` customization
+remain separate unfinished work. The literal search methods currently reject
+actual RegExp objects; their complete IsRegExp protocol requires Symbols.
+
+New string-producing methods check lengths before allocation and retain the
+historical immediate-integer length limit of 1,073,741,823 UTF-16 code units.
+`repeat` doubles initialized buffer regions, and `raw` grows its buffer
+geometrically. Raw assembly observes length once, retrieves segments in order,
+preserves abrupt completions and ignores excess substitutions. Character
+pointers are acquired after observable argument conversions; converted strings
+and temporary raw values stay rooted across callbacks and GC.
+
+`string-additions.js` passes **175 checks**, including descriptors, constructors,
+receiver validation, surrogate pairs/lone surrogates, embedded NULs, conversion
+order, GC, reentrant raw calls, exceptions and legacy behavior. The upstream
+String subset passes **1,725/1,857 test/mode cases**.
+
+The full ES2015 run records **23,232 passes, 5,334 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. This adds 204
+passes with no previously passing case lost and unchanged runtime hashes. The
+complete required-mode ES5 run passes all **11,540 cases**. Reports are
+`artifacts/es6/string-additions-full.json` and
+`artifacts/es6/string-additions-es5.json`.
+
+All four macOS arm64 engines rebuilt and passed package/relocated runtime checks,
+including Suite Composer/ChatZilla, 169 Browser navigation/layout assertions,
+Calendar's eight unit suites/four views and standalone ChatZilla in XULRunner.
+Other operating systems and architectures have not been revalidated for this
+batch; complete ES2015 compliance remains unfinished.
+
+
+## Unicode normalization
+
+`String.prototype.normalize` implements NFC, NFD, NFKC and NFKD using private,
+checksum-pinned Unicode 18.0.0 tables. It preserves lone UTF-16 surrogates,
+canonical ordering/composition exclusions and algorithmic Hangul behavior.
+The existing XPCOM normalizer and historical casing/identifier tables are not
+changed. See [data provenance and regeneration](../../src/unicode/README.md).
+Unicode License V3 is retained in source and both application license pages.
+
+`normalization.js` passes **50 checks**, including receiver/form coercion,
+exceptions, GC/reentrancy, canonical ordering, composition and supplementary
+compatibility mappings. The Test262 normalization subset passes **22/26
+execution cases**; the four remaining failures require Symbol support.
+
+```sh
+python3 js/tests/es6/test-normalization.py \
+  --data /path/to/ucd-18.0.0/NormalizationTest.txt \
+  --shell obj-zoolrunner-macos-arm64-suite/dist/bin/xpcshell \
+  --report artifacts/es6/normalization-unicode.json
+```
+
+The full Unicode check passes **4,791,252 assertions** on macOS arm64: all
+20,171 rows and identity checks for the 1,096,958 code points outside Part 1.
+The runner transports strings as ASCII source escapes, preserving UTF-16 code
+units through the historical loader. It checks the upstream data checksum and
+requires the final completion marker, not just the shell exit status.
+
+The same 4,791,252 assertions pass in `TestNormalizationKernel.c` when compiling
+the actual normalization kernel with ASan and UBSan against the native engine.
+This instruments the new kernel and diagnostic, not the complete engine:
+
+```sh
+xcrun clang -arch arm64 -isysroot "$ZR_MACOS_SDK" -std=gnu89 -O1 -g \
+  -DXP_UNIX -DJS_THREADSAFE -DMOZILLA_1_8_BRANCH \
+  -Ijs/src -Iobj-zoolrunner-macos-arm64-suite/js/src \
+  -Iobj-zoolrunner-macos-arm64-suite/dist/include/nspr \
+  -fsanitize=address,undefined -fno-sanitize-recover=all \
+  js/tests/es6/TestNormalizationKernel.c js/src/jsnormalization.c \
+  -Lobj-zoolrunner-macos-arm64-suite/dist/bin -lmozjs -o /tmp/zool-normalization
+DYLD_LIBRARY_PATH="$PWD/obj-zoolrunner-macos-arm64-suite/dist/bin" \
+  /tmp/zool-normalization /path/to/ucd-18.0.0/NormalizationTest.txt
+```
+
+Use SDK 11.3 and a matching native arm64 object directory for that host command.
+The full ES2015 run records **23,250 passes, 5,316 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**, with unchanged
+runtime hashes. It adds 18 passes without losing any previously passing case.
+The required-mode ES5 run passes all **11,540 cases**. Reports are
+`artifacts/es6/normalization-full.json` and
+`artifacts/es6/normalization-es5.json`.
+
+All four macOS arm64 applications rebuilt and passed package/relocated desktop
+checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
+assertions, Calendar's eight unit suites/four views and standalone ChatZilla
+in XULRunner. Each packaged chrome archive includes the Unicode license notice.
+Other operating systems and architectures have not been revalidated for this
+batch; complete ES2015 compliance remains unfinished.
+
+
+## Array-like operations
+
+`Array.prototype.find`, `findIndex`, `fill` and `copyWithin` use ES2015 ToLength
+(up to 2^53-1) and generic object receivers. Find visits holes and captures the
+length before callbacks; copyWithin checks property presence, preserves holes
+and handles overlap in the appropriate direction. Fill/copyWithin reject failed
+native property writes and undeletable targets independently of caller strictness.
+Setter callbacks retain their own strictness and historical embedding hooks
+retain their existing dispatch. Existing Array methods retain their length policy.
+Symbol-based unscopables and the other Array additions remain unfinished.
+
+`array-operations.js` passes 89 focused checks on macOS arm64, including large
+indices, coercion/access order, inherited properties, sparse arrays, frozen and
+nonextensible objects, exceptions, reentrancy, GC and setter strictness isolation.
+The same methods are included in the modern-edition XUL/content window probe.
+The Array Test262 subset passes 4,609/4,968 execution cases, gaining 124 passes
+without losing a previously passing case. For the four new methods, the only
+remaining subset failures require Symbol or Proxy. The full ES2015 run records
+**23,374 passes, 5,192 failures, 14 unsupported modules, zero timeouts, zero
+crashes and two harness errors**, gaining 124 passes with no losses and unchanged
+runtime hashes. Reports are `artifacts/es6/array-operations-full.json` and
+`artifacts/es6/array-operations-es5.json`. The complete required-mode ES5 run
+passes all 11,540 cases.
+All four macOS arm64 applications rebuilt and passed package/relocated desktop
+checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
+assertions, Calendar's eight unit suites/four views and standalone ChatZilla
+in XULRunner. Other operating systems and architectures remain unvalidated for
+this batch.
+
+
+## Object additions and edition-specific reflection
+
+`Object.is` uses SameValue, including NaN equality and distinct signed zeros.
+`Object.assign` snapshots each source's own keys when that source is reached,
+rechecks ownership/enumerability before each read, and uses throwing writes with
+ordinary setter dispatch. It preserves object identity without invoking valueOf.
+Native key order follows ES2015 integer indices through 2^53-1, followed by other
+string keys in creation order. Symbol keys and Proxy traps remain unfinished.
+
+ES2015 scripts box primitive inputs to getPrototypeOf, getOwnPropertyDescriptor,
+getOwnPropertyNames and keys. Integrity mutators return primitive inputs unchanged;
+isExtensible returns false and isFrozen/isSealed return true for primitives.
+ES5 and explicitly legacy scripts retain their primitive-argument TypeErrors and
+own-name order. Modern own-name reflection sorts integer indices and modern
+hasOwnProperty no longer treats inherited ordinary Object shared fields as own.
+
+Object's static methods now receive the internal non-constructor flag through
+JS_InitClass's constructor reference. The public eight-bit JSFunctionSpec field
+could not hold that flag. No public structure was widened, and initialization
+does not read prototype.constructor during DOM bootstrap.
+
+`object-additions.js` passes **145 checks** on macOS arm64, covering method
+metadata, numeric/object identity, boxed primitives, property order, live
+property changes, exceptions, setter dispatch, GC, reentrancy and legacy edition
+behavior. The new methods/reflection behavior also appear in the modern XUL and
+content-window fixture.
+
+The full ES2015 run records **23,520 passes, 5,046 failures, 14 unsupported
+modules, zero timeouts, zero crashes and two harness errors**. This adds 146
+passes without losing any previous pass, with unchanged runtime hashes. The
+Object subset accounts for 5,890/5,984 passes. Required-mode ES5 passes all
+11,540 cases. Reports are `artifacts/es6/object-additions-full.json` and
+`artifacts/es6/object-additions-es5.json`.
+
+All four macOS arm64 applications rebuilt and passed package/relocated desktop
+checks, including Suite Composer/ChatZilla, 169 Browser navigation/layout
+assertions, Calendar's eight unit suites/four views and standalone ChatZilla
+in XULRunner. Other operating systems and architectures remain unvalidated for
+this batch, and complete ES2015 conformance remains unfinished.
+
+
+## Prototype mutation
+
+`Object.setPrototypeOf` validates arguments, rejects cycles and changes to
+nonextensible objects, permits unchanged prototypes and returns primitive
+targets unchanged after validating the requested prototype. It uses the existing
+inner/outer-object boundary and embedding access checks, without invoking a user
+property named __proto__. A callback's in/out value has a separate root from the
+requested prototype. The trusted JS_SetPrototype API keeps its historical policy.
+
+The classic engine shares certain own String/RegExp/Function fields with their
+class prototypes. The new operation materializes equivalent native descriptors
+before detaching such prototypes, preserving private-data getters/setters and
+short ids rather than copying mutable state such as RegExp.lastIndex into a
+stale data property. Property caches continue to track prototype changes.
+
+`prototype-mutation.js` passes **100 checks** and `TestPrototypeMutation.c`
+passes **15 native embedding checks** on macOS arm64. They cover cycles,
+nonextensibility, cached lookups, private fields, GC, access denial, callback
+value replacement/reentrancy and the unchanged trusted native API. The pinned
+setPrototypeOf subset passes **14/20 execution cases**; the six remaining cases
+require Symbol or Proxy. The modern XUL/content fixture and packaged native
+embedding checks include this operation.
+
+The complete pinned ES2015 run passes **23,528** cases, with **5,038 failures**,
+14 unsupported module cases and two harness errors; there are no timeouts or
+crashes. This adds eight passes without losing any previous passes. Runtime
+hashes were unchanged throughout the run. All **11,540 required ES5 cases**
+pass. Reports are `artifacts/es6/prototype-mutation-full.json` and
+`artifacts/es6/prototype-mutation-es5.json`.
+
+All four macOS arm64 applications build, package and pass the packaged shell,
+embedding and desktop checks. Additional checks pass for Calendar's eight unit
+suites and all four views, Browser's 169 navigation/layout assertions, Suite
+Composer/ChatZilla and standalone XULRunner ChatZilla. These results do not
+establish validation on other operating systems or architectures.
+
+
+### Realm intrinsics and literal construction
+
+Modern array/object literals use an intrinsic-constructor bytecode instead of
+looking up mutable `Array`/`Object` bindings. Explicit constructor calls still
+use the application's binding. Default and explicitly selected legacy scripts
+retain their historical literal lookup. Bytecode cache version **36** invalidates
+older cached scripts; decompilation and cross-edition XDR tests cover literals.
+
+A private runtime table retains the first built-in constructors for each global,
+including classic embedding globals with no reserved JSProto slots. Its global
+keys are weak: constructors are traced only through a reachable global, and
+entries disappear before dead globals are finalized. `JS_ClearScope` resets the
+cache. Reinitializing a deleted global property does not replace a modern realm's
+original intrinsic. Public JSClass layouts and existing reserved slots are
+unchanged. This is groundwork for ES2015 intrinsic handling, not complete realm
+or ES2015 conformance.
+
+Focused shell checks cover shadowed/deleted globals, hostile global getters,
+boxing, collection, decompilation and legacy-to-modern calls. Native checks
+cover separate globals, rooted and unreachable realm lifetimes and scope reset.
+The packaged checks include both probes and mixed-edition XUL/content windows.
+All 35 shell and 19 native embedding checks pass; the cross-edition XDR probe
+passes its 13 checks with bytecode version 36.
+
+The complete pinned ES2015 run remains **23,528 passes, 5,038 failures, 14
+unsupported module cases and two harness errors**, with zero timeouts/crashes.
+No previously passing cases regress, and runtime hashes remain unchanged.
+All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/realm-intrinsics-full.json` and `realm-intrinsics-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, embedding and
+desktop checks. Additional checks pass for Calendar's eight unit suites and four
+views, Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla. Other platforms have not been revalidated for
+this batch.
+
+
+### Array.of
+
+`Array.of` constructs with a numeric argument count when its receiver has
+[[Construct]], including bound constructors. Otherwise it creates an intrinsic
+array in the built-in's defining global, even when called from a legacy script
+or another embedding global. Own index descriptors bypass inherited setters;
+nonconfigurable properties and nonextensibility reject writes. The final length
+assignment uses ordinary setter dispatch with throwing failure semantics.
+
+`array-of.js` passes 50 checks and `TestArrayOf.c` passes 15 cross-global native
+embedding checks on macOS arm64. The pinned method subset passes 26/28 cases;
+the remaining two need Proxy support.
+
+The complete pinned ES2015 run passes **23,550 cases**, with **5,016 failures**,
+14 unsupported module cases and two harness errors. There are no timeouts or
+crashes, and runtime hashes remain unchanged. This adds 22 passes with no lost
+passes. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/array-of-full.json` and `array-of-es5.json`.
+
+All four macOS arm64 applications build, package and pass the shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. These are macOS arm64 results; other
+platforms have not been revalidated for this batch.
+
+
+### Symbol primitives
+
+The engine now represents Symbol primitives independently of strings while
+preserving existing jsval tags and public JSClass layouts. An unused private
+string flag identifies a Symbol payload whose owned UTF-16 display buffer also
+contains its description. There are no hidden GC children. A private registry
+indexes slices of registered Symbols' owned buffers; it and the eleven ES2015
+well-known identities persist for the lifetime of the JSRuntime, including
+intervals without contexts. Runtime teardown frees these retained buffers.
+
+`JS_IsSymbolValue` and appended `JSTYPE_SYMBOL` expose the new type. Existing
+type enum values, classic global reserved-slot counts and old value encodings
+remain unchanged. Older native code viewing the string tag gets bounded display
+text from string accessors; dependent-string and concatenation APIs produce
+ordinary strings. Language ToString/ToNumber conversions still throw where
+required. Symbols cannot be serialized through XDR.
+
+Primitive conversion, boxing, identity comparisons, symbol property keys,
+descriptors, own-symbol reflection, assign, enumeration, JSON omission and
+@@toPrimitive/@@toStringTag are implemented. Symbol-valued descriptors stay
+rooted through callbacks. Additional well-known protocols such as iteration,
+matching, species and instanceof still require work; named well-known symbols
+alone do not establish their protocols or full ES2015 conformance.
+
+Current macOS arm64 focused validation passes 92 shell checks and 42 native
+embedding checks, including cross-global registries, classic 31-slot globals,
+GC and context teardown/recreation. A preliminary Symbol Test262 subset passes
+48/52 cases; the remaining cases require species getters and classes. The full
+pinned ES2015 run passes **23,781 cases**, with **4,785 failures**, 14 unsupported
+module cases and two harness errors. There are no timeouts or crashes, no lost
+passes, and 231 additional passes relative to Array.of. Runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/symbol-primitives-full.json` and `symbol-primitives-es5.json`.
+The native embedding probe also passes with its executable instrumented by
+AddressSanitizer; the engine itself was not instrumented. The focused script
+passes with macOS malloc scribbling enabled.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar passes its eight unit suites and four
+views; Browser passes 169 navigation/layout assertions. Suite Composer and
+ChatZilla, and standalone XULRunner ChatZilla pass. Windows, Linux and other
+architectures have not been revalidated for this batch.
+
+
+### Symbol.match classification
+
+String `includes`, `startsWith` and `endsWith` now use ES2015 IsRegExp: an
+object's observable `Symbol.match` value controls classification unless it is
+undefined, when the native RegExp type supplies the result. Truth testing does
+not invoke user conversion. Receiver conversion precedes classification, and
+classification precedes search-string and position conversion. This does not
+implement RegExp's matching, replacement, searching or splitting protocols.
+
+The focused fixture `string-match-classification.js` passes 39 checks on macOS
+arm64, including getter exceptions, inherited classification, opt-out, callback
+ordering and GC. The pinned String prototype subset passes 1,524/1,572 cases;
+all cases for these three methods pass. The full pinned ES2015 run passes
+**23,787 cases**, with **4,779 failures**, 14 unsupported module cases and two
+harness errors. This gains six passes without losing any; there are no crashes
+or timeouts and runtime hashes remain unchanged. All **11,540 required ES5
+cases** pass. Reports are `artifacts/es6/match-classification-full.json` and
+`match-classification-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, embedding and
+desktop checks. Calendar's eight unit suites and four views, Browser's 169
+navigation/layout assertions, Suite Composer/ChatZilla and standalone XULRunner
+ChatZilla pass. Other architectures and operating systems have not been
+revalidated for this batch.
+
+
+### Fresh modern RegExp literals
+
+The explicitly selected ES2015 edition emits a dedicated RegExp literal
+bytecode. Each evaluation creates a new object with independent identity,
+properties and lastIndex while sharing the compiled pattern. Global loops,
+function calls and eval follow this rule; explicitly selected legacy editions
+retain their historical literal identity. The interpreter and decompiler
+handle both ordinary and extended atom operands. Bytecode cache version **37**
+invalidates older caches. Clone initialization roots the new object and takes
+its pattern reference before later initialization can fail.
+
+`regexp-literals.js` passes 33 focused checks on macOS arm64. The separate
+`regexp-literals-wide.js` covers execution and decompilation beyond 65,535
+atoms. The edition/XDR probe includes fresh literal state and legacy identity
+in its 13 checks; the realm probe passes 22 checks, including RegExp prototypes
+across globals and context teardown. The pinned regexp-literal subset passes
+116/124 cases; the eight remaining cases require Unicode regexp behavior.
+The complete pinned ES2015 run retains **23,787 passes** and **4,779 failures**,
+with 14 unsupported module cases and two harness errors. There are no lost
+passes, crashes or timeouts; runtime hashes remain unchanged. All **11,540
+required ES5 cases** pass. Reports are `artifacts/es6/regexp-literals-full.json`
+and `regexp-literals-es5.json`. The focused tests cover the identity gap that
+the pinned corpus did not expose.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.
+
+
+### Symbol.hasInstance
+
+Modern `instanceof` evaluates custom Symbol.hasInstance hooks, propagates getter
+and call exceptions, and converts the result to Boolean. Function.prototype's
+non-constructible hook implements OrdinaryHasInstance, including primitive
+short-circuiting and bound-target delegation. Native state remains rooted
+through callbacks. Explicit legacy script modes and the public JS_HasInstance
+API keep the historical native class dispatch.
+
+The focused fixture passes 34 checks on macOS arm64. All 75 pinned instanceof
+operator cases pass, and 22/24 Function.prototype Symbol.hasInstance cases pass;
+the remaining two require Proxy. TestHasInstanceEmbedding passes 13 checks for
+native class hooks, version transitions, custom modern hooks and GC.
+
+The full pinned ES2015 run passes **23,811 cases**, with **4,755 failures**,
+14 unsupported module cases and two harness errors. This gains 24 passes
+without losing any; there are no crashes or timeouts and runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/hasinstance-full.json` and `hasinstance-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.
+
+
+### Built-in Symbol.toStringTag properties
+
+Math and JSON now define their standard non-writable, non-enumerable,
+configurable Symbol.toStringTag properties. Explicit ES2015 Object.prototype
+toString uses the specification's default tags when a custom tag is absent or
+non-string, including Object for Math, JSON and Symbol wrappers whose tags were
+removed. Legacy script modes retain historical native JSClass names. Native
+callability is inspected without invoking the object.
+
+`builtin-tags.js` passes 27 focused checks on macOS arm64, including tag
+deletion, replacement, Unicode getters and collection. TestBuiltinTags passes
+13 native checks, including ordinary/callable native objects and legacy edition
+transitions. All 40 pinned Object.prototype.toString cases pass; the separate
+Symbol.toStringTag filename subset passes 8/40, with the remaining cases
+requiring other unimplemented built-ins.
+
+The full pinned ES2015 run passes **23,815 cases**, with **4,751 failures**,
+14 unsupported module cases and two harness errors. This gains four passes
+without losing any; there are no crashes or timeouts and runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/builtin-tags-full.json` and `builtin-tags-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.
+
+
+### Array and String iterators
+
+Array keys/values/entries and Symbol.iterator, String Symbol.iterator, and
+modern arguments' own Symbol.iterator are implemented. Array iteration reads
+live lengths and visits holes; String iteration combines valid UTF-16 surrogate
+pairs. Iterator state is private, exhaustion is permanent, and results and entry
+arrays use the executing built-in's realm. Private weak realm caches retain
+intrinsic prototypes and the original values function without expanding public
+global reserved slots. Classic Iterator/StopIteration and legacy arguments
+objects retain their existing behavior.
+
+`modern-iterators.js` passes 62 focused checks and `TestModernIterators.c` passes
+23 native embedding checks on macOS arm64, including callbacks, collection,
+borrowed methods, context teardown, realm collection and scope clearing.
+The String Symbol.iterator subset passes 10/10. The iterator-prototype subset
+passes 40/94; its remaining cases require Map, Set or typed arrays.
+
+The full pinned ES2015 run passes **23,909 cases**, with **4,657 failures**,
+14 unsupported module cases and two harness errors. This gains 94 passes
+without losing any; there are no crashes or timeouts and runtime hashes remain
+unchanged. All **11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/iterators-full.json` and `iterators-es5.json`. An earlier Array
+prototype diagnostic overlapped compilation and is invalid; use the complete
+run for results.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch. This does not implement for-of, spread, generators or iterable
+consumers such as Array.from.
+
+
+### Array.from
+
+Array.from supports iterable and array-like inputs, generic construction,
+mapping with raw receivers, own indexed data properties and throwing length
+writes. Its fallback arrays use the built-in's defining realm. IteratorClose
+follows the ES2015 edition: return-getter failures replace the original throw;
+after successful method lookup the original throw takes precedence over the
+return call's outcome. Failures in next, done or value do not close the iterator.
+Callback state and index atoms remain rooted through collection.
+
+On macOS arm64, 36 focused checks and 17 native realm checks pass. The pinned
+Array.from subset passes 72/78; the remaining cases require ArrayBuffer or
+computed method syntax. The full pinned ES2015 run passes **23,975 cases**,
+with **4,591 failures**, 14 unsupported module cases and two harness errors.
+This gains 66 passes without losing any; there are no crashes or timeouts and
+runtime hashes remain unchanged. All **11,540 required ES5 cases** pass.
+Reports are `artifacts/es6/array-from-full.json` and `array-from-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+standalone XULRunner ChatZilla pass. Other platforms have not been revalidated
+for this batch.
+
+
+### Symbol.unscopables
+
+Modern syntactic with environments consult Symbol.unscopables after finding a
+property. Array.prototype provides the seven ES2015 exclusions in a null-prototype
+table. Legacy scripts and ordinary embedding/global scopes retain their prior
+lookup policy. Callback state and identifier atoms remain rooted; native
+property handles are released before getters run. A private binding marker
+preserves the lookup decision when a getter deletes the property. Reads then
+use object operations, and implicit method calls receive the binding object.
+
+On macOS arm64, 37 focused checks, 14 native embedding checks, all 14 targeted
+cases and all 155 upstream with-statement cases pass. The full pinned ES2015
+run passes **23,982 cases**, with **4,584 failures**, 14 unsupported module
+cases and two harness errors. This gains seven passes without losing any;
+there are no crashes or timeouts and runtime hashes remain unchanged. All
+**11,540 required ES5 cases** pass. Reports are
+`artifacts/es6/unscopables-full.json` and `unscopables-es5.json`.
+
+All four macOS arm64 applications build, package and pass shell, native
+embedding and desktop checks. Calendar's eight unit suites and four views,
+Browser's 169 navigation/layout assertions, Suite Composer/ChatZilla and
+packaged standalone XULRunner ChatZilla pass. Other platforms have not been
+revalidated for this batch.
+
+
+### Modern object-literal properties
+
+Explicit ES2015 code supports computed data properties, ordinary concise
+methods, computed getters/setters and shorthand identifier properties. Computed
+keys are converted before evaluating values. Anonymous function names belong
+to each closure, including Symbol-derived names and the distinction between
+absent and empty Symbol descriptions. Methods/accessors are non-constructible;
+simple method parameter names are checked for duplicates. The historical accessor embedding access
+check still runs, with identifier atoms rooted through callback collection.
+Computed and shorthand __proto__ fields create own data properties. Legacy
+script modes keep their existing grammar.
+
+The new bytecodes use cache version **38**, with matching script decompilation
+and XDR coverage. On macOS arm64, 58 focused checks, two extended-atom checks
+and 14 edition/embedding checks pass. The object-expression subset passes
+142/208; the broader computed-name subset passes 20/90, retaining class,
+generator and other missing-feature cases. Array.from improves to 76/78; its
+remaining two cases require ArrayBuffer. These subsets are diagnostics.
+
+The complete pinned ES2015 run passes **24,063 cases**, with **4,503 failures**,
+14 unsupported module cases and two Float64Array harness errors. There are no
+crashes or timeouts, the runtime hash stays unchanged, and 81 cases newly pass
+without losing any previously passing case. All **11,540 ES5 cases** pass.
+The scanner recognizes the ES2015 arrow punctuator separately from assignment;
+arrow-function parsing remains unimplemented. This preserves SyntaxError for
+invalid arrow bindings now that shorthand properties parse successfully.
+
+All four macOS arm64 applications compile and pass package shell/native checks
+and relocated desktop checks, including real window globals and classic scripts.
+Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout checks; Suite passes Composer lifecycle and ChatZilla checks,
+and packaged standalone XULRunner passes ChatZilla initialization/input checks.
+Other platforms have not been revalidated. Computed destructuring, generator
+methods, super and remaining parameter grammar still require work.
+
+### Map and Set
+
+Native Map and Set now use an ordered SameValueZero hash table with tombstones
+for live iteration. Methods, iterable constructors, size accessors, iterator
+aliases, tags, species and iterator cleanup are implemented. Clear/delete/reinsert
+and additions during forEach or next retain iteration order. Shared native
+storage ownership protects either finalizer order; iterators also trace their
+collection objects. Native operations release object locks before callbacks,
+error reporting or GC allocation. The collection classes append prototype keys
+without increasing the classic global reserved-slot requirement.
+
+The storage regression `TestCollectionTable.c` currently passes 229,123 checks,
+including 50,000 deterministic randomized operations compared with an independent
+ordered-array model. A separate ASan/UBSan build of the storage and test passes;
+this is not whole-engine instrumentation. That build disables shift-base checks
+for the historical signed `INT_TO_JSVAL` tagging macro. The focused JavaScript
+fixture passes 53 checks, and the native cross-global/lifetime probe passes 26.
+The pinned Map subset passes 257/277; its remaining cases require WeakMap.
+The Set subset passes 352/368, retaining missing WeakSet and arrow-function
+coverage. These subsets do not replace the full suite.
+
+The complete pinned ES2015 run passes **24,708 cases**, with **3,858 failures**,
+14 unsupported module cases and two Float64Array harness errors. All 645 newly
+passing cases are gains; no previously passing case regresses. The runtime hash
+stays unchanged, with no crashes or timeouts. All **11,540 ES5 cases** pass.
+All four macOS arm64 applications compile, package and pass relocated shell,
+native embedding and desktop checks, including Map/Set in chrome and content
+window globals. Calendar passes eight unit suites and four views; Browser passes
+169 navigation/layout checks; Suite passes Composer and ChatZilla checks; packaged
+standalone XULRunner passes ChatZilla initialization/input. Other platforms have
+not been revalidated for this batch.
+
+### Weak collections
+
+WeakMap and WeakSet have native object-only keys, iterable constructors and
+standard methods/tags, without exposing enumeration. Their tables do not trace
+keys or values during ordinary marking. The collector computes ephemeron
+reachability to a fixed point: a reachable owner and key may retain a value,
+and that value may expose another key or owner. Dead keys are removed before
+sweeping. Unreachable value-to-key cycles cannot keep themselves alive.
+
+Weak closure runs before legacy generator-close discovery, after its marking,
+and around the embedding mark callback. A host's mark call during MARK_END
+returns with weak reachability complete, preserving the classic immediate
+finalization guarantee. The native regression observes actual finalizer counts
+for key/value cycles, dead owners, transitive weak chains, callback-only roots,
+classic generators and destroyed contexts.
+
+On macOS arm64, 60 focused checks, 57 native GC/embedding checks, all 174 pinned
+WeakMap cases and all 148 WeakSet cases pass. The focused/native checks also
+pass with malloc scribbling enabled; this is not full-engine sanitizer coverage.
+The complete pinned ES2015 run passes **25,064 cases**, with **3,502 failures**,
+14 unsupported module cases and two Float64Array harness errors. All 356 new
+passes are gains, with no lost passes, crashes or timeouts; the runtime hash
+stays unchanged. All **11,540 ES5 cases** pass.
+
+All four macOS arm64 applications compile and pass packaged shell/native and
+relocated desktop checks, including weak collections in chrome/content globals.
+Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout checks; Suite passes Composer lifecycle and ChatZilla checks;
+packaged standalone XULRunner passes ChatZilla initialization/input. Other
+platforms have not been revalidated for this batch.
+
+
+### Reflect
+
+The native ES2015 Reflect namespace implements all 14 operations, including
+`enumerate` from the 2015 edition. Property operations preserve raw accessor
+receivers and return false for ordinary descriptor, extensibility and deletion
+rejections; user exceptions still propagate. Construction supports alternate
+`newTarget` prototypes, bound constructors and intrinsic fallback from the
+new target's realm without replacing the historical embedding APIs.
+
+The focused script currently passes 53 checks. `TestReflect.c` passes 43 native
+checks covering foreign globals after their context is destroyed, intrinsic
+fallback, legacy callers, native setter hooks with collection during callbacks,
+enumerator reentry, security callback rejection, namespace deletion and cache
+reset. Before the Proxy implementation, the pinned Reflect subset passed
+266 of 288 cases; all 22 remaining cases depended on Proxy.
+The complete pinned ES2015 run passes **25,330 cases**, with **3,236 failures**,
+14 unsupported module cases and two harness errors. This adds 266 passes and
+loses none relative to the weak-collection baseline. The runtime hashes remained
+unchanged during the run, with no crashes or timeouts. All **11,540 ES5.1 cases**
+pass. All four macOS arm64 applications compile and pass packaged shell/native
+and relocated desktop checks, including Reflect in chrome/content globals.
+Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout checks; Suite passes all 24 lifecycle checks and ChatZilla;
+packaged standalone XULRunner passes ChatZilla initialization and input checks.
+Other platforms have not been revalidated for this batch.
+
+Nonstandard embedding object operations retain their classic
+hooks; a distinct receiver cannot be forwarded through a historical get hook
+that has no receiver parameter. The Reflect batch alone did not establish
+Proxy support or complete host-object receiver semantics.
+
+
+### Proxy
+
+The native Proxy implementation adds forwarding and traps for property reads,
+writes, own descriptors, definition/deletion, keys, prototype/extensibility,
+call/construction and the ES2015 `enumerate` operation. Trap results are checked
+against target invariants, including non-configurable properties and
+non-extensible targets. Property receivers and alternate construction targets
+are retained. Callable/constructible capabilities survive revocation, while
+operations on revoked proxies throw. Captured target/handler roots survive
+revocation and collection inside trap getters; revocation releases their strong
+references. Revoker closures also retain their state when cloned through JSAPI.
+
+The public JSClass/JSObjectOps layouts are unchanged. Private dispatch prevents
+native scope/property-cache paths from interpreting Proxy property handles as
+native properties. Historical objects retain their existing embedding hooks.
+Proxy array recognition is shared by Array.isArray, JSON, concat, Object tags
+and JS_IsArrayObject. Object integrity/assignment and own-property queries
+use the corresponding traps, and inherited enumeration delegates to the
+prototype Proxy without calling its `has` trap.
+
+The focused script passes 65 checks; TestProxy.c passes 55 checks, including
+foreign realms after context destruction, cloned revokers, GC during callbacks,
+finalization of target/handler pairs, 1,000 opaque JSAPI lookups without retained
+roots, and intrinsic-cache reset. The final pinned run passes all 398 Proxy
+cases and all 288 Reflect cases. It records **25,767 passes**, **2,799 failures**,
+14 unsupported module cases and two harness errors: **437 gained, zero lost**
+relative to Reflect. Runtime hashes remained unchanged, with no crashes or
+timeouts. All **11,540 required-mode ES5.1 cases** pass. Conformance ran on the
+validated XULRunner shell with America/Los_Angeles as the test timezone.
+
+All four macOS arm64 applications pass root compilation, package shell/native
+checks and relocated desktop checks with SDK 11.3. Calendar passes eight unit
+suites and all four views; Browser passes 169 navigation/layout assertions;
+Suite passes its 24 lifecycle assertions and ChatZilla; standalone packaged
+XULRunner initializes ChatZilla and its input. No other platform or architecture
+has been revalidated for this batch.
+
+
+Native C getter/setter hooks installed directly on a Proxy through JSAPI are
+not represented by ES property descriptors and currently reject that operation;
+existing native objects are unchanged. The historical native `__proto__`
+accessor needed receiver adaptation when reached through a Proxy in this batch;
+the Annex B follow-up below supplies modern accessors while retaining legacy
+hooks. Reflect.getPrototypeOf and Object.getPrototypeOf use the Proxy trap directly.
+These results do not establish full ES6
+conformance or all host-object wrapping semantics.
+
+
+### Annex B built-ins
+
+Globals explicitly initialized in ES2015 mode now expose `__proto__` as a
+configurable, non-enumerable accessor. Its getter/setter preserve raw receivers,
+Proxy traps, rejection exceptions, foreign-realm primitive prototypes and
+classic embedding access checks. Legacy-initialized globals retain the old
+short-id property hooks. Script edition selection alone does not recreate a
+window's pre-existing built-in prototypes.
+
+In ES2015 code, the four attribute-bearing String HTML helpers convert their
+receiver before the attribute and replace attribute quotes with `&quot;`.
+Legacy editions retain their previous order and quoting. The implementation
+checks the expanded allocation length and roots converted strings through
+callbacks and GC. Modern globals also retain deletion of escape/unescape and
+related String helpers, including when accessed from legacy code; a private
+per-global initialization marker preserves the legacy lazy-resolution behavior
+in legacy globals. JS_ClearScope starts a fresh cache lifetime.
+
+Focused checks currently pass: 32 prototype, 27 HTML, 25 global-binding and 28
+native embedding checks. The Annex B B.2 subset passes all 52 cases. Native
+coverage includes host access denial, callbacks replacing in/out values and
+collecting, JSAPI-cloned accessors, foreign contexts destroyed before use,
+standard-class enumeration after deletion, and reset to a legacy global.
+The complete pinned ES2015 run passes **25,783 cases**, with **2,783 failures**,
+14 unsupported module cases and two harness errors: **16 gained, zero lost**
+relative to Proxy. The runtime remained unchanged and had no crashes/timeouts.
+All **11,540 required-mode ES5.1 cases** pass (America/Los_Angeles).
+
+All four macOS arm64 / SDK 11.3 root builds, package checks and relocated desktop
+checks pass. Calendar passes eight unit suites and all four views; Browser
+passes 169 navigation/layout assertions; Suite passes all 24 lifecycle assertions
+and ChatZilla; standalone packaged XULRunner passes ChatZilla initialization and
+input checks. The unchanged Object additions regression also passes all 145
+checks, including legacy virtual __proto__ ownership in a modern global.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Full ES6 compliance remains incomplete.
+
+### RegExp prototype fields
+
+ES2015-initialized globals use an ordinary RegExp prototype and configurable,
+non-enumerable accessors for source, global, ignoreCase and multiline. Instances
+retain their internal matcher and own writable, non-enumerable, non-configurable
+lastIndex. The source getter escapes slashes and line terminators for literal
+round trips and reports the empty pattern as `(?:)`. Generic flags reads all five
+ES2015 flag properties in order; generic toString converts source before flags.
+The ordinary prototype has no matcher slots: ES2015 accessors reject it with
+TypeError. The special prototype values found in later editions do not apply.
+This does not implement Unicode/sticky matching or the remaining RegExp symbol
+protocols and constructor semantics. Script edition selection alone does not
+reinitialize a legacy window's built-in prototypes.
+
+Legacy-initialized globals retain callable/matcher-bearing RegExp prototypes
+and virtual own fields. The prototype-mutation regression now explicitly checks
+ES2015 inherited accessors; its original own-field expectation is retained in
+the native legacy-global test. Native construction supplies the modern
+prototype's parent when differing private-slot layouts prevent map sharing.
+XDR decodes RegExp literals using the instance class, independently of the
+modern prototype's ordinary-object class. Decoding failure leaves installed
+matcher state owned by its object; a debugger allocation hook forces the
+lastIndex failure path and GC checks cleanup under MallocScribble. Inherited
+read-only lastIndex properties cannot block modern own-field creation. Serialized bytes and bytecodes are
+unchanged. Function/script decompilation continues to read internal patterns
+rather than mutable public source/flags properties.
+
+Focused coverage has 66 script checks and 45 native embedding checks, including
+GC/reentrancy, cloned accessors, foreign contexts destroyed before use, native
+UTF-16 construction, cached-script decoding under a legacy context edition, and
+reset to a legacy global, and lazy class initialization by a modern script in
+a legacy global, plus RegExp as the first lazily resolved class. RegExp initialization and stringification follow the global
+policy even when the triggering caller has another edition. These checks are included in macOS packaging. The
+RegExp slice of the complete pinned run passes 1,120 of 1,546 cases.
+
+The complete pinned ES2015 run passes **25,839 cases**, with **2,727 failures**,
+14 unsupported module cases and two harness errors: **56 gained, zero lost**
+relative to Annex B. The frozen runtime remained unchanged; no crashes or
+timeouts occurred. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports are `artifacts/es6/regexp-fields-full.json` and
+`regexp-fields-es5.json`; the final snapshot is
+`/tmp/zr-regexp-fields-conformance-final3-20260918`.
+
+All four macOS arm64 / SDK 11.3 applications pass root builds, final package
+checks and relocated desktop checks. Calendar passes eight unit suites and all
+four views. Browser passes 169 navigation/layout checks. Suite passes 24
+lifecycle assertions and ChatZilla; standalone packaged XULRunner passes
+ChatZilla initialization and input. Final desktop reports are under
+`artifacts/es6/regexp-fields-runtime-final3`. Earlier canceled conformance runs
+and superseded package/desktop diagnostics are not completion evidence.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Full ES6 compliance remains incomplete.
+
+The implementation follows [the original ES2015 RegExp specification](https://262.ecma-international.org/6.0/#sec-properties-of-the-regexp-prototype-object),
+including its rejection of the ordinary prototype by source/flag accessors.
+
+### RegExp match/search protocols
+
+Modern globals now provide generic RegExp test, Symbol.match and Symbol.search,
+and String match/search dispatch through symbol methods. These operations keep
+raw receivers and observable getter/conversion order, invoke overridden exec,
+reject primitive exec results, and preserve user exceptions. String fallback
+uses the defining realm's cached RegExp constructor. Legacy globals retain their
+original String/RegExp methods and ignore exec overrides as before.
+
+The original ES2015 RegExpBuiltinExec reads lastIndex, global and sticky through
+ordinary properties. It clamps lastIndex with ToLength, snapshots matcher state
+after callbacks, and checks index writes, including failed nonglobal matches.
+Sticky property overrides anchor the matcher, but the y flag/parser and Unicode
+matching remain unimplemented. Global match advances empty matches by code point
+when the observable unicode property is true, while preserving code-unit offsets.
+Search performs both index writes unconditionally in this edition and does not
+restore after an exec exception. Later-edition algorithms differ.
+
+Native result arrays use the executing method's realm; a callable exec may
+return an array from its own realm. The native probe covers foreign contexts
+destroyed before use, cloned methods, primitive symbol getter/method receivers,
+GC, interrupting a native match loop and collection after references are removed.
+There are 56 focused script checks and 28 native embedding checks. The diagnostic
+RegExp subset passes 1,236/1,546 cases with no timeouts; all 146 String match/search
+cases pass. The complete pinned ES2015 run passes **25,969 cases**, with
+**2,597 failures**, 14 unsupported module cases and two harness errors:
+**130 gained, zero lost** relative to RegExp fields. No crashes or timeouts
+occurred and the frozen runtime remained unchanged. All **11,540 required-mode
+ES5.1 cases** pass in America/Los_Angeles. Reports are
+`artifacts/es6/regexp-protocols-full.json` and `regexp-protocols-es5.json`;
+the frozen runtime is `/tmp/zr-regexp-protocols-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 root builds, package checks and relocated desktop
+checks pass. Calendar passes eight unit suites and all four views. Browser
+passes 169 navigation/layout assertions. Suite passes 24 lifecycle assertions
+and ChatZilla; standalone packaged XULRunner passes ChatZilla initialization and
+input. Final desktop reports are under `artifacts/es6/regexp-protocols-runtime`.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Constructor details, y/u flag support, replacement/splitting protocols and other
+ES6 work remain incomplete.
+
+The prototype-mutation and Reflect focused tests now supply an explicit global
+property when replacing a RegExp's prototype, preserving their original
+lastIndex assertions while following ES2015's property lookup semantics. The
+legacy prototype/field behavior remains covered separately. The upstream
+Test262 files and assertions are unchanged. No bytecode or cache-format changes
+are needed for these runtime operations.
+
+### RegExp constructors and sticky flags
+
+Modern RegExp construction observes Symbol.match and regexp-like properties
+before newTarget.prototype, preserves constructor identity short-circuits,
+copies actual matcher state without reading public source/flags overrides,
+and accepts explicit flag overrides. A dedicated native constructor delays
+allocation until the required observable steps complete. Bound and Proxy
+newTarget fallback uses the existing constructor-realm logic. RegExp species
+is a configurable accessor returning its raw receiver.
+
+The y flag is accepted by ES2015 literals and modern constructors; legacy
+source grammar still rejects it. Native JSAPI callers can request JSREG_STICKY.
+Both the initial simple-matcher search and the outer search loop honor
+anchoring. Literal decompilation and XDR preserve the flag. Cache version 39
+invalidates component caches made before the new RegExp flag semantics. Unicode
+matching and the u flag remain unimplemented.
+
+String match/search fallback now calls private RegExpCreate directly. That
+operation converts the pattern instead of performing the constructor's
+IsRegExp, identity or matcher-copy steps. The distinction prevents a second
+symbol lookup and preserves fallback behavior when a RegExp's symbol method
+is null or undefined. Constructor and String fallback share initialization
+of fresh matcher objects without changing public JSAPI layouts.
+
+Focused checks: 35 script and 36 native embedding checks under MallocScribble.
+Native coverage includes JS_NewRegExpObject, the classic construct-with-arguments
+API, foreign contexts destroyed before use, bound/Proxy constructor realms,
+JSAPI-cloned constructors, legacy callers, sticky XDR decode/execution under
+a different context edition, and return to legacy globals. Classic JSAPI
+function clones create their own ordinary prototypes; tests use intrinsic
+accessors to inspect their matcher state rather than changing that contract.
+The diagnostic RegExp subset passes 1,328/1,546 cases. The complete pinned
+ES2015 run passes **26,061 cases**, with **2,505 failures**, 14 unsupported
+module cases and two harness errors: **92 gained, zero lost** relative to
+match/search. No crashes or timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/regexp-constructor-full.json` and
+`regexp-constructor-es5.json`. Frozen runtime:
+`/tmp/zr-regexp-constructor-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 root builds, packages and relocated desktop
+checks pass. Calendar passes eight unit suites and all four views. Browser
+passes 169 navigation/layout assertions. Suite passes 24 lifecycle assertions
+and ChatZilla; standalone packaged XULRunner passes ChatZilla initialization
+and input. Desktop reports: `artifacts/es6/regexp-constructor-runtime`.
+Windows, Linux and other architectures have not been revalidated for this batch.
+Unicode matching, replacement/splitting protocols and further ES6 work remain
+incomplete. Modern constructor selection follows the initialized global's
+policy; running an ES2015 script alone does not replace legacy window built-ins.
+
+### RegExp and String split protocols
+
+Modern globals dispatch String split through Symbol.split before converting the
+receiver. RegExp split resolves the species constructor, appends the sticky flag,
+constructs a separate matcher, preserves capture values without string coercion,
+and creates arrays in the executing method's realm. String fallback converts
+ordinary separators and preserves the legacy limit conversion and empty-piece
+behavior. Existing legacy globals retain their original split implementation.
+
+The pinned ES2015 corpus incorporates the [July 2015 limit correction](https://tc39.es/archives/bugzilla/4432/):
+split limits use ToUint32, preserving negative-limit compatibility. Match indices
+and capture counts still use ToLength. Native loops remain interruptible,
+including custom exec results with excessive capture counts. Out-of-range custom
+match indices cannot create out-of-bounds dependent strings.
+
+The diagnostic subsets pass all 210 String split cases and 80/84 RegExp split
+cases; the four remaining failures require Unicode u matching. There are 33
+focused script checks and 27 native embedding checks under MallocScribble,
+covering callback GC, constructor order, primitive receivers, foreign contexts
+destroyed before use, cloned methods, result realms and legacy behavior.
+The full pinned ES2015 run passes **26,143 cases**, with **2,423 failures**,
+14 unsupported module cases and two harness errors: **82 gained, zero lost**
+relative to constructor/sticky. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/regexp-split-full.json` and
+`regexp-split-es5.json`; runtime: `/tmp/zr-regexp-split-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass on the completed desktop run. Calendar passes eight unit suites and four
+views; Browser passes 169 navigation/layout assertions; Suite and XULRunner pass
+ChatZilla initialization/input checks. The first Suite run recorded an
+intermittent Inspector `mDocPanel` lifecycle error under concurrent conformance
+load despite all 24 explicit assertions passing. The unchanged package passed
+its rerun; retain `regexp-split-runtime/suite-first-failure` as diagnostic evidence.
+Two additional lifecycle runs after conformance each pass all 24 assertions
+without console errors. These repeats do not establish that the intermittent
+Inspector issue is fixed. No application code or
+upstream assertions were changed to bypass the failure. Other operating systems
+and architectures have not been revalidated. Unicode matching, replacement
+protocols and the remaining ES6 work are still incomplete.
+
+### RegExp and String replacement protocols
+
+Modern RegExp Symbol.replace collects exec results before invoking replacement
+callbacks, then observes result length, matched text, index and captures in
+order. Capture conversion preserves undefined, callback receivers remain raw,
+and overlapping results still invoke callbacks. A checked native UTF-16 output
+buffer handles substitutions without quadratic concatenation. Native capture
+loops remain interruptible. String replacement dispatches Symbol.replace before
+receiver conversion and uses literal string matching for fallback; legacy
+globals retain their historical method and `$+` behavior.
+
+Diagnostic subsets pass 106/108 RegExp replacement cases (two Unicode u failures)
+and all 86 String replacement cases. There are 34 focused script checks and
+27 native embedding checks under MallocScribble, covering callback GC, ordering,
+foreign realms, cloned methods, primitive receivers and interrupt recovery.
+The full pinned ES2015 run passes **26,249 cases**, with **2,317 failures**,
+14 unsupported module cases and two harness errors: **106 gained, zero lost**
+relative to split. No crashes/timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/regexp-replace-full.json` and `regexp-replace-es5.json`;
+runtime: `/tmp/zr-regexp-replace-conformance-20260918`.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass. Calendar passes eight unit suites and all four views; Browser passes 169
+navigation/layout assertions; Suite passes 24 lifecycle assertions and ChatZilla;
+standalone packaged XULRunner passes ChatZilla initialization and input. Desktop
+reports: `artifacts/es6/regexp-replace-runtime`. Other operating systems and
+architectures have not been revalidated. Unicode RegExp matching and the other
+remaining ES6 features are still incomplete.
+
+### Date conversion and prototype
+
+Modern Date globals provide the configurable, non-writable Symbol.toPrimitive
+method. Its generic ordinary conversion preserves getter exceptions, calls
+methods with zero arguments, accepts primitive results including Symbols, and
+rejects invalid hints without coercing them. Removing the hook from a modern
+Date selects ordinary conversion rather than the historical hint-argument path.
+Modern valueOf ignores extra arguments. Existing legacy globals retain their
+hint-sensitive valueOf and NaN-valued Date prototype, even when Date is first
+resolved by a modern caller.
+
+Modern Date.prototype retains the private native class layout but has no date
+value; instance methods reject it, and its default ES2015 Object tag is Object.
+The Date constructor copies real instances' stored values without observable
+conversion, and uses the default primitive hint for other objects before
+parsing strings or converting numbers. Classic native Date creation/getter APIs
+and foreign-context lifetimes are covered.
+
+The complete Date diagnostic subset passes 898/898 cases. There are 29 focused
+script and 32 native embedding checks under MallocScribble; C89 checks pass.
+The complete pinned ES2015 run passes **26,281 cases**, with **2,285 failures**,
+14 unsupported module cases and two harness errors: **32 gained, zero lost**
+relative to replacement. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/date-primitive-full.json` and
+`date-primitive-es5.json`; runtime: `/tmp/zr-date-primitive-conformance-20260918`.
+Its library hash matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass. Calendar passes eight unit suites and four views; Browser passes 169
+navigation/layout assertions; Suite passes 24 lifecycle assertions and ChatZilla;
+standalone XULRunner passes packaged ChatZilla initialization/input. Reports:
+`artifacts/es6/date-primitive-runtime`. The first Date
+subset was stopped because it started before compilation completed; only the
+completed third subset is the final diagnostic result. A native fixture used
+`undefined` before initializing that global; replacing it with `void 0` preserves
+the assertion without requiring extra global bootstrap. Upstream tests are
+unchanged. Other operating systems and architectures have not been revalidated.
+
+### Array concat and species
+
+Modern concat observes Symbol.isConcatSpreadable, preserves sparse properties,
+uses ToLength and checked safe-integer output indices, and creates results through
+ArraySpeciesCreate. Foreign intrinsic Array constructors select the executing
+method's default Array rather than reading the foreign species accessor; custom
+constructors still participate. Primitive receiver wrappers use the method's
+realm. Modern Array has a configurable species getter returning its raw receiver.
+Legacy globals retain the previous concat implementation.
+
+Diagnostic concat coverage: 89/95 cases; the remaining six require typed arrays
+or classes. Focused checks: 29 script and 36 native embedding checks under
+MallocScribble, including GC, foreign contexts, cloned methods, primitive wrapper
+realms, custom species, Proxy trap order and native-loop interruption. The native
+GC fixture clears its non-deletable boxed-object variable before collecting the
+foreign global. The full pinned ES2015 run passes **26,330 cases**, with **2,236
+failures**, 14 unsupported module cases and two harness errors: **49 gained,
+zero lost** relative to Date. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/array-concat-full-final2.json` and
+`array-concat-es5-final2.json`; snapshot:
+`/tmp/zr-array-concat-conformance-final2-20260918`.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktop checks
+pass. Calendar passes eight unit suites and four views; Browser passes 169
+navigation/layout assertions; Suite passes 24 lifecycle assertions and ChatZilla;
+standalone XULRunner passes packaged ChatZilla initialization/input. Reports:
+`artifacts/es6/array-concat-runtime`. Other platforms remain unvalidated.
+
+Modern concat has a distinct native entry point, so a JSAPI clone into a legacy
+global preserves the modern method's semantics while using that destination's
+intrinsics. The superseded first full runs were stopped before completion and
+must not be reported as validation; final runs use a second frozen snapshot.
+
+### Array callback methods
+
+Modern forEach, map, filter, some, every, reduce and reduceRight use ToLength,
+live HasProperty/Get traversal with a snapshot length, and raw callback receivers.
+Map/filter use ArraySpeciesCreate and CreateDataProperty without an extra length
+Set on custom results. Distinct native entry points preserve modern semantics
+when JSAPI-cloned into legacy globals. Legacy globals retain their original
+methods and ToUint32 lengths. Long native loops remain interruptible.
+
+All 3,048 pinned cases in the seven method subsets pass: map 383, filter 438,
+forEach 366, some 424, every 421, reduce 509 and reduceRight 507. Focused coverage
+passes 37 script checks and 35 native embedding checks under MallocScribble.
+The first diagnostic invocation resolved xpcshell's symlink out of dist/bin and
+failed source preflight due to its missing runtime library; no cases executed.
+Corrected runs preserve the executable's dist/bin path and report unchanged
+runtime hashes. The native GC fixture releases the foreign cloned method before
+checking finalization, keeping a local method rooted for the later legacy-clone
+check. Upstream tests and assertions are unchanged.
+
+The full pinned ES2015 run passes **26,394 cases**, with **2,172 failures**,
+14 unsupported module cases and two harness errors: **64 gained, zero lost**
+relative to concat. No crashes/timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/array-iteration-full.json` and `array-iteration-es5.json`;
+snapshot: `/tmp/zr-array-iteration-conformance-20260918`. Its libmozjs SHA-256
+`11abfd5ba54784ea0622a37f18b3bcea8a2323cbdf1b3339b7746babd225d543` matches the
+completed Suite root build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/array-iteration-runtime`. Other platforms remain unvalidated;
+full ES6 remains incomplete.
+
+### Array indexed methods
+
+Modern push, pop, shift, unshift, reverse, slice, splice, indexOf and lastIndexOf
+use ToLength and safe-integer indices, throwing writes/deletes and observable
+property ordering. Slice/splice create species results, preserve holes and set
+the result length before returning or mutating the source. Native loops remain
+interruptible; boxed receivers/results use the executing method's realm. Legacy
+globals retain their previous methods. Length conversion and search results
+normalize negative zero to positive zero where required.
+
+The nine diagnostic subsets pass 1,144/1,144 cases; focused checks pass 59 script
+and 48 native embedding assertions under MallocScribble. The first subsets found
+eight signed-zero failures in pop/shift/indexOf/lastIndexOf; corrected subsets
+pass without upstream changes. C89 checks pass.
+
+The full pinned ES2015 run passes **26,452 cases**, with **2,114 failures**,
+14 unsupported module cases and two harness errors: **58 gained, zero lost**
+relative to callback methods. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/array-indexed-full.json` and
+`array-indexed-es5.json`; snapshot: `/tmp/zr-array-indexed-conformance-20260918`.
+Its libmozjs SHA-256 `a02956086d6cd0320988edb64c8e3abf9d806ac8908f939d896caf3f9357c95a`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/array-indexed-runtime`. Other platforms and full ES6 remain
+incomplete.
+
+### Array string conversion and sorting
+
+Modern join/toLocaleString use ToLength, checked UTF-16 accumulation and direct
+Get operations without the historical sharp-map enumeration. A per-context,
+stack-owned cycle guard is unwound on failure and interruption; its object stays
+rooted independently. Modern Array.toString invokes an observed callable join or
+the intrinsic Object tag operation. Modern Object.toLocaleString preserves raw
+primitive receivers in both property lookup and invocation. Boxing uses the
+executing built-in's realm through a shared private helper. Legacy methods remain
+separate, including legacy toString and boxed locale forwarding.
+
+Modern sort collects sparse properties with a dynamically grown rooted vector,
+orders values/undefined/holes, performs throwing writes/deletes, and remains
+interruptible during traversal and comparison. Even identical objects undergo
+observable default string conversions. The private join state is appended to
+JSContext and all embedding builds must be refreshed.
+
+Focused checks pass 36 script and 44 native embedding assertions under
+MallocScribble, including comparison-phase interruption, foreign realms,
+cloned methods, primitive receivers, cycle recovery and GC. C89 checks pass.
+Initial subsets exposed inherited locale boxing and identical-value comparison
+shortcuts; the modern paths were corrected with added regressions. Corrected
+subsets pass **141/141** cases: join 42, toLocaleString 20, toString 24 and sort 55.
+
+The full pinned ES2015 run passes **26,462 cases**, with **2,104 failures**,
+14 unsupported module cases and two harness errors: **10 gained, zero lost**
+relative to indexed methods. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/array-text-full.json` and
+`array-text-es5.json`; snapshot: `/tmp/zr-array-text-conformance-20260918`.
+Its libmozjs SHA-256 `f7b7a8c29a8c50134818f9f0f7bbd06b393b34347762b483bdbae6f382f3a37b`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/array-text-runtime`. Other platforms and full ES6 remain incomplete.
+
+### Error construction and prototypes
+
+Modern Error instances use a nonconstructible native class retaining the classic
+report/stack representation. Prototypes are ordinary objects, NativeError
+constructors inherit from Error, and each prototype owns its empty message.
+Modern message properties are configurable own data properties that stay deleted;
+lazy native resolution does not recreate them. The classic report APIs recognize
+both native classes. Legacy globals keep their original constructor/prototype
+and lazy-resolution behavior.
+
+Modern constructors allow nested Error creation from message conversion and
+ignore the legacy optional filename/line arguments. Generic Error.toString uses
+ordered name/message conversion with standard defaults and rejects primitive
+receivers. NewTarget and JSAPI-cloned constructors retain the appropriate realm
+and native Error identity. Engine-generated exceptions retain native reports,
+file/line extensions and garbage-collected stacks.
+
+Diagnostic subsets pass 148/148 cases: Error 74 and Object.getPrototypeOf 74.
+Focused checks pass 72 script and 32 native assertions under MallocScribble; C89
+checks pass. The native fixture enables JSOPTION_DONT_REPORT_UNCAUGHT before
+inspecting a pending exception; otherwise outermost evaluation reports and clears
+it. Upstream tests are unchanged.
+
+The full pinned ES2015 run passes **26,482 cases**, with **2,084 failures**,
+14 unsupported module cases and two harness errors: **20 gained, zero lost**
+relative to string/sort methods. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/error-modern-full.json` and
+`error-modern-es5.json`; snapshot: `/tmp/zr-error-modern-conformance-20260918`.
+Its libmozjs SHA-256 `005485a3545a71c1452d84b3583c0fb8265d8693f154a063cb0e347b97c4e60e`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/error-modern-runtime`. Other platforms and full ES6 remain incomplete.
+
+### ArrayBuffer and DataView
+
+Native ArrayBuffer storage is zero initialized and limited to 2^31-1 bytes per
+buffer on all targets; allocation failure raises RangeError. DataView implements
+all eight integer/floating-point accessor pairs with unaligned, endian-neutral
+byte operations. Float32 writes share Math.fround's explicit ties-to-even rounding
+rather than relying on overflowing host casts. Views retain their buffer object;
+coercion, species/newTarget callbacks and chunked-copy interrupts recheck detached
+storage. An internal native detachment hook supports embedding lifetime tests.
+
+Constructors follow the pinned ES2015 edition, including its stricter ArrayBuffer
+length/index conversion rules. Optional DataView offsets follow the
+[TC39 #4516 correction](https://tc39.es/archives/bugzilla/4516/); setters convert
+values before final bounds checks as explicitly required by the pinned suite's
+`range-check-after-value-conversion.js` fixtures.
+[TC39 #4536](https://tc39.es/archives/bugzilla/4536/) records the published
+algorithm's missing value conversion; that issue's proposed ordering alone is
+not the retained pinned-test policy.
+NewTarget prototype lookup occurs after argument conversion. ArrayBuffer slicing
+honors species, copies independent storage, and rejects detached/undersized/same
+result buffers. Deleted global bindings stay deleted without losing intrinsics.
+
+Initial diagnostic subsets pass all 146 cases (ArrayBuffer 90, DataView 56).
+Focused checks pass 68 script and 41 native assertions under MallocScribble,
+including float boundaries, GC, foreign realms, JSAPI cloning, detachment of both
+copy buffers, interruption/recovery and constructor observation order. C89 checks
+pass. The initial compiler pass exposed a missing Boolean helper declaration;
+its header was added before full validation.
+
+The full pinned ES2015 run passes **26,630 cases**, with **1,936 failures**,
+14 unsupported module cases and two harness errors: **148 gained, zero lost**
+relative to Error changes. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/binary-data-full.json` and
+`binary-data-es5.json`; snapshot: `/tmp/zr-binary-data-conformance-20260918`.
+Its libmozjs SHA-256 is
+`11e151f7465868bfd03d94464205a31a8ae6a580d8e499d06ceb0fb1d2284c52`.
+The snapshot was copied from the completed Suite build before casing changes.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/binary-data-runtime`. Typed arrays remain unimplemented;
+ArrayBuffer.isView currently recognizes DataView only. Other platforms and full
+ES6 remain incomplete.
+
+### Modern Unicode casing
+
+ES2015 globals use separate native upper/lowercase methods backed by checksum-
+pinned Unicode 18.0.0 data. Full mappings cover expansions and supplementary
+characters; Final_Sigma uses original-text Cased and Case_Ignorable context,
+including characters with both properties. Native loops are interruptible and
+UTF-16 growth is checked. Legacy globals retain historical methods; cloned modern
+methods retain modern mappings even when installed into a legacy global. Explicit embedding locale
+callbacks remain authoritative; default modern locale casing uses the full tables.
+Platform-wide Unicode tables and regexp case folding remain unchanged.
+
+Focused checks pass 23 script and 26 native assertions under MallocScribble;
+C89 checks pass. The String `prototype/to*` diagnostic subset passes 204/204.
+The pinned UCD runner checks every code point through four methods: all
+4,456,448 comparisons pass, including identity mappings and lone surrogates.
+Native tests exercise GC, long ignored runs, interruption/recovery, foreign
+contexts, JSAPI cloning and legacy isolation. The initial compile required adding
+the private function-flags header.
+
+The full pinned ES2015 run passes **26,648 cases**, with **1,918 failures**,
+14 unsupported module cases and two harness errors: **18 gained, zero lost**
+relative to binary data. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/casing-full.json` and
+`casing-es5.json`; snapshot: `/tmp/zr-casing-conformance-20260918`.
+It combines the preceding frozen runtime with the completed casing engine;
+libmozjs SHA-256 `4c8b2ab27b15cde35d732b2f11f33a0f85bfc6c64958d16bac921b001ce2f9f2`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/casing-runtime`. Other platforms and full ES6 remain incomplete.
+
+### Modern Function invocation
+
+Modern call/apply reject noncallable receivers without invoking their conversion
+hooks. Apply uses ToLength instead of wrapping argument-list lengths to 32 bits,
+preserves raw target receivers and ordered element reads, and permits native-loop
+interruption. Exceeding the existing argument-storage limit raises RangeError
+before allocation; legacy apply retains its original ToUint32 behavior. Modern
+methods retain their behavior when cloned into a legacy global.
+
+Native modern errors now use the executing function's realm. The historical
+caller scope remains intact for embedding/eval behavior; callback-thrown errors
+retain the callback's realm. An initial native test exposed caller-realm errors;
+the exception prototype lookup was corrected with foreign TypeError/RangeError
+and callback regressions.
+
+Focused checks pass 24 script and 29 native assertions under MallocScribble; C89
+checks pass. The diagnostic Function subset passes 715/715 cases.
+
+The full pinned ES2015 run preserves **26,648 passes**, **1,918 failures**,
+14 unsupported module cases and two harness errors: **zero gained, zero lost**
+relative to casing. These fixes cover additional semantics beyond the pinned
+suite's failing cases. No crashes/timeouts occurred; the frozen runtime remained
+unchanged. All **11,540 required-mode ES5.1 cases** pass in America/Los_Angeles.
+Reports: `artifacts/es6/function-invoke-full.json` and `function-invoke-es5.json`;
+snapshot: `/tmp/zr-function-invoke-conformance-20260918`. It combines the preceding
+frozen runtime with the completed invocation engine. Its libmozjs SHA-256
+`3f81e339d2679060864da2053abe4ecb3377aeb2d9a1c6132d5b14af4b6e6c05`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/function-invoke-runtime`. Other platforms and full ES6 remain incomplete.
+
+### Reflection key ordering and array realms
+
+Modern Object.keys sorts ordinary native keys by the original ES2015 integer-
+index rule, then string creation order. Object.keys, getOwnPropertyNames and
+getOwnPropertySymbols allocate result arrays in the executing built-in's realm.
+Proxy-supplied ordering remains unchanged. Selected ES5/legacy script ordering
+and primitive TypeErrors remain unchanged, including calls into modern globals.
+
+JSON's internal calls into the shared key collector do not have a native argv
+callee slot. The array helper derives its realm from the active operation frame,
+so JSON stringify/reviver enumeration follows modern ordering safely. Copied key
+identifiers stay rooted across garbage collection and native-loop interrupts.
+
+Focused checks pass 16 script and 28 native assertions under MallocScribble; C89
+checks pass. Diagnostic subsets pass Object 5,984/5,984 and JSON 208/208. Native
+checks cover foreign ordinary/proxy results, cloned methods, interruption and
+recovery, internal JSON calls, and explicitly selected legacy script behavior.
+The full pinned ES2015 run passes **26,654 cases**, with **1,912 failures**,
+14 unsupported module cases and two harness errors: **six gained, zero lost**
+relative to invocation changes. No crashes/timeouts occurred; the frozen runtime
+remained unchanged. All **11,540 required-mode ES5.1 cases** pass in
+America/Los_Angeles. Reports: `artifacts/es6/reflection-keys-full.json` and
+`reflection-keys-es5.json`; snapshot: `/tmp/zr-reflection-keys-conformance-20260918`.
+It combines the preceding frozen runtime with the completed reflection engine;
+libmozjs SHA-256 `56cd289961ae4c8fbdf9d7f4e84aeded103f024f3cba844650942982300b710c`
+matches the completed Suite build.
+
+All four macOS arm64 / SDK 11.3 builds, packages and relocated desktops pass.
+Calendar passes eight unit suites and four views; Browser passes 169 navigation/
+layout assertions; Suite passes 24 lifecycle assertions and ChatZilla; standalone
+XULRunner passes packaged ChatZilla initialization/input. Desktop reports:
+`artifacts/es6/reflection-keys-runtime`. Other platforms and full ES6 remain incomplete.
+
+## ECMAScript job queue foundation
+
+`JS_EnqueueJob`, `JS_HasPendingJobs` and `JS_RunJobs` provide explicit embedding
+checkpoints. Contexts on the same runtime/thread share a FIFO queue; separate
+threads never execute one another's jobs. Queued callbacks remain rooted across
+GC and temporary-context destruction. Removing the last context from a thread
+cancels its remaining jobs. A nested drain is a no-op. A pending exception blocks
+a drain, and an abrupt callback stops it with later jobs still queued.
+
+Both shells provide `enqueueJob` and `drainJobQueue` testing hooks and drain after
+a command-line script turn. Nested `load` and `evaluate` calls do not themselves
+checkpoint. Uncaught job failures give the shell a failing exit status. Test262
+captures the drain hook before running test code, then checks async completion
+only after the queue drains; queued failures cannot satisfy synchronous negative
+exception patterns. These hooks are not exposed as web globals.
+
+Focused validation uses `TestJobQueue.c` (51 checks), `test-job-shell.py` (ten
+xpcshell checks and nine standalone-shell checks), and the 23-check runner
+integration fixture. This foundation did not itself implement Promise or DOM
+checkpoints; the following batch adds those features.
+
+The final macOS arm64/SDK 11.3 queue run preserves all **26,654 ES2015 passes**,
+with 1,912 failures, 14 unsupported module cases, two harness errors and no
+crashes/timeouts. Zero cases gained or lost against reflection. All **11,540
+ES5.1 cases** pass in America/Los_Angeles. Reports are
+`artifacts/es6/promise-jobs-fixed-full.json` and `promise-jobs-fixed-es5.json`;
+the frozen runtime `/tmp/zr-job-queue-fixed-conformance-20260918` remained unchanged.
+All four root builds, packages and relocated application checks passed, along
+with Calendar's eight unit suites/four views, Browser's 169 navigation/layout
+checks, Suite's 24 lifecycle checks/ChatZilla, and standalone XULRunner ChatZilla.
+Other platforms and full ES6 remain unvalidated/incomplete.
+
+Application testing caught a thread-teardown crash that shell conformance did
+not: direct context migration could leave the old thread's queue root registered
+with an empty context list. Migration now detaches the previous owner normally;
+thread teardown clears surviving contexts' owner pointers for later TLS cleanup.
+The native migration fixture crashes on the pre-fix build and passes on the fix.
+Pre-fix crash reports and logs are retained. One fixed-package lifecycle attempt
+also timed out without a crash report; the unchanged package subsequently passed.
+That isolated timeout is not claimed fixed. The lifecycle runner now preserves
+partial timeout output, and the desktop runner reports nonzero GUI exits early.
+Final runtime reports are under `artifacts/es6/promise-jobs-fixed-runtime`.
+
+
+## Promise and application checkpoints
+
+The engine implements Promise construction, then/catch, resolve/reject, all/race,
+thenable assimilation, reaction jobs and species constructors. Resolving functions
+share an already-resolved record, and queued work retains traced records rather
+than pointers into C stack storage. The implementation preserves custom constructor
+callbacks, raw handler receivers, callback exceptions and foreign intrinsic realms.
+The pinned corpus incorporates the correction removing static all/race species
+lookup; instance then still uses species. Promise.all limits its result array to
+2^32−1 elements and rejects larger input, subject to allocation limits.
+
+Promise metadata uses ES2015 attributes even in legacy globals. Existing legacy
+built-ins and syntax remain version-selected. The added JSProto entry changes
+internal runtime layout, requiring complete application/embedding rebuilds;
+bytecode is unchanged. Embedders outside ZoolRunner must arrange their own
+JS_RunJobs checkpoints.
+
+DOM script completion drains jobs only after the outer script returns. The full
+context stack is inspected, including frames below null barriers; nested event
+loops cannot drain a suspended outer script's queue. Context ownership survives
+jobs that close their window. XPConnect also provides an outer event-boundary
+checkpoint, plus a checkpoint after each completed wrapped-JS component callback
+so batched native events preserve job ordering. It reports abrupt job errors
+and prevents safe-context replacement during a checkpoint. A marked native job entry frame supplies
+the callback realm for security principal lookup before a handler enters its
+script; the generic XULRunner safe context must neither block legitimate
+sandbox handlers nor supply chrome privileges to content handlers. Native and
+window fixtures cover job scopes, unprivileged component-access denial and
+existing cross-principal constructor access restrictions. Bound/proxy callbacks
+use their target realm; revoked callbacks still reject asynchronously.
+Promise rejection is represented as Promise state; this batch does not add an unhandled-rejection notification API.
+
+Focused fixtures cover 40 shell assertions and 55 native assertions, including
+GC, interruptions, foreign contexts, legacy globals and cloned resolver captures.
+The chrome/content fixture covers 16 checks including component timers, nested
+event processing, result realms and queued work after closing a child window. The initial synthetic
+command event did not execute its listener; the corrected fixture uses a custom
+synthetic event, explicitly accepts untrusted events and verifies listener entry.
+
+The final macOS arm64/SDK 11.3 full pinned run passes **27,036 ES2015 cases**,
+with **1,530 failures**, 14 unsupported module cases, two harness errors and
+zero crashes/timeouts. Compared with the queue baseline, 382 cases gained and
+zero previously passing cases were lost. The Promise group passes 380/396;
+all 16 remaining failures require unsupported class syntax, with no exclusions.
+All **11,540 ES5.1 cases** pass in America/Los_Angeles. Reports are
+`artifacts/es6/promise-realm-full.json`, `promise-realm-es5.json` and
+`promise-realm-pass-comparison.json`. The frozen XULRunner runtime at
+`/tmp/zr-promise-realm-conformance-20260918` remained unchanged during both runs;
+its engine hash matches all four completed applications.
+
+All four root builds, packages and relocated GUI checks pass, including the
+16-check Promise fixture. Calendar passes eight unit suites and all four views;
+Browser passes 169 navigation/layout checks; Suite passes 24 lifecycle checks
+and ChatZilla; standalone XULRunner ChatZilla initializes with its input widget.
+The native fixture passes under MallocScribble; C89 checks and all 23 runner
+integration checks pass. Final desktop reports are under
+`artifacts/es6/promise-realm-runtime`. These results cover macOS arm64 only;
+other platforms and complete ES6 remain unvalidated/incomplete.
+
+Application validation exposed a security-bootstrap defect absent from shell
+results: XULRunner's generic safe context could drain a job yet reject a sloppy
+sandbox handler's implicit parent lookup before entering its script. Suite's
+hidden-window context masked this. Explicit job scopes and callback-realm
+selection fix that path while preserving content/component and cross-principal
+access restrictions. Foreign-window result arrays and both privilege levels are
+covered by the final fixture. Earlier failures and diagnostic runs are retained
+in `artifacts/es6/promise-*`; focused diagnostics are not full application passes.
+
+### Function-environment new.target
+
+ES2015 ordinary functions now parse and evaluate `new.target`. Ordinary calls
+return undefined; constructor calls retain the actual newTarget, including
+Reflect.construct, bound functions and proxies. Direct eval inherits this
+binding through strict and nested evaluations. Global and indirect eval reject
+the syntax, and a nested ordinary function has its own binding. Selected legacy
+language versions retain their old grammar. Arrow/class environments remain
+unfinished; this is a prerequisite, not completion of those features.
+
+The new opcode decompiles as `new.target` and advances the bytecode cache to
+version 40. `new-target.js` passes 38 checks covering call/construction, eval
+boundaries, syntax, GC and decompilation. `TestEditionEmbedding.c` includes the operation in its
+serialized, decoded and decompiled program. `edition-modern.js` exercises it
+in actual chrome and content windows.
+
+The final macOS arm64/SDK 11.3 run preserves all **27,036 ES2015 passes**, with
+**1,530 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts. Exact pass-set comparison shows zero gains and zero losses: the
+remaining syntax features are still needed to pass their complete cases.
+All **11,540 ES5.1 cases** pass. Reports are
+`artifacts/es6/new-target-final-es6.json`, `new-target-final-es5.json` and
+`new-target-final-pass-comparison.json`. The frozen runtime at
+`/tmp/zr-new-target-final-conformance-20260918` remained unchanged through both
+runs. Its libmozjs SHA-256 is
+`f76069069ec87817aed9bdec65d31366b539fbfc5db834775047fba7fc33862f`.
+
+All four applications pass root builds, packages and relocated desktop checks;
+their engine hashes match the frozen runtime. Calendar passes its unit suites
+and four views; Browser passes 169 navigation/layout checks; Suite passes
+lifecycle and ChatZilla checks; standalone XULRunner ChatZilla initializes with
+its input widget. C89 checks and 23 runner integration checks pass. Desktop
+reports are under `artifacts/es6/new-target-final-runtime`. Other platforms have
+not been revalidated for this batch.
+
+The first full run caught two regressions: lookahead after `new` incorrectly
+scanned a regexp as division. Operand scanning and a dedicated regression now
+preserve the required runtime TypeError for `new /pattern/()`. Invalid
+new.target assignment and destructuring targets report SyntaxError. Earlier
+`new-target-*` reports precede these corrections and are diagnostic only.
+
+### Property assignment references
+
+ES2015 property assignments now check null/undefined bases and convert computed
+keys before the right-hand side. Compound assignments reuse that converted key
+for reading and writing. The key expression still runs before the base check;
+primitive receivers stay unboxed until the actual property operation. Earlier
+selected-language modes retain their existing reference-evaluation behavior.
+This batch does not fix unresolved identifier references, lexical TDZ or
+remaining destructuring semantics.
+
+`assignment-reference.js` covers 44 checks, including callback exceptions,
+Symbol keys, single conversion, raw primitive setters, GC and decompilation.
+The initial fixture had 18 failures. `assignment-reference-wide.js` covers 12
+large-script execution/decompilation checks in ES2015 and JS 1.7, including
+accessor initializers and historical getter/setter assignment syntax. The
+large-script checks found existing extended-operand defects: property writes
+could reverse the key and value, and catch source notes were read at the wrong
+position, causing decompilation to fail. Extended stores now keep their operand
+order, and block/catch decompilation retains the prefix source position.
+
+Bytecode cache version 41 adds the reference-check opcodes and extended property
+store dispatch. Native XDR and real chrome/content fixtures include reference
+ordering. The complete pinned macOS arm64 run passes **27,064 ES2015 cases**,
+with **1,502 failures**, 14 unsupported module cases, two harness errors and no
+crashes/timeouts: **28 gained, zero lost** versus the new.target baseline.
+All **11,540 ES5.1 cases** and 23 runner integration checks pass. Both suites
+used the frozen runtime `/tmp/zr-assignment-reference-conformance-20260918`,
+whose hashes remained unchanged through both runs. Reports are
+`artifacts/es6/assignment-reference-{es6,es5}.json` and
+`assignment-reference-pass-comparison.json`.
+
+All four macOS arm64 applications build and package successfully, with identical
+engine binaries. Relocated desktop checks pass for XULRunner, Suite, Browser
+and Calendar, including real chrome/content globals, Suite lifecycle/ChatZilla,
+Calendar's four views, browser navigation/layout and actual XULRunner ChatZilla
+initialization/input. Logs and reports use the `assignment-reference-` prefix
+under `artifacts/es6`. C89 compatibility checks pass. Other platforms and full
+ES2015 compliance remain unverified.
+
+### Identifier assignment references
+
+ES2015 unoptimized identifier assignments now retain both their resolved scope
+and whether resolution succeeded before the RHS. Strict unresolved writes still
+throw if the RHS introduces that global name. Resolved object bindings remain
+the target even if a callback deletes the property or changes `unscopables`.
+Compound assignments perform GetBindingValue before the RHS, including its
+existence check, without repeating scope resolution at the write. Older selected
+language modes keep their existing assignment path. This implements the
+[ES2015 environment binding algorithms](https://262.ecma-international.org/6.0/#sec-object-environment-records-setmutablebinding-n-v-s).
+
+The reference pair is traced on the operand stack, avoiding hidden heap objects
+and preserving embedding scope receivers. Three new bytecodes and cache version
+42 preserve the pair through callbacks. Wide identifier reads and increments
+retain their name opcodes, rather than becoming element operations that could
+return undefined/NaN for unresolved names. Extended operands retain source notes
+and decompilation behavior.
+
+`identifier-reference.js` passes 33 focused checks and
+`identifier-reference-wide.js` passes 14 execution/decompilation checks above
+the 16-bit atom-index boundary. Native XDR and chrome/content checks include
+resolved-deleted and initially unresolved writes. The complete pinned macOS
+arm64 run passes **27,100 ES2015 cases**, with **1,466 failures**, 14 unsupported
+module cases, two harness errors and no crashes/timeouts: **36 gained, zero
+lost** versus the property-reference baseline. All **11,540 ES5.1 cases** and
+23 runner integration checks pass. The complete compound-assignment group now
+passes **703/703** cases. Both full suites used the frozen runtime
+`/tmp/zr-identifier-reference-conformance-20260918`; its hashes stayed unchanged.
+Reports use the `identifier-reference-` prefix under `artifacts/es6`.
+
+That first run also passed all four application build/package/desktop checks,
+Calendar's four views, browser navigation and ChatZilla. An additional native
+probe then found that extended opcodes exposed a PC inside their atom operand
+to embedding hooks: `JS_IsAssigning` returned false for a large-script write.
+Frames and operand provenance now retain the actual prefix address. Assignment
+and resolve hints decode extended/debugger opcodes, including their full length;
+BINDREF preserves the classic assignment hint to native resolve hooks.
+
+`TestReferenceEmbedding.c` adds 38 checks across JS 1.7 and ES2015, small scripts,
+66,000/131,000 atom tables, setter/resolve callbacks, nested evaluation, GC and
+traps on the extended writes. The final corrected run preserves all **27,100
+ES2015 passes** and **11,540 ES5.1 passes**, with the same 1,466 failures,
+14 unsupported modules, two harness errors and no crashes/timeouts. There are
+**36 gained, zero lost** versus the property-reference baseline. All four
+macOS arm64 applications pass root build, package and relocated desktop checks;
+Calendar's four views, browser navigation/layout and Suite/XULRunner ChatZilla
+also pass. The 23 runner checks, C89 checks, debugger lifecycle and six additional
+large-script error/decompilation diagnostics pass.
+
+Final reports use `artifacts/es6/identifier-reference-final-*`; the frozen
+runtime is `/tmp/zr-identifier-reference-final-conformance-20260918`. Hashes
+remain unchanged through both suites and match all four application engines
+(SHA-256 `1bb529de9a08dda7bb994c6f434797f9e82e46d8e966aff5a268b5c546d8342e`).
+Earlier `identifier-reference-*` reports precede the native prefix correction.
+Destructuring, lexical TDZ, arrow/class semantics, other platforms and full
+ES2015 compliance remain unfinished.
+
+### Template literals
+
+ES2015 ordinary and tagged template parsing/evaluation are implemented in the
+existing engine. Ordinary substitutions perform ToString with the string hint
+before the next expression. Tags receive unconverted values, preserve their
+reference receiver, and treat tagged `eval` as an indirect call. Selected legacy
+language versions continue rejecting template syntax.
+
+The registry follows [ES2015 GetTemplateObject](https://262.ecma-international.org/6.0/#sec-gettemplateobject):
+equal ordered raw strings share an immutable template array within one realm,
+including different source sites and substitution expressions. This intentionally
+differs from later editions' site identity rule. ES2015 also rejects malformed
+escapes in tagged templates. The private registry uses the existing weak-global
+intrinsic cache, immutable raw/cooked arrays, traced operands and native roots;
+it does not call mutable global Array/Object helpers.
+
+Cache version 43 adds ToString, template-object and tag-call bytecodes. Encoded
+UTF-16 raw/cooked atoms survive XDR. The decompiler preserves raw Unicode,
+including lone surrogates, NUL and line separators, through its byte-oriented
+internal buffers without changing the public byte-string JSAPI. Long scanner
+lines preserve CRLF pairs across buffer boundaries and only normalize a line
+terminator once it actually belongs to the copied segment.
+
+`template-literals.js` passes 45 focused checks; `template-boundaries.js` passes
+5,416 checks covering long lines, raw strings, nested decompilation and wide atom
+indices. `TestTemplateEmbedding.c` passes 33 checks for native Unicode compilation,
+XDR, GC, distinct realms, cross-realm calls, selected legacy editions and native
+allocation hooks that reenter while the registry or an entry is being created.
+The modern chrome/content fixture also exercises templates. C89 syntax checks
+pass. The upstream template diagnostic passes 132/134 cases; the two remaining
+cases additionally require arrow functions. These are retained as failures.
+
+The final frozen macOS arm64 runtime passes **27,217 ES2015 cases**, with
+**1,349 failures**, 14 unsupported module cases, two harness errors and no
+crashes/timeouts: **117 gained, zero lost** against the identifier-reference
+baseline. All **11,540 ES5.1 cases** pass on the same frozen runtime, whose hashes
+remain unchanged through both complete suites. String.raw passes all 58 upstream
+cases and runner integration passes all 23 checks. Reports use `template-final-*`
+under `artifacts/es6`; the frozen runtime is
+`/tmp/zr-template-final-conformance-20260918`.
+
+All four macOS arm64 applications pass root build, package and relocated
+desktop checks, including real chrome/content globals, Calendar's four views,
+browser navigation/layout (169 checks) and Suite/XULRunner ChatZilla. Their
+engine binaries match the frozen conformance runtime (SHA-256
+`43b65c08df3e0f981329df11a0dc0a733cf79c367f6fc659f1ba45d58683e5f2`).
+The 33 native checks also cover 540 file-input CRLF boundaries; the engine opens
+its own file stream to preserve Windows static-CRT ownership. Six supplemental
+checks cover primitive/getter tag receivers, evaluation order, non-callable
+errors, conditional-callee decompilation and intrinsic eval tagging.
+
+Full ES2015 compliance and other-platform validation remain unfinished.
+Earlier `template-untagged-full-*` reports are intermediate diagnostics and
+precede tagged-template implementation.
+
+### Arrow functions
+
+ES2015 arrows with simple named parameters now parse and execute in the existing
+engine. Expression/block bodies, duplicate-parameter rejection, lexical `this`,
+lexical `arguments`, lexical `new.target`, metadata and constructor rejection are
+implemented. Parenthesis provenance prevents arbitrary expressions or nested
+parameter parentheses from being accepted as arrow formals. Default and
+destructured arrow parameters, and class/super integration remain unfinished;
+named rest parameters are covered in the subsequent section.
+
+A private function-kind field occupies existing structure padding; public
+function flags and the native frame ABI remain intact. Traced per-activation
+cells retain the raw receiver and new target, including strict primitives and
+undefined. Arrows retain outer argument environments without introducing an
+implicit arguments binding of their own. Native cloning retains the original
+lexical cell, and interpreted closure creation allocates independent instances.
+Cache version 44 serializes function kind. Function/script decompilation retains
+arrow syntax and invocation precedence.
+
+Native allocation hooks exercise GC and debugger evaluation that recursively
+creates arrows during lexical-cell allocation. This exposed two additional
+lifetime defects: already materialized mapped argument indices needed their
+last live parameter values saved before frame destruction, and debugger/eval
+`this` conversion must follow the enclosing function rather than the evaluated
+script's directive prologue. The fixes preserve deleted/detached argument
+indices and do not invoke user index accessors during frame cleanup.
+
+Focused checks pass: `arrow.js` (37), `TestArrowEmbedding.c` (20), and
+`../es5/arguments-lifetime.js` (12). The native checks also cover cross-realm
+calls/cloning, XDR, source reconstruction, legacy rejection and explicit GC.
+Package validation registers these checks; the modern chrome/content fixture
+checks arrows with object and strict primitive receivers. All changed C files
+pass C89 declaration and implicit-function checks.
+
+The final frozen macOS arm64 runtime passes **27,296 ES2015 cases**, with
+**1,270 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **79 gained, zero lost** against the template baseline. All
+**11,540 ES5.1 cases** pass; runtime hashes remain unchanged through both full
+suites. The arrow diagnostic passes 120/146 cases; remaining cases need parameter,
+destructuring or class/super support. Runner integration passes all 23 checks.
+Reports use `arrow-final-*` under `artifacts/es6`; the frozen runtime is
+`/tmp/zr-arrow-final-conformance-20260918`.
+
+All four macOS arm64 applications pass root build and package checks. Their
+engine binaries match the frozen conformance runtime (SHA-256
+`c5910c8616ee44c6ed0c0c9b8043a828c8a6eaec27ea8c47311598694bcb91d7`).
+All four relocated desktop checks pass, including real chrome/content globals,
+Calendar's four views, browser navigation/layout (169 checks), and unchanged
+Suite/XULRunner ChatZilla. The first desktop run caught an incorrect expectation
+in the new strict-mode fixture (arguments must retain the original value);
+the corrected fixture passes in all four applications. Failed-run diagnostics
+remain in `arrow-final-*-strict-fixture-error*` artifacts.
+The earlier `arrow-basic-full-*` diagnostic precedes the two callback-discovered
+corrections. Four argument/eval regressions fail on the committed template
+runtime and pass with these corrections. Full ES2015 compliance and current
+other-platform validation remain unfinished.
+
+### Rest parameters
+
+Named rest formals are implemented for ordinary functions, arrow functions,
+object methods and the dynamic `Function` constructor. A hidden local holds the
+rest array; `nargs` continues to represent the fixed parameter count and hence
+`Function.length`. Cache version 45 adds a rest-initialization opcode and extends
+private function-kind flags. The initializer runs in the prolog before body
+function declarations, creates own array elements without invoking inherited
+setters, and roots the incomplete array independently of debugger-visible
+bindings. It does not read mutable global Array helpers.
+
+Ordinary rest functions use an unmapped arguments snapshot even when non-strict;
+arrow rest functions still resolve outer arguments. Fast indexed argument reads
+also honor the snapshot. Parsing rejects duplicate bindings, invalid rest
+placement, getter/setter rest lists and explicit strict directives with
+non-simple formals. Legacy edition grammar remains separate. Rest source
+reconstruction retains its parameter name; inherited strictness remains in the
+enclosing source rather than introducing an illegal directive inside the rest
+function. Default parameters and rest destructuring patterns remain unfinished.
+
+Focused `rest-parameters.js` passes 56 cases; `TestRestEmbedding.c` passes
+24 checks, including XDR, decompilation, cross-realm calls, native cloning, GC
+and debugger reentry while rest arrays are allocated. Modern chrome/content
+fixtures exercise rest arrows and dynamic Function. ES2015 unmapped arguments
+create the caller/callee poison properties in the specified order, while older
+editions retain their historical ordering. The
+final frozen macOS arm64 runtime passes **27,316 ES2015 cases**, with
+**1,250 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **20 gained, zero lost** against the arrow baseline. All
+**11,540 ES5.1 cases** pass, and runtime hashes remain unchanged through both
+complete suites. All four macOS arm64 applications pass root build, package and
+relocated desktop checks, including modern chrome/content globals, Calendar's
+four views, browser navigation/layout (169 checks) and Suite/XULRunner ChatZilla.
+Their engine binaries match the frozen conformance runtime (SHA-256
+`bdb8da644b063b05604a47007995cecc9bcc1e83680f9341c8ba4aaa7c163a0c`).
+Reports use `rest-corrected-*`; the frozen runtime is
+`/tmp/zr-rest-corrected-conformance-20260918`. The upstream rest-parameter folder
+passes 16/22 cases; the remaining six modes require patterns or class/new-target
+integration. Runner integration passes all 23 checks on an unchanged retry; its
+first launch exceeded the two-second per-case limit, and both logs are retained.
+C89 checks pass. Other platforms have not been revalidated for these changes.
+
+`rest-final-*` precedes the metadata correction and was superseded after its
+active build/runtime children completed.
+Earlier `rest-basic-full-*` reports precede inherited-setter and dynamic-Function
+corrections and are intermediate diagnostics only.
+
+
+### Block lexical initialization
+
+Modern block and function-body `let` bindings now retain an uninitialized state
+until their declaration executes. Reads, writes, `typeof`, increments, direct
+eval and captured closures check that state, including after the frame exits.
+Discarded lexical reads still execute because they can throw. Initialization
+uses separate bytecodes from assignment; cache version 46 also records template
+initialization metadata in XDR. Block entry preserves producer PCs used by value
+decompilation. Selected legacy-version let semantics remain unchanged.
+
+`lexical-initialization.js` passes 44 focused checks; `TestLexicalEmbedding.c`
+passes 14 checks, including GC, debugger reentry during function cloning, XDR
+and decompilation. Modern chrome/content fixtures exercise initialized and
+uninitialized bindings. Runner integration passes 23 checks and C89 checks pass.
+
+The final frozen macOS arm64 runtime passes **27,338 ES2015 cases**, with
+**1,228 failures**, 14 unsupported modules, two harness errors, and no crashes or
+timeouts: **22 gained, zero lost** against the rest-parameter baseline. All
+**11,540 ES5.1 cases** pass. Reports use `block-tdz-final-*`; the frozen runtime is
+`/tmp/zr-block-tdz-final-conformance-20260918`, with engine SHA-256
+`068b6779b57b2dbbec84a7e1791e60e703679c3dc988c8d646891bef8ecb558f`.
+All four macOS arm64 applications pass root build, package and relocated desktop
+checks, including modern chrome/content globals, Calendar's four views, browser
+navigation/layout (169 checks), and Suite/XULRunner ChatZilla. All four engine
+binaries match the frozen runtime; hashes remain unchanged through both complete
+conformance runs.
+
+This does not complete lexical environments: persistent global declarative
+bindings, block const scoping and fresh per-iteration environments still require
+work. The earlier `block-tdz-diagnostic-*` run precedes the bare for-in assignment
+and producer-PC follow-ups; it has the same totals but is not the final runtime.
+Other operating systems and architectures have not been revalidated for these
+changes.
+
+
+### Block const and per-iteration bindings
+
+Modern block/function-body const declarations now use lexical storage, retain
+TDZ checks and immutable writes, and can shadow outer bindings. Const identity
+survives captured-frame detachment, source reconstruction and XDR. Assignment
+checks initialization after evaluating the RHS; compound assignments read first.
+Selected legacy const behavior remains separate.
+
+Named C-style let loop bindings are fresh before the first condition and before
+each update, including continue paths with no update expression. Named let/const
+for-in bindings receive a fresh environment for each iteration; captured RHS
+bindings remain uninitialized. The old environment stays live while a replacement
+is allocated so native callbacks can capture it safely. Exception unwinding
+retains the replacement on the scope chain even when detachment fails. Ordinary
+var loops, including catch-variable loops, preserve their shared bindings.
+
+Cache version 47 preserves block const metadata and adds immutable local writes
+and environment transitions. Decompilation retains const in destructuring and
+for-in declarations and hides internal iteration transitions, including loops
+without an explicit updater.
+
+Focused const and loop scripts pass 40 and 26 checks, alongside the prior 44
+initialization checks. The native lexical probe passes 17 assertions, covering
+both const and mutable bindings, XDR/source round-trips, GC and debugger reentry
+while loop environments are allocated. Modern window checks exercise const and
+loop closures. C89 checks and 23 runner integration checks pass.
+
+The final frozen macOS arm64 runtime passes **27,377 ES2015 cases**, with
+**1,189 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **39 gained, zero lost** against the block-TDZ baseline. All
+**11,540 ES5.1 cases** pass, with engine hashes unchanged through both suites.
+Reports use `lexical-scope-final-*`; the frozen runtime is
+`/tmp/zr-lexical-scope-final-conformance-20260918`, with engine SHA-256
+`3954a8bcf7d44bc998d364df7395977ecca6ebb1b5d1a11e88181a288106dd67`.
+All four macOS arm64 applications pass root builds, packaging and packaged
+desktop checks with engines matching the frozen runtime. Calendar passes all
+four views; Browser navigation/layout passes 169 checks; Suite and XULRunner
+ChatZilla checks pass. These results do not establish validation on other
+architectures or operating systems.
+
+The intermediate `block-const-basic-*` snapshot passes 27,365 ES6 modes
+(1,201 failing, 14 unsupported, two harness errors), 27 gained/zero lost from
+block TDZ, plus all 11,540 ES5 modes. It precedes iteration, source-reconstruction
+and callback/unwind follow-ups and is diagnostic only.
+
+Global lexical environments, module environments, default/destructured parameters,
+and the broader iterator/destructuring semantics remain unfinished. This batch
+does not implement for-of. Non-macOS-arm64 validation remains outstanding.
+
+### Strict function declaration positions
+
+Modern strict code now rejects function declarations used directly as a single
+statement body, including `if`, loops and labels. Declarations in blocks,
+switch clauses and function bodies remain accepted. The check applies to strict
+eval, Function construction and inherited strictness while leaving selected
+historical grammar and existing sloppy extensions intact. This is a parser
+change with no bytecode-format change.
+
+The focused `function-statement-grammar.js` regression passes 32 checks and is
+registered in packaged validation. C89 syntax checks pass. The targeted upstream
+function-declaration group passes 9/9 modes. The complete ES2015 run passes
+**27,383 modes**, with **1,183 failures**, 14 unsupported modules, two harness
+errors and no crashes or timeouts: **six gained, zero lost** from the preceding
+lexical-scope baseline. The six gains include strict labelled declarations.
+All **11,540 ES5.1 cases** pass. Both full suites used the frozen runtime at
+`/tmp/zr-function-grammar-final-conformance-20260918`, with engine SHA-256
+`fc537655b5d3567f21a7d5a897b4d6b186ab254a80a529e790c63ba64976912e`,
+unchanged through both runs. All four application engines match it. Reports use
+`function-grammar-final-*`. All four macOS arm64 applications pass root builds,
+packaging and desktop checks, including Calendar's four views, 169 Browser
+navigation/layout checks and Suite/XULRunner ChatZilla. Eight additional lexical
+unwind checks pass, covering labelled continue, finally, with/eval closures and
+GC. Other platforms have not been revalidated for this parser change.
+
+Grammar reference: https://262.ecma-international.org/6.0/#sec-block
+and the strict restrictions in sections 13.13 and B.3.4. This does not complete
+block function binding/redeclaration semantics.
+
+
+### For-of iteration
+
+Modern `for…of` now uses the ES2015 Symbol.iterator protocol separately from
+historical for-in/for-each enumeration. It supports ordinary assignment targets,
+var declarations and named let/const iteration bindings. Iterator values are
+acquired before evaluating assignment targets; lexical RHS captures retain their
+uninitialized head environment, and body captures receive distinct bindings.
+Existing destructuring patterns work in loop heads, but complete ES2015
+pattern/default/rest/iterator semantics remain unfinished.
+
+A private traced state object retains the iterator and current value across
+callbacks and GC. Failures in next/done/value do not close the iterator. Abrupt
+binding/body completion closes it, with distinct throw and normal-return error
+precedence. Same-loop continue and normal exhaustion do not close. Nested
+labels and finally clauses retain cleanup order. Exception-handler ranges
+exclude later outer cleanup after an inner loop has already been closed and
+popped; an outer close failure must not resurrect an invalid inner stack slot.
+The legacy generator-return sentinel is treated as a return completion by the
+cleanup helper, without implementing ES2015 generator syntax.
+
+Grammar keeps `of` contextual and unescaped, rejects initializers/multiple
+bindings and invalid statement bodies, and preserves the head's `let` lookahead
+restriction. Printed source protects comma RHS expressions and normalized `let`
+assignment targets with parentheses. Source notes, large jumps, extended atom
+indices and XDR preserve the loop. Cache version **48** adds the iterator
+instructions; stack limits reject an unrepresentable handler depth before it
+can wrap. The statement-name table is aligned with its internal enum.
+
+Focused validation passes **66 iteration checks**, **seven boundary checks**
+and the expanded **19-check native lexical embedding probe**. The native probe
+collects during allocations, captures head bindings through debugger reentry,
+and executes XDR-decoded and decompiled scripts. Modern chrome/content probes
+exercise iteration and break cleanup. Explicit legacy checks retain for-in
+key/value destructuring and for-each behavior; for-of remains edition selected.
+C89 syntax checks pass. Final review corrected the XML wildcard emitter case
+placement; a selected-legacy E4X regression now covers it.
+
+The corrected complete ES2015 run passes **27,485 modes**, with **1,081 failures**,
+14 unsupported modules, two harness errors and no crashes or timeouts:
+**102 gained, zero lost** against the preceding strict-declaration baseline.
+It uses the frozen runtime at `/tmp/zr-for-of-reviewed-conformance-20260918`,
+with engine SHA-256
+`4fe74a0cf894edfc7383b43816adfaa1800642e4cab65df716409b381e1e8a1f`.
+All **11,540 ES5.1 cases** pass. Engine hashes remained unchanged through both
+full runs, and all four application engines match the frozen runtime. All four
+macOS arm64 applications pass root builds, packaging and desktop checks,
+including Calendar startup/four views, 169 Browser navigation/layout checks
+and Suite/XULRunner ChatZilla. Reports use `for-of-reviewed-*`.
+The preceding `for-of-validated-*` run had the same ES2015 totals and passed
+all ES5 cases and four application checks, but predates the XML case correction.
+
+The initial pinned for-of diagnostic passes **96/206 modes**; the remaining
+110 require missing generator syntax (74) or typed arrays (36). This subset
+is not a full-suite result. Earlier `for-of-final-*` and
+`for-of-corrected-final-*` matrix/conformance attempts were stopped for grammar
+and source-round-trip follow-ups; retain their partial logs as diagnostics.
+The first large-array source-printing probe exceeded its time limit; a follow-up
+completed, and the unchanged baseline also exhibited slow large-array printing.
+The registered atom-boundary probe uses separate assignments to exercise the
+same extended atom indices without that unrelated quadratic array formatting.
+
+Global lexical environments, modules, generators, typed arrays and broader
+parameter/destructuring semantics still require work. The implementation follows
+[the ES2015 iteration algorithms](https://262.ecma-international.org/6.0/#sec-for-in-and-for-of-statements)
+and [IteratorClose](https://262.ecma-international.org/6.0/#sec-iteratorclose).
+Other-platform and minimum-OS validation remains outstanding for this batch.
+
+
+### Unicode identifier code points
+
+Modern identifier tokens accept brace Unicode escapes and supplementary raw
+characters using private Unicode 18.0.0 ID_Start/ID_Continue tables. Legacy
+editions retain their historical identifier rules. Source reconstruction emits
+valid Unicode identifier escapes instead of string-only hex escapes or separate
+surrogate escapes. String and XML text escaping remains separate.
+
+`identifier-codepoints.js` passes 55 checks, including malformed/overflowing
+escapes, contextual and reserved words, surrogate boundaries, long tokens,
+source round-trips and legacy XML. The pinned identifier subset passes all
+267 modes; the independent Unicode property-boundary probe passes 15,736 checks.
+The complete run passes **27,499 ES2015 modes**, with **1,067 failures**,
+14 unsupported modules, two harness errors and no crashes/timeouts:
+**14 gained, zero lost** against the for-of baseline. All **11,540 ES5.1 cases**
+pass. All four macOS arm64 applications pass root builds, packaging and desktop
+checks, including Calendar's four views, 169 Browser navigation/layout checks
+and Suite/XULRunner ChatZilla. Reports use `identifier-codepoint-final-*`.
+The frozen runtime `/tmp/zr-identifier-codepoint-final-conformance-20260918`
+remained unchanged through both suites; its engine SHA-256 is
+`47078f7aa13cdd3a766fc22299c27464c7eb0fbf1df87104ea92eb8a764171c4`,
+matching all four application engines. C89 syntax checks pass. No bytecode-format
+change is needed. Other platforms remain unvalidated for this batch.
+
+
+### Modern generators
+
+Modern function-star declarations/expressions and generator methods use a
+separate intrinsic prototype graph and resume protocol. Classic generators
+retain next/send/throw/close and StopIteration. Modern next/throw/return handle
+newborn, suspended, running and closed states; return values survive yielding
+finally blocks. Strict/rest arguments stay unmapped when frames are moved.
+Abandoned modern generators do not run legacy GC close hooks; escaped block,
+call and mapped-argument environments retain their suspended generator.
+
+Yield-star delegates next/throw/return, preserves done-false result identity,
+and closes on a missing throw method. Abrupt cleanup interoperates with for-of.
+Function kind survives cloning/XDR, generator functions reject construction,
+and the decompiler retains function-star and yield-star syntax. Cache version
+49 records the new function kind and delegated-yield opcode.
+
+Focused validation passes 78 checks and a 14-check native embedding probe with
+GC on allocation, debugger reentry, suspended return values, XDR and source
+round-trips. Targeted upstream groups pass 114/114 Generator built-in cases,
+122/122 generator syntax cases and 29/29 yield cases. The for-of group now
+passes 170/206; the remaining 36 depend on typed arrays. The first diagnostic
+full run (`generators-first-*`) predates completion-value, contextual-yield and
+strict-argument corrections. The final full run passes **27,878 modes**, with
+**688 failures**, 14 unsupported modules, two harness errors and no crashes or
+timeouts: **379 gained, zero lost** against the identifier baseline. All
+**11,540 ES5.1 cases** pass. All four macOS arm64 applications pass root builds,
+packaging and desktop checks, including Calendar's four views, 169 Browser
+navigation/layout checks and Suite/XULRunner ChatZilla. C89 checks pass.
+Reports use `generators-validated-final-*`; the frozen runtime remained
+unchanged through both complete suites. Its engine SHA-256 is
+`07ea6ede90438b0282945f319ccd9c25fa35479e5c5c4d442178a5d756b61b9d`,
+matching all four application engines. Other platforms remain unvalidated for
+this batch. Typed arrays, classes, modules, Unicode regular expressions and
+broader parameter/destructuring/global lexical semantics still require work.
+
+
+### Typed arrays
+
+All nine ES2015 typed-array types now use integer-indexed object operations
+over shared ArrayBuffer storage. Numeric properties remain separate from
+ordinary string/symbol properties. Array iteration reads internal lengths;
+reflection, inherited receivers and buffer detachment follow the original
+ES2015 rules. Native methods implement conversion, callbacks, species, shared
+views and byte-preserving copies, without changing classic embedding APIs.
+
+`typed-arrays.js` passes 252 checks and `TestTypedArrays.c` passes 29 native
+checks, including reflection and collection during allocation, property-store
+initialization before embedding hooks, and detachment inside callbacks.
+The frozen foundation subset reports (`typedarray-foundation-*`) pass the
+typed-array, typed-array concat, ArrayIteratorPrototype, for-of and Symbol
+number-coercion groups. Those subsets are diagnostics, not full conformance.
+The complete pinned run passes **27,940 modes**, with **628 failures**, 14
+unsupported modules, no harness errors, crashes or timeouts: **62 gained, zero
+lost** against the generator baseline. All **11,540 ES5.1 cases** pass. The
+initial parallel ES5 startup failed during XPCOM component registration; the
+unchanged frozen runtime completed the full suite on rerun. Its initial startup
+log is retained separately. Future relocated snapshots initialize their
+component registry before concurrent conformance processes.
+
+All four macOS arm64 applications pass root builds, packaging and desktop
+checks, including Calendar's four views, 169 Browser navigation/layout checks
+and Suite/XULRunner ChatZilla. C89 checks pass. Reports use
+`typedarray-allocation-final-*`; the engine SHA-256 is
+`0fa3c91c88d04260de966b17e3c4f91cd48340ce62362bf57d4315151fc354d1`,
+matching all four applications. An initial Browser package check exposed a
+stale object after staging files with preserved timestamps; rebuilding it with
+current timestamps restored the matching engine. The failed log is retained.
+Review also fixed throwing writes to invalid
+indices and a native allocation-hook crash: each view's ordinary property
+store now exists before the hook can inspect or restrict it. No bytecode change
+is needed for this batch. Other platforms remain unvalidated for these changes.
+Classes, modules, Unicode regular expressions and broader parameter,
+destructuring and lexical-environment semantics remain unfinished.
+
+
+### Basic object patterns and update targets
+
+Modern object patterns now accept shorthand bindings, validate null/undefined
+sources even for empty or nested patterns, and reject invalid assignment targets
+at compilation. Their decompiled source retains the distinction between empty
+object and array patterns. Cache version 50 records this emission/source-note
+change. Legacy destructuring remains edition selected. Modern update expressions
+parse their complete unary operand and report early ReferenceError for invalid
+non-simple targets, following the original ES2015 rules.
+
+Focused object-pattern and update-target fixtures pass 27 and 19 checks. The
+native embedding probe passes 13 checks, including GC during property access,
+XDR into a legacy-version context and decompiled script evaluation. The final
+complete pinned run passes **27,997 modes**, with **571 failures**, 14 unsupported
+modules and no harness errors, crashes or timeouts: **57 gained, zero lost**
+against the typed-array baseline. All **11,540 ES5.1 cases** pass. All four macOS
+arm64 applications pass root builds, packaging and desktop checks, including
+Calendar's four views, 169 Browser navigation/layout checks and Suite/XULRunner
+ChatZilla. C89 checks pass. The frozen runtime remained unchanged through both
+suites and matches all four application engines; its SHA-256 is
+`e28cdb4f23395f9709f2c6e3572a68bba0c5ce8cbf2acdc2e794783a6ad45b61`.
+Other platforms remain unvalidated for this batch. Arbitrary
+computed pattern keys, defaults, rest and complete array iterator semantics
+remain unfinished. Reports use `object-patterns-stage-*`; the main-build checks
+use `object-patterns-final-*`.
+
+The older focused tests now verify successful constant-key patterns and the
+original ES2015 ReferenceError for invalid new.target updates. Their previous
+unsupported-feature/error-type expectations no longer matched the implemented
+behavior. The pinned upstream tests and runner policy remain unchanged.
+
+
+### Computed object pattern keys
+
+Object patterns now evaluate computed keys, including Symbol conversion and
+yield expressions, and preserve their source through decompilation. Cache 51
+records the computed-key source-note regions. The focused fixture passes 25
+checks, including GC, primitive receivers, for-of bindings and long branches;
+the 13-check native pattern probe now includes computed keys through XDR and
+script decompilation. The complete pinned ES2015 run passes **28,002 modes**,
+with **566 failures**, 14 unsupported modules and no harness errors, crashes or
+timeouts: **five gained, zero lost**. All **11,540 required ES5 cases** pass on
+the same frozen macOS arm64 runtime, with unchanged binary hashes before and
+after both runs. Reports use `artifacts/es6/computed-patterns-final-*`.
+All four applications pass root build, package and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout checks and
+ChatZilla in Suite and XULRunner. The engine SHA-256 is identical in all four
+builds and the conformance runtime:
+`306d5709832f0c684fdbec3f8dace9ce5a441053e97c9c83ff2aa7dbd62e6af1`.
+C89 diagnostics pass. These results cover macOS arm64 only. Defaults, rest,
+assignment-reference ordering and complete array iterator behavior remain
+unfinished; this is not full ES2015 compliance.
+
+
+### Destructuring defaults
+
+Modern object and array patterns accept initializers, evaluating them only for
+undefined values. Object shorthand defaults remain cover grammar and are
+rejected when used as ordinary object literals, including dead branches.
+Source notes preserve initializers and cache version 52 records their emission.
+Object-pattern formal decompilation also skips the coercibility opcode.
+The focused fixture passes 28 checks, including GC, inferred names, lexical
+initialization, generator suspension, parameter/source round trips and wide
+branches. The native 13-check pattern probe includes defaults through XDR and
+script decompilation; real-window coverage includes lexical and formal defaults.
+The complete pinned ES2015 run passes **28,085 modes**, with **483 failures**,
+14 unsupported modules and no harness errors, crashes or timeouts: **83 gained,
+zero lost**. All **11,540 ES5 cases** pass on the same frozen macOS arm64 runtime.
+All four applications pass root build, package and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout checks and
+ChatZilla in Suite and XULRunner. Reports use
+`artifacts/es6/pattern-defaults-final-*`; all four application engine hashes
+match the conformance runtime: `885a599b9536dee8b5290abb0e885f5d45901bdc3d1b68f2f704137ee90f887b`.
+C89 diagnostics and the existing focused lexical, generator, for-of, arrow,
+reference and legacy-application fixtures pass. Other platforms have not been
+revalidated for this batch. Parameter initializers on the whole parameter,
+complete parameter-environment semantics, rest elements, assignment-reference
+ordering and iterator-based array patterns remain unfinished. This is not full
+ES2015 compliance.
+
+
+### Iterator-based patterns and captured assignment targets
+
+ES2015 array patterns use iterators, retain exhaustion, skip elision values,
+collect rest elements into arrays and close unfinished iterators. Destination
+references are captured before source access or defaults for both object and
+array assignments. Legacy selected-edition patterns retain indexed behavior.
+Cache version 54 records the iterator opcodes and source notes; source and XDR
+round trips include nested/rest patterns, reference capture and wide branches.
+The focused reference, array, rest and wide fixtures pass 60 checks, and the
+native pattern probe passes 13 checks. The upstream destructuring subset passes
+291 of 299 cases; its remaining cases require classes or whole-parameter
+defaults. This diagnostic result is not a complete conformance result.
+The complete pinned ES2015 run passes **28,147 modes**, with **421 failures**,
+14 unsupported modules and no harness errors, crashes or timeouts: **62 gained,
+zero lost**. All **11,540 ES5 cases** pass on the same frozen macOS arm64 runtime.
+All four applications pass root build, package and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout checks and
+ChatZilla in Suite and XULRunner. Reports use `artifacts/es6/array-patterns-final-*`;
+all four engine hashes match the conformance runtime:
+`8a0abdef0880abc202bb7e139fba773d59d11d66764096c265a2815c3bb2dbb4`.
+C89 diagnostics and focused legacy-application checks pass. Array-literal
+spread, function-call spread, whole-parameter defaults, complete parameter
+environments, classes and modules remain unfinished. This is not full ES2015
+compliance; other platforms have not been revalidated for this batch.
+
+The wide immutable-write fixture now supplies `Array.prototype[Symbol.iterator]`
+on its array-like ES2015 input, so execution reaches the intended constant-write
+error. Its 24 assertions remain unchanged. The ES5 diagnostic likewise retains
+54 exception assertions with an iterable modern input and original legacy
+inputs. Initial package-check logs are retained under
+`array-patterns-final-*.initial*.log`; upstream Test262 files are unchanged.
+
+The initial orchestration watchers stopped while a failed package log was being
+rotated. Their diagnostics are retained; complete restarted conformance and
+desktop runs above passed their required checks against the unchanged engine.
+
+## Unicode regular expressions
+
+ES2015 regular expressions accept `u`, expose the `unicode` accessor, and match
+code points while preserving UTF-16 offsets for captures and `lastIndex`.
+Patterns support supplementary literals, paired and braced Unicode escapes,
+code-point classes/ranges, Unicode-aware backreferences and strict Unicode
+escape grammar. Unicode ignore-case matching uses pinned Unicode 18.0.0
+simple/common case folds, including word-class/boundary canonicalization;
+non-Unicode matching and explicitly selected legacy editions retain their paths.
+Existing match/replace/split protocols advance empty Unicode matches by code point.
+
+Unicode class bitmaps are completed before publishing the regexp. Compilation
+callbacks can cancel, collect or compile another regexp. Decoded regexp objects
+and script atoms remain rooted across those callbacks. Cache version 55 records
+the new flag semantics; script/function source and XDR round-trips are exercised.
+
+`regexp-unicode.js` supplies 48 focused checks and `TestRegExpUnicode.c` supplies
+22 native embedding checks. The real-window edition fixture exercises Unicode
+matching and empty global matches. `test-regexp-casefold.py` checks every pinned
+simple/common mapping (15,330 assertions); see the [Unicode data guide](../../src/unicode/README.md).
+
+The final full macOS arm64 run passes **28,193 modes**, with **375 failures**,
+**14 unsupported modules**, and no harness errors, crashes or timeouts: **46 gained,
+zero lost** against iterator patterns. All **11,540 ES5 cases** pass against the
+same frozen runtime. All four applications pass root builds, packaging and
+relocated desktop checks, including Calendar's four views, 169 Browser
+navigation/layout checks and ChatZilla in Suite and XULRunner. Native, mapping,
+C89 and 9,450 optional Node differential checks pass. Final reports use
+`artifacts/es6/regexp-unicode-verified-final-*`. All four engine hashes match
+the frozen conformance runtime:
+`136d604f959eb1b7468ccd071c735e9a0349e465269fc79142d6075229f54af6`.
+Full ES2015 compliance remains unfinished; other platforms are not revalidated
+for this batch.
+
+The first desktop run exposed mixed-edition integration missing from the modern
+shell: historical globals did not expose the new `unicode` field, and their
+String match/replace/split loops advanced empty Unicode matches by a code unit.
+The legacy regexp property hook now reports the stored flag, and those loops
+advance paired surrogates together only for Unicode regexps. Existing callable
+regexp behavior and non-Unicode matching remain covered. The unchanged failing
+window assertions now pass, with additional replace/split assertions, after
+this engine correction. A second diagnostic run also caught an omitted legacy
+property-table entry; the strengthened native probe creates an independent
+legacy global and reproduces that failure before the correction. The first failure log is retained under
+`artifacts/es6/regexp-unicode-final-runtime/xulrunner/editions.log`.
+
+## Global declarations and statement completion values
+
+Modern native-global scripts and eval validate all function/variable declarations
+before creating any of them. Function checks run in reverse declaration order,
+ignore earlier duplicate functions, and inspect own descriptors without invoking
+getters. Configurable properties can become functions; allowed nonconfigurable
+data properties retain their attributes. Inherited properties do not prevent an
+own variable binding. Local/strict eval and explicitly selected legacy editions
+retain their separate paths. Persistent global lexical environments remain
+unfinished; these checks do not implement global `let`/`const` semantics.
+
+Result-producing modern statements implement ES2015's undefined completion for
+empty branches/loops/handlers. Finally preserves a normal try/handler result;
+abrupt finally completion still overrides it. The immutable script edition
+controls finally stack layout even if an embedding callback changes the context's
+selected edition. Explicit legacy scripts retain their old completion behavior.
+Cache version 56 records this layout change. Constant folding, source
+reconstruction, wide branches, generators and XDR round trips are covered.
+
+The focused declaration fixture has 22 checks; its native embedding probe has
+13. Completion fixtures cover 27 basic, four wide-branch and ten error-source
+checks, plus 17 native embedding assertions. The real-window edition fixture
+also checks statement results and caught errors. An initial isolated full run
+exposed incorrect stack accounting in error-source reconstruction: a hidden
+PUSH/POPV reset must be skipped as a pair, and finally needs its additional saved
+completion slot. All 96 affected cases pass after correction; original diagnostic
+reports are retained under `artifacts/es6/completion-stage-*` and
+`completion-reviewed-*`. The complete final macOS arm64 run passes **28,199
+ES2015 modes**, with **369 failures**, **14 unsupported modules** and no harness
+errors, crashes or timeouts: **six gained, zero lost**. All **11,540 ES5 cases**
+pass on the same frozen runtime. All four applications pass root builds,
+packaging and relocated desktop checks, including Calendar's four views,
+169 Browser navigation/layout checks and ChatZilla in Suite and XULRunner.
+Final reports use `artifacts/es6/completion-final-*`. All four engine hashes
+match the frozen conformance runtime:
+`387d3d062c068c8387587beeb29bec7e9c767d89943a7ae8f56a95fbbd0eec74`.
+C89 diagnostics pass. Full ES2015 compliance remains unfinished; other platforms
+have not been revalidated for this batch.
+
+## Array, call and constructor spread
+
+The validated implementation adds iterator-based array literals and function/
+constructor argument spread. Array accumulation preserves holes around spreads,
+UTF-16 string iteration, own element definitions and evaluation order. It uses
+neither mutable array methods nor indexed reads in place of iteration. Call
+accumulation retains the callee and receiver before evaluating arguments, keeps
+direct `eval` attached to its original caller, and uses the existing constructor,
+new-target, bound-function and Proxy paths. Temporary constructor argument
+vectors are marked as internal invocations, including native constructors and
+bound/Reflect/Proxy forwarding.
+
+Fixed-arity opcodes 253/254 describe array accumulation and spread invocation;
+cache version 58 records them. Source reconstruction preserves comma expressions
+and parentheses around constructor expressions. Selected legacy editions still
+reject spread syntax. Focused array/call fixtures supply 21/20 checks, with
+23 assertions in each native embedding probe covering collection, callback
+reentry, cancellation, XDR and source round trips. Optional Node differential
+checks cover 970 array and 624 call/constructor cases without differences.
+Real-window checks include array holes, method receivers, construction and direct
+eval. Seven additional checks exercise 66,000 arguments through ordinary,
+Proxy and bound construction, direct/indirect eval and source round trips.
+These exposed an allocator assumption about a caller's operand stack: nested
+internal invocations can temporarily point the stack pointer into another rooted
+argument segment. Operand-tail initialization now checks its frame bounds and
+runs before redirecting that pointer. The native probe also collects during
+large Proxy, bound and Reflect construction. The original failure and LLDB
+trace remain under `artifacts/es6/call-spread-wide*`.
+
+The final corrected runtime retains **28,199 passes**, **369 failures** and
+**14 unsupported modules**, with zero lost passes, harness errors, crashes or
+timeouts. All **11,540 ES5 cases** pass on the same frozen runtime. All four
+applications pass root builds, packaging and relocated desktop checks, including
+Calendar's four views, 169 Browser navigation/layout checks and ChatZilla in
+Suite and XULRunner. Final reports use `artifacts/es6/spread-wide-final-*`.
+All four application engine hashes match the frozen conformance runtime:
+`cbe636e5eb1ed8d075c1a21337c98299cf15e4396e8fe8fd7387e379a2b6e30e`.
+The earlier corpus runs alone missed the wide-argument regression; the added
+wide and native collection probes cover it. Full ES2015 compliance remains
+unfinished; validation of this batch is macOS arm64 only.
+
+## Persistent global and eval lexical bindings
+
+The validated implementation stores modern global `let`/`const` bindings in a
+private environment retained by the owning global. They are absent from the
+global object's properties, and functions from earlier scripts capture the same
+environment. Reads, writes and `typeof` observe uninitialized bindings until the
+declaration executes. Fresh eval records isolate eval-local declarations while
+retaining captured closures. Non-strict eval checks intervening lexical records;
+global declared-var history is independent of ordinary property deletion.
+Explicitly selected legacy declarations and embedding object receivers retain
+their existing paths. The historical `__parent__` accessor hides these private
+records, as it already hides function/block environments.
+
+Script metadata records the binding template in the atom map. Bytecode cache
+version 59 includes that metadata and an atom-directed extended instruction for
+binding initialization, including destructuring. Source reconstruction and XDR
+cover wide atom indices. The split prolog/body JSAPI path gives the prolog its own
+STOP instruction: truncating the script length alone did not stop the threaded
+interpreter from executing the body. The body does not instantiate bindings a
+second time.
+
+Focused script checks pass 17 assertions. Native probes pass 55 compiler/scope,
+49 record-lifetime and 13 wide-atom checks, including GC, multiple globals,
+nonextensible globals, failed initializers, mixed caller editions, source/XDR
+round trips and separate prolog/body execution. The contextual-keyword fixture
+now assigns distinct global names to its independent shadowing cases; all 84
+assertions remain. Real-window fixtures exercise lexical declarations across
+separate scripts in both chrome and content globals.
+
+The initial complete macOS arm64 diagnostic run passes **28,213 ES2015 modes**,
+with **355 failures**, **14 unsupported modules** and no harness errors, crashes
+or timeouts: **14 gained, zero lost**. All **11,540 ES5 cases** pass. These reports
+use `artifacts/es6/global-lexical-compiler-*`. The final corrected runtime retains
+those totals and the 14 gained/zero lost result. All four applications pass root
+builds, packaging and relocated desktop checks, including Calendar's four views,
+169 Browser navigation/layout checks and ChatZilla in Suite and XULRunner.
+Final reports use `artifacts/es6/global-lexical-final-*`. All four engine hashes
+match the frozen conformance runtime:
+`28ca09fd4b1a86436944ece57598ac3cdb316c25c7b7bc00ad2bb0fa90b6ac21`.
+C89 checks pass. Full ES2015 compliance remains unfinished; this batch's
+validation is macOS arm64 only.
+
+
+## Method home objects and super properties
+
+Object methods and accessors retain their own traced home object; cloning,
+computed methods, generators and nested arrows preserve it. Modern `super.x`
+and `super[key]` support reads, calls, tagged/spread calls, assignment, compound
+assignment, updates, destructuring targets and for-in/for-of targets. Direct
+eval inherits method context; ordinary nested functions and indirect eval do
+not. A private reference captures the base, receiver, key and strictness before
+RHS callbacks. Base lookup follows the home object's current prototype, while
+getter/setter calls retain the original receiver. Deleting a super property
+throws ReferenceError. Class declarations and `super()` remain unfinished.
+
+Cache version 60 stores the function kind needed to reconstruct home objects;
+integer selectors extend the existing atom-directed instruction. The new tests
+are `super-properties.js` (33 assertions), `TestMethodHome.c` (75),
+`TestSuperReference.c` (36) and `TestSuperWide.c` (16). The wide probe exercises
+66,000 distinct atoms, XDR, source reconstruction and collection in accessors.
+It exposed a decompiler buffer relocation bug: copying an expression already
+inside the growing buffer must relocate its source pointer as well. Thirty
+repeated wide runs pass with allocation scribbling enabled. Real chrome/content
+fixtures also execute super accessors, an escaped arrow and direct eval.
+
+The initial complete isolated macOS arm64 run gains 16 cases with zero lost:
+**28,229 pass, 339 fail, 14 unsupported**, with zero harness errors, crashes or
+timeouts. All **11,540 ES5 cases** pass. The 1,020-case comparison against Node
+agrees after fixing a recursive Proxy trap and comparing global identity rather
+than host-specific global tags in the diagnostic fixture. Reports use
+`artifacts/es6/super-property-first-*`. Final integrated reports under
+`artifacts/es6/super-property-final-*` retain these totals and the 16 gained/zero
+lost result. All four applications pass root builds, packaging and relocated
+desktop checks, including Calendar's four views, 169 Browser navigation/layout
+checks and ChatZilla in Suite and XULRunner. All four engine hashes match the
+unchanged frozen conformance runtime:
+`284ae2f98e5d99b54a3407afa01e520861ced00348641700dc23d96d50445149`.
+C89 checks pass. Full ES2015 compliance remains unfinished; this batch's
+validation is macOS arm64 only.
+
+
+## Scripted setter assignment results
+
+Standard-edition assignment retains the assigned value when a scripted setter
+returns another value or returns implicitly. Explicit historical editions keep
+their old result behavior unless the caller opts into strict mode. Native setter
+hooks retain their embedding contract. The assigned value is rooted across
+callbacks; the setter's exception still propagates.
+
+`setter-result.js` passes 16 checks in default ES5 and ES2015 modes, covering
+computed/inherited/primitive receivers, compound assignment, updates, descriptor
+replacement and reentrancy. `TestSetterResult.c` passes 66 checks with collection
+and mixed setter/caller editions. The 20-case object-literal diagnostic subset
+passes completely. Final integrated reports under
+`artifacts/es6/setter-result-final-*` record **28,231 ES2015 passes**, **337
+failures**, **14 unsupported modules** and zero harness errors, crashes or
+timeouts: **two gained, zero lost**. All **11,540 ES5 cases** pass. All four
+applications pass build, package and relocated desktop checks, including
+Calendar's four views, 169 Browser navigation/layout checks and Suite/XULRunner
+ChatZilla. The frozen conformance runtime remains unchanged, and all four
+engine hashes match: `fca775a9ee16720547e1373307306ccddd6dd85899649a6a6e73668d25577515`.
+C89 checks pass. This batch is validated on macOS arm64 only; full ES2015
+compliance remains unfinished.
+
+
+## Classes and derived constructors
+
+ES2015 class declarations and expressions now support heritage, default and
+explicit constructors, instance/static methods, accessors, generators, computed
+keys, inner class-name bindings and `super()` through arrows and direct eval.
+Derived receivers remain uninitialized until a successful super call; object
+returns, primitive-return errors and repeated initialization follow separate
+paths. Constructor and method descriptors retain their ES2015 ordering.
+
+Cache version 61 records the new function kinds and complete class source.
+The public function decompiler retains class expressions, including nested and
+Unicode source; enclosing script decompilation reconstructs class instructions.
+Source recording covers memory and file token streams in ES2015 mode. Explicit
+legacy editions keep their existing parser paths.
+
+The first isolated full run records **28,509 passes, 59 failures, 14 unsupported
+modules**, no harness errors/crashes/timeouts, **278 gained and zero lost**.
+ES5 passes all **11,540 cases**. Subsequent class-name fixes pass **322/324**
+class-related modes; the other two require parameter defaults. Reports are
+`artifacts/es6/class-first-*` and `class-names-fixed-subset.json`. These are
+intermediate results. Final integrated reports under `artifacts/es6/classes-reviewed-*`
+record **28,519 passes, 49 failures, 14 unsupported modules**, zero harness errors,
+crashes or timeouts: **288 gained, zero lost**. All **11,540 ES5 cases** pass.
+Focused probes cover 53 class assertions, eight source cases, 47 native
+constructor checks and 16 wide-operand/cache/collection checks. Ten repeated
+wide runs pass with allocation scribbling; 157 additional class behavior cases
+agree with Node. C89 checks pass.
+
+Real content-window validation exposed an initialization path that looked up
+internal constructor-state classes by name. Their objects now use the cached
+built-in prototype, matching the other private engine records. All four macOS
+arm64 applications pass root build, packaging and relocated desktop checks,
+including Calendar's four views, 169 Browser navigation/layout assertions and
+ChatZilla in Suite and XULRunner. All four engine hashes match the unchanged
+frozen conformance runtime:
+`b0a096716f708d35d39719f0426b603c9f657f75ba311be3da6c30af6e0bdfa5`.
+Other platforms are not revalidated for this batch. Full parameter environments,
+module execution and full ES2015 conformance remain unfinished.
+
+
+## Catch variables and block function declarations (integrated macOS arm64 validation)
+
+A catch-local slot used by an initializer no longer suppresses its separate
+outer `var` declaration in ES2015 scripts/eval. ES2015 also rejects duplicate
+block function declarations according to its original
+[13.2.1 early errors](https://262.ecma-international.org/6.0/#sec-block-static-semantics-early-errors);
+explicit legacy and default editions retain their existing behavior. The
+[catch-variable extension](https://262.ecma-international.org/6.0/#sec-variablestatements-in-catch-blocks)
+applies to strict as well as non-strict cases. These three pinned failures were
+implementation issues, not contradictory test metadata.
+
+The final integrated macOS arm64 run passes **28,522 cases**, with **46 failures**,
+**14 unsupported modules**, zero harness errors/crashes/timeouts, **three gained
+and zero lost**. `catch-declarations.js` passes 18 checks, and the native wide
+probe passes 16. The latter also exposed missing decompiler handling for wide
+prolog declarations; they now retain the same source-note behavior as narrow
+instructions. All **11,540 ES5 cases** pass. All four applications pass root
+builds, packaging and relocated desktop checks, including Calendar's four
+views, Browser navigation/layout (169 checks), and Suite/XULRunner ChatZilla.
+The four application libraries and frozen conformance runtime share SHA-256
+`4faae023331deddd2dcee1e37f1bdd3b56962b7d57211935dbd1eb03865b1330`.
+C89 declaration/implicit-function checks pass. Cache version remains 61.
+Reports use `artifacts/es6/catch-declarations-final-*`. Other operating systems
+and architectures have not been revalidated for this batch.
+
+
+### Parameter environments (integrated macOS arm64 validation)
+
+ES2015 defaults and binding patterns now share a formal parser across ordinary
+functions, methods, generators, arrows and dynamic Function constructors.
+Parameters initialize left to right with TDZ checks, unmapped arguments,
+initializer eval scopes, and separate body bindings when necessary. Defaults
+run before a generator first suspends. The body owns a separately traced and
+serialized initializer script so destructuring exception tables and IteratorClose
+retain their normal offsets. The dynamic constructor parses formals and body
+as separate streams. Legacy editions retain their existing parser path.
+
+The isolated full run in `artifacts/es6/parameter-reviewed-*` records **28,568
+passes, zero failures, 14 unsupported module cases**, and zero harness errors,
+crashes or timeouts. All **11,540 ES5 cases** pass. This is not completion:
+module compilation/linking/evaluation remains unsupported. Additional native
+checks subsequently fixed destructured argument holes and duplicate binding
+metadata in XDR, Unicode binding serialization, and raw parameter source output.
+The wide initializer test covers 66,000 atoms, GC during script callbacks,
+balanced script notifications, and cache/source round trips. Cache version is 62.
+`default-parameters.js` passes 60 focused checks and `TestParameterWide.c`
+passes 17 checks with 12 balanced script lifecycles. All four applications pass
+root builds, packaging and relocated desktop checks, including Calendar's four
+views, Browser navigation/layout (169 checks), and Suite/XULRunner ChatZilla.
+The final packaged-runtime full run confirms **28,568 passes, zero failures,
+14 unsupported modules**, zero other errors, **46 gained and zero lost**;
+ES5 remains **11,540/11,540**. Reports use `artifacts/es6/parameters-final-*`.
+All four libraries and the frozen runtime share SHA-256
+`85ea999d5c43a23af1ffda28c7369bd6ba2db8d1ccbbfed569c61a8e9ec9a85d`.
+C89 checks pass. Other platforms are not revalidated for this batch.
+
+The pinned corpus also includes later rest binding-pattern cases. Those formals
+are accepted without widening ordinary variable-declaration rest grammar; the
+unchanged `array-rest.js` negative cases and all 56 rest-parameter checks pass.
+
+
+### Modules (integrated macOS arm64 validation)
+
+The native engine now compiles Unicode module source, records imports/exports,
+instantiates private bindings, resolves live imports and re-exports through
+cycles, and evaluates each dependency graph once. Missing or ambiguous named
+exports fail linking. Star ambiguities are omitted from namespaces. Namespace
+objects expose sorted live bindings and preserve the original ES2015 edition's
+key iterator and definition restrictions (9.4.6 and 26.3); these differ from
+later editions. Module `this` is undefined, including arrows/direct eval, and
+module declarations never become properties of the application global.
+
+Embedding APIs are additive: `JS_CompileUCModule`, `JS_GetModuleRequests`,
+`JS_SetModuleDependency`, `JS_InstantiateModule`, `JS_EvaluateModule` and
+`JS_GetModuleNamespace`. Root returned record/namespace objects through the
+normal JSAPI. Compilation temporarily selects ES2015 and restores the caller's
+edition; existing XUL/component loaders retain their classic script behavior.
+The host supplies dependency records for each requested specifier before linking.
+No filesystem/network resolver or HTML module-script loader is implied. Records
+own their compiled scripts and are not ordinary XDR script-cache objects.
+
+The shell exposes `compileModule(source, filename)`, `moduleRequests(record)`,
+`linkModule(record, specifier, dependency)`, `instantiateModule(record)`,
+`evaluateModule(record)` and `namespaceModule(record)`. Test262 harness setup
+remains a separately compiled global script; module tests then use the actual
+module compiler/evaluator. All 14 pinned module cases are negative cases, so
+positive coverage is supplied separately by grammar, linking, namespace, lifetime
+and embedding regressions. Do not equate 14 negative-test passes with a complete
+module implementation. The full integrated results are recorded below.
+
+A separate wide-declaration probe also covers more than 65,535 atoms before
+exported var/function declarations. The native host probe checks dependency
+request deduplication, live values, repeat evaluation, global isolation, context
+edition restoration, namespace-only reachability and balanced script hooks
+with collection during compilation. C89 declaration/implicit-function checks
+pass. These checks do not replace the full conformance and application runs.
+
+The later-coverage inventory is reproducible with `inventory-test262.py`, using
+the original baseline and the clean later checkout at
+`35d566604512cba908054eec49f85e64a59f3091`. It inventories all 48,912 files in
+the same three ECMA-262 roots: 36,100 added paths, 10,684 changed bodies, and
+2,128 identical bodies at retained paths. These are file comparisons, not test
+passes or edition decisions. Every entry remains in the review queue. An
+`es6id` is insufficient to determine the expected edition: for example, later
+module namespace tests retain ES6 references while asserting changed namespace
+symbol descriptors. The pinned historical run alone does not complete this
+later-coverage review.
+
+The frozen integrated run passes **28,582/28,582 pinned ES6 modes**, with **zero
+failures, unsupported cases, harness errors, crashes or timeouts**: 14 gained
+and zero lost. All **11,540 ES5 modes** pass. All four applications pass root
+builds, packaging and relocated desktop checks, including Calendar's four
+views, Browser navigation/layout (169 checks), and Suite/XULRunner ChatZilla.
+All four libraries and the frozen runtime share SHA-256
+`acc1c5edf759d2803a256403802a83902edffe433776c067a70d7f3c68815cfe`.
+Reports use `artifacts/es6/modules-validated-*`. C89 checks and 27 runner
+integration checks pass. Cache version remains 62. Other operating systems and
+architectures were not revalidated for this batch.
+
+This is the first complete pinned-corpus pass, not completion of the user's
+full ES2015 coverage objective. The later `es6id` diagnostic ran 5,852 modes:
+5,734 diagnostic passes, 109 failures and nine harness errors. Its edition
+review and modern host support are incomplete, so these are not conformance
+counts. Follow-up probes also found escaped module-contextual keywords,
+export-list semicolon insertion, and top-level-arrow `new.target` gaps; fixes
+are being validated separately. No upstream assertions or failing cases were
+removed to obtain the complete historical pass.
+
+
+The module-context follow-up corrects literal `as`/`from` parsing, export-list
+semicolon insertion, and lexical `new.target` availability through arrows and
+direct eval. Public namespace retrieval now propagates failed module records.
+The integrated macOS arm64 run preserves **28,582/28,582 ES6** and
+**11,540/11,540 ES5**, with zero failures or unsupported cases. All four
+applications pass builds, packages and relocated desktop checks, including
+Calendar views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Reports: `artifacts/es6/module-context-final-*`. Focused coverage includes
+9 contextual-keyword, 8 module-production and 12 `new.target` checks, plus
+24 native module checks across five scripts. C89 checks pass. Other platforms
+remain unvalidated for this batch; the later-test review remains open.
+
+
+The later built-in/statement edge batch preserves **28,582/28,582 pinned ES6**
+and **11,540/11,540 ES5**, with zero failures, unsupported cases, crashes,
+timeouts or harness errors on macOS arm64. It corrects Number.toString and
+RegExp.compile arity in modern globals, undefined substr lengths in ES2015,
+Symbol subclass definition versus constructor rejection, statement-position
+function restrictions, and duplicate catch-binding SyntaxErrors. Explicit
+legacy statement forms still pass in JavaScript 1.7. The local statement
+fixture now distinguishes Annex B's permitted positions from legacy extensions;
+no upstream tests were changed. There are 21 new built-in checks and 24 new
+statement checks, plus 39 updated statement/edition checks.
+
+All four applications pass root builds, packages and relocated desktop checks,
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Reports use `artifacts/es6/later-edges-final-*`. C89 checks pass; adding the
+missing realm-helper header produces byte-identical libraries across all four
+applications and the frozen conformance runtime (SHA-256
+`0edb98fd8de17b868885d7125a17ad309d79dca89ea76375ad2700ea48e6cc9c`).
+The later 5,852-mode diagnostic with isolated realms improves to 5,820 passes
+and 32 failures, without harness errors. That diagnostic still needs edition
+review and phase checking and is not a full ES2015 conformance result. Further
+pattern/scope fixes are being validated separately. Other platforms have not
+been revalidated for this batch.
+
+
+### Pattern, realm and strict block-function follow-up
+
+ES2015 for-in destructuring now consumes property-name strings while explicit
+legacy editions retain key/value enumeration. Duplicate `__proto__` keys are
+allowed in patterns but rejected in object literals. Arrow formals inherit the
+outer generator grammar and reject yield expressions. Foreign-realm eval
+intrinsics perform indirect eval. Non-Unicode `\8`/`\9` identity escapes
+consume their digit when there is no matching capture. Strict block and switch
+functions now initialize lexical bindings at scope entry, retain closures and
+do not leak into the surrounding variable environment. Their source declarations
+remain at their original positions when decompiled. Cache version is **63** for
+the updated hidden initialization/source-note behavior.
+
+The integrated macOS arm64 run preserves **28,582/28,582 ES6** and
+**11,540/11,540 ES5**, with zero failures, unsupported cases, harness errors,
+crashes or timeouts. All four applications pass root builds, packages and
+relocated desktop checks, Calendar views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. Reports: `artifacts/es6/pattern-scope-final-*`. All
+four libraries and the frozen conformance runtime share SHA-256
+`546397d516c9e9d3f3b0239dbaf77f4b529789d1addc85e1265662be0c62ec18`.
+C89 checks pass. Focused coverage includes 21 pattern/escape checks, nine strict
+block-function checks, 16 realm/phase checks, 16 runner controls, 107 pinned
+block-scope modes, and 17 native wide-function checks including GC, XDR, source
+round trips and execution in another global. Other platforms were not revalidated.
+
+The phase-aware later `es6id` diagnostic reports **5,833 passes and 19 failures**,
+without harness errors. These remain diagnostic results, with edition review
+pending, rather than conformance totals. The broader tail-call-tagged selection
+has 35 modes (one pass and 34 failures, including two later coalescing cases);
+proper ES2015 tail-call execution is still required. The separate expanded
+feature-tagged run includes 37,972 modes, retains mixed newer features, and must
+not be described as a reviewed ES2015 suite. Full ES2015 completion remains open.
+
+
+## Original RegExp ranges and buffer-detachment host follow-up
+
+Non-Unicode range endpoints now follow the original ES2015 Annex B
+`ClassAtomInRange` identity-escape fallback. For example, `[a-\\d]` denotes
+`a` through `d`; Unicode mode still rejects the non-singleton endpoint.
+Constructor realm selection also governs this grammar and decimal identity
+escapes when modern RegExp constructors are called from legacy code. Existing
+legacy constructors retain their historical grammar. Lazy bitmap creation
+preserves the parse decision. This intentionally does not implement the later
+`CharacterRangeOrUnion` semantics required by some current Test262 cases.
+
+The additive `JS_DetachArrayBuffer` API supports the isolated test host's
+`$262.detachArrayBuffer`; native binary-data tests use the public entry point.
+The diagnostic runner accepts upstream's informational `generated` flag and
+continues to reject unknown flags. Its executable control suite now has 18
+checks. No upstream test assertions or required-mode policies were changed.
+
+Validation on macOS arm64: **28,582/28,582 pinned ES6** and **11,540/11,540
+ES5**, zero failures, unsupported cases, harness errors, crashes or timeouts.
+All four root builds, packages and relocated desktop checks pass, including
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+Reports: `artifacts/es6/ranges-detach-final-*`; C89 checks pass. All four
+application libraries and the frozen conformance runtime have SHA-256
+`8035311985f7ebffc32dca9aaa9f8d68675b5fa3e65aeeb14fefa501f803baec`.
+Focused checks cover 13 original-range/edition cases and five detachment-host
+cases. This is local macOS arm64 validation, not new Windows/Linux validation.
+Proper tail calls and the reviewed later ES2015 inventory remain unfinished.
+
+
+## Conversion and built-in metadata follow-up
+
+Modern globals expose `Number.parseInt` and `Number.parseFloat` as aliases of
+their global functions. `DataView.length` is 1, excluding optional arguments;
+the constructor explicitly handles an omitted offset. The local binary-data
+fixture's old arity assertion was corrected to the ES2015 requirement.
+
+Modern primitive conversion skips non-callable fallback methods, propagates
+accessor exceptions and calls ordinary `valueOf` with no arguments. A primitive
+`null` returned by conversion is stringified as `"null"`. Modern
+`isPrototypeOf` checks a primitive argument before coercing its receiver and
+preserves an existing object receiver without invoking legacy class conversion.
+Explicit legacy callers retain the historical `valueOf` hint convention;
+modern built-ins work with values from legacy globals. Native class conversion
+hooks and legacy XML conversion remain available.
+
+The final macOS arm64 validation passes **28,582/28,582 pinned ES6** and
+**11,540/11,540 ES5**, with zero failures, unsupported cases, harness errors,
+crashes or timeouts. All four root builds, packages and relocated desktop
+checks pass, including Calendar's four views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. Reports: `artifacts/es6/conversion-builtins-final-*`.
+All four libraries and the frozen runtime share SHA-256
+`3c3f6180fb722504b5aaeb447f1f825ebcd64e5797d2ac65cd2ebccab45f1387`.
+C89 checks, 18 focused conversion checks and 18 native cross-realm/embedding
+checks pass. Initial failures involving optional arguments and Date prototype
+receivers were fixed before this final validation. Other platforms were not
+revalidated. Tail-call implementation is still separate, unfinished work.
+
+The expanded later feature-tag diagnostic, before these conversion fixes,
+reports 18,971 passes, 18,697 failures and 304 host/harness errors across 37,972
+modes. Report: `artifacts/es6/later-expanded-generated-diagnostic.json`.
+This is not an ES2015 conformance score: the selection includes many later
+features and normative changes, and edition review remains pending. Unknown
+host flags, unsupported module fixtures and newer harness syntax remain visible.
+No upstream assertions or required modes were changed.
+
+
+## Tail-call execution and generator shorthand
+
+Strict ES2015 function and arrow calls in tail position now transfer their
+callee, raw receiver and evaluated arguments to an internal invocation loop.
+The retired activation releases its stack storage after captured arguments,
+locals and lexical blocks have been detached. The loop supports mutual calls,
+changing argument counts, spread, bound functions, `call`, `apply`,
+`Reflect.apply`, Proxy targets and Proxy traps. Direct intrinsic eval retains
+its calling environment. Calls protected by catch/finally handlers, generators,
+non-tail expressions and legacy editions retain their existing execution path.
+Embedding call/execute hooks disable retirement so their entry/exit callbacks
+remain balanced, including when a branch callback installs a hook.
+
+Original ES2015 removes the tail caller's execution context before invocation;
+pre-call Proxy errors and argument arrays therefore use the resumed caller's
+realm. This differs from the [2021 normative change](https://github.com/tc39/ecma262/pull/2495).
+The explicit engine edition is preserved independently of that realm. This
+change adds no opcode or serialized-bytecode format; cache version remains 63.
+Native regressions cover branch cancellation, collection, hooks, decompilation
+and XDR execution. Object shorthand `yield` in generator bodies is now rejected,
+while ordinary property names and nested ordinary/arrow bodies preserve their
+respective grammar contexts.
+
+The isolated candidate passes **28,582/28,582 pinned ES6** and **11,540/11,540
+ES5**, all 89 existing focused shell fixtures, 60 new focused checks and 19
+native checks. Reports: `artifacts/es6/tail-candidate-*`. The later `tco`
+substring diagnostic passes 37 of 41 modes: all 33 original-ES2015 tail-call
+modes pass; two post-ES2015 coalescing modes and two unrelated BigInt sort modes
+remain diagnostic failures. These are retained, not excluded from that report.
+Application build/package/runtime validation is recorded separately below.
+The integrated follow-up also handles parenthesized/comma expressions and
+constructors. Base constructor receivers remain rooted across tail execution;
+derived constructors retain their lexical `this` cell for return validation,
+including a tail-invoked arrow that initializes it through `super()`. Expanded
+control-flow tests cover catch/finally, loops, switch, tagged templates, extended
+jumps and iterator cleanup.
+
+Idle JSD script tracking no longer installs call/execute hooks that have no
+work to do. Function/top-level callbacks, profiling and object tracing install
+them when needed and continue to disable frame retirement. Strict functions
+with null/undefined receivers are included in debugger stacks. Inline entry
+callbacks now see the callee as the current frame, matching the ordinary call
+path. The debugger fixture checks balanced calls, profiling, callback collection
+and restoration of tail calls after hooks are cleared. The native fixture also
+checks current-frame identity and collection inside entry hooks. These fixes
+were found during Suite package validation; the failed attempt remains recorded.
+The combined focused coverage is 101 shell checks and 20 native checks.
+
+Final macOS arm64 validation passes **28,582/28,582 pinned ES6** and
+**11,540/11,540 ES5**, with zero failures, unsupported cases, harness errors,
+crashes or timeouts. All four root builds, packages and relocated desktop checks
+pass, including Calendar's four views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. Reports: `artifacts/es6/tail-integration-final-*`.
+The four application engine libraries and frozen conformance runtime share
+SHA-256 `691e17ff66b622a8e90d771d846adcd07d901fab948656cd2152b16d92fe9634`.
+C89 checks pass for the engine, JSD changes and native fixture. Three later
+generator shorthand diagnostic modes also pass. This batch has not been
+revalidated on Windows or Linux. The reviewed later ES2015 inventory is still unfinished;
+this is not a full ES2015 completion claim.
+
+
+## Property queries and reentrant array-length conversion
+
+Modern `hasOwnProperty` and `propertyIsEnumerable` convert their property key
+before boxing or rejecting the receiver. The converted key stays rooted across
+boxing; existing embedding objects retain their identity. Explicit legacy
+globals keep their existing built-ins.
+
+ES2015 array-length definition now reads the current descriptor after both
+numeric conversions, so a conversion callback that makes `length` non-writable
+cannot be overwritten using stale attributes. Direct length assignment checks
+that changed state before shrinking the array. Strict assignments throw;
+non-strict assignments leave its elements intact; Reflect operations report
+rejection. Earlier-edition descriptor ordering remains unchanged.
+
+Modern assignment expressions preserve their original right-hand-side value
+when a native setter normalizes its storage value. This covers named, computed,
+unqualified and global assignments. The native JSAPI still receives the
+normalized value, and explicitly selected legacy scripts retain that historical
+result convention. This changes no opcode or cache format.
+
+The isolated candidate passes **28,582/28,582 pinned ES6** and **11,540/11,540
+ES5**, 99 prior focused fixtures, 22 new shell checks and 18 native checks.
+The native checks exercise collection, compound assignments, prefix/postfix
+updates, JSAPI writes and explicit legacy execution. Six relevant later
+upstream diagnostic modes pass unchanged. Reports:
+`artifacts/es6/property-coercion-fixed-*`, `property-coercion-later-*`, and
+`native-setter-result-stage.log`. The final integrated runtime also passes both
+complete pinned suites with the same counts and zero failures. All four macOS
+arm64 applications pass root build, packaging and relocated desktop checks,
+including Calendar's four views, Browser navigation/layout and Suite/XULRunner
+ChatZilla. C89 checks pass. Final reports are
+`artifacts/es6/property-coercion-final-*`; all four application engine libraries
+match the frozen conformance runtime's SHA-256:
+`97f9d03208bca7f43113e05d65694e57c31d129ea66e4d52c9d4c683a7e66d87`.
+Property-order replacement validation is recorded below. The complete later
+ES2015 inventory and validation on other operating systems remain unfinished.
+
+
+### Property replacement and function creation order
+
+Modern descriptor replacement now forks the immutable property-tree suffix
+without moving the replaced property to the end. Existing value slots, middle
+deletions, duplicate formal metadata and watchpoint setters are preserved.
+Explicit legacy language versions retain their historical ordering.
+
+Interpreted ES2015 constructors materialize their prototype after `length` and
+before `name`, as required by the original creation algorithms. This also
+handles generators and functions named `Object`; native bootstrap and
+non-constructible methods keep their existing paths. Reflection no longer
+exposes hidden compiler parameter/local metadata from dynamic functions.
+No bytecode format, cache version or embedding API changes are required.
+
+The final integrated runtime passes both complete pinned suites with zero
+failures: **28,582/28,582 ES6** and **11,540/11,540 ES5**. All four macOS arm64
+applications pass root build, package and relocated desktop validation, plus
+Calendar's four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+The candidate also passes 100 existing focused fixtures, 63 native fixtures,
+36 new shell checks and C89 checks. All four application engine libraries match
+the frozen conformance runtime's SHA-256:
+`3e77fde23d592142a1339f7e6b43fc56a305def7a50ac4e93406e5008aa4055c`.
+Reports are under
+`artifacts/es6/property-order-stage-*`, `function-order-stage-*` and
+`function-order-final-*`. This is not a completed review of the later ES2015
+inventory or validation on other operating systems.
+
+
+### Catch environments, Unicode strings and signed-zero indices
+
+ES2015 catch parameter initialization now precedes a distinct body lexical
+environment. Pattern bindings start uninitialized, so later/self references
+throw rather than yielding `undefined`; abrupt initialization still closes
+iterators. Immediate body lexical conflicts remain errors, nested shadowing
+works, and legacy catch parsing remains unchanged.
+
+Ordinary ES2015 strings now accept braced Unicode code-point escapes, including
+supplementary points and leading zeroes, while rejecting empty, malformed and
+out-of-range sequences. Earlier language versions retain their grammar.
+Generator `let` declarations cannot use a newline to evade the forbidden
+`yield` binding. No bytecode format or embedding API changes are needed.
+
+Typed-array search and relative-index operations normalize numeric negative
+zero to element zero. This fixes searches and `fill` without accepting the
+distinct canonical property string `"-0"` or changing original ES2015 per-element
+fill conversion. The regression covers all nine ES2015 typed-array types.
+
+The combined candidate passes 102 existing focused fixtures, 63 native
+fixtures, 255 new shell checks and C89 checks. Integrated validation passes
+all 28,582 pinned ES6 modes and 11,540 pinned ES5 modes with zero failures,
+unsupported cases, timeouts, crashes or harness errors. All four macOS arm64
+applications build, package and pass relocated desktop checks, including
+Calendar’s four views, Browser navigation/layout and Suite/XULRunner ChatZilla.
+The frozen runtime and all four application engines share SHA-256
+`a2e992d6cb05578e92bca40b7bebc87e0bd50563fbab2a9e33fb9e4f7fed5a87`.
+Reports are
+`artifacts/es6/lexical-index-stage-*` and `lexical-index-final-*`. The earlier
+catch-only full runs were stopped incomplete when the parser batch expanded;
+they are not passing conformance results.
+
+The unchanged later diagnostics record 177/195 catch modes, 178/258 accessor
+modes, 2/2 generator-let modes and 4/12 signed-zero search modes passing. The
+remaining failures in those bounded groups require later rest-binding/object
+rest syntax, private class accessors or `includes`; they remain in the reports.
+[The edition review ledger](edition-review.json) records 132 manually reviewed
+paths with exact source hashes and original specification sections, including
+other normative differences. It is incomplete and is not a test selector or
+conformance score. The broader ES2015 inventory and other operating systems
+remain unvalidated for this batch.
+
+The refreshed 5,852-mode `es6id` diagnostic records 5,835 passes and 17 failures
+(`artifacts/es6/later-lexical-index-es6id.json`). All 17 remaining modes are
+listed in the review ledger as changed normative expectations or revised tests
+containing BigInt syntax. They remain failures in the diagnostic, which is not
+a replacement for the complete pinned suite or the unfinished broader inventory.
+
+The later diagnostic host now loads the pinned suite's module fixtures with
+canonical relative paths and cycle support; all 26 runner controls pass. The
+95-mode module diagnostic records 52 passes and 43 failures, with no harness
+errors (`artifacts/es6/later-module-fixtures-diagnostic.json`). All three
+original-language cases previously blocked by missing external fixtures now
+pass unchanged. The fourth requires later arbitrary module export names and
+now reports its actual dependency syntax failure. This bounded diagnostic
+retains its later-language and normative-difference failures.
+
+### Generator method grammar and caller reflection
+
+Object generator methods now reject incomplete stars and accessor-prefix forms
+such as `({*get x(){}})`, while retaining valid generator methods named `get`
+and `set`. Decompilation places the generator star before a computed property
+name, so the resulting function source compiles and runs again.
+
+For modern non-strict functions, the optional historical `caller` extension
+returns `null` when called from a strict function, including class methods.
+This also permits inspecting its property descriptor. Explicit earlier-edition
+functions retain their throwing getter; strict functions and bound functions
+retain their throwing caller accessors. No bytecode or embedding API changes
+are required.
+
+The isolated candidate passes 106 existing focused fixtures, 63 native fixtures,
+30 new shell checks, C89 checks, all 28,582 pinned ES6 modes and all 11,540
+pinned ES5 modes with zero failures. The integrated packaged-engine runs also
+pass all 28,582 ES6 modes and 11,540 ES5 modes, with zero failures, unsupported
+cases, timeouts, crashes or harness errors. All four macOS arm64 applications
+build, package and pass relocated desktop checks, including Calendar's four
+views, Browser navigation/layout and Suite/XULRunner ChatZilla. The four
+application engines and unchanged frozen conformance runtime share SHA-256
+`922f649567bdb41e95fb50f7ab376fb2484ed0124643b8f12cef5dd76e44e7d2`.
+Reports use `artifacts/es6/generator-caller-stage-*` and
+`generator-caller-final-*`. The bounded unchanged later class-method and
+generator-method diagnostics both pass all six modes. The broader later-suite
+review remains unfinished; these results do not establish complete ES6
+conformance or validation on other operating systems.
+
+The refreshed 37,972-mode later-feature diagnostic records 19,098 passes,
+18,574 failures and 300 harness errors (`later-expanded-generator-caller.json`).
+Compared with the earlier same-source diagnostic, 127 modes now pass and no
+passing modes were lost. These mixed-edition results are not an ES6 conformance
+score: later syntax, changed normative requirements and later harness needs
+remain visible. The narrower metadata-only triage still contains 699 failing
+modes across 370 paths and requires edition review. It confirmed four original
+switch-environment failures, now being fixed and validated separately.
+
+### Switch discriminant environments
+
+Modern switch discriminants now execute before entering the case-body lexical
+environment. Their closures retain the enclosing bindings, while case selectors
+and bodies share the new case environment. Explicit legacy versions retain
+the historical scope ordering. ENTERBLOCK preserves the evaluated discriminant
+above the new lexical slots, including its producer information; decompilation
+preserves that stack order without overwriting lexical-name strings. The
+bytecode cache version advances to 64.
+
+The corrected isolated candidate passes four unchanged later-Test262 original
+ES2015 modes, 108 existing focused fixtures, 63 native fixtures, 15 new shell
+checks and C89 checks. The final combined conformance and all four macOS arm64 application checks
+pass as recorded below. Reports use `switch-scope-source-fixed-*` and
+`environment-final-*` under `artifacts/es6`. An expanded native XDR and source
+round-trip check also exposed an older default-only switch decompilation bug;
+the decompiler now retains that body. The expanded shell fixture passes 18
+checks, and the native allocation-callback/cache/source fixture passes all 19
+checks with the added switch coverage. The intermediate `switch-scope-final-*`
+application run stopped after XULRunner/Suite checks to incorporate this fix;
+it does not establish complete final application validation. The initial `switch-scope-stage-*`
+full runs were stopped incomplete after an expanded multi-binding source
+round-trip regression failed; they are not passing full-suite results.
+The corrected source regression passes. Other operating systems and the
+broader edition review remain unvalidated for this batch.
+
+The switch and default-source changes are now validated together with the
+with-binding read correction below under `environment-final-*`. The short
+`switch-source-final-*` attempt stopped during its first build before any
+complete package or conformance results; its logs remain diagnostic only.
+
+### With-binding reads after observable lookup
+
+ES2015 syntactic `with` reads now perform GetBindingValue's property-existence
+check after HasBinding and its `Symbol.unscopables` lookup. A removed binding
+returns `undefined` in non-strict code and throws `ReferenceError` in strict
+code, including `typeof` on a previously resolved binding. A compound read
+performs the check once, and methods retain the binding object's receiver.
+Explicit legacy language versions and embedding object scopes keep their
+historical behavior. Original ES2015 writes do not perform the extra existence
+check required by later specifications.
+
+The isolated candidate passes 109 existing focused fixtures, 63 native
+fixtures, 13 new shell checks and C89 checks. The unchanged later with-scope
+diagnostic passes 16 of 21 modes, fixing three original-ES2015 failures; the
+remaining five involve later write requirements and remain diagnostic failures.
+Full suites and combined four-application validation pass under
+`artifacts/es6/environment-final-*`; intermediate reports use
+`with-binding-stage-*`. Its intermediate full runs stopped incomplete when
+the changes were consolidated; only `environment-final-*` can establish the
+combined full-suite result. Other operating systems and architectures have
+not been revalidated for this batch.
+
+The combined packaged runtime passes all 41 selected unchanged later switch
+modes and 16/21 with modes (`environment-final-later-switch.json` and
+`environment-final-later-with.json`). The five remaining with failures are
+recorded in the edition ledger as later write requirements. These bounded
+diagnostics are additional evidence, not substitutes for the full pinned runs.
+
+Final integrated validation records all **28,582 ES6 modes** and **11,540 ES5
+modes** passing, with zero failures, unsupported cases, timeouts, crashes or
+harness errors. All four macOS arm64 applications build, package and pass their
+relocated desktop checks, including Calendar's four views, Browser
+navigation/layout and Suite/XULRunner ChatZilla. The package checks include
+110 focused fixtures, 63 native fixtures and the new 18 switch/13 with checks.
+The native lexical fixture additionally observes temporary discriminant
+liveness during allocation-callback collection, then exercises XDR and source
+round trips; the expanded probe passes against all four application engines
+(`environment-final-*-xdr-liveness.log`). C89 checks pass. All four engines
+and the unchanged frozen conformance runtime share SHA-256
+`3c76e27af3d8b9f6a2895318c04d8e17e30b7e855cd3b37647311f8f7b6ec830`.
+The broader later-Test262 edition inventory remains incomplete; these results
+are not a claim of complete specification correctness or other-platform runtime
+validation.
+
+### Untagged later-test diagnostics
+
+The diagnostic host now supports `--selection all` without changing the pinned
+conformance gates. All 30 phase/isolation/selection controls pass, including
+untagged strict/non-strict modes, filtered source hashes and module fixtures.
+The existing metadata selections retain their 5,852 and 37,972 source/mode
+sets. A full identifiers-directory diagnostic records 415 passes and 120
+failures (`artifacts/es6/later-all-identifiers.json`); every failure requires
+later private class fields, while the ordinary and escaped identifier cases
+pass. This remains a bounded diagnostic, not an edition-completeness claim.
+
+The refreshed 37,972-mode diagnostic against the committed environment fixes
+records 19,105 passes, 18,567 failures and 300 harness errors. Seven original
+switch/with modes gained and no previously passing modes were lost, with an
+unchanged runtime (`later-expanded-environment.json` and
+`later-environment-comparison.json`). Mixed later requirements and harness
+limitations remain visible; this is not an ES2015 conformance score.
+
+### JSON reviver descriptor rejection
+
+The untagged later-Test262 diagnostic exposed two original-ES2015 regressions:
+revivers could overwrite a later non-configurable array/object property because
+JSON used the low-level native definition hook. Reviver writes now share the
+complete data-descriptor implementation with standard property creation, with
+a separate acceptance result. A rejected definition leaves the property intact;
+exceptions still propagate. This also preserves ES5's non-throwing descriptor
+rejection requirement.
+
+`json-reviver.js` adds 93 checks in both default ES5 and ES2015 modes, covering
+arrays/objects, frozen properties, accessors, nonextensible containers, deletion,
+replacement descriptors, Proxy rejection/exception behavior, reentrant parsing
+and callback-triggered GC. The previous frozen runtime fails the new regression.
+The staged later JSON.parse diagnostic gains all four affected modes with no
+lost passes: 144 diagnostic passes and ten failures requiring later reviver
+source-context arguments. Final validation passes all 28,582 pinned ES6 modes
+and 11,540 ES5 modes, all four macOS arm64 builds/packages and relocated
+runtime checks, Calendar's four views, Browser navigation and Suite/XULRunner
+ChatZilla. The final full JSON diagnostic records 272 passes and 58 failures
+requiring further edition review (`json-reviver-final-later-json.json`).
+
+The first Suite lifecycle run exposed an asynchronous Inspector startup race;
+its unchanged rerun passes, and the original failure remains recorded in
+`json-reviver-final-suite-desktop.log`. A deterministic controller probe also
+reproduces the race with the previous engine; the startup-order fix is being
+validated separately. The completed retry is in
+`json-reviver-final-desktops-retry.log`. All four application engines and the
+frozen conformance runtime share SHA-256
+`a0ca2b2d7aa53e78068e611a245758034d17eed2f6be0951b177eb818763b4b2`.
+C89 checks pass. This batch has not been validated on other operating systems.
+
+The broader Array diagnostic records 5,333 passes, 768 failures and 18 harness
+errors across 6,119 modes (`later-all-array.json`). The JSON diagnostic before
+the fix records 268 passes and 62 failures across 330 modes
+(`later-all-json.json`). These mixed-edition diagnostics retain their failures
+and are not conformance scores. The edition ledger now has 147 exact-source
+records, including the JSON defects and reviewed later changes to Proxy
+invariants, revoked Proxy construction, Object.prototype and sort ordering.
+
+The later diagnostic protocol now escapes non-ASCII result text before sending
+it through the historical shell's byte-oriented `print` path. This preserves
+Unicode exceptions instead of corrupting their JSON completion record. All 31
+runner controls pass. Rechecking the canonical-equivalence localeCompare case
+now records two real diagnostic failures, previously obscured by transport
+errors (`later-unicode-localecompare.json`); the engine issue remains under review.
+
+### JSON method realms and array lengths
+
+Modern JSON parse/stringify methods now use ToLength for Proxy-array traversal,
+including the replacer property list, and allocate parsed containers and root
+callback holders in the method's realm. Separate native entry points retain
+legacy ToUint32 behavior and preserve modern behavior when JSAPI clones a
+method into a legacy global. Traversal loops remain interruptible.
+
+The staged implementation passes 91 new shell checks and 28 native checks for
+wide/negative lengths, conversion order, collection, foreign realms, cloned
+methods, legacy globals and interruption. Independent native globals have
+explicitly null parents. All 111 existing focused fixtures and 63 native
+fixtures pass against the stage with current embedding components. An initial
+stage copied older XUL components and failed the debugger/tail-call fixture;
+that result is preserved in `json-realms-stage-focused.log`, with the complete
+current-component rerun in `json-realms-current-stage-focused.log`.
+
+The Suite's Inspector startup race is also fixed: a browser load waits for the
+asynchronous viewer registry, and teardown removes listeners and discards
+pending callbacks. The real controller passes 12 deterministic order/teardown
+checks; the unchanged controller reproduces the failure with the previous
+engine. Final `json-realms-final-*` validation passes all 28,582 pinned ES6
+modes and 11,540 ES5 modes with zero failures, all four macOS arm64 builds,
+packages and relocated desktop checks, Calendar's four views, Browser
+navigation/layout and Suite/XULRunner ChatZilla. The strengthened native realm
+probe passes against each application engine. All four and the frozen
+conformance runtime share SHA-256
+`5170c6b9d7e76e8085ac1252e8ae5b46d63b39450c6ec0dc15d4634f6896427d`. C89 checks pass. Other platforms and the broader edition inventory
+remain unvalidated for this batch.
+
+### Canonical comparison and incomplete RegExp escapes
+
+Modern localeCompare now applies canonical normalization before comparing,
+including when a host collator is absent. Legacy methods retain their callback
+inputs and behavior. Without a host collator, normalized Unicode scalar values
+use simple case folding for primary order and their original normalized spelling
+for ties. Focused coverage adds 33 shell and 20 native checks for
+canonical/supplementary sequences, conversion order, callbacks, GC, exceptions,
+legacy globals and cloned methods. The later localeCompare directory passes
+all 26 diagnostic modes.
+
+Non-Unicode RegExp escapes now consume hex digits only for complete escapes;
+otherwise original ES2015 Annex B treats x/u as identity escapes. This fixes
+end-of-pattern and character-class cases while preserving legacy parsing and
+strict Unicode patterns. Lazy class bitmaps carry their grammar policy. XDR
+also serializes that policy independently of the decoder's context, requiring
+bytecode cache version 65. There are 62 shell and 15 native checks, including
+script/source and standalone-object cache roundtrips across editions and GC.
+The complete split-directory diagnostic retry records 228 passes, 12 failures
+and two missing-host errors. The failures include later primitive-separator
+rules and later syntax; the unavailable IsHTMLDDA fixture remains explicit.
+See `string-collation-final-later-split-retry.json`.
+Final macOS arm64 validation passes both complete pinned suites: 28,582 ES6
+modes and 11,540 ES5 modes, with zero failures, unsupported cases, timeouts,
+crashes or harness errors. All four builds, packages and relocated desktop
+checks pass, including Calendar's four views, Browser navigation/layout and
+Suite/XULRunner ChatZilla. There are 114 focused fixtures and 66 native fixtures.
+All four engines and the frozen runtime share SHA-256
+`7949dc49110b0f094a15f39dc1e086e89349e44255bee25e396a4613ba04fadd`.
+C89 checks and all 149 edition-ledger source hashes/anchors pass.
+
+Reports use `artifacts/es6/string-collation-final-*`; the complete ES6 success
+is `string-collation-final-es6-retry.json`. Its first complete attempt had
+28,581 passes and one shell-bootstrap harness error. The unchanged complete
+corpus was rerun with eight workers and passed; the original error remains
+recorded and its cause is not established. A separate split diagnostic also
+encountered one bootstrap error. Earlier `string-grammar-final-*` reports
+retain the two pinned collation failures and the stopped application pipeline
+before the general case-folded fallback correction. These are not clean passes.
+Other platforms and the broader edition review remain unfinished.
+
+The later diagnostic host now records its own runner SHA-256 and explicitly
+reports a harness error when a test requires `$262.IsHTMLDDA`, which this shell
+host does not supply. This prevents an absent fixture from being mistaken for
+an ordinary undefined value or satisfying an expected TypeError. All selected
+rows remain in the report. The expanded host controls pass all 33 checks.
+
+### Date arithmetic and callback order
+
+Modern Date construction, UTC and setters use separate native entry points to
+preserve their behavior through cloned methods and calls from legacy scripts.
+Arithmetic now truncates before the year offset, honors zero/negative days,
+rejects nonfinite fields after required conversions, avoids unchecked wide-year
+casts and clips negative fractions to positive zero. Setter callbacks operate
+on a snapshot of the original Date value; exceptions retain callback mutations,
+while ordinary completion stores the original ES2015 result. This intentionally
+differs from later invalid-Date early-return rules. Legacy globals keep their
+historical methods and parsing behavior.
+
+Offsetless ISO date-times now use local time in modern globals. Date-only forms
+retain UTC, matching inherited pinned cases and later corrected specifications.
+This is an explicit compatibility policy rather than the published original
+ES2015 date-only interpretation; see [TC39's discussion](https://github.com/tc39/ecma262/issues/87).
+
+The isolated candidate passes 164 focused checks in America/Los_Angeles, UTC
+and America/New_York, and 44 native checks including JSAPI dates, cloned methods,
+callback GC and independent legacy globals. All 898 pinned Date modes pass.
+Final integrated macOS arm64 validation passes all 28,582 pinned ES6 modes and
+11,540 ES5 modes with zero failures, unsupported cases, timeouts, crashes or
+harness errors. All four builds, packages and relocated desktop checks pass,
+including Calendar's four views, Browser navigation/layout and Suite/XULRunner
+ChatZilla. There are 115 focused fixtures and 67 native fixtures; C89 checks
+pass. All four engines and the frozen runtime share SHA-256
+`b419a6d4e0ba5cd48280648e3c6a5a64e81b0cd384d1a964b3039d96db7aa349`.
+Reports use `artifacts/es6/date-numeric-final-*`. Fresh macOS x86_64 validation
+also passes all 28,582 ES6 modes and 11,540 ES5 modes with zero errors, and all
+four build/package/relocated runtime gates, Calendar views, Browser navigation
+and Suite/XULRunner ChatZilla. These binaries ran through Rosetta on Apple
+Silicon, not physical Intel hardware. Its four engines and frozen runtime share
+SHA-256 `8197e6c350d44105d46d15cc1c4497871a7bc16abebf72dd9e03dd06c3d5c08d`.
+Reports use `date-numeric-x86-final-*`; all eight Date-batch package archives and
+checksums were preserved before the next parser build. Linux aarch64 Suite GTK2
+also passes its local `act` workflow at commit `57e7022a`: compilation, ABI checks,
+packaging, relocated runtime tests and both artifact uploads. Its complete pinned
+ES5 run passes 11,540 cases. Additional package testing passes all 28,582 ES6
+modes with a 60-second per-case limit and an unchanged runtime. Its first full
+run with the default 10-second limit had 28,578 passes and four exhaustive
+URI-decoding timeouts. Both modes of each timed-out test passed separately,
+then the entire unchanged corpus passed on retry. The first report remains in
+`extra/es6.json`; the clean complete retry is `extra-full-retry/es6.json`.
+Windows remains unvalidated for this batch. Linux reports are under
+`artifacts/es6/linux-date-act-suite-gtk2/`.
+
+The complete later Date directory records 1,194 diagnostic passes and 42
+failures (`date-local-parse-later.json`). Compared with the prior engine it gains
+32 modes and loses eight. Those eight require a later invalid-Date early return;
+the original ES2015 final store is now tested explicitly instead. Remaining
+failures include those later setter rules, Temporal and the newer no-argument
+UTC requirement. Every selected row is retained. The ledger now has 177 reviewed
+records with matching pinned source hashes and original-specification anchors;
+it remains incomplete and does not turn diagnostic failures into passes.
+
+### Contextual modifiers and class parameter lists
+
+Modern parsing rejects escaped spellings used as static/get/set modifiers,
+while preserving escaped ordinary property and method names and legacy object
+accessor syntax. This follows the pre-ES2015 [TC39 clarification](https://archives.ecma-international.org/2013/TC39/tc39-2013-071.pdf#page=28)
+that contextual keywords use their literal spellings. Class method and modern object-accessor keys now
+require the parameter-list opening parenthesis immediately afterward. Previously
+the shared function parser could consume an extra name or generator star, so
+invalid forms such as `class C { a b() {} }` and `({get a b(){}})`
+compiled successfully.
+
+The isolated correction passes 88 focused checks and 25 native checks for exact
+SyntaxErrors, legacy accessors, collection, source decompilation and XDR execution
+across editions. All 115 existing focused fixtures and 67 existing native
+fixtures also pass. The first candidate only guarded modifier recognition and
+still accepted invalid class methods; that failed attempt remains recorded in
+`contextual-escape-followup-notes.txt`. No opcode or serialized record changes
+are involved, so bytecode cache version stays 65. Integrated macOS arm64 validation
+passes all 28,582 pinned ES6 modes and 11,540 pinned ES5 modes with zero errors,
+and all four build/package/relocated runtime gates, Calendar views, Browser
+navigation and Suite/XULRunner ChatZilla. The package checks now include 116
+focused fixtures and 68 native fixtures. Its four application engines share
+SHA-256 `46ef2c22ed4d21898f607322abe8b7940bc3eeab7d3df2ddadccef611785350b`;
+reports use `artifacts/es6/contextual-final-*`. Fresh x86_64 validation also passes
+all 28,582 ES6 modes and 11,540 ES5 modes with zero errors. Its four build/package
+gates and relocated desktop checks pass; the engine SHA-256 is
+`d7546eee8009f4a43032976cd6822349313cd0070994f1185591a191ca739999`.
+The extra Calendar view check initially produced no completion marker, and the
+XULRunner ChatZilla check initially timed out at 20 seconds. Unchanged packages
+passed on retry (Calendar at its original 45-second limit, ChatZilla at 60 seconds
+with overlay/load diagnostics); causes remain unconfirmed. Browser navigation
+and Suite ChatZilla also pass. Preserve `contextual-x86-final-*` original logs
+and retry logs; the original desktop coordinator exited unsuccessfully. All eight
+archives were preserved under `contextual-package-archives/`.
+Linux aarch64 Suite GTK2 passes its local `act` workflow at `b7551120`, including
+build, ABI, package, runtime, full ES5 and both uploads. Supplemental checks passed 116 focused fixtures and 63 native probes; five
+private-probe links failed, and the external runner then hit a Git worktree-path
+error. The queue stopped with those failures retained. The expanded Linux
+workflow now tests private probes against production objects and is undergoing
+fresh validation with the subsequent emitter correction. Windows remains
+unvalidated for this parser batch.
+
+### Discarded derived-this reads
+
+The later class diagnostic exposed a real original-ES2015 regression: the
+emitter treated a bare `this;` expression as effect-free and could discard it,
+suppressing the required ReferenceError before `super()`. Modern discarded
+reads now retain their evaluation, including arrow captures and unary, comma,
+loop-initializer and delete expressions. Legacy optimization is unchanged.
+The [original GetThisBinding rule](https://262.ecma-international.org/6.0/#sec-function-environment-records-getthisbinding)
+requires the exception even when the value is unused. Emitted code changes,
+so the embedding bytecode cache version advances to 66.
+
+The isolated correction passes 43 focused checks, 13 native checks, both modes
+of the upstream null-heritage regression, all 116 existing focused fixtures
+and 68 existing native fixtures, and C89 checks. Coverage includes a captured
+binding before/after `super()`, callbacks/GC, exact exception type, legacy
+receivers, decompilation and XDR execution across editions. Both macOS architectures now pass the complete pinned ES2015 corpus
+(28,582/28,582) and ES5.1 corpus (11,540/11,540), with zero failures, timeouts,
+crashes, unsupported cases or harness errors. All four applications build,
+package and pass their relocated desktop checks on each architecture, including
+Calendar four-view checks, Browser navigation (169 checks), and Suite/XULRunner
+ChatZilla coverage. All eight archives and engine hashes are retained under
+`artifacts/es6/this-effects-package-archives` and
+`this-effects-both-architectures-hashes.json`. Logs use the `this-effects-final`
+and `this-effects-x86-final` prefixes.
+
+Native Linux aarch64 Suite GTK2 also passes the actual local `act` workflow:
+build, ABI probe, package, runtime, both complete pinned suites, all 117 focused
+fixtures, all 69 native probes and artifact uploads. The five internal probes
+link production objects; the other probes use the packaged engine. Its unchanged
+engine hash is `71f48aacb0965649ebf27ddc133627312ef23b4b4abb8ac21bc04816bda47ff7`.
+The exact source snapshot, patch and copied-source verification are retained
+under `artifacts/es6/linux-this-effects-snapshot` and
+`linux-this-effects-act-suite-gtk2`. This is one Linux matrix entry, not the full
+expanded Linux matrix. Linux x86, other aarch64 entries and Windows remain
+unvalidated for this batch; GitHub-hosted results are not claimed.
+
+The complete later class-directory diagnostic before this correction retained
+3,478 passes, 5,184 failures and four unavailable-IsHTMLDDA host errors across
+8,666 modes. This mixes many later language features and is not an ES6
+conformance total. Manual review of 27 failing files with original-only or
+absent feature tags identified the discarded-this regression plus later syntax,
+later class-name insertion order, later default-constructor argument forwarding,
+later omitted ArrayBuffer lengths, and assumptions about exact function source.
+Original ES2015 permits equivalent function representations; the classic
+decompiler preserves strict class-created functions with an explicit directive.
+No upstream assertions or report outcomes were changed. The edition ledger now
+contains 229 records with verified source hashes and original-specification
+anchors, and remains incomplete.
+
+The first integrated package attempt caught a stale expected cache-version
+constant in `TestRegExpConstructor.c`; both logs remain as
+`this-effects-*.cache-assertion-failure`. The assertion now checks version 66,
+matching the intentional header change. Fresh validation retains the complete
+fixture table. Linux now runs it and the full pinned ES2015 corpus inside the
+workflow, linking the five private-interface probes against production objects
+while public embedding probes continue to use the packaged shared library; see
+[Linux gate](../../../build/linux/README.md#es2015-regression-gate).
+
+The separate class-expression diagnostic retains 3,028 diagnostic passes and
+4,999 failures across 8,027 modes. Manual review of 25 original-tagged or
+untagged failing files found later grammar, exact-source assumptions, omitted
+ArrayBuffer length behavior and anonymous-class own-name requirements. Original
+ES2015 class-expression evaluation adds the name here only for a present
+BindingIdentifier. These source-hashed reviews neither change the diagnostic
+results nor establish a complete edition inventory.
+
+### Discarded conversions and arguments detachment
+
+A follow-up effect-analysis audit found discarded arithmetic, comparison,
+`in`/`instanceof`, and arguments-property reads could lose conversions,
+getters or exceptions. Default ES5, strict code and ES2015 now retain those
+operations; explicitly selected non-strict legacy editions keep their existing
+optimization. Emitted semantics change, so the embedding cache advances to 67.
+
+The added arguments getter checks also exposed calls to overridden `length`
+and `callee` accessors when the owning function returned. Standard arguments
+objects now detach using own-property snapshots without invoking those public
+getters/setters or walking a replaced prototype. Parameter mappings, assigned
+fields and deleted/detached properties remain intact. Policy follows the
+function's saved edition; explicit legacy detachment remains unchanged.
+
+The isolated candidate passes 63 discarded-operation checks and 25 arguments
+exit checks in each standard mode, five ES2015 Proxy/protocol checks, 13 native
+source/XDR/cross-edition checks, all 117 existing focused fixtures and 69 native
+fixtures, and C89 diagnostics. The integrated fixture table contains 122
+focused fixtures and 70 native probes. Fixtures are `discarded-operations.js`,
+`arguments-exit.js`, `arguments-exit-prototype.js`, and `TestDiscardedEffects.c`.
+
+The integrated arm64 and x86_64 engines each pass all 28,582 pinned ES2015
+modes and all 11,540 pinned ES5.1 cases with zero failures, timeouts, crashes or
+harness errors. Engine hashes match across all four applications within each
+architecture. The first Intel
+Suite package attempt and its unchanged retry timed out before the first fixture
+ran. A native stack sample places the delay in XPCOM component loading; a clean
+startup-only run then completed in 100.6 seconds, and the fixture passed in
+0.26 seconds after initialization. Packaging now requires a separate 180-second
+initialization step before the unchanged per-fixture limits. Original failures,
+loader logs and samples remain recorded. All eight packages pass the fresh gate,
+and all four applications on both architectures pass their relocated desktop
+checks, Calendar four-view checks, Browser navigation (169 checks), and
+Suite/XULRunner ChatZilla coverage. The successful driver log is
+`discarded-effects-startup-coordinator.log`; the initial coordinator and first
+unchanged package retry remain failed records. A separate local wait-file error
+was corrected without changing tests or rerunning the successful builds.
+Archives are preserved under `artifacts/es6/discarded-effects-package-archives`,
+with full hashes in `discarded-effects-both-architectures-hashes.json`.
+
+Native Linux aarch64 Suite and Browser GTK2 each pass actual local `act`
+build/ABI/package/runtime/upload validation, both complete pinned suites, all
+122 focused fixtures and all 70 native probes. Their packaged engine hash is
+`df4c535ffecd820f568f445fc097825e7927f0a6c9e9450401d6b16260cee42e`.
+The frozen source, patch, original reports and artifacts are retained under
+`linux-discarded-effects-snapshot` and `linux-discarded-effects-act-*`.
+The other six aarch64 matrix entries are running; Linux x86 and Windows remain
+unvalidated for this batch. These are local results, not GitHub-hosted runs.
+
+A fresh later ES6-ID diagnostic on the isolated candidate retains 5,835 passes
+and 17 failures (10 files), with no host errors. All 17 failures correspond to
+source-hashed later-requirement records already in the ledger. This is a bounded
+diagnostic, not a complete edition inventory or a zero-failure conformance run.
+All 33 diagnostic runner controls pass.
+
+Package copies have different full-file engine hashes because packaging renews
+Mach-O metadata. A byte comparison after removing that metadata in temporary
+copies confirms identical code/data on both architectures; the only remaining
+changes are LINKEDIT virtual/file sizes and verified zero alignment padding.
+Both the initial whole-file comparison and the precise payload comparison are
+retained (`discarded-effects-package-checkpoint.json`,
+`discarded-effects-signature-normalized-comparison.json`, and
+`discarded-effects-package-payload-comparison.json`). Conformance uses the frozen
+build runtimes; focused/native and desktop checks use the actual relocated
+packages. Do not conflate their full-file hashes.
+
+Further arguments review identified an unfinished original-ES2015 ordering
+edge: resolving `arguments.callee` before `length`, or adding a user field first,
+can change the initial string-key order of mapped arguments. A separate isolated
+correction passes initial focused/native checks but is not part of this batch.
+The full later-edition diagnostic and edition inventory also remain unfinished.
+
+### Mapped arguments property creation order
+
+Modern mapped arguments now create their `length` and `callee` fields in the
+required order before exposing the object. Previously, reading `callee` first,
+asking for its descriptor, or adding a custom field before enumeration could
+reorder the initial own string keys. Numeric argument mappings remain lazy,
+and default ES5/explicit legacy ordering remains unchanged. This changes runtime
+object creation rather than emitted bytecode, so cache version 67 is retained.
+The original requirement is [CreateMappedArgumentsObject](https://262.ecma-international.org/6.0/#sec-createmappedargumentsobject).
+
+The isolated correction passes 28 focused checks, 13 native source/XDR/GC and
+cross-edition checks, all 122 existing focused fixtures, all 70 existing native
+probes, and C89 checks. Coverage includes live/detached objects, descriptor and
+accessor reads, custom fields, symbol grouping, deletion/re-addition, freezing,
+parameter mapping and zero actual arguments. The first isolated implementation
+passed an internal jsid to the resolver callback, which expects a jsval; its
+failed regression is preserved and the corrected call uses the atom value.
+The integrated correction passes all 28,582 pinned ES2015 modes and all 11,540
+required ES5.1 cases on both macOS arm64 and x86_64, with zero failures, timeouts,
+crashes or harness errors. All eight application build/package checks pass,
+including 123 focused fixtures and 71 native probes per package. All four apps
+pass desktop validation on both architectures, plus Calendar's four views,
+Browser navigation and Suite/XULRunner ChatZilla. The complete driver is
+`artifacts/es6/arguments-order-final-coordinator.log`; no failed attempt was
+replaced to obtain this matrix result.
+
+The eight archives are preserved in `arguments-order-package-archives`, with
+`arguments-order-both-architectures-hashes.json` and
+`arguments-order-package-payload-comparison.json` recording signed package and
+build hashes separately. Code/data payloads match after removing only signing
+metadata in temporary comparison copies. The broader diagnostic and currently
+running Linux matrix use the preceding frozen source and do not validate this
+correction. Its queued matrix was superseded before any job started by the
+URI/Math matrix, which also includes and tests this arguments-order change.
+
+### Complete later-corpus diagnostic
+
+The unfiltered later diagnostic at `35d566604512cba908054eec49f85e64a59f3091`
+completed all 93,197 modes on the frozen discarded-effects arm64 runtime:
+52,417 diagnostic passes, 37,446 diagnostic failures and 3,334 harness errors;
+its runtime hashes remained unchanged. The full report is
+`artifacts/es6/discarded-effects-later-all.json`. This mixed-edition corpus
+includes post-ES2015 features and is not an ES2015 conformance result. Every
+failure and host error remains visible. Feature tags and directory names can
+prioritize review but cannot establish an edition exemption. The existing
+source-hashed review ledger does not cover this entire inventory.
+
+Review found an original Decode requirement missing from the engine: URI
+functions accept encoded surrogate values and some overlong UTF-8 sequences.
+The follow-up below corrects those in default ES5/ES2015 calls while retaining
+explicit legacy behavior. It also corrects the Math prototype during eager
+initialization of a new realm, which the shell's initial global did not expose.
+
+### URI decoding and eager Math initialization
+
+The integrated follow-up enforces the original Decode requirement for encoded
+surrogates, overlong UTF-8 and out-of-range scalar values in default ES5/ES2015
+calls. Explicit legacy editions retain their prior behavior. The shared byte
+decoder is unchanged, and raw UTF-16 input still passes through as required.
+The isolated URI candidate passes 4,166 checks in each standard mode, 15 native
+saved-edition/source/XDR checks, all 123 prior focused fixtures, all 71 native
+probes and a C89 declaration check. The exact later URI case passes both modes.
+The isolated URI candidate also passes the complete 11,540-case ES5.1 and
+28,582-mode ES2015 suites with zero failures. Its first new native test had a
+truncated source-length argument; that fixture
+error and corrected `strlen` call are recorded separately.
+
+Eager initialization now supplies Math's Object prototype explicitly and caches
+the resulting intrinsic, avoiding recursive Math initialization. Default and
+ES2015 native globals receive the required prototype; explicit legacy behavior
+is retained. The combined isolated candidate passes 19 new realm checks,
+29 native initialization/GC checks, all 123 previous focused fixtures and all
+71 previous native probes. Both exact later Math-prototype files pass both
+modes. The edition ledger now records 232 exact-hash reviews; it is still
+incomplete and never changes a diagnostic result into a pass.
+
+The integrated revision passes all 28,582 pinned ES2015 modes and all 11,540
+required ES5.1 cases on macOS arm64 and x86_64, with zero failures and unchanged
+frozen runtimes. All eight application builds, packages and relocated desktop
+runs pass, including Calendar's four views, Browser navigation/reflection checks
+and Suite/XULRunner ChatZilla. Each package passes 126 focused fixtures and
+73 native probes. Runtime-only changes retain cache 67.
+
+Evidence is in `artifacts/es6/uri-math-final-coordinator.log`, the matching
+`uri-math[-x86]-final` reports, `uri-math-both-architectures-hashes.json` and
+`uri-math-package-payload-comparison.json`. All eight package archives are
+preserved independently. Signed package hashes differ from build hashes; the
+normalized engine code/data comparison passes. The newer Linux aarch64 matrix
+has not started: its waiting coordinator was canceled before any jobs so the
+next combined revision can be validated. Windows remains unvalidated for this
+revision. These results do not establish complete ES2015 compliance.
+
+The later diagnostic now accepts upstream runtime negatives using the
+harness-defined `Test262Error`, capturing that constructor after harness setup.
+Native error constructors remain captured before setup, and an exception from
+harness setup cannot satisfy a negative test. All 38 phase/isolation controls
+pass. A supplemental recheck of every one of the original full diagnostic's
+26 metadata rejections yields 24 passes and two actual parser failures in
+`annexB/language/comments/multi-line-html-close.js`. The original full report is
+unchanged. Those failures concern original Annex B HTML close comments after
+multiline comments containing a line terminator; a separate isolated parser
+correction passes all 26 affected modes, 79 new focused checks, 15 native
+source/XDR checks, all 126 existing focused fixtures and all 73 existing native
+probes. It is not part of this URI/Math matrix and still needs complete
+conformance/application validation.
+
+### HTML comments, Number formatting and immutable native fields
+
+The next integrated correction recognizes original Annex B HTML close comments
+after line terminators inside multiline comments, while retaining explicit
+legacy scanning and module rejection. Default ES5/ES2015 Number formatting now
+uses ToInteger and RangeError for invalid radix, converts precision before
+returning nonfinite exponential/precision results, and removes redundant zeros
+from undefined-precision exponential output. Shared dtoa and explicit legacy
+formatting remain unchanged. Original ES2015 permits the existing negative
+fixed-precision extension; later BigInt syntax remains outside this edition.
+
+Standard immutable descriptor changes snapshot the optional native function
+caller/arguments and RegExp capture fields when they become non-writable and
+non-configurable. Mutable fields, explicit legacy behavior, accessor properties
+and other native embedding hooks retain their contracts.
+
+The isolated candidate passes 79 HTML-comment checks, 146 Number checks in each
+standard mode, 18 immutable-property checks in each standard mode and three
+15-check native source/XDR/edition probes. The combined candidate also passes
+all 126 prior focused fixtures, 73 prior native probes and the complete 11,540
+required ES5.1 cases and all 28,582 pinned ES2015 modes, with zero failures.
+The integrated revision also passes both complete suites on macOS arm64 and
+x86_64, with unchanged frozen runtimes. All eight application builds, packages
+and relocated desktop runs pass, including Calendar's four views, Browser
+navigation/reflection and Suite/XULRunner ChatZilla. Package gates require
+131 focused fixtures and 76 native probes. These parser/runtime changes retain
+cache version 67.
+
+Evidence is in `artifacts/es6/html-number-final-coordinator.log` and the matching
+`html-number[-x86]-final` reports. All eight archives are independently preserved
+under `html-number-package-archives`, with the two-architecture hash manifest and
+normalized package/build payload comparison beside them. This revision's Linux
+coordinator was deferred before starting any jobs, so the next combined
+block-function/prototype revision can receive the follow-up matrix. Windows
+remains unvalidated for this revision.
+
+Supplemental later diagnostics pass all 13 comment modes and all six selected
+immutable-native modes. Number/prototype reports 332 passes and four failures:
+two modes impose later fixed-precision requirements and two require BigInt.
+Exact-source reviews are recorded separately; the ledger now has 244 entries,
+is incomplete and never converts a failure into a passing result. The full
+93,197-mode mixed-edition diagnostic has not been rerun with these corrections.
+
+A separate confirmed original ES2015 gap remains in non-strict block functions:
+entry-time lexical initialization and eligible function-body Annex B variable
+bindings are incomplete. Script/eval blocks can leak declarations. Large RegExp
+quantifiers also remain under investigation. Neither the pinned-suite result
+nor this review ledger establishes full ES2015 compliance.
+
+The preceding discarded-effects/cache-67 revision has now completed all eight
+native Linux aarch64 local `act` workflows: Suite, Browser, Calendar and XULRunner
+on GTK2 and Xlib. Each passes build, package, runtime, upload, 28,582 pinned ES2015
+modes, 11,540 ES5.1 cases, 122 focused fixtures and 70 native probes. The original
+XULRunner GTK2 attempt's two ten-second ES5 timeouts remain recorded; its full
+retry passes with the uniform sixty-second ES5 budget. Evidence is
+`artifacts/es6/linux-discarded-effects-matrix-complete.json` and the retry driver
+log. This older matrix does not validate the subsequent arguments-order,
+URI/Math or current HTML/Number/native-property engine revisions. Their combined
+Linux matrix was deferred before any jobs started; the unused frozen source
+manifest remains at `linux-html-number-snapshot/source.json`. Its waiting
+coordinator cancellation is recorded in `linux-html-number-matrix-deferred.json`.
+
+### Non-strict block functions and prototype initializer syntax
+
+The next integrated revision initializes every modern block function at block
+entry. For eligible non-strict function bodies, a separate variable binding is
+instantiated before execution and receives the current lexical value at the
+declaration's source position. Eligibility is checked against the completed
+outer lexical scopes and formal bound names. Simple catch parameters follow
+original Annex B.3.5; destructured catch bindings retain their conflict checks.
+Implicit arguments bindings are reused, if arms receive lexical blocks, and
+labelled declarations retain their hoisting and single-statement early errors.
+Default and explicit legacy script behavior remains unchanged.
+
+The bridge writes directly to the variable environment and cannot be redirected
+by a with object. Its private bytecode selector advances the cache version to
+68. The initial wide-script source round trip exposed an extra decompiler stack
+value; the corrected bridge consumes its source operands without leaving one
+for the hidden POP. The initial failure and successful rerun are retained.
+
+ES2015 literal `__proto__` initializer syntax now uses the existing rooted
+internal prototype operation. Replaced public setters are bypassed; primitive
+values create no property, and computed/shorthand/method/accessor members keep
+their ordinary behavior. Explicit legacy literal assignment remains unchanged.
+
+The isolated block-function candidate passes 49 fresh-realm assertions, 15
+native saved-edition/cache/source checks, 17 wide-atom/capture/collection checks,
+all 131 previous focused fixtures, all 76 previous native probes, C89 declaration
+checks, all 28,582 pinned ES2015 modes and all 11,540 pinned ES5.1 cases.
+The combined prototype candidate additionally passes 46 focused and 17 native
+checks, all prior 131/76 probes and both modes of the original upstream
+prototype-setter failure and all 28,582 pinned ES2015 modes. All eight integrated
+macOS builds and packages pass their 133 focused fixtures and 79 native probes.
+Both architecture runtimes pass all 28,582 pinned ES2015 modes and all 11,540
+pinned ES5.1 cases with zero failures, timeouts, crashes or harness errors. All
+eight relocated-package desktop checks pass, along with Calendar's four views,
+Browser navigation/reflection and Suite/XULRunner ChatZilla coverage. The eight
+archives and engine payload comparisons are preserved under
+`artifacts/es6/block-prototype-*`; the frozen conformance runtime hashes remain
+unchanged. This validates the local macOS matrix, not GitHub-hosted runs, the
+latest Linux source revision or Windows.
+
+The later function-code diagnostic reports 156 passes and three failures. The
+three failures require later duplicate-declaration relaxations or the later
+implicit-arguments exclusion. The later eval-code diagnostic reports 218 passes
+and 252 failures: 160 previous failures now pass and 147 previous passes now
+fail. These include original lexical corrections and later eval-var extensions;
+the entire set has not been individually reviewed and remains nonzero. No
+directory or feature tag establishes an exemption. The source-hashed ledger now
+has 270 records, including 24 DataView ToIndex/Infinity ordering reviews against
+the retained historical gate. It remains an incomplete review ledger, not a
+passing full conformance run. Large RegExp quantifiers remain unfinished work.
+
+Further isolated work covers large RegExp quantifiers, assignment-target early
+errors, parenthesized destructuring defaults and prohibited method own fields.
+Those candidates are not part of this cache-68 application result. The RegExp
+candidate passes the complete pinned ES2015 suite; the combined candidate's full
+runs are still in progress. The later diagnostic remains nonzero and incompletely
+reviewed. Full ES2015 compliance has not yet been established.
+
+### Large RegExp counts and assignment/method grammar edges
+
+The next integrated revision removes the modern RegExp parser's 65,535 bound
+ceiling. Two explicit 32-bit limbs avoid target/compiler integer-width changes;
+larger decimal bounds remain positive within the matcher's checked repetition
+budget. Decimal spans are compared exactly, including values beyond double
+precision and leading zeros. Wide bytecode operands use a fixed byte encoding;
+small bounds retain their compact encoding. Empty children without captures or
+alternatives can complete immediately. Other nullable children retain matching,
+backtracking and cancellation behavior. The saved RegExp grammar edition still
+controls parsing, including cloning and XDR; explicit legacy parsing is unchanged.
+
+Modern assignment parsing now rejects call targets and parenthesized object or
+array patterns before evaluation, with original ES2015 ReferenceError versus
+SyntaxError rules. Earlier editions retain their historical runtime call-target
+and parenthesized-pattern behavior. A separate pre-existing emitter defect for
+parenthesized local destructuring defaults is corrected. Local and reference
+stores retain parentheses in source notes, so decompilation cannot introduce an
+anonymous default function/class name. Native wide-atom source/XDR round trips
+exercise the changed paths. This batch advances the bytecode cache to 69.
+
+Modern non-strict methods no longer materialize own caller/arguments properties
+when queried. Their inherited restricted accessors remain intact; ordinary
+functions and explicit legacy functions retain the optional historical fields.
+The contextual-let parser also applies the expression-statement lookahead rule
+in single-statement positions: a newline can terminate a let identifier before
+an identifier or block, while let followed by an opening square bracket remains
+restricted. Statement lists still recognize lexical declarations, including
+newline/yield cases; legacy let-block grammar remains unchanged.
+
+The frozen RegExp/assignment/method candidate passes all 28,582 pinned ES2015
+modes and all 11,540 pinned ES5.1 cases with zero failures. The additional let
+candidate passes all 133 previous focused fixtures and 79 previous native probes.
+The four new JavaScript fixtures pass 106, 127, 121 and 72 assertions; four new
+native fixtures pass 24, 15, 17 and 19 checks. They include reentrant RegExp
+matching and collection during successful/cancelled repetitions, two-global
+cache round trips, native cloning and more than 65,535 atom operands. All changed
+compilation units pass C89 declaration checks. These are isolated candidate
+results. The resulting cache-69 production revision now passes all eight macOS
+arm64/x86_64 build, package and desktop jobs, each with 137 focused fixtures and
+83 native probes. Both frozen architecture runtimes pass all 28,582 pinned
+ES2015 modes and 11,540 pinned ES5.1 cases with zero failures. Calendar's four
+views, Browser navigation/reflection and Suite/XULRunner ChatZilla checks pass
+on both architectures. All eight archives and runtime hashes are preserved;
+normalized engine payload comparisons pass across the applications. The 38
+later-runner host controls also pass on both production architectures.
+
+The frozen Linux aarch64 source for this revision was deferred on user direction
+until the ES2015 implementation is complete. Its results remain separate from
+the earlier successful Linux revision; current Windows validation is also
+outstanding. A fresh complete 93,197-mode later diagnostic ran against the
+frozen arm64 cache-69 runtime and retained every failure and host error.
+
+Exact later diagnostics pass both large-quantifier modes, both method-own-field
+cases and 14 original contextual-let statement cases. The two additional
+for-await-of cases remain later-edition failures. The earlier assignment-target diagnostic
+records 149 passes and 485 failures: original ES2015 early ReferenceError rules
+and later SyntaxError/runtime-call-target rules differ. Its complete transitions
+are retained; it is not a zero-failure gate. The review ledger then held 313
+source-hashed records, including original regressions and later changes to
+Promise resolve lookup, anonymous built-in names, RegExp prototype accessors and
+template cache identity/escape grammar. The ledger is incomplete and does not
+convert any failing execution into a pass. Full ES2015 compliance and current
+cross-platform application validation remain unfinished.
+
+
+### Math extrema conversion order
+
+Standard-edition `Math.max` and `Math.min` continue `ToNumber` conversion after an earlier NaN, preserving callbacks and thrown exceptions. Explicit legacy editions retain their existing early return. `math-extrema-conversion.js` checks left-to-right conversion, callbacks that collect and reenter, signed zero, conversion exceptions, cross-edition objects and legacy behavior. It passes 264 assertions on the isolated macOS arm64 candidate. The isolated candidate passes all 28,582 pinned ES2015 modes and all 11,540 pinned ES5.1 modes with zero failures. After integration and a macOS arm64 XULRunner rebuild, both full suites pass again against the integrated source; the ES2015 runner confirms the runtime hash is unchanged. Application builds and runtime checks across supported OSes are deferred until the language implementation work is complete. Two exact source-hashed upstream Math cases require this behavior per original clauses 20.2.2.24 and 20.2.2.25; see the diagnostic review artifact.
+
+### Current macOS arm64 Suite validation
+
+After integrating the Math change, the arm64 Suite was rebuilt and packaged
+from the current source. Its frozen packaged shell passes the complete pinned
+ES2015 suite (28,582/28,582) and ES5.1 suite (11,540/11,540), each with zero
+failures, unsupported cases, timeouts, crashes or harness errors. The 38 later
+runner controls pass. The relocated Suite package also passes the application,
+window/bootstrap, Promise, ChatZilla and Composer lifecycle checks. Reports and
+logs are under `artifacts/es6/math-extrema-suite-*`. One validation wrapper used
+the ES2015 expected count for its ES5 assertion and exited after both reports
+were complete; the raw ES5 report has the expected 11,540/11,540 result.
+
+The later full-corpus diagnostic remains a separate mixed-edition inventory,
+not a conformance result: 93,197 modes recorded 52,616 diagnostic passes,
+37,273 failures and 3,308 harness errors. Most failures exercise later-edition
+features or changed requirements, but every applicable ES2015 case still needs
+source-hash review. The ledger currently has 474 records and is incomplete.
+Full ES2015 compliance and cross-platform application validation remain
+unfinished.
+
+### Latest macOS arm64 Suite assignment-grammar validation
+
+The parser now retains an expression's grammar category through constant
+folding. In ES2015 mode a bare binary or unary expression cannot be an
+assignment target and fails during parsing with SyntaxError; a parenthesized
+expression is a grammar-valid LeftHandSideExpression and keeps the original
+ES2015 early ReferenceError behavior. Explicit legacy editions are unchanged.
+The focused assignment fixture passes 187 assertions, including constant-folded
+addition and paired bare/parenthesized cases. The later-corpus assignment-target
+diagnostic now records 328 passes and 306 failures across 634 modes, up from 326
+passes and 308 failures. The newly passing source-hashed additive case is
+reviewed against the original grammar in `edition-review.json`. All failing
+source files in this bounded assignment-target selection now have exact-hash
+reviews: the remaining SyntaxError expectations and Annex B call-target cases
+require later rules. This diagnostic is not a zero-failure ES2015 gate.
+
+The rebuilt, frozen macOS arm64 Suite package passes all 28,582 pinned ES2015
+modes and 11,540 pinned ES5.1 modes with zero failures, unsupported cases,
+timeouts, crashes or harness errors. Package native probes, the 38 later-runner
+controls and relocated Suite application/window/ChatZilla/Composer regressions
+also pass. The exact package, reports and logs are under
+`artifacts/es6/assignment-target-final-suite-*`. Work on the full ES2015
+implementation continues; all-application and cross-OS validation remains
+deferred until then.
+
+The earlier GetIterator note above was based on a misread of later-edition
+iterator records and a stale object file. The rebuilt engine reads `next` for
+each iterator step in both for-of and array patterns, matching the pinned
+ES2015 abstract operations; the corresponding focused regressions now exercise
+getter reentrancy and collection.
+
+### Completed ES2015 gate on the macOS arm64 Suite
+
+The current source was rebuilt and packaged as the macOS arm64 Suite. Its
+frozen packaged runtime passes **all 28,582 modes** in the complete pinned
+2015 Test262 snapshot and **all 11,540 modes** in the pinned ES5.1 suite, with
+zero failures, unsupported cases, timeouts, crashes or harness errors. All 38
+later-runner host controls pass. The relocated desktop Suite tests pass chrome
+startup and navigation, error pages, chrome/content bootstrap, ChatZilla,
+Composer editing and teardown, Address Book, Inspector, Venkman and profile
+lifecycle checks. Artifacts are under `artifacts/es6/edge-suite-*` and the
+package is `artifacts/zoolrunner-macos-arm64-suite-sdk11.3.tar.gz`.
+
+The separate 5,852-mode later-corpus `es6id` diagnostic records 5,839
+diagnostic passes and 13 diagnostic failures across eight files. Every failing
+source hash matches an exact-hash review in `edition-review.json`: later
+Annex B duplicate-function relaxation, anonymous built-in naming, RegExp
+lastIndex observability, BigInt syntax in revised accessor tests, and the
+module namespace tag descriptor. These are edition-review findings, not
+passing Test262 results or exclusions from the pinned ES2015 gate. The broader
+later-edition inventory remains incomplete. The original ES2015 and ES5.1
+conformance gates are complete on macOS arm64; cross-application and
+cross-operating-system validation is now the remaining project phase.
+
+### Current cross-platform validation
+
+The current source also passes build, package and relocated runtime checks for
+all eight Linux aarch64 application/backend entries: Suite, Browser, Calendar
+and XULRunner on GTK2 and Xlib. Each entry passes the pinned ES2015 suite
+(28,582/28,582) and ES5.1 suite (11,540/11,540); Calendar also passes all eight
+compatibility tests and its four-view window check. Logs and packages are
+under `artifacts/matrix/linux/aarch64/`.
+
+The i686 Suite GTK2 entry passes its build, package, ABI check, application
+smoke tests and native probes. Its ES2015 Test262 run was stopped on user
+direction at approximately 18,000 of 28,582 modes; it is incomplete and is not
+a passing suite result. The i686 interpreter explicitly rounds binary
+arithmetic through the x87 53-bit precision control and restores the embedding
+thread's control word immediately, preserving host libm behavior and
+application state. `double-rounding.js` covers the regression. Local QEMU
+validation used longer per-case and native-probe timeouts; the workflow's
+native-host defaults remain unchanged. Partial logs and reports are under
+`/tmp/zool-linux-i686-suite-gtk2-current/` and
+`artifacts/matrix/linux/i686/suite/gtk2/`.
+
+The Linux x86_64 Suite GTK2 entry has also passed its full build, package and
+relocated application/runtime checks under QEMU, including all 28,582 pinned
+ES2015 modes and 310 focused/native embedding checks. Test262 reported zero
+failures, unsupported cases, timeouts, crashes or harness errors; its report,
+package and logs are under `artifacts/matrix/linux/x86_64/suite/gtk2/`. This
+was an emulated x86_64 validation on Apple Silicon, not a native x86_64 host
+run.
+
+All four applications on modern macOS arm64 and x86_64 have also passed their
+build, package and relocated runtime checks. Linux x86_64 Suite GTK2 coverage
+is complete; Linux x86_64 also has Browser and Calendar GTK2 complete. Linux
+x86_64 Suite Xlib is also complete. Linux i686 Suite GTK2 built and passed
+application checks, but its Test262 run was interrupted and remains incomplete.
+The other 10 Linux x86 application/backend entries and the remaining
+supported OS/architecture matrices are still in progress. Do not infer their
+status from these results. GitHub-hosted
+workflow runs and physical minimum-version runtime validation remain separate
+checks.
+
+### Current macOS arm64 application matrix
+
+On the current checkout, Suite, Browser, Calendar and XULRunner each pass
+macOS arm64 SDK 11.3 build and package validation, relocated application
+startup, and image/relaunch platform probes. Browser also passes the complete
+pinned ES2015 suite (28,582/28,582) and ES5.1 suite (11,540/11,540), with zero
+failures, timeouts, crashes or harness errors. Calendar's package compatibility
+tests pass, and its fresh-profile GUI check passes startup and all four views
+(day, week, multiweek and month), with zero console errors. Suite additionally
+passes its Composer/editor and classic application lifecycle checks. Logs and
+reports are under `artifacts/macos-modern-validation/arm64-*-current-*`; the
+current application packages are under `artifacts/zoolrunner-macos-arm64-*`.
+This completes the macOS arm64 application matrix locally. The broader
+cross-OS/architecture matrix remains in progress; Linux x86_64 Suite Xlib and
+Suite/Browser/Calendar/XULRunner GTK2 are complete. Linux i686 Suite GTK2's
+Test262 run was interrupted and remains incomplete.
+
+The current-checkout Linux x86_64 Calendar GTK2 target also passes build,
+package, runtime and focused/native embedding probes, plus all 28,582 pinned
+ES2015 modes with zero failures, unsupported cases, timeouts, crashes or
+harness errors. It ran under QEMU on Apple Silicon, not on a native x86_64
+host. Its logs and archive are under
+`artifacts/matrix/linux/x86_64/calendar/gtk2/`.
+
+The current-checkout Linux x86_64 XULRunner GTK2 target passes build, CPU
+probe, package, standalone XUL application runtime and focused/native probes,
+plus all 28,582 pinned ES2015 modes with zero failures, unsupported cases,
+timeouts, crashes or harness errors. This was QEMU emulation on Apple Silicon,
+not a native x86_64 host run. Its logs and package are under
+`artifacts/matrix/linux/x86_64/xulrunner/gtk2/`.
+
+The current-checkout Linux x86_64 Suite Xlib target passes build, CPU probe,
+package, GUI navigation and lifecycle checks (24/24), native embedding probes,
+and all 28,582 pinned ES2015 modes with zero failures, unsupported cases,
+timeouts, crashes or harness errors. This was QEMU emulation on Apple Silicon,
+not a native x86_64 host run. Its logs and package are under
+`artifacts/matrix/linux/x86_64/suite/xlib/`.
+
+The current-checkout macOS x86_64 matrix is now also complete under Rosetta:
+Suite, Browser, Calendar and XULRunner pass SDK 11.3 build/package, relocated
+application startup and platform image/relaunch checks. Suite passes all
+28,582 pinned ES2015 and 11,540 pinned ES5.1 cases; Calendar passes all eight
+compatibility tests and its fresh-profile four-view GUI test. These Intel
+package runs use Rosetta on Apple Silicon and are not physical Intel hardware
+validation. Logs and reports are under
+`artifacts/macos-modern-validation/x86_64-*-current-*`.
+
+### Native structured-value snapshots for session history
+
+The additive `JS_WriteStructuredValue`, `JS_ReadStructuredValue` and
+`JS_FreeStructuredValue` embedding APIs store an immutable in-process graph
+without retaining source contexts, objects or GC roots. They preserve cycles,
+shared identities, sparse arrays, UTF-16, primitive wrappers, Date, RegExp,
+Map/Set and shared ArrayBuffer/view storage. Getters run in property order;
+unsupported functions, symbols, proxies, weak collections and promises are
+rejected. Getter exceptions and embedding access checks remain observable.
+Deserialization uses the destination realm's intrinsic prototypes.
+
+`TestStructuredValue.c` passes 63 native checks on LoongArch64 Linux Suite
+GTK2 and Xlib, including collection mutation, reentrant serialization, GC,
+realm teardown, access denial, cancellation and bounded deep-input failure.
+Both builds produced the same engine binary. The GTK2 driver additionally
+passes all 28,582 pinned ES2015 modes, 139 focused scripts and 84 native
+fixtures; the pinned ES5.1 run passes all 11,540 cases. Both full runs use
+America/Los_Angeles. Reports are in
+`artifacts/speedometer21/structured-value-es2015/` and
+`artifacts/speedometer21/structured-value-es5.json`. Both Suite backends pass
+24 application lifecycle checks after the change.
+
+This is an embedding facility, not a JavaScript `structuredClone` global or a
+portable persistence format. DOM-specific clone types and transfer operations
+are not implemented. These tests do not establish complete HTML structured
+serialization or History API conformance; browser integration remains pending.
+
+### Native weak-key storage for DOM values
+
+`JS_NewWeakMapObject`, `JS_GetWeakMapEntry` and `JS_SetWeakMapEntry` provide
+embedding access to the existing ES2015 ephemeron implementation. They bypass
+mutable JavaScript constructors and methods, distinguish a missing entry from
+an undefined value, and do not create unconditional roots. Callers must keep
+the map, key and value rooted for each API call. No JavaScript global or
+post-ES2015 language feature is added.
+
+`TestWeakMapEmbedding.c` passes 38 checks on native LoongArch Suite GTK2 and
+Xlib, including constructor/method replacement, key/value cycles, cross-realm
+storage and collection when a map becomes unreachable. Both engines have hash
+`1d29abb799a6522dc58735d5274b00304a10a48b3cbe79a67ffa3b5a3e360782`.
+The full GTK2 driver passes 28,582 pinned ES2015 modes, 139 focused scripts,
+85 native fixtures and five internal fixtures. The separate pinned ES5.1 run
+passes all 11,540 cases. Both runs use America/Los_Angeles; reports are under
+`artifacts/speedometer21/weakmap-embedding-es2015/` and
+`artifacts/speedometer21/weakmap-embedding-es5.json`. DOM event/traversal
+integration is a separate, still-pending validation step.
+
+### Native named-property object support (in progress)
+
+Web IDL named-property objects need internal operations that ordinary ES2015
+Proxy invariants cannot express. For example, a DOMStringMap data-property
+definition accepts a non-configurable descriptor but exposes a live,
+configurable attribute property afterwards. Wrapping a plain object in a
+JavaScript Proxy cannot implement that contract.
+
+`JS_NewHostObject`, `JS_GetHostObjectOps` and `JS_IsHostObject` add an embedding
+path for such native objects without changing the existing JSClass or
+JSObjectOps layouts. The embedding supplies private backing/handler objects
+and owns the specified internal-method contracts. The engine traces their
+references, validates descriptor/key result types, and performs ordinary
+enumeration through the host's own properties and prototype chain. Ordinary
+JavaScript Proxy target invariants remain enforced. A host object is neither
+callable nor constructible, and does not inherit an Array brand from its
+backing object.
+
+`TestHostObject.c` passes 35 native LoongArch GTK2 embedding checks, including
+collection during callbacks, live keys and descriptors, attribute-order
+numeric keys, symbols, prototypes, rejected extensibility, and paired Proxy
+invariant checks. It is included in the shared native package fixture table.
+Both Suite backends pass their complete native package gates: all 11,540
+pinned ES5.1 cases, all 28,582 selected ES2015 cases, 139 focused scripts,
+86 native probes (five internal), embedding/window and Suite lifecycle checks.
+Reports are in `artifacts/speedometer21/host-package-suite-{gtk2,xlib}`;
+the engine SHA-256 is
+`f2a6f04353be06ab29e621b59417789a1db10292e00215c8f7150646e85458b2`.
+These frozen packages contain the engine support committed as `f643a168`,
+before the live dataset binding. Their DOM dataset binding still
+uses its old snapshot implementation; this engine support alone does not fix
+the known dataset failures or establish Web IDL compliance.

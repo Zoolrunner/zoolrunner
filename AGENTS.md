@@ -78,6 +78,14 @@ features, support policy, or development workflows change. Document material
 limitations and distinguish intended compatibility from verified build and
 runtime results.
 
+Keep the root README and test-guide entry pages concise: purpose, essential
+commands, current limits and links. Use `docs/README.md` as the documentation
+index. Put detailed implementation notes and dated validation results in the
+relevant reference (`DETAILS.md` for ES5, ES2015 and Speedometer); update status
+summaries instead of appending progress logs to entry pages. Preserve historical
+results with their revision and test scope. `docs/project-record.md` preserves
+the former root README; maintain dependency versions in `docs/dependencies.md`.
+
 ---
 
 # Preserve the Classic Mozilla Application Platform
