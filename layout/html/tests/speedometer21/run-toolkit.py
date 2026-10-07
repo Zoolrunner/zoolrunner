@@ -5,8 +5,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
+import sys
 import tempfile
+import time
 
 
 def main():
@@ -19,7 +22,8 @@ def main():
                                help='Privileged XUL fixture using the same result marker')
     parser.add_argument('--restart-url', action='append', default=[])
     parser.add_argument('--mode', choices=['probe'], default='probe')
-    parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
+    parser.add_argument('--content-edition', choices=['application', 'es5', 'es2015'], default='es2015',
+                        help='Use application to test shipped defaults without a profile override')
     parser.add_argument('--timeout', type=int, default=60)
     parser.add_argument('--gdb', action='store_true', help='Record a native crash backtrace in the probe log')
     parser.add_argument('--report', type=Path, required=True)
@@ -34,7 +38,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix='zool-content-' + args.application + '-') as temporary:
         base = Path(temporary)
         runtime = base / 'runtime'
-        shutil.copytree(source_runtime, runtime, symlinks=False)
+        if sys.platform == 'darwin' and source_runtime.parent.parent.suffix == '.app':
+            # Preserve the bundle for native startup/relaunch on macOS.
+            bundle = base / source_runtime.parent.parent.name
+            shutil.copytree(source_runtime.parent.parent, bundle, symlinks=False)
+            runtime = bundle / 'Contents/MacOS'
+        else:
+            shutil.copytree(source_runtime, runtime, symlinks=False)
         for name in ('compreg.dat', 'xpti.dat'):
             (runtime / 'components' / name).unlink(missing_ok=True)
         home, profile, fixture = base / 'home', base / 'profile', base / 'fixture'
@@ -73,19 +83,22 @@ def main():
                        '-ex', 'thread apply all bt full', '--args'] + command
         environment = dict(os.environ, HOME=str(home), LD_LIBRARY_PATH=str(runtime),
                            MOZILLA_FIVE_HOME=str(runtime), MOZ_NO_REMOTE='1')
+        if sys.platform == 'darwin':
+            environment['DYLD_LIBRARY_PATH'] = str(runtime)
         preferences = {
             'browser.dom.window.dump.enabled': True,
             'browser.shell.checkDefaultBrowser': False,
             'browser.startup.homepage_override.mstone': 'ignore',
             'nglayout.debug.disable_xul_cache': True,
             'nglayout.debug.disable_xul_fastload': True,
-            'javascript.options.content.es2015': args.content_edition == 'es2015',
             'zoolrunner.speedometer.mode': 'probe',
             'zoolrunner.speedometer.debugErrors': '',
             'zoolrunner.speedometer.timeout': args.timeout,
             'zoolrunner.test.application': args.application,
             'toolkit.defaultChromeURI': 'chrome://zooltest/content/early-application.xul',
         }
+        if args.content_edition != 'application':
+            preferences['javascript.options.content.es2015'] = args.content_edition == 'es2015'
         urls = [args.url or args.chrome_probe.resolve().as_uri()] + args.restart_url
         for index, url in enumerate(urls):
             preferences['zoolrunner.speedometer.url'] = url
@@ -96,9 +109,41 @@ def main():
                 args.report.stem + '.restart-' + str(index) + '.log')
             with log.open('w') as output:
                 try:
-                    result = subprocess.run(command, env=environment, stdout=output,
-                                            stderr=subprocess.STDOUT, timeout=args.timeout + 60)
-                    status = result.returncode
+                    if sys.platform == 'darwin':
+                        # First-profile startup can relaunch and return zero
+                        # before the child opens the fixture. Keep its bundle,
+                        # profile and inherited log alive until completion.
+                        process = subprocess.Popen(command, env=environment, stdout=output,
+                                                   stderr=subprocess.STDOUT)
+                        status = 'timeout'
+                        try:
+                            deadline = time.monotonic() + args.timeout + 60
+                            while time.monotonic() < deadline:
+                                if any(line.startswith('SPEEDOMETER-RESULT ') for line in
+                                       log.read_text(errors='replace').splitlines()):
+                                    status = process.wait(timeout=10)
+                                    break
+                                if process.poll() not in (None, 0):
+                                    status = process.returncode
+                                    break
+                                time.sleep(0.1)
+                        finally:
+                            # Only this disposable runtime's processes qualify.
+                            for line in subprocess.check_output(
+                                    ['ps', '-axo', 'pid=,command='], text=True).splitlines():
+                                pid, _, child = line.strip().partition(' ')
+                                if child.startswith(str(executable) + ' '):
+                                    try:
+                                        os.kill(int(pid), signal.SIGTERM)
+                                    except ProcessLookupError:
+                                        pass
+                            if process.poll() is None:
+                                process.kill()
+                            process.wait()
+                    else:
+                        result = subprocess.run(command, env=environment, stdout=output,
+                                                stderr=subprocess.STDOUT, timeout=args.timeout + 60)
+                        status = result.returncode
                 except subprocess.TimeoutExpired:
                     status = 'timeout'
             markers = [line[len('SPEEDOMETER-RESULT '):] for line in log.read_text(errors='replace').splitlines()

@@ -20,7 +20,8 @@ def main():
     parser.add_argument('--benchmark-version', choices=['1.0', '2.1'], default='2.1')
     parser.add_argument('--navigator-window', action='store_true',
                         help='Load the benchmark/probe in unchanged Suite Navigator chrome')
-    parser.add_argument('--content-edition', choices=['es5', 'es2015'])
+    parser.add_argument('--content-edition', choices=['application', 'es5', 'es2015'],
+                        help='Use application to test shipped defaults without a profile override')
     parser.add_argument('--debug-errors', default='', help='Diagnostic throw-stack filename filter')
     parser.add_argument('--timeout', type=int, default=1800)
     parser.add_argument('--report', type=Path, required=True)
@@ -65,7 +66,6 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
             profile = Path(info['path'])
             preferences = {
                 'browser.dom.window.dump.enabled': True,
-                'javascript.options.content.es2015': args.content_edition == 'es2015',
                 'browser.shell.checkDefaultBrowser': False,
                 'browser.startup.homepage_override.mstone': 'ignore',
                 'nglayout.debug.disable_xul_cache': True,
@@ -77,6 +77,8 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 'zoolrunner.speedometer.debugErrors': args.debug_errors,
                 'zoolrunner.speedometer.timeout': args.timeout,
             }
+            if args.content_edition != 'application':
+                preferences['javascript.options.content.es2015'] = args.content_edition == 'es2015'
             if args.mode == 'benchmark':
                 # Keep interactive slow-script dialogs out of unattended runs.
                 # The parent process still enforces the hard timeout.

@@ -36,12 +36,14 @@ For an already running HTTP server, use `run-suite.py --url` as shown in the
 
 The older `https://browserbench.org/Speedometer/` URL serves **Speedometer 1.0**.
 Select its separate gate explicitly; it requires all seven enabled workloads,
-twenty iterations and 420 workload checks, using ordinary ES5 content defaults:
+twenty iterations and 420 workload checks. This command uses Suite's application
+default for the content edition:
 
 ```sh
 python3 layout/html/tests/speedometer21/run-suite.py \
   --runtime obj-zoolrunner-macos-arm64-suite/dist/bin \
   --url https://browserbench.org/Speedometer/ --benchmark-version 1.0 --navigator-window \
+  --content-edition application \
   --report artifacts/speedometer1/suite.json
 ```
 
@@ -51,11 +53,22 @@ from the existing 2.1 gate; selecting a version does not alter the benchmark's
 workloads or iteration count.
 
 The macOS arm64 Suite [1.0 completion record](DETAILS.md#speedometer-10-completion-in-macos-suite-2026-10-06)
-passes all 420 checks through Navigator with ES2015 disabled.
+passes all 420 checks through Navigator with ES2015 disabled. The subsequent
+[application-default run](../../../../js/tests/es6/DETAILS.md#browser-and-suite-html-defaults-2026-10-06)
+also passes all 420 with ES2015 enabled.
 
 Add `--navigator-window` to exercise unchanged Suite Navigator chrome and its
 event listeners around the benchmark or content probe. The default uses the
 minimal embedded-browser window.
+
+Use `--content-edition application` with either the Suite or Toolkit runner to
+test the shipped application default without setting a profile override.
+Browser/Suite default to ES2015; Calendar/XULRunner retain ES5 content defaults.
+Explicit `es5` and `es2015` selections still override the disposable profile.
+Without an edition option, the runner retains its explicit ES5 setting for 1.0
+and ES2015 for 2.1, independently of application defaults.
+For macOS Toolkit probes, pass the built `.app/Contents/MacOS` directory as
+`--runtime`; the runner preserves the disposable bundle across native relaunch.
 
 ## Run a focused content probe
 

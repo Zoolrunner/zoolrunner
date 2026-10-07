@@ -2,6 +2,46 @@
 
 [Quick guide](README.md)
 
+## Browser and Suite HTML defaults (2026-10-06)
+
+`25d5cf6e` enables `javascript.options.content.es2015` in Browser's
+`browser/app/profile/firefox.js` and Suite's `xpfe/bootstrap/browser-prefs.js`.
+The shared `modules/libpref/src/init/all.js` value remains false for Calendar
+and XULRunner. Existing explicit user values still win; this does not rewrite
+profiles or change privileged chrome/XUL and explicit MIME edition selection.
+
+The Suite and Toolkit probe runners accept `--content-edition application` to
+omit the test-profile override and exercise shipped defaults. Explicit `es5`
+and `es2015` modes remain available. On macOS arm64 with SDK 11.3, Browser was
+built and Suite's preferences/bundle refreshed; both effective default branches
+report true. The edition shell test passes 36 checks and the native embedding
+probe passes 14. Suite's mixed-edition fixture passes five checks with an explicit
+false profile override, preserving its ES5-content expectation and legacy XUL.
+
+Fresh-profile `content-edition.html` passes all seven assertions in both Browser
+and Suite without a preference override. Suite's unchanged Navigator completes
+Speedometer 1.0 with ES2015 enabled: seven workloads, twenty iterations and all
+420 state checks, without script exceptions. Suite lifecycle passes 24 checks
+and chrome/content bootstrap passes 19. Reports are under
+`artifacts/speedometer1/`: `suite-default-edition.json`,
+`browser-default-edition.json`, `suite-default-benchmark.json`,
+`suite-default-lifecycle.log`, `suite-default-bootstrap.log` and
+`suite-default-mixed.log`.
+
+Browser's unchanged preferences fixture passes 29 of 30 assertions: all panes
+load, the font menu contains installed fonts, restore-default behavior is
+preserved and there are no chrome script errors. Its `FontBuilder._allFonts`
+cache assertion fails in both the application-default run and an explicit ES5
+control (`browser-default-preferences.json`, `browser-es5-preferences.json`).
+This preference-independent font-enumeration limitation remains visible; the
+test and font implementation were not changed. The fixture also retains its
+existing literal-homepage/localized-string limitation report.
+
+The Toolkit runner preserves macOS bundles and waits for the result marker
+across first-profile native relaunch, cleaning up only its disposable runtime's
+processes. Calendar/XULRunner defaults were checked in source; their runtimes
+and other OS/architecture matrices were not rebuilt for this preference change.
+
 The default-script property-query correction at `a619d7ca` was checked on
 macOS arm64 Suite against all 28,582 pinned ES2015 modes and all 11,540 pinned
 ES5.1 cases, with zero failures (2026-10-06, `America/Los_Angeles`). Reports:
