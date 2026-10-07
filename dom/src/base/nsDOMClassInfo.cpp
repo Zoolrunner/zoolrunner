@@ -3269,6 +3269,25 @@ nsDOMEventSH::PreCreate(nsISupports* native, JSContext* cx,
   if (!event) return NS_OK;
   nsCOMPtr<nsIScriptGlobalObject> owner;
   event->GetEventGlobal(getter_AddRefs(owner));
+  if (!owner) {
+    // Native events may first reach script in a chrome capture listener.
+    // Their wrapper belongs to the target's document, not that listener's
+    // global. Keep an already assigned creation realm for script-created
+    // events, including events dispatched into another document.
+    nsCOMPtr<nsIDOMEvent> domEvent = do_QueryInterface(native);
+    nsCOMPtr<nsIDOMEventTarget> target;
+    if (domEvent) domEvent->GetTarget(getter_AddRefs(target));
+    nsCOMPtr<nsIContent> content = do_QueryInterface(target);
+    nsCOMPtr<nsIDocument> document = do_QueryInterface(target);
+    if (content) document = content->GetOwnerDoc();
+    if (!document) {
+      nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(target);
+      if (window) document = do_QueryInterface(window->GetExtantDocument());
+    }
+    nsCOMPtr<nsIDocument_MOZILLA_1_8_0_BRANCH> doc18 = do_QueryInterface(document);
+    if (doc18) owner = doc18->GetScopeObject();
+    if (owner) event->SetEventGlobal(owner);
+  }
   if (owner && owner->GetGlobalJSObject()) {
     *parent = owner->GetGlobalJSObject();
     return NS_OK;

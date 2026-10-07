@@ -41,7 +41,7 @@ twenty iterations and 420 workload checks, using ordinary ES5 content defaults:
 ```sh
 python3 layout/html/tests/speedometer21/run-suite.py \
   --runtime obj-zoolrunner-macos-arm64-suite/dist/bin \
-  --url https://browserbench.org/Speedometer/ --benchmark-version 1.0 \
+  --url https://browserbench.org/Speedometer/ --benchmark-version 1.0 --navigator-window \
   --report artifacts/speedometer1/suite.json
 ```
 
@@ -49,6 +49,9 @@ The Suite runner also supports macOS and restores its previous native profile
 selection after removing the disposable test profile. A 1.0 result is separate
 from the existing 2.1 gate; selecting a version does not alter the benchmark's
 workloads or iteration count.
+
+The macOS arm64 Suite [1.0 completion record](DETAILS.md#speedometer-10-completion-in-macos-suite-2026-10-06)
+passes all 420 checks through Navigator with ES2015 disabled.
 
 Add `--navigator-window` to exercise unchanged Suite Navigator chrome and its
 event listeners around the benchmark or content probe. The default uses the

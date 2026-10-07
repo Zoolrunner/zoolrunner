@@ -87,6 +87,15 @@ nsDOMEvent::nsDOMEvent(nsPresContext* aPresContext, nsEvent* aEvent)
   mPresContext = aPresContext;
   mInitialized = PR_FALSE;
 
+  // Capture the creation document before chrome capture or XBL retargeting
+  // changes the visible target. The first script listener is not necessarily
+  // in the event's realm. Keep this weak, like explicitly assigned owners.
+  if (aPresContext && aPresContext->GetPresShell()) {
+    nsCOMPtr<nsIDocument_MOZILLA_1_8_0_BRANCH> document =
+      do_QueryInterface(aPresContext->GetPresShell()->GetDocument());
+    if (document) SetEventGlobal(document->GetScopeObject());
+  }
+
   if (aEvent) {
     mEvent = aEvent;
     mEventIsInternal = PR_FALSE;

@@ -193,6 +193,17 @@ interface, preserving legacy event interface layouts. Suite's 24 lifecycle
 checks pass after these changes. Chromium 148 differs on two target-reset
 assertions; the fixture retains the DOM specification's required null target.
 
+`native-event-owner.xul` exercises native clicks and mutations first captured
+by chrome, content/frame prototypes, retained events after callback-driven frame
+removal and GC, and denied access to chrome-created events. Run it through
+`editor/composer/tests/run-lifecycle.py --fixture` with expected marker
+`NATIVE-EVENT-OWNER checks=13 failures=0`.
+`native-focus-owner.html` checks native focus/blur through Navigator's existing
+chrome listeners; run `layout/html/tests/speedometer21/run-suite.py --mode probe
+--content-edition es5 --navigator-window` with its file URL and a Suite runtime.
+These complement the event prototype and propagation probes; minimal embedded
+browser windows alone do not reproduce Navigator's focus-event path.
+
 `event-propagation-state.html` covers stopImmediatePropagation and cancelBubble
 on Event, UIEvent and CustomEvent, propagation reset and retained native-event
 redispatch (47 assertions). Native LoongArch GTK2 Suite passes these tests and

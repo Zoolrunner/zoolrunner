@@ -18,8 +18,12 @@ callback mutation, collection, numeric keys and accessor queries.
 boundaries (`OWN-QUERY-EMBEDDING editions=3 failures=0`). Build it with the
 same include/library arguments as `TestObjectEmbedding.c` below. Existing
 object-reflection, legacy-application, strict-parameter-history and
-TestObjectEmbedding checks also pass. Complete standards and browser results
-are recorded separately after their runs finish.
+TestObjectEmbedding checks also pass. The engine at `a619d7ca` passes the
+complete pinned ES5.1 gate (11,540/11,540) and ES2015 gate (28,582/28,582),
+with no failures, crashes, timeouts, unsupported cases or harness errors.
+Both runs use `America/Los_Angeles`; reports are
+`artifacts/speedometer1/es5.json` and `es2015.json`. Browser/event ownership
+results are separate in the [Speedometer record](../../../layout/html/tests/speedometer21/DETAILS.md).
 
 This reference preserves the original instructions, implementation notes and
 validation reports. Read results in revision order: an older failure or pending

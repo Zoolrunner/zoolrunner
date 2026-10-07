@@ -475,6 +475,10 @@ does not establish exhaustive specification conformance.
 Event-prototype changes must exercise `layout/html/tests/style/event-prototype.html`,
 including Window initialization, frame realms, document fragments and historical
 named-property lookup, alongside Suite lifecycle and chrome/content bootstrap.
+Event ownership changes must also run `native-event-owner.xul` and
+`native-focus-owner.html` in that directory, the latter through unchanged Suite
+Navigator chrome. Preserve chrome-event access checks and retained events after
+frame teardown and collection.
 Do not link Window's legacy global-scope polluter into a shared DOM prototype.
 History state and traversal changes must run
 `layout/html/tests/speedometer21/run-history-probes.py`, the session-entry shell

@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!-- MPL 1.1/GPL 2.0/LGPL 2.1. Run with the Suite lifecycle runner. -->
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        width="900" height="700" onload="run()">
+<browser id="content" type="content" flex="1"/>
+<script><![CDATA[
+var C = Components.classes, I = Components.interfaces;
+var captures = 0, mutationCaptures = 0, failures = 0, checks = 0;
+function check(ok, name) {
+  ++checks;
+  if (!ok) ++failures;
+  dump((ok ? 'PASS ' : 'FAIL ') + name + '\n');
+}
+function finish() {
+  dump('NATIVE-EVENT-OWNER checks=' + checks + ' failures=' + failures + '\n');
+  C['@mozilla.org/toolkit/app-startup;1'].getService(I.nsIAppStartup).quit(3);
+}
+function run() {
+  setTimeout(function() { check(false, 'fixture timeout'); finish(); }, 10000);
+  try { start(); }
+  catch (error) { check(false, 'fixture startup: ' + error); finish(); }
+}
+function start() {
+  var browser = document.getElementById('content');
+  // Include content-initiated clicks. Wrapping first in chrome must not make
+  // the content event inaccessible to the next listener down the event path.
+  browser.addEventListener('click', function(e) {
+    if (e.target.id === 'button') ++captures;
+  }, true, true);
+  browser.addEventListener('DOMNodeInserted', function(e) {
+    if (e.target.id === 'mutation') ++mutationCaptures;
+  }, true, true);
+  function loaded() {
+    var content = browser.contentWindow.wrappedJSObject || browser.contentWindow;
+    if (typeof content.runNativeEvents !== 'function' ||
+        !content.document.getElementById('child').contentDocument.body) {
+      setTimeout(loaded, 100); return;
+    }
+    setTimeout(function() {
+      try {
+        var w = browser.contentWindow.wrappedJSObject || browser.contentWindow;
+        w.runNativeEvents();
+        check(captures === 2, 'chrome captures both native clicks first');
+        check(mutationCaptures === 1, 'chrome captures native mutation first');
+        var event = document.createEvent('Events');
+        event.initEvent('chrome-owned', true, false);
+        w.document.getElementById('button').dispatchEvent(event);
+        var debuggerService = C['@mozilla.org/js/jsd/debugger-service;1']
+          .getService(I.jsdIDebuggerService);
+        debuggerService.on();
+        try { debuggerService.GC(); } finally { debuggerService.off(); }
+        w.afterCollection();
+        check(w.results.length === 10, 'all content assertions executed');
+        for (var i = 0; i < w.results.length; ++i)
+          check(w.results[i].pass, w.results[i].name);
+      } catch (error) { check(false, 'unexpected exception: ' + error); }
+      finish();
+    }, 100);
+  }
+  setTimeout(loaded, 100);
+  var uri = C['@mozilla.org/network/io-service;1'].getService(I.nsIIOService)
+    .newURI(window.location.href.replace(/[^/]*$/, 'native-event-owner.html'), null, null);
+  // Load as ordinary content, not as a privileged chrome document.
+  var fileURI = C['@mozilla.org/chrome/chrome-registry;1']
+    .getService(I.nsIChromeRegistry).convertChromeURL(uri);
+  browser.setAttribute('src', fileURI.spec);
+}
+]]></script></window>

@@ -1,0 +1,38 @@
+<!doctype html>
+<html><head><title>Native focus event ownership through Navigator chrome</title></head>
+<body><input id="first"><input id="second"><script>
+// Run with run-suite.py --mode probe --content-edition es5 --navigator-window.
+// Navigator's existing chrome focus listeners must run before content without
+// assigning the event to the chrome global.
+var testDone = false, testFailures = 0, testResults = [];
+function check(ok, name) {
+  if (!ok) ++testFailures;
+  testResults.push((ok ? 'PASS ' : 'FAIL ') + name);
+}
+window.onload = function() {
+  setTimeout(function() {
+    var first = document.getElementById('first'), focus = 0, blur = 0;
+    first.addEventListener('focus', function(e) {
+      ++focus;
+      try {
+        check(e.target === first, 'native focus target');
+        check(e.type === 'focus', 'native focus type');
+        check(e instanceof Event, 'native focus content prototype');
+      } catch(error) { check(false, 'focus exception: ' + error); }
+    }, false);
+    first.addEventListener('blur', function(e) {
+      ++blur;
+      try {
+        check(e.target === first, 'native blur target');
+        check(e.type === 'blur', 'native blur type');
+        check(e instanceof Event, 'native blur content prototype');
+      } catch(error) { check(false, 'blur exception: ' + error); }
+    }, false);
+    first.focus();
+    document.getElementById('second').focus();
+    check(focus === 1, 'exactly one native focus delivered');
+    check(blur === 1, 'exactly one native blur delivered');
+    testDone = true;
+  }, 200);
+};
+</script></body></html>

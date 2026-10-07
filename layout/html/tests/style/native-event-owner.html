@@ -1,0 +1,48 @@
+<!doctype html>
+<html><head><title>Native event owner content</title></head><body>
+<input type="button" id="button" value="Dispatch native click">
+<iframe id="child"></iframe>
+<script>
+var results = [], retained, retainedTarget;
+function check(ok, name) { results.push({pass:!!ok, name:name}); }
+window.addEventListener('click', function(e) {
+  try {
+    check(e.target === document.getElementById('button'), 'native target');
+    check(e instanceof MouseEvent, 'native event content prototype');
+    check(e.view === window, 'native event view');
+  } catch (error) { check(false, 'native click: ' + error); }
+}, true);
+window.addEventListener('chrome-owned', function(e) {
+  var denied = false;
+  try { var target = e.target; } catch (error) { denied = true; }
+  check(denied, 'chrome-created event stays protected');
+}, false);
+window.addEventListener('DOMNodeInserted', function(e) {
+  try {
+    if (e.target.id !== 'mutation') return;
+    check(e.target.parentNode === document.body, 'native mutation target');
+    check(e instanceof MutationEvent, 'native mutation content prototype');
+  } catch (error) { check(false, 'native mutation: ' + error); }
+}, true);
+function runNativeEvents() {
+  var inserted = document.createElement('span');
+  inserted.id = 'mutation';
+  document.body.appendChild(inserted);
+  document.getElementById('button').click();
+  var frame = document.getElementById('child'), w = frame.contentWindow;
+  w.document.body.innerHTML = '<input type="button" id="button">';
+  w.eval("window.addEventListener('click', function(e) {" +
+    "try { parent.check(e.target === document.getElementById('button'), 'frame target');" +
+    "parent.check(e instanceof MouseEvent, 'frame event prototype');" +
+    "parent.retained=e; parent.retainedTarget=e.target;" +
+    "frameElement.parentNode.removeChild(frameElement);" +
+    "} catch(error) { parent.check(false, 'frame click: '+error); } }, true);");
+  w.document.getElementById('button').click();
+}
+function afterCollection() {
+  try {
+    check(retained.target === retainedTarget, 'retained target after frame removal and GC');
+    check(retained.type === 'click', 'retained native event data');
+  } catch(error) { check(false, 'retained event: ' + error); }
+}
+</script></body></html>

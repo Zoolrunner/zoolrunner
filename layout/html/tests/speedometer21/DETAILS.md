@@ -2,6 +2,49 @@
 
 [Quick guide](README.md)
 
+## Speedometer 1.0 completion in macOS Suite (2026-10-06)
+
+The rebuilt `obj-zoolrunner-macos-arm64-suite` completes the live, unmodified
+`https://browserbench.org/Speedometer/` benchmark in unchanged Navigator chrome:
+**7 workloads, 20 iterations, 420/420 successful workload-state checks**.
+`artifacts/speedometer1/navigator-final.json` and its console log record the run;
+the log has no script exceptions or permission-denied errors. The ordinary ES5
+content mode remains selected (`javascript.options.content.es2015=false`).
+This is functional completion evidence, not a controlled performance measurement.
+
+Two independent engine defects caused the reported errors:
+
+- Ember Data uses an array key in `state.hasOwnProperty(pivotName)`. Default ES5
+  queried a native E4X object ID instead of converting the array to a string.
+  `a619d7ca` corrects both own-property query methods while preserving the classic
+  JSAPI and explicit historical language editions. The focused JS/native tests
+  and complete ES5.1/ES2015 gates pass; see the
+  [property-query record](../../../../js/tests/es5/DETAILS.md#property-query-object-keys-2026-10-06).
+- A native event first wrapped in a chrome listener could acquire the chrome
+  window as its owner, making later content access fail normal security checks.
+  Events now retain a weak reference to the presentation document's existing
+  script scope at creation, before focus/XBL target changes. Contextless native
+  events fall back to the target document when first wrapped. Already assigned
+  creation realms and the access checks remain intact; no XPCOM interface or
+  private-event vtable changed.
+
+The initial embedded-window run also passed 420 checks, but Navigator reproduced
+the exact jQuery `Event.target` exception and additional Angular errors until
+event creation ownership was corrected. `--navigator-window` keeps that chrome
+path in the runner. The focused ownership fixture covers chrome-first native
+clicks/mutations, frame prototypes, callback-driven frame removal and GC, and
+continued protection of chrome-created events. The native focus/blur probe and
+existing event prototype, cross-frame, reinitialization and propagation probes
+pass in both ES5 and ES2015 content modes (194 assertions per edition).
+The ownership fixture passes all 13 checks, Suite's lifecycle fixture passes
+24 checks, and the unchanged chrome/content bootstrap fixture passes 19.
+`artifacts/speedometer1/application-results.json` indexes the successful runs.
+
+This validation uses macOS arm64 Suite and the existing SDK 11.3 build profile.
+The changes add no OS, compiler, libc or library dependencies. Other platform
+and application matrices, and the separate Speedometer 2.1 benchmark, were not
+rerun for this correction.
+
 ## Speedometer 1.0 baseline (2026-10-06)
 
 The separate `--benchmark-version 1.0` gate reproduced the reported step-three

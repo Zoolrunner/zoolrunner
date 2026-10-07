@@ -2,6 +2,13 @@
 
 [Quick guide](README.md)
 
+The default-script property-query correction at `a619d7ca` was checked on
+macOS arm64 Suite against all 28,582 pinned ES2015 modes and all 11,540 pinned
+ES5.1 cases, with zero failures (2026-10-06, `America/Los_Angeles`). Reports:
+`artifacts/speedometer1/es2015.json` and `es5.json`; the ES2015 report confirms
+unchanged shell/engine hashes throughout its run. See the
+[property-query regression record](../es5/DETAILS.md#property-query-object-keys-2026-10-06).
+
 This reference preserves the original instructions, implementation notes and
 validation reports. Read results in revision order: an older failure or pending
 check may have been resolved later, and a pass does not validate later changes.
