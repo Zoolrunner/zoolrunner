@@ -34,6 +34,22 @@ incomplete workload count fail; do not disable workloads or add page polyfills.
 For an already running HTTP server, use `run-suite.py --url` as shown in the
 [detailed runner instructions](DETAILS.md#speedometer-21-compatibility).
 
+The older `https://browserbench.org/Speedometer/` URL serves **Speedometer 1.0**.
+Select its separate gate explicitly; it requires all seven enabled workloads,
+twenty iterations and 420 workload checks, using ordinary ES5 content defaults:
+
+```sh
+python3 layout/html/tests/speedometer21/run-suite.py \
+  --runtime obj-zoolrunner-macos-arm64-suite/dist/bin \
+  --url https://browserbench.org/Speedometer/ --benchmark-version 1.0 \
+  --report artifacts/speedometer1/suite.json
+```
+
+The Suite runner also supports macOS and restores its previous native profile
+selection after removing the disposable test profile. A 1.0 result is separate
+from the existing 2.1 gate; selecting a version does not alter the benchmark's
+workloads or iteration count.
+
 ## Run a focused content probe
 
 ```sh

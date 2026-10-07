@@ -2,6 +2,17 @@
 
 [Quick guide](README.md)
 
+## Speedometer 1.0 baseline (2026-10-06)
+
+The separate `--benchmark-version 1.0` gate reproduced the reported step-three
+hang in the existing macOS arm64 Suite at source baseline `dbbbf0fd`, with the
+ordinary ES5 content preference. The live, unchanged benchmark completed the
+three VanillaJS steps, then Ember Data 1.0.0-beta.6 reported `state has no
+properties` at line 4984. `artifacts/speedometer1/before.json` and its log retain
+the failed run. This is not a passing benchmark result. The 1.0 gate requires
+seven workloads, twenty iterations and 420 successful state checks; the 2.1
+requirements remain sixteen workloads, ten iterations and 480 checks.
+
 This reference preserves the original instructions, implementation notes and
 validation reports. Read results in revision order: an older failure or pending
 check may have been resolved later, and a pass does not validate later changes.

@@ -7,6 +7,7 @@
 var C = Components.classes, I = Components.interfaces;
 var prefs = C['@mozilla.org/preferences-service;1'].getService(I.nsIPrefBranch);
 var done = false, started = false, deadline, browser, mode, lastStep = -1;
+var benchmarkVersion = '2.1';
 var consoleService = C['@mozilla.org/consoleservice;1'].getService(I.nsIConsoleService);
 // dump() converts to UTF-8 and cannot preserve lone UTF-16 surrogates.
 function safeText(value) {
@@ -50,6 +51,8 @@ function run() {
   }
   consoleService.registerListener(listener);
   mode = prefs.getCharPref('zoolrunner.speedometer.mode');
+  try { benchmarkVersion = prefs.getCharPref('zoolrunner.speedometer.version'); }
+  catch (ignored) {}
   deadline = Date.now() + prefs.getIntPref('zoolrunner.speedometer.timeout') * 1000;
   browser = document.getElementById('content');
   browser.setAttribute('src', prefs.getCharPref('zoolrunner.speedometer.url'));
@@ -60,6 +63,12 @@ function run() {
 function installWorkloadChecks() {
   window.zoolrunnerWorkloadChecks = [];
   window.zoolrunnerReportedChecks = 0;
+  window.zoolrunnerIterations = [];
+  var originalSuites = benchmarkClient.didRunSuites;
+  benchmarkClient.didRunSuites = function(values) {
+    originalSuites.apply(this, arguments);
+    window.zoolrunnerIterations.push(values);
+  };
   var originalFrame = benchmarkClient.willAddTestFrame;
   benchmarkClient.willAddTestFrame = function(frame) {
     window.zoolrunnerActiveFrame = frame;
@@ -111,7 +120,9 @@ function poll() {
       finish(w.testFailures === 0, {failures:w.testFailures, results:w.testResults});
       return;
     }
-    if (mode == 'benchmark' && !started && typeof w.startTest == 'function') {
+    if (mode == 'benchmark' && !started && typeof w.startTest == 'function' &&
+        typeof w.BenchmarkRunner == 'function' && w.Suites &&
+        w.document.getElementById('info') && w.document.querySelector('section.selected')) {
       started = true;
       // Observe completion after the original UI callback succeeds. Do not
       // change suites, iteration counts, workload sources, or measured steps.
@@ -135,16 +146,22 @@ function poll() {
     }
     if (mode == 'benchmark' && w.zoolrunnerBenchmarkDone) {
       var client = w.benchmarkClient;
-      var values = client._measuredValuesList;
-      var complete = client.suitesCount === 16 && client.iterationCount === 10 &&
-                     values.length === 10 && client._finishedTestCount === client.stepCount;
+      var values = w.zoolrunnerIterations;
+      var expectedSuites = benchmarkVersion == '1.0' ? 7 : 16;
+      var expectedIterations = benchmarkVersion == '1.0' ? 20 : 10;
+      var expectedSteps = expectedSuites * expectedIterations * 3;
+      var steps = benchmarkVersion == '1.0' ? client.testsCount : client.stepCount;
+      var complete = client.suitesCount === expectedSuites &&
+                     client.iterationCount === expectedIterations &&
+                     values.length === expectedIterations && steps === expectedSteps &&
+                     client._finishedTestCount === expectedSteps;
       for (var iteration = 0; iteration < values.length; ++iteration) {
         var count = 0;
         for (var suite in values[iteration].tests) ++count;
-        complete = complete && count === 16;
+        complete = complete && count === expectedSuites;
       }
       var workloadChecks = w.zoolrunnerWorkloadChecks;
-      complete = complete && workloadChecks.length === client.stepCount;
+      complete = complete && workloadChecks.length === expectedSteps;
       for(var checkIndex=0;checkIndex<workloadChecks.length;++checkIndex)
         complete = complete && workloadChecks[checkIndex].pass;
       finish(complete, {workloadChecks:workloadChecks, suites:client.suitesCount, iterations:values.length,
@@ -159,7 +176,7 @@ function poll() {
           body:frame.document.body ? frame.document.body.innerHTML.substr(0,12000) : null});
         var fw = frame.wrappedJSObject || frame;
         if (fw.Ember) {
-          var apps = fw.Ember.Namespace.NAMESPACES, appInfo = [];
+          var apps = fw.Ember.Namespace.NAMESPACES || [], appInfo = [];
           for (var appIndex = 0; appIndex < apps.length; ++appIndex) {
             var app = apps[appIndex], boot = app._bootPromise;
             appInfo.push({name:String(app),booted:app._booted,
@@ -169,14 +186,14 @@ function poll() {
           }
           frames[frames.length-1].ember = appInfo;
           frames[frames.length-1].jqueryReady = fw.jQuery ? fw.jQuery.isReady : null;
-          var bb=fw.Ember.run.backburner, queueInfo={};
+          var bb=fw.Ember.run.backburner || {}, queueInfo={};
           if(bb.currentInstance) for(var q in bb.currentInstance.queues) {
             var queue=bb.currentInstance.queues[q];
             queueInfo[q]={length:queue._queue ? queue._queue.length : null,
               flushing:queue._queueBeingFlushed ? queue._queueBeingFlushed.length : null};
           }
           frames[frames.length-1].runLoop={autorun:bb._autorun,queues:queueInfo,
-            stack:bb.instanceStack.length};
+            stack:bb.instanceStack ? bb.instanceStack.length : null};
         }
       }
       finish(false, {error:'timeout', url:String(w.location), started:started,

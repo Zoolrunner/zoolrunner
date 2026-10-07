@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 from xml.sax.saxutils import quoteattr
 
@@ -16,16 +17,21 @@ def main():
     parser.add_argument('--restart-url', action='append', default=[],
                         help='Probe another URL in a new process using the same test profile')
     parser.add_argument('--mode', choices=['probe', 'benchmark'], default='benchmark')
-    parser.add_argument('--content-edition', choices=['es5', 'es2015'], default='es2015')
+    parser.add_argument('--benchmark-version', choices=['1.0', '2.1'], default='2.1')
+    parser.add_argument('--content-edition', choices=['es5', 'es2015'])
     parser.add_argument('--debug-errors', default='', help='Diagnostic throw-stack filename filter')
     parser.add_argument('--timeout', type=int, default=1800)
     parser.add_argument('--report', type=Path, required=True)
     args = parser.parse_args()
+    if args.content_edition is None:
+        args.content_edition = 'es5' if args.benchmark_version == '1.0' else 'es2015'
     if args.restart_url and args.mode != 'probe':
         parser.error('--restart-url is only supported for content probes')
     runtime = args.runtime.resolve()
     environment = dict(os.environ, LD_LIBRARY_PATH=str(runtime),
                        MOZILLA_FIVE_HOME=str(runtime), MOZ_NO_REMOTE='1')
+    if sys.platform == 'darwin':
+        environment['DYLD_LIBRARY_PATH'] = str(runtime)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='zool-speedometer-') as temporary:
         base = Path(temporary)
@@ -42,14 +48,17 @@ def main():
 
         info = None
         try:
+            # macOS uses the native profile registry, independently of HOME.
+            # Preserve its selection as the existing macOS lifecycle runner does.
+            baseline = '' if sys.platform == 'darwin' else '''p.createNewProfile('baseline',HOME,null,false);
+p.currentProfile='baseline';'''
             output = shell('''var p=Components.classes['@mozilla.org/profile/manager;1'].getService(Components.interfaces.nsIProfile);
-p.createNewProfile('baseline',HOME,null,false);
-p.currentProfile='baseline';
+BASELINE
 var old=p.currentProfile;
 if(p.profileExists(NAME))throw Error('Test profile already exists');
 p.createNewProfile(NAME,BASE,null,false);
 print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.interfaces.nsIProfileInternal).getProfileDir(NAME).path}));
-'''.replace('NAME', json.dumps(name)).replace('BASE', json.dumps(str(base))).replace('HOME', json.dumps(str(home))))
+'''.replace('BASELINE', baseline).replace('NAME', json.dumps(name)).replace('BASE', json.dumps(str(base))).replace('HOME', json.dumps(str(home))))
             info = json.loads(next(line[8:] for line in output.splitlines() if line.startswith('PROFILE=')))
             profile = Path(info['path'])
             preferences = {
@@ -61,6 +70,7 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 'nglayout.debug.disable_xul_fastload': True,
                 'zoolrunner.speedometer.url': args.url,
                 'zoolrunner.speedometer.mode': args.mode,
+                'zoolrunner.speedometer.version': args.benchmark_version,
                 'zoolrunner.speedometer.debugErrors': args.debug_errors,
                 'zoolrunner.speedometer.timeout': args.timeout,
             }
@@ -101,6 +111,8 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 report = {'pass': False, 'exit': exit_code, 'runtime': str(runtime),
                           'url': url, 'mode': args.mode,
                           'contentEdition': args.content_edition}
+                if args.mode == 'benchmark':
+                    report['benchmarkVersion'] = args.benchmark_version
                 if len(markers) == 1:
                     try:
                         report['result'] = json.loads(markers[0])
