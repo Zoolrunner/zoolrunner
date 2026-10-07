@@ -75,6 +75,32 @@ python3 build/linux/package-ci.py loongarch64 suite "$zr_package_work" \
 For Xlib, add `--toolkit xlib` and use the matching object directory. The
 archive is written to `$zr_package_work/artifacts`.
 
+## GConf-free and legacy builds
+
+All supplied Linux profiles use `--disable-gconf`. This excludes GConf service
+implementations and typelibs, runtime-loaded protocol/MIME registry lookup,
+system-proxy import, desktop accessibility lookup, and the GNOME browser shell
+service. It also disables GnomeVFS and libgnomeui integration, which can bring
+GConf in indirectly. GTK2 itself remains supported.
+
+Explicit protocol-handler preferences, mailcap/mime.types, ordinary profile
+proxy settings, and `GNOME_ACCESSIBILITY=1` (with accessibility compiled in)
+remain available. These builds do not provide GNOME default-browser registration,
+wallpaper controls, automatic desktop proxy/accessibility discovery or the old
+GNOME service contracts. No replacement desktop-settings backend is implied.
+
+For a legacy GTK2 build, use a custom mozconfig with `--enable-gconf` instead.
+Remove `--disable-gnomevfs` too if the linked GNOME component is wanted; it
+requires GConf, GnomeVFS and libgnome development packages. Raw configure retains
+legacy GConf integration by default on GTK2, including optional runtime loaders
+when development packages are absent. `--enable-gnomevfs` or `--enable-gnomeui`
+with `--disable-gconf` is rejected.
+
+Use a fresh object directory when switching this policy: old staged components
+can otherwise survive. The Linux packager rejects GConf implementation/loader
+signatures in disabled builds, and package tests check transitive dependencies.
+See [validation results](NOTES.md#gconf-free-builds) for the tested scope.
+
 ## Incremental builds
 
 Within a configured container or native build environment, use an absolute

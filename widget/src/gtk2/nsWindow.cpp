@@ -73,9 +73,11 @@
 #include "stdlib.h"
 static PRBool sAccessibilityChecked = PR_FALSE;
 static PRBool sAccessibilityEnabled = PR_FALSE;
+#ifdef MOZ_GCONF
 static const char sSysPrefService [] = "@mozilla.org/system-preference-service;1";
-static const char sAccEnv [] = "GNOME_ACCESSIBILITY";
 static const char sAccessibilityKey [] = "config.use_system_prefs.accessibility";
+#endif
+static const char sAccEnv [] = "GNOME_ACCESSIBILITY";
 #endif
 
 /* For SetIcon */
@@ -2687,7 +2689,6 @@ nsWindow::NativeCreate(nsIWidget        *aParent,
     Resize(mBounds.width, mBounds.height, PR_FALSE);
 
 #ifdef ACCESSIBILITY
-    nsresult rv;
     if (!sAccessibilityChecked) {
         sAccessibilityChecked = PR_TRUE;
 
@@ -2697,19 +2698,20 @@ nsWindow::NativeCreate(nsIWidget        *aParent,
             sAccessibilityEnabled = atoi(envValue);
             LOG(("Accessibility Env %s=%s\n", sAccEnv, envValue));
         }
-        //check gconf-2 setting
+#ifdef MOZ_GCONF
+        // Read the legacy desktop accessibility setting when available.
         else {
+            nsresult rv;
             nsCOMPtr<nsIPrefBranch> sysPrefService =
                 do_GetService(sSysPrefService, &rv);
             if (NS_SUCCEEDED(rv) && sysPrefService) {
 
-                // do the work to get gconf setting.
-                // will be done soon later.
                 sysPrefService->GetBoolPref(sAccessibilityKey,
                                             &sAccessibilityEnabled);
             }
 
         }
+#endif
     }
     if (sAccessibilityEnabled) {
         LOG(("nsWindow:: Create Toplevel Accessibility\n"));

@@ -129,6 +129,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --disable-xprint        Disable Xprint printing support "
 ac_help="$ac_help
+  --disable-gconf         Exclude all GConf and dependent legacy GNOME integration "
+ac_help="$ac_help
   --disable-gnomevfs      Disable GnomeVFS support "
 ac_help="$ac_help
   --disable-gnomeui       Disable libgnomeui support (default: auto, optional at runtime) "
@@ -14055,9 +14057,36 @@ fi
 fi
 
 
+# This policy also controls runtime loaders, independently of GConf SDK detection.
+MOZ_GCONF=1
+# Check whether --enable-gconf or --disable-gconf was given.
+if test "${enable_gconf+set}" = set; then
+  enableval="$enable_gconf"
+  if test "$enableval" = "no"; then
+    MOZ_GCONF=
+  elif test "$enableval" = "yes"; then
+    MOZ_GCONF=1
+  else
+    { echo "configure: error: Option, gconf, does not take an argument ($enableval)." 1>&2; exit 1; }
+  fi
+fi
+
+
+if test -z "$MOZ_X11"; then
+    MOZ_GCONF=
+fi
+if test "$MOZ_GCONF"; then
+    cat >> confdefs.h <<\EOF
+#define MOZ_GCONF 1
+EOF
+
+fi
+
+
+
 if test "$MOZ_X11"
 then
-            if test "$MOZ_ENABLE_GTK2"
+            if test "$MOZ_GCONF" -a "$MOZ_ENABLE_GTK2"
     then
         MOZ_ENABLE_GNOMEVFS=1
         MOZ_ENABLE_GCONF=1
@@ -14076,6 +14105,17 @@ if test "${enable_gnomevfs+set}" = set; then
   fi
 fi
 
+
+    if test -z "$MOZ_GCONF"; then
+        if test "$MOZ_ENABLE_GNOMEVFS" = "force"; then
+            { echo "configure: error: --enable-gnomevfs conflicts with --disable-gconf" 1>&2; exit 1; }
+        fi
+        MOZ_ENABLE_GNOMEVFS=
+        MOZ_ENABLE_GCONF=
+        MOZ_ENABLE_LIBGNOME=
+        MOZ_GCONF_CFLAGS=
+        MOZ_GCONF_LIBS=
+    fi
 
     if test "$MOZ_ENABLE_GNOMEVFS"
     then
@@ -14420,6 +14460,14 @@ if test "${enable_gnomeui+set}" = set; then
   fi
 fi
 
+
+    # libgnomeui can load GConf indirectly; omit it in GConf-free builds.
+    if test -z "$MOZ_GCONF"; then
+        if test "$MOZ_ENABLE_GNOMEUI" = "force"; then
+            { echo "configure: error: --enable-gnomeui conflicts with --disable-gconf" 1>&2; exit 1; }
+        fi
+        MOZ_ENABLE_GNOMEUI=
+    fi
 
     if test "$MOZ_ENABLE_GNOMEUI"
     then
@@ -20690,6 +20738,7 @@ s%@MOZ_ENABLE_PANGO@%$MOZ_ENABLE_PANGO%g
 s%@MOZ_ENABLE_COREXFONTS@%$MOZ_ENABLE_COREXFONTS%g
 s%@MOZ_GNOMEVFS_CFLAGS@%$MOZ_GNOMEVFS_CFLAGS%g
 s%@MOZ_GNOMEVFS_LIBS@%$MOZ_GNOMEVFS_LIBS%g
+s%@MOZ_GCONF@%$MOZ_GCONF%g
 s%@MOZ_GCONF_CFLAGS@%$MOZ_GCONF_CFLAGS%g
 s%@MOZ_GCONF_LIBS@%$MOZ_GCONF_LIBS%g
 s%@MOZ_LIBGNOME_CFLAGS@%$MOZ_LIBGNOME_CFLAGS%g

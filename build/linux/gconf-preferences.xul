@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!-- Suite preferences in a GConf-free build. MPL 1.1/GPL 2.0/LGPL 2.1. -->
+<window xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+        title="GConf-free preferences regression" onload="run()">
+<script><![CDATA[
+var prefsWindow, checks = 0, failures = 0, attempts = 0;
+function check(ok, label) {
+  ++checks;
+  if (!ok) ++failures;
+  dump((ok ? 'PASS ' : 'FAIL ') + label + '\n');
+}
+function finish() {
+  if (prefsWindow && !prefsWindow.closed) prefsWindow.close();
+  dump('GCONF-PREFERENCES checks=' + checks + ' failures=' + failures + '\n');
+  Components.classes['@mozilla.org/toolkit/app-startup;1']
+    .getService(Components.interfaces.nsIAppStartup).quit(3);
+}
+function inspect() {
+  try {
+    var frame = prefsWindow.document.getElementById('panelFrame');
+    var page = frame && frame.contentWindow;
+    if (!page || !page.document.getElementById('advancedJavaAllow') ||
+        !prefsWindow.hPrefWindow || !page._elementIDs) {
+      if (++attempts < 100) { setTimeout(inspect, 100); return; }
+      throw new Error('Advanced preferences did not initialize');
+    }
+    check(page.location.href == 'chrome://communicator/content/pref/pref-advanced.xul',
+          'original advanced preferences page opens');
+    check(!!page.document.getElementById('advancedJavaAllow'), 'ordinary preference remains');
+    check(!page.document.getElementById('systemPrefs'), 'system preferences controls absent');
+    check(page._elementIDs.indexOf('systemPrefCheck') == -1, 'no missing control in preference list');
+    check(typeof page.sysPrefCheck == 'undefined', 'desktop service lookup absent');
+    var messages = {}, count = {}, errors = 0;
+    Components.classes['@mozilla.org/consoleservice;1']
+      .getService(Components.interfaces.nsIConsoleService).getMessageArray(messages, count);
+    for (var i = 0; i < count.value; ++i) {
+      try {
+        var error = messages.value[i].QueryInterface(Components.interfaces.nsIScriptError);
+        if (!(error.flags & error.warningFlag)) {
+          ++errors;
+          dump('PREFERENCES-CONSOLE ' + error.message + '\n');
+        }
+      } catch (e) {}
+    }
+    check(errors == 0, 'preferences startup has no script errors');
+  } catch (e) { check(false, String(e)); }
+  finish();
+}
+function run() {
+  prefsWindow = window.openDialog('chrome://communicator/content/pref/pref.xul',
+      'gconf-preferences', 'chrome,dialog=no',
+      'chrome://communicator/content/pref/pref-advanced.xul');
+  setTimeout(inspect, 1000);
+}
+]]></script>
+</window>

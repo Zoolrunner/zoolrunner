@@ -67,9 +67,11 @@ else
 ifneq (,$(filter mac cocoa,$(MOZ_WIDGET_TOOLKIT)))
 CPPSRCS = nsMacShellService.cpp
 else
-ifeq ($(MOZ_WIDGET_TOOLKIT), gtk2)
+ifdef MOZ_GCONF
+ifeq ($(MOZ_WIDGET_TOOLKIT),gtk2)
 CPPSRCS = nsGNOMEShellService.cpp
 REQUIRES += mozgnome
+endif
 endif
 endif
 endif

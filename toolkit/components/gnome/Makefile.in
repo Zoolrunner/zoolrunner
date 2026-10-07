@@ -51,8 +51,9 @@ XPIDLSRCS = \
 	$(NULL)
 
 
-# We always export these interfaces if we're building for gtk2, but
-# only compile the component if the required libraries are available.
+# With legacy GConf integration enabled, export these GTK2 interfaces even
+# when the development libraries are absent. The top-level build omits this
+# directory entirely for --disable-gconf.
 
 ifdef MOZ_ENABLE_GNOME_COMPONENT
 

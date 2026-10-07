@@ -24,7 +24,7 @@ comm.jar:
     content/communicator/permissions/permissionsNavigatorOverlay.xul (permissions/content/permissionsNavigatorOverlay.xul)
     content/communicator/permissions/permissionsOverlay.js      (permissions/content/permissionsOverlay.js)
     content/communicator/permissions/treeUtils.js               (permissions/content/treeUtils.js)
-    content/communicator/pref/pref-advanced.xul                 (prefwindow/resources/content/pref-advanced.xul)
+*   content/communicator/pref/pref-advanced.xul                 (prefwindow/resources/content/pref-advanced.xul)
     content/communicator/pref/pref-appearance.xul               (prefwindow/resources/content/pref-appearance.xul)
     content/communicator/pref/pref-applications.xul             (prefwindow/resources/content/pref-applications.xul)
     content/communicator/pref/pref-download.js                  (prefwindow/resources/content/pref-download.js)

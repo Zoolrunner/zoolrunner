@@ -26,6 +26,10 @@ ZoolRunner targets:
 See the [documentation](docs/README.md) for build instructions and the tested
 versions and configurations within these compatibility goals.
 
+The supplied Linux profiles disable GConf integration; optional legacy support
+remains in tree. See the [Linux build guide](build/linux/README.md#gconf-free-and-legacy-builds)
+for configuration and feature limits.
+
 Mozilla and RetroZilla authorship and attribution are preserved. See
 [LICENSE](LICENSE), [LEGAL](LEGAL) and individual source files for license terms
 and credits.

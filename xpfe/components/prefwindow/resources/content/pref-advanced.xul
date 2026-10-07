@@ -52,11 +52,16 @@
   <script type="application/x-javascript">
   <![CDATA[
     var panel = "chrome://communicator/content/pref/pref-advanced.xul";
-    var _elementIDs = ["advancedJavaAllow", "systemPrefCheck"];
+    var _elementIDs = ["advancedJavaAllow"];
+#ifdef MOZ_GCONF
+    _elementIDs.push("systemPrefCheck");
+#endif
 
     function Startup() {
       turboCheck();
+#ifdef MOZ_GCONF
       sysPrefCheck();
+#endif
       initJVMConfigList();
     }
 
@@ -142,6 +147,7 @@
         }
       }
 
+#ifdef MOZ_GCONF
     function sysPrefCheck() {
       var frame = document.getElementById("systemPrefs");
       if ("@mozilla.org/system-preference-service;1" in Components.classes)
@@ -160,6 +166,7 @@
       parent.hPrefWindow.pagePrefChanged = true;
       parent.hPrefWindow.pagePrefUpdated = [];
     }
+#endif
   ]]>
   </script>
 
@@ -363,6 +370,7 @@
       </vbox>
     </vbox>
   </groupbox>
+#ifdef MOZ_GCONF
   <groupbox id="systemPrefs">
     <caption id="systemPrefCaption" label="&systemPref.caption;"/>
     <vbox id="systemPrefBox" align="start">
@@ -375,5 +383,6 @@
       </vbox>
     </vbox>
   </groupbox>
+#endif
   
 </page>

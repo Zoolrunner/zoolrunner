@@ -67,6 +67,7 @@ ac_add_options --disable-debug
 ac_add_options --disable-tests
 ac_add_options --disable-installer
 ac_add_options --disable-updater
+ac_add_options --disable-gconf
 ac_add_options --disable-gnomevfs
 ac_add_options --disable-dbus
 ac_add_options --disable-pango

@@ -775,6 +775,13 @@ A checkout should contain enough of its obscure or obsolete build dependencies t
 
 # Application CI Coverage
 
+Modern Linux profiles use `--disable-gconf`. Keep every direct and runtime-loaded
+GConf path behind `MOZ_GCONF`, including the system-preference extension, GTK2
+registry/accessibility lookups, Browser's GNOME shell service and Suite's
+system-preference controls. Exclude dependent GnomeVFS/libgnomeui integration too. Preserve `--enable-gconf` for legacy GTK2
+applications. Use clean object directories when switching policy, retain package
+signature/dependency audits, and document the omitted desktop features.
+
 Every OS and architecture must have mozconfigs for at least Suite, Browser,
 Calendar and XULRunner. Every OS build pipeline must build these four apps.
 Linux i686 and x86_64 bring-up and CI must run inside `oraclelinux:8` with

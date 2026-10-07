@@ -102,8 +102,10 @@ endif
 
 LOCAL_INCLUDES = -I$(srcdir)
 
+ifdef MOZ_GCONF
 ifeq ($(MOZ_WIDGET_TOOLKIT),gtk2)
 OSHELPER	+= nsGNOMERegistry.cpp
+endif
 endif
 
 ifeq ($(MOZ_WIDGET_TOOLKIT),beos)

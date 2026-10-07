@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import shutil
 import tarfile
+import zipfile
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('arch', choices=['i686', 'x86_64', 'aarch64', 'loongarch64'])
@@ -37,6 +38,27 @@ for name in ['compreg.dat', 'xpti.dat']:
         f.unlink()
 if a.app == 'xulrunner':
     shutil.copytree(str(obj / 'dist/xpi-stage/simple'), str(stage / 'applications/simple'))
+# Catch stale components and runtime loaders as well as linked GConf code.
+# Reconfiguring an old object directory does not remove previously staged DSOs.
+gconf = re.search(r'^MOZ_GCONF\s*=([^\n]*)', config, re.M)
+if gconf is None:
+    raise RuntimeError('Missing MOZ_GCONF build policy; reconfigure before packaging')
+gconf_enabled = bool(gconf.group(1).strip())
+if not gconf_enabled:
+    signatures = (b'libgconf-', b'gconf_client_', b'gnome-gconf-service;1',
+                  b'nsIGConfService', b'system-preference-service;1',
+                  b'nsGNOMERegistry')
+    for f in runtime.rglob('*'):
+        if f.is_file():
+            contents = [(str(f), f.read_bytes())]
+            if f.suffix in ('.jar', '.zip', '.xpi') and zipfile.is_zipfile(str(f)):
+                with zipfile.ZipFile(str(f)) as archive:
+                    contents += [(str(f) + ':' + name, archive.read(name))
+                                 for name in archive.namelist()]
+            for label, data in contents:
+                if any(signature in data for signature in signatures):
+                    raise RuntimeError('GConf code in disabled build: ' + label +
+                                       '; rebuild in a clean object directory')
 elfs = []
 for f in runtime.rglob('*'):
     if not f.is_file():
@@ -53,7 +75,7 @@ if not elfs:
     raise RuntimeError('No ELF binaries found')
 appname = re.search(r'^MOZ_APP_NAME\s*=\s*(\S+)', config, re.M).group(1)
 (work / 'logs/package.json').write_text(json.dumps({'arch': a.arch, 'app': a.app, 'toolkit': a.toolkit,
-    'appname': appname, 'elfs': elfs}, indent=2) + '\n')
+    'appname': appname, 'gconf': gconf_enabled, 'elfs': elfs}, indent=2) + '\n')
 archive = work / 'artifacts' / (stage.name + '.tar.gz')
 with tarfile.open(str(archive), 'w:gz', dereference=True) as tar:
     tar.add(str(stage), arcname=stage.name)

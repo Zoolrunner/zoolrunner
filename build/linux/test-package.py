@@ -58,11 +58,16 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
             raise RuntimeError('Unresolved or build-tree dependency: ' + relative + '\n' + result.stdout)
     dependencies = '\n'.join(imports)
     (logs / 'dependencies.log').write_text(dependencies)
+    if not metadata.get('gconf', True) and 'libgconf-' in dependencies:
+        raise RuntimeError('GConf-free package has a transitive GConf dependency')
     if a.toolkit == 'gtk2' and 'libgtk-x11-2.0' not in dependencies:
         raise RuntimeError('GTK2 package does not load GTK2')
     if a.toolkit == 'xlib' and ('libgtk-' in dependencies or 'libgdk-' in dependencies):
         raise RuntimeError('Xlib package unexpectedly depends on GTK/GDK')
     shell = runtime / 'xpcshell'
+    if not metadata.get('gconf', True):
+        run([shell, '-f', root / 'build/linux/gconf-disabled.js'],
+            'gconf-disabled', 'GCONF-DISABLED checks=9 failures=0')
     if a.toolkit == 'xlib':
         run([shell, '-f', root / 'gfx/tests/font-enumeration-headless.js'],
             'fonts-headless', 'FONT-ENUMERATION-HEADLESS checks=2 failures=0')
@@ -177,6 +182,9 @@ with tempfile.TemporaryDirectory(prefix='zoolrunner-linux-test-') as tmp:
     if a.app == 'suite':
         cases += [('lifecycle', (root / 'editor/composer/tests/platform-lifecycle.xul').read_text(), 'PLATFORM-LIFECYCLE checks=24 failures=0'),
                   ('chatzilla', (tests / 'modern-chatzilla.xul').read_text(), 'SUITE-CHATZILLA initialized=true')]
+    if a.app == 'suite' and not metadata.get('gconf', True):
+        cases += [('gconf-preferences', (root / 'build/linux/gconf-preferences.xul').read_text(),
+                   'GCONF-PREFERENCES checks=6 failures=0')]
     if a.app == 'browser':
         cases += [('preferences', (root / 'browser/components/preferences/tests/lifecycle.xul').read_text(),
                    'BROWSER-PREFERENCES checks=30 failures=0')]

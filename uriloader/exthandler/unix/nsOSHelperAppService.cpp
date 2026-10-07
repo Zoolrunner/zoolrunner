@@ -42,7 +42,7 @@
 #include <sys/stat.h>
 
 #include "nsOSHelperAppService.h"
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
 #include "nsGNOMERegistry.h"
 #endif
 #include "nsISupports.h"
@@ -87,7 +87,7 @@ IsNetscapeFormat(const nsACString& aBuffer);
 
 nsOSHelperAppService::nsOSHelperAppService() : nsExternalHelperAppService()
 {
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
   nsGNOMERegistry::Startup();
 #endif
 
@@ -1249,7 +1249,7 @@ NS_IMETHODIMP nsOSHelperAppService::ExternalProtocolHandlerExists(const char * a
     LOG(("   handler exists: %s\n", *aHandlerExists ? "yes" : "no"));
   }
 
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
   // Check the GConf registry for a protocol handler
   if (!*aHandlerExists)
     *aHandlerExists = nsGNOMERegistry::HandlerExists(aProtocolScheme);
@@ -1291,7 +1291,7 @@ nsresult nsOSHelperAppService::LoadUriInternal(nsIURI * aURI)
     return proc->Run(/*blocking*/PR_FALSE, args, NS_ARRAY_LENGTH(args), &tmp);
   }
 
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
   return nsGNOMERegistry::LoadURL(aURI);
 #else
   return rv;
@@ -1306,7 +1306,7 @@ NS_IMETHODIMP nsOSHelperAppService::GetApplicationDescription(const nsACString& 
   if (NS_SUCCEEDED(rv))
     return appFile->GetLeafName(_retval);
 
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
   nsGNOMERegistry::GetAppDescForScheme(aScheme, _retval);
   return _retval.IsEmpty() ? NS_ERROR_NOT_AVAILABLE : NS_OK;
 #else
@@ -1401,7 +1401,7 @@ nsOSHelperAppService::GetFromExtension(const nsCString& aFileExt) {
 
   if (NS_FAILED(rv) || majorType.IsEmpty()) {
     
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
     LOG(("Looking in GNOME registry\n"));
     nsMIMEInfoBase *gnomeInfo = nsGNOMERegistry::GetFromExtension(aFileExt.get()).get();
     if (gnomeInfo) {
@@ -1521,7 +1521,7 @@ nsOSHelperAppService::GetFromType(const nsCString& aMIMEType) {
           NS_LossyConvertUTF16toASCII(handler).get(),
           NS_LossyConvertUTF16toASCII(mailcap_description).get()));
 
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
   nsMIMEInfoBase *gnomeInfo = nsnull;
   if (handler.IsEmpty()) {
     // No useful data yet.  Check the GNOME registry.  Unfortunately, newer
@@ -1544,7 +1544,7 @@ nsOSHelperAppService::GetFromType(const nsCString& aMIMEType) {
                                  extensions,
                                  mime_types_description);
 
-#ifdef MOZ_WIDGET_GTK2
+#if defined(MOZ_WIDGET_GTK2) && defined(MOZ_GCONF)
   if (gnomeInfo) {
     LOG(("Got MIMEInfo from GNOME registry without extensions; setting them "
          "to %s\n", NS_LossyConvertUTF16toASCII(extensions).get()));

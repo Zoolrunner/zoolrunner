@@ -14,6 +14,100 @@ Commands use the repository root unless stated otherwise.
 
 </details>
 
+## GConf-free builds
+
+`--disable-gconf` controls the `MOZ_GCONF` build policy separately from
+`MOZ_ENABLE_GCONF`, which records availability of the development library for
+the linked GNOME component. X11's legacy default still allows the policy;
+all supplied Linux profiles explicitly disable it. Direct GConf backends remain
+GTK2-only; legacy Xlib builds can still explicitly enable the GnomeVFS extension.
+
+Disabled builds omit:
+
+- `toolkit/components/gnome` (including the GConf and GnomeVFS typelibs);
+- `extensions/pref/system-pref` and its dynamic GConf loader;
+- `nsGNOMERegistry` and all Unix helper-service calls into it;
+- GTK2's desktop accessibility-setting lookup and Suite's system-preferences UI;
+- the browser GNOME shell implementation, factory and archive linkage;
+- the GnomeVFS extension and libgnomeui icon integration, avoiding indirect
+  GConf dependencies.
+
+The existing profile preference, protocol-handler and mailcap/mime.types paths
+remain. GTK2 accessibility retains `GNOME_ACCESSIBILITY` activation. There is no
+new replacement for desktop application associations, wallpaper settings or
+system proxy discovery. Legacy service contracts retain their names and
+implementation when enabled; they are intentionally absent when disabled.
+
+`package-ci.py` scans disabled packages for implementation and loader signatures,
+including stale components/typelibs from earlier builds. `test-package.py` checks
+transitive ELF dependencies and runs `gconf-disabled.js`, which checks absent
+service contracts/typelibs and explicit protocol-handler preference fallback.
+Suite additionally opens its original Advanced preferences pane through
+`gconf-preferences.xul`, checking ordinary controls and the removed desktop UI.
+The ordinary package runner also covers application windows, font enumeration,
+Browser preferences, Suite lifecycle and Calendar views. Use the packaging and
+runtime commands below with a fresh native object directory for each profile:
+
+```sh
+python3 build/linux/package-ci.py loongarch64 suite "$zr_package_work" \
+  --toolkit gtk2 --objdir "$PWD/obj-zoolrunner-suite"
+sh build/linux/with-display.sh python3 build/linux/test-package.py \
+  loongarch64 suite "$zr_package_work" --toolkit gtk2 \
+  --objdir "$PWD/obj-zoolrunner-suite"
+```
+
+The work directory needs `logs`, `artifacts`, and a `source` symlink to the
+checkout, as in the build guide. Choose the matching app, toolkit and object
+directory for each run. A passing audit applies to the packaged code and its
+resolved dependencies; it does not validate legacy GNOME desktop behavior.
+
+### Native LoongArch validation, 2026-10-06–07
+
+Base revision `dbbbf0fd` plus this GConf build-policy change, on native AOSC OS
+LoongArch64 with GCC 15.3.0 and Linux 7.1.13. GConf 3.2.6 development files were
+installed on the host: disabled builds therefore exercise policy exclusion,
+not merely the absence of the dependency. Each application/backend started
+with a fresh object directory; Browser compilation was resumed when moving to
+parallel object-directory builds. Configuration steps remained sequential.
+
+| Application | Backend | Build | Package/GConf audit | Full runtime runner |
+| --- | --- | --- | --- | --- |
+| Suite | GTK2 | PASS | PASS | PASS |
+| Browser | GTK2 | PASS | PASS | PASS |
+| Calendar | GTK2 | PASS | PASS | PASS |
+| XULRunner | GTK2 | PASS | PASS | PASS |
+| Suite | Xlib | PASS | PASS | PASS |
+| Browser | Xlib | PASS | PASS | PASS |
+| Calendar | Xlib | PASS | PASS | PASS |
+| XULRunner | Xlib | PASS | PASS | PASS |
+
+Every package passed all 11,540 pinned ES5 cases and all 28,582 pinned ES2015
+modes, with zero failures, unsupported cases, crashes, timeouts or harness errors.
+The ES2015 runner also passed 139 focused fixtures and 86 native probes per
+package and verified the packaged engine identity; timezone was
+`America/Los_Angeles`. These are bounded corpus results, not an exhaustive proof
+of specification correctness. All packages passed font enumeration, application
+and window bootstrap checks; Suite lifecycle/ChatZilla and Calendar's four views
+passed on both backends. Relocated-package dependency checks found no GConf
+library dependencies on either backend.
+
+The initial Suite package audit found the remaining system-preference service
+lookup in `comm.jar`; the preference controls and lookup were then gated and the
+affected chrome/component rebuilt. The final package passed. Suite's new
+Advanced preferences probe passed six checks on both backends; GTK2 ran it as a
+separate relocated-package check after its runtime runner had already started.
+Browser preferences passed all 30 checks on both backends, preserving the
+reported legacy homepage/localized-string limitation. The GConf-free service
+and explicit protocol fallback probe passed nine checks in all eight packages.
+
+Additional checks passed: all 32 supplied Linux profiles select the disabled
+policy; legacy-enabled GTK2 and Xlib configure modes remain selectable;
+conflicting explicit GnomeVFS/libgnomeui requests are rejected; stale loader,
+typelib and compressed chrome references are rejected by the package audit.
+Enabled/disabled Suite preference preprocessing was checked separately.
+Legacy GNOME desktop runtime behavior and other architectures were not
+revalidated in this change. Use a fresh object directory when changing policy.
+
 # Linux builds
 
 The i686 and x86_64 bring-up uses **Oracle Linux 8** (`oraclelinux:8`) and
@@ -24,10 +118,10 @@ metadata from `/usr/lib/pkgconfig`.
 
 Both architectures have GTK2 and Xlib mozconfigs for Suite, Browser, Calendar and
 XULRunner. All four x86 Suite configurations pass the complete local workflow;
-the full sixteen-entry x86 application matrix remains unverified. Native
-LoongArch Suite passes both backends, and Browser, Calendar and XULRunner pass
-GTK2 package/runtime checks. Their remaining Xlib validation is in progress;
-see the Speedometer work notes.
+the full sixteen-entry x86 application matrix remains unverified. The current
+native LoongArch build/package/runtime coverage includes all eight application/backend pairs;
+see the [GConf-free matrix](#gconf-free-builds) above for its runtime scope.
+The remaining sections preserve earlier platform results.
 
 The native LoongArch GCC profiles also preserve `-flifetime-dse=1` and
 `-fno-strict-aliasing`. A GCC 15 Suite lifecycle run exposed an invalid frame
