@@ -2,6 +2,25 @@
 
 [Quick guide](README.md)
 
+## Property-query object keys (2026-10-06)
+
+Default ES5 `hasOwnProperty` and `propertyIsEnumerable` now convert object
+arguments to property keys before lookup. Previously they passed object IDs
+through the E4X-aware native `JS_ValueToId` API, so `{loaded:1}` incorrectly
+reported no own property for the key `['loaded']`. This blocked Ember Data's
+state traversal in Speedometer 1.0. The native API, XML helper and explicitly
+selected historical script editions keep their existing behavior.
+
+`own-query-keys.js` passes 32 checks in each of default ES5 and initialized
+ES2015 mode on macOS arm64 Suite, including conversion order, exceptions,
+callback mutation, collection, numeric keys and accessor queries.
+`TestOwnQueryKeys.c` verifies default, JavaScript 1.7 and ES2015 native/script
+boundaries (`OWN-QUERY-EMBEDDING editions=3 failures=0`). Build it with the
+same include/library arguments as `TestObjectEmbedding.c` below. Existing
+object-reflection, legacy-application, strict-parameter-history and
+TestObjectEmbedding checks also pass. Complete standards and browser results
+are recorded separately after their runs finish.
+
 This reference preserves the original instructions, implementation notes and
 validation reports. Read results in revision order: an older failure or pending
 check may have been resolved later, and a pass does not validate later changes.

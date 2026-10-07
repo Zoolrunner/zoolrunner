@@ -1858,9 +1858,29 @@ obj_unwatch(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval)
 
 /* Proposed ECMA 15.2.4.5. */
 static JSBool
+ObjectQueryKey(JSContext *cx, jsval *key)
+{
+    jsid id;
+
+    /* JS_ValueToId deliberately preserves E4X object ids for the classic
+     * JSAPI. Standard-script property queries need string/property-key
+     * conversion instead. Keep the converted key rooted in the call's argv
+     * through lookup/resolve callbacks, without changing the embedding API
+     * or explicitly selected legacy editions. */
+    if (JSVERSION_NUMBER(cx) != JSVERSION_DEFAULT && !JS_VERSION_IS_ES2015(cx))
+        return JS_TRUE;
+    if (!js_ValueToPropertyId(cx, *key, &id))
+        return JS_FALSE;
+    *key = ID_TO_VALUE(id);
+    return JS_TRUE;
+}
+
+static JSBool
 obj_hasOwnProperty(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
                    jsval *rval)
 {
+    if (!ObjectQueryKey(cx, &argv[0]))
+        return JS_FALSE;
     return js_HasOwnPropertyHelper(cx, obj, obj->map->ops->lookupProperty,
                                    argc, argv, rval);
 }
@@ -1993,7 +2013,7 @@ obj_propertyIsEnumerable(JSContext *cx, JSObject *obj, uintN argc, jsval *argv,
     JSProperty *prop;
     JSBool ok;
 
-    if (!JS_ValueToId(cx, argv[0], &id))
+    if (!ObjectQueryKey(cx, &argv[0]) || !JS_ValueToId(cx, argv[0], &id))
         return JS_FALSE;
 
     if (js_IsProxy(cx, obj)) {

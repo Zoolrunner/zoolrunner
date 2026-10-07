@@ -431,6 +431,8 @@ Native setter and descriptor changes must preserve modern assignment results
 without changing the native JSAPI's normalized output or explicit legacy
 behavior. Run `property-coercion.js` and `TestNativeSetterResult.c`, including
 collection and array-length callbacks that change descriptor attributes.
+Run `js/tests/es5/own-query-keys.js` and `TestOwnQueryKeys.c` for property-query
+conversion changes; preserve classic JSAPI object IDs and explicit legacy modes.
 Catch parameter defaults must run outside the catch body lexical environment;
 pattern bindings must retain their temporal dead zone. Run `catch-environments.js`,
 `string-codepoint-escapes.js`, `generator-let-newline.js` and
