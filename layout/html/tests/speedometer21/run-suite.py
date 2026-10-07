@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run content probes or unmodified Speedometer 2.1 with a private HOME/profile."""
+"""Run content probes or unmodified Speedometer with a private HOME/profile."""
 import argparse
 import json
 import os
@@ -18,6 +18,8 @@ def main():
                         help='Probe another URL in a new process using the same test profile')
     parser.add_argument('--mode', choices=['probe', 'benchmark'], default='benchmark')
     parser.add_argument('--benchmark-version', choices=['1.0', '2.1'], default='2.1')
+    parser.add_argument('--navigator-window', action='store_true',
+                        help='Load the benchmark/probe in unchanged Suite Navigator chrome')
     parser.add_argument('--content-edition', choices=['es5', 'es2015'])
     parser.add_argument('--debug-errors', default='', help='Diagnostic throw-stack filename filter')
     parser.add_argument('--timeout', type=int, default=1800)
@@ -71,6 +73,7 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                 'zoolrunner.speedometer.url': args.url,
                 'zoolrunner.speedometer.mode': args.mode,
                 'zoolrunner.speedometer.version': args.benchmark_version,
+                'zoolrunner.speedometer.navigatorWindow': args.navigator_window,
                 'zoolrunner.speedometer.debugErrors': args.debug_errors,
                 'zoolrunner.speedometer.timeout': args.timeout,
             }
@@ -110,7 +113,8 @@ print('PROFILE='+JSON.stringify({original:old,path:p.QueryInterface(Components.i
                            if line.startswith('SPEEDOMETER-RESULT ')]
                 report = {'pass': False, 'exit': exit_code, 'runtime': str(runtime),
                           'url': url, 'mode': args.mode,
-                          'contentEdition': args.content_edition}
+                          'contentEdition': args.content_edition,
+                          'navigatorWindow': args.navigator_window}
                 if args.mode == 'benchmark':
                     report['benchmarkVersion'] = args.benchmark_version
                 if len(markers) == 1:

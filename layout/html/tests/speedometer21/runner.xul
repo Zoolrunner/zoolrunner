@@ -8,6 +8,8 @@ var C = Components.classes, I = Components.interfaces;
 var prefs = C['@mozilla.org/preferences-service;1'].getService(I.nsIPrefBranch);
 var done = false, started = false, deadline, browser, mode, lastStep = -1;
 var benchmarkVersion = '2.1';
+var navigatorWindow = null;
+var navigatorLoaded = false;
 var consoleService = C['@mozilla.org/consoleservice;1'].getService(I.nsIConsoleService);
 // dump() converts to UTF-8 and cannot preserve lone UTF-16 surrogates.
 function safeText(value) {
@@ -54,9 +56,37 @@ function run() {
   try { benchmarkVersion = prefs.getCharPref('zoolrunner.speedometer.version'); }
   catch (ignored) {}
   deadline = Date.now() + prefs.getIntPref('zoolrunner.speedometer.timeout') * 1000;
+  var useNavigator = false;
+  try { useNavigator = prefs.getBoolPref('zoolrunner.speedometer.navigatorWindow'); }
+  catch (ignored) {}
+  if (useNavigator) {
+    navigatorWindow = window.openDialog('chrome://navigator/content/navigator.xul',
+      '_blank', 'chrome,all,dialog=no', 'about:blank');
+    navigatorWindow.addEventListener('load', function loaded(e) {
+      if (e.target !== navigatorWindow.document) return;
+      navigatorWindow.removeEventListener('load', loaded, false);
+      navigatorLoaded = true;
+    }, false);
+    setTimeout(waitForNavigator, 100);
+    return;
+  }
   browser = document.getElementById('content');
   browser.setAttribute('src', prefs.getCharPref('zoolrunner.speedometer.url'));
   setTimeout(poll, 100);
+}
+function waitForNavigator() {
+  if (Date.now() > deadline) { finish(false, 'Navigator startup timeout'); return; }
+  if (!navigatorLoaded) { setTimeout(waitForNavigator, 100); return; }
+  try {
+    var tabs = navigatorWindow.getBrowser();
+    if (tabs && tabs.selectedBrowser && tabs.selectedBrowser.contentWindow) {
+      browser = tabs.selectedBrowser;
+      browser.loadURI(prefs.getCharPref('zoolrunner.speedometer.url'));
+      setTimeout(poll, 100);
+      return;
+    }
+  } catch (ignored) {}
+  setTimeout(waitForNavigator, 100);
 }
 // Installed in the content realm. Observe DOM state after each measured step;
 // keep the workload code and its timing interval unchanged.

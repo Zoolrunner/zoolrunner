@@ -50,6 +50,10 @@ selection after removing the disposable test profile. A 1.0 result is separate
 from the existing 2.1 gate; selecting a version does not alter the benchmark's
 workloads or iteration count.
 
+Add `--navigator-window` to exercise unchanged Suite Navigator chrome and its
+event listeners around the benchmark or content probe. The default uses the
+minimal embedded-browser window.
+
 ## Run a focused content probe
 
 ```sh
