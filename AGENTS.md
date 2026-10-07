@@ -506,13 +506,15 @@ native embedding class conversion hooks remain usable.
 Keep explicit legacy language versions and historical XUL/component script
 loading behavior usable while implementing the modern language semantics.
 The initial ES2015 boundary uses `JSVERSION_ECMA_2015` (2015), selected by
-`xpcshell -v 2015` or a script MIME `version=2015`. Keep default HTML semantics,
+`xpcshell -v 2015` or a script MIME `version=2015`. Keep application HTML defaults,
 unversioned XUL's JS 1.7 selection and existing JSAPI version values stable.
-The opt-in `javascript.options.content.es2015` preference selects modern
+The `javascript.options.content.es2015` preference selects modern
 non-privileged HTML scripts and initializes their realm built-ins in ES2015.
-Keep its ordinary-profile default false, honor explicit MIME editions and
-preserve privileged globals. The Speedometer Suite runner enables this
-preference in its disposable profile; validate `content-edition.html` as well
+Browser and Suite default it to true through their application preferences;
+keep the platform default false for Calendar and XULRunner. Honor explicit
+MIME editions, preserve privileged globals and respect user overrides.
+The Speedometer runner selects the edition in its disposable profile;
+validate `content-edition.html` as well
 as the existing mixed-edition fixture when changing this boundary.
 Exercise `js/tests/es6/editions.js`, `TestEditionEmbedding.c` and the mixed-edition
 window fixture when changing the boundary. Preserve saved editions through

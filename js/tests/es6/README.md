@@ -44,10 +44,11 @@ Use `xpcshell -E` to initialize modern built-ins and `-v 2015` for modern script
 Native embeddings select ES2015 before `JS_InitStandardClasses`. Changing a
 script's edition alone does not replace its global's built-ins.
 
-Historical application defaults remain intact. The opt-in preference
-`javascript.options.content.es2015` enables modern non-privileged HTML content;
-it defaults to false in ordinary profiles. The Speedometer runner enables it
-in a disposable profile. Classic XUL/component loaders are unchanged. Native
+`javascript.options.content.es2015` enables modern non-privileged HTML content.
+It defaults to true in Browser and Suite, and remains false in Calendar and
+XULRunner. Existing explicit user values take precedence over these defaults.
+The Speedometer runner selects the edition in its disposable profile.
+Classic XUL/component loaders and explicit script editions are unchanged. Native
 module APIs do not imply an HTML module-script loader or ordinary module XDR.
 
 ## Results and remaining work

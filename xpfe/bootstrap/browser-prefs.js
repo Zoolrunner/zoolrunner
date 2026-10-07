@@ -189,6 +189,8 @@ pref("browser.search.defaultenginename", "chrome://communicator-region/locale/re
 pref("browser.backspace_action", 0);
 
 pref("javascript.options.showInConsole",    true);
+// Modern HTML content; privileged chrome and explicit script editions are unchanged.
+pref("javascript.options.content.es2015",    true);
 
 pref("offline.startup_state",            0);
 pref("offline.send.unsent_messages",            0);

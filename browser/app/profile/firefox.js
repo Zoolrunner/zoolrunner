@@ -290,6 +290,8 @@ pref("browser.bookmarks.sort.resource", "rdf:http://home.netscape.com/NC-rdf#Nam
 // Scripts & Windows prefs
 pref("dom.disable_open_during_load",              true);
 pref("javascript.options.showInConsole",          false);
+// Modern HTML content; privileged chrome and explicit script editions are unchanged.
+pref("javascript.options.content.es2015",          true);
 // Make the status bar reliably present and unaffected by pages
 pref("dom.disable_window_open_feature.status",    true);
 // This is the pref to control the location bar, change this to true to 

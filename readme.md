@@ -14,6 +14,11 @@ Suite are included in the source tree and maintained as usable applications,
 as well as tests of the platform. You can use ZoolRunner as a browser or Suite,
 or use its runtime to build and run standalone applications.
 
+Browser and Suite enable ES2015 JavaScript for ordinary HTML content by default.
+Calendar and XULRunner retain their existing default. The
+`javascript.options.content.es2015` preference can override this per profile;
+privileged XUL/chrome scripts and explicitly selected script editions are unchanged.
+
 ## Platforms
 
 ZoolRunner targets:
